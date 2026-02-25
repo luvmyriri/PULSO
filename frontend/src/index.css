@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+/* Enforce manual dark mode toggling alongside system preferring */
+@variant dark (&:is(.dark *));
+
+@theme {
+  --color-primary-light: #fdba74;
+  --color-primary: #f97316;
+  --color-primary-dark: #ea580c;
+
+  --color-dark-light: #1e293b;
+  --color-dark: #0f172a;
+
+  --color-light-offset: #f8fafc;
+  --color-light: #ffffff;
+
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Oswald', sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: white;
+    color: var(--color-dark);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-primary);
+    color: white;
+  }
+}
+
+@layer utilities {
+  .glass-nav {
+    background-color: color-mix(in srgb, white 90%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-light-offset);
+  }
+
+  .dark .glass-nav {
+    background-color: color-mix(in srgb, var(--color-dark) 85%, transparent);
+    border-bottom: 1px solid var(--color-dark-light);
+  }
+
+  .glass-card {
+    background-color: color-mix(in srgb, white 90%, transparent);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--color-light-offset);
+    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark .glass-card {
+    background-color: color-mix(in srgb, var(--color-dark-light) 60%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-dark-light) 80%, white);
+  }
+
+  .glass-card:hover {
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    transform: translateY(-0.25rem);
+  }
+
+  .text-gradient {
+    background-clip: text;
+    color: transparent;
+    background-image: linear-gradient(to right, var(--color-primary), var(--color-primary-light));
+  }
+}

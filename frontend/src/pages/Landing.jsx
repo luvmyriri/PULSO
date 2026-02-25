@@ -1,0 +1,530 @@
+import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { motion } from 'framer-motion';
+import {
+    MapPinned, Activity, BrainCircuit, ArrowRight, ActivitySquare,
+    Menu, X, Trash2, Route as RouteIcon, Zap, Shield, BarChart3,
+    Users, CheckCircle2, Sun, Moon, Monitor
+} from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+import Hero3D from '../Hero3D';
+import '../index.css';
+
+// SVG Logo Component for Professional Look (Rebuilt from User Concept)
+export const PulsoLogo = ({ className = "w-9 h-9 shrink-0" }) => (
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={`transform hover:scale-105 transition-transform drop-shadow-md shrink-0 ${className}`}>
+        <defs>
+            <linearGradient id="pulsoGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#f97316" />
+                <stop offset="1" stopColor="#ea580c" />
+            </linearGradient>
+            <linearGradient id="pinGrad" x1="50" y1="15" x2="50" y2="59" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#ffffff" />
+                <stop offset="1" stopColor="#f8fafc" />
+            </linearGradient>
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.2" />
+            </filter>
+        </defs>
+
+        {/* Main Background Circle */}
+        <circle cx="50" cy="50" r="48" fill="url(#pulsoGrad)" />
+
+        {/* Buildings (Bottom Left) */}
+        <path d="M 16 85 L 16 55 L 28 55 L 28 85 Z" fill="#ffffff" />
+        <rect x="19" y="60" width="3" height="4" rx="1" fill="#ea580c" />
+        <rect x="24" y="60" width="3" height="4" rx="1" fill="#ea580c" />
+        <rect x="19" y="68" width="3" height="4" rx="1" fill="#ea580c" />
+        <rect x="24" y="68" width="3" height="4" rx="1" fill="#ea580c" />
+        <rect x="19" y="76" width="3" height="4" rx="1" fill="#ea580c" />
+        <rect x="24" y="76" width="3" height="4" rx="1" fill="#ea580c" />
+
+        <path d="M 29 85 L 29 42 L 43 42 L 43 85 Z" fill="#ffffff" />
+        <rect x="32" y="48" width="4" height="4" rx="1" fill="#ea580c" />
+        <rect x="38" y="48" width="4" height="4" rx="1" fill="#ea580c" />
+        <rect x="32" y="58" width="4" height="4" rx="1" fill="#ea580c" />
+        <rect x="38" y="58" width="4" height="4" rx="1" fill="#ea580c" />
+        <rect x="32" y="68" width="4" height="4" rx="1" fill="#ea580c" />
+        <rect x="38" y="68" width="4" height="4" rx="1" fill="#ea580c" />
+        <rect x="32" y="78" width="4" height="4" rx="1" fill="#ea580c" />
+        <rect x="38" y="78" width="4" height="4" rx="1" fill="#ea580c" />
+
+        {/* Network / Connections (Right Side) */}
+        <path d="M 52 75 A 32 32 0 0 0 82 45" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="52" cy="75" r="2.5" fill="#ffffff" />
+        <circle cx="82" cy="45" r="2.5" fill="#ffffff" />
+
+        <path d="M 64 68 A 20 20 0 0 0 78 54" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="64" cy="68" r="2.5" fill="#ffffff" />
+        <circle cx="78" cy="54" r="2.5" fill="#ffffff" />
+
+        {/* Gear Segment */}
+        <path d="M 68 28 A 20 20 0 0 1 85 43 M 72 23 L 75 19 M 82 27 L 86 24 M 88 35 L 94 35" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Map Pin (Top Center) */}
+        <path d="M 50 12 C 40 12 32 20 32 30 C 32 44 50 62 50 62 C 50 62 68 44 68 30 C 68 20 60 12 50 12 Z M 50 38 C 45.58 38 42 34.42 42 30 C 42 25.58 45.58 22 50 22 C 54.42 22 58 25.58 58 30 C 58 34.42 54.42 38 50 38 Z" fill="url(#pinGrad)" filter="url(#shadow)" />
+
+        {/* Heartbeat Line (Slicing Across) */}
+        <polyline points="8 50, 20 50, 28 35, 42 65, 50 48, 55 52, 65 50, 92 50" fill="none" stroke="#ffffff" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" filter="url(#shadow)" />
+        <circle cx="8" cy="50" r="3" fill="#ffffff" />
+        <circle cx="92" cy="50" r="3" fill="#ffffff" />
+    </svg>
+);
+
+function Landing() {
+    const { t } = useTranslation();
+    const [scrolled, setScrolled] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    useEffect(() => {
+        const handleScroll = () => setScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Animation variants
+    const fadeUp = {
+        hidden: { opacity: 0, y: 30 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
+    };
+
+    const staggerContainer = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: { staggerChildren: 0.2 }
+        }
+    };
+
+    const { theme, changeTheme } = useTheme();
+
+    return (
+        <div className="min-h-screen flex flex-col font-sans bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative transition-colors duration-500">
+
+            {/* Absolute Fullscreen 3D Map Background */}
+            <div className={`absolute top-0 left-0 w-full h-screen z-0 overflow-hidden transition-colors duration-1000 ${theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'bg-[radial-gradient(circle_at_50%_10%,_#1e293b_0%,_#0f172a_100%)]' : 'bg-[radial-gradient(circle_at_50%_10%,_#fff_0%,_#f1f5f9_100%)]'}`}>
+                <Hero3D />
+                {/* Gradient fade at the bottom to blend into the features section smoothly */}
+                <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white dark:from-slate-950 to-transparent pointer-events-none transition-colors duration-500"></div>
+            </div>
+
+            {/* Navbar Fixed */}
+            <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? 'glass-nav py-3' : 'bg-transparent py-6'}`}>
+                <div className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
+                    <div className="flex items-center gap-3 text-orange-500 font-extrabold text-2xl tracking-tight">
+                        <PulsoLogo />
+                        <span>PULSO</span>
+                    </div>
+                    <ul className="hidden md:flex gap-8 items-center text-sm font-medium text-slate-600 dark:text-slate-300">
+                        <li><a href="#home" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.home')}</a></li>
+                        <li><a href="#features" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.platform')}</a></li>
+                        <li><a href="#solutions" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.solutions')}</a></li>
+                        <li><a href="#about" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.about')}</a></li>
+                    </ul>
+
+                    <div className="hidden md:flex gap-4 items-center">
+                        {/* Theme Switcher Toggle */}
+                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
+                            <button onClick={() => changeTheme('light')} className={`p-1.5 rounded-md transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Sun size={14} /></button>
+                            <button onClick={() => changeTheme('system')} className={`p-1.5 rounded-md transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Monitor size={14} /></button>
+                            <button onClick={() => changeTheme('dark')} className={`p-1.5 rounded-md transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Moon size={14} /></button>
+                        </div>
+
+                        <a href="/login" className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
+                            {t('landing.nav.login')} <ArrowRight size={16} />
+                        </a>
+                    </div>
+
+                    {/* Mobile Menu Toggle */}
+                    <button className="md:hidden text-orange-500 p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                        {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                    </button>
+                </div>
+
+                {/* Mobile Navigation Dropdown */}
+                {mobileMenuOpen && (
+                    <div className="absolute top-full left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 shadow-2xl py-6 px-6 flex flex-col gap-4 md:hidden transition-colors">
+                        <a href="#home" className="text-slate-800 dark:text-slate-200 font-bold py-2 border-b border-slate-200 dark:border-slate-700" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.home')}</a>
+                        <a href="#features" className="text-slate-800 dark:text-slate-200 font-bold py-2 border-b border-slate-200 dark:border-slate-700" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.platform')}</a>
+                        <a href="#solutions" className="text-slate-800 dark:text-slate-200 font-bold py-2 border-b border-slate-200 dark:border-slate-700" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.solutions')}</a>
+                        <a href="#about" className="text-slate-800 dark:text-slate-200 font-bold py-2 mb-4" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.about')}</a>
+
+                        {/* Mobile Theme Switcher Toggle */}
+                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 mb-2">
+                            <button onClick={() => { changeTheme('light'); setMobileMenuOpen(false); }} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Sun size={18} /></button>
+                            <button onClick={() => { changeTheme('system'); setMobileMenuOpen(false); }} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Monitor size={18} /></button>
+                            <button onClick={() => { changeTheme('dark'); setMobileMenuOpen(false); }} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Moon size={18} /></button>
+                        </div>
+
+                        <a href="/login" className="w-full justify-center flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white px-5 py-3 rounded-lg font-bold text-base transition-all shadow-md">
+                            {t('landing.nav.login')} <ArrowRight size={18} />
+                        </a>
+                    </div>
+                )}
+            </nav>
+
+            {/* Hero Interactivity (now transparent overlay on top of full 3D Map) */}
+            <section id="home" className="relative z-10 min-h-screen flex items-center pt-24 pb-20">
+                <div className="max-w-7xl mx-auto px-6 lg:px-8 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 mt-12">
+
+                    {/* Left: Copy & Actions */}
+                    <motion.div
+                        className="max-w-xl bg-white/40 dark:bg-slate-900/40 p-8 rounded-3xl backdrop-blur-md border border-white/50 dark:border-slate-700/50 shadow-2xl transition-colors duration-500"
+                        initial="hidden"
+                        animate="visible"
+                        variants={staggerContainer}
+                    >
+                        <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide mb-6 border border-orange-200 dark:border-orange-500/30">
+                            <ActivitySquare size={14} />
+                            <span>{t('landing.hero.status')}</span>
+                        </motion.div>
+
+                        <motion.h1 variants={fadeUp} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl leading-[1.1] tracking-tight mb-6 text-slate-900 dark:text-white">
+                            {t('landing.hero.title1')}<br /><span className="text-gradient">{t('landing.hero.title2')}</span>
+                        </motion.h1>
+
+                        <motion.p variants={fadeUp} className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed font-medium">
+                            {t('landing.hero.subtitle')}
+                        </motion.p>
+
+                        <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
+                            <a href="/register" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-2">
+                                {t('landing.hero.register')}
+                            </a>
+                            <button className="bg-white/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 px-6 py-3 rounded-lg font-semibold transition-all">
+                                {t('landing.hero.docs')}
+                            </button>
+                        </motion.div>
+                    </motion.div>
+
+                    {/* Right side is intentionally empty to let the 3D Map background shine through */}
+                    <div className="hidden lg:block"></div>
+                </div>
+            </section>
+
+            {/* Features Grid */}
+            <section id="features" className="relative z-10 py-24 bg-white dark:bg-slate-950 transition-colors">
+                <div className="max-w-7xl mx-auto px-6 lg:px-8">
+                    <motion.div
+                        className="text-center max-w-3xl mx-auto mb-16"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-100px" }}
+                        variants={fadeUp}
+                    >
+                        <h2 className="font-display font-bold text-3xl md:text-4xl tracking-tight mb-4 text-slate-900 dark:text-white">{t('landing.features.title')}</h2>
+                        <p className="text-lg text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
+                            {t('landing.features.subtitle')}
+                        </p>
+                    </motion.div>
+
+                    <motion.div
+                        className="grid grid-cols-1 md:grid-cols-3 gap-8"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-50px" }}
+                        variants={staggerContainer}
+                    >
+                        {/* Feature 1 */}
+                        <motion.div variants={fadeUp} className="glass-card p-8 rounded-2xl">
+                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-6">
+                                <MapPinned size={28} />
+                            </div>
+                            <h3 className="font-display font-bold text-xl mb-3 text-slate-800 dark:text-slate-100 uppercase tracking-wide">{t('landing.features.f1_title')}</h3>
+                            <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm">
+                                {t('landing.features.f1_desc')}
+                            </p>
+                        </motion.div>
+
+                        {/* Feature 2 */}
+                        <motion.div variants={fadeUp} className="glass-card p-8 rounded-2xl">
+                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-6">
+                                <Activity size={28} />
+                            </div>
+                            <h3 className="font-display font-bold text-xl mb-3 text-slate-800 dark:text-slate-100 uppercase tracking-wide">{t('landing.features.f2_title')}</h3>
+                            <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm">
+                                {t('landing.features.f2_desc')}
+                            </p>
+                        </motion.div>
+
+                        {/* Feature 3 */}
+                        <motion.div variants={fadeUp} className="glass-card p-8 rounded-2xl">
+                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-6">
+                                <BrainCircuit size={28} />
+                            </div>
+                            <h3 className="font-display font-bold text-xl mb-3 text-slate-800 dark:text-slate-100 uppercase tracking-wide">{t('landing.features.f3_title')}</h3>
+                            <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm">
+                                {t('landing.features.f3_desc')}
+                            </p>
+                        </motion.div>
+                    </motion.div>
+                </div>
+            </section>
+
+            {/* Solutions Section */}
+            <section id="solutions" className="relative z-10 py-24 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 transition-colors">
+                <div className="absolute top-0 w-full h-px bg-gradient-to-r from-transparent via-orange-300 dark:via-orange-500/50 to-transparent opacity-50"></div>
+
+                <div className="max-w-7xl mx-auto px-6 lg:px-8">
+                    <motion.div
+                        className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6"
+                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
+                    >
+                        <div className="max-w-2xl">
+                            <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-400 font-bold text-sm tracking-widest uppercase mb-3">
+                                <Shield size={16} /> {t('landing.solutions.badge')}
+                            </div>
+                            <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-tight">
+                                {t('landing.solutions.title')}
+                            </h2>
+                        </div>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium max-w-sm">
+                            {t('landing.solutions.subtitle')}
+                        </p>
+                    </motion.div>
+
+                    <motion.div
+                        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
+                    >
+                        {/* Solution 1 */}
+                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-500/50">
+                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/20">
+                                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center mb-6 shadow-sm">
+                                    <Trash2 size={24} />
+                                </div>
+                                <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t('landing.solutions.s1_title')}</h3>
+                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
+                                    {t('landing.solutions.s1_desc')}
+                                </p>
+                                <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> {t('landing.solutions.s1_l1')}</li>
+                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> {t('landing.solutions.s1_l2')}</li>
+                                </ul>
+                            </div>
+                        </motion.div>
+
+                        {/* Solution 2 */}
+                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-orange-200 dark:hover:border-orange-500/50">
+                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors group-hover:bg-orange-50/50 dark:group-hover:bg-orange-900/20">
+                                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center mb-6 shadow-sm">
+                                    <RouteIcon size={24} />
+                                </div>
+                                <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t('landing.solutions.s2_title')}</h3>
+                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
+                                    {t('landing.solutions.s2_desc')}
+                                </p>
+                                <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-orange-500" /> {t('landing.solutions.s2_l1')}</li>
+                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-orange-500" /> {t('landing.solutions.s2_l2')}</li>
+                                </ul>
+                            </div>
+                        </motion.div>
+
+                        {/* Solution 3 */}
+                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-yellow-200 dark:hover:border-yellow-500/50">
+                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors group-hover:bg-yellow-50/50 dark:group-hover:bg-yellow-900/20">
+                                <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-xl flex items-center justify-center mb-6 shadow-sm">
+                                    <Zap size={24} />
+                                </div>
+                                <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t('landing.solutions.s3_title')}</h3>
+                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
+                                    {t('landing.solutions.s3_desc')}
+                                </p>
+                                <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-yellow-600" /> {t('landing.solutions.s3_l1')}</li>
+                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-yellow-600" /> {t('landing.solutions.s3_l2')}</li>
+                                </ul>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                </div>
+            </section>
+
+            {/* About LGU Section */}
+            <section id="about" className="relative z-10 py-32 bg-white dark:bg-slate-950 overflow-hidden transition-colors">
+                <div className="absolute top-1/2 left-0 w-[800px] h-[800px] bg-orange-50 dark:bg-orange-500/5 rounded-full blur-[120px] -translate-y-1/2 -translate-x-1/2 opacity-50 pointer-events-none"></div>
+
+                <div className="max-w-7xl mx-auto px-6 lg:px-8 relative grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+
+                    {/* Left: Content */}
+                    <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}>
+                        <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-400 font-bold text-sm tracking-widest uppercase mb-4">
+                            <Users size={16} /> {t('landing.about.badge')}
+                        </div>
+                        <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-[1.15] mb-6">
+                            {t('landing.about.title')}
+                        </h2>
+                        <div className="space-y-6 text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
+                            <p dangerouslySetInnerHTML={{ __html: t('landing.about.p1').replace('<1>', '<strong>').replace('</1>', '</strong>') }} />
+                            <p>
+                                {t('landing.about.p2')}
+                            </p>
+                        </div>
+
+                        <div className="mt-10 pt-10 border-t border-slate-200 dark:border-slate-800 flex items-center gap-8">
+                            <div className="flex flex-col">
+                                <span className="text-4xl font-display font-bold text-slate-900 dark:text-white">{t('landing.about.stat1_val')}</span>
+                                <span className="text-sm font-bold text-orange-500 uppercase tracking-widest mt-1">{t('landing.about.stat1_lbl')}</span>
+                            </div>
+                            <div className="w-px h-12 bg-slate-200 dark:bg-slate-800"></div>
+                            <div className="flex flex-col">
+                                <span className="text-4xl font-display font-bold text-slate-900 dark:text-white">{t('landing.about.stat2_val')}</span>
+                                <span className="text-sm font-bold text-orange-500 uppercase tracking-widest mt-1">{t('landing.about.stat2_lbl')}</span>
+                            </div>
+                            <div className="w-px h-12 bg-slate-200 dark:bg-slate-800"></div>
+                            <div className="flex flex-col">
+                                <span className="text-4xl font-display font-bold text-slate-900 dark:text-white">{t('landing.about.stat3_val')}</span>
+                                <span className="text-sm font-bold text-orange-500 uppercase tracking-widest mt-1">{t('landing.about.stat3_lbl')}</span>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    {/* Right: Graphic / Stats Box */}
+                    <motion.div
+                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
+                        className="relative"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-tr from-orange-200 to-orange-50 dark:from-orange-500/20 dark:to-orange-500/5 rounded-3xl transform rotate-3 scale-105 opacity-50"></div>
+                        <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-3xl p-10 overflow-hidden transition-colors">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-100 dark:bg-orange-500/20 rounded-bl-[100px] -mr-8 -mt-8 flex items-end pb-6 pl-6">
+                                <BarChart3 size={32} className="text-orange-500 dark:text-orange-400" />
+                            </div>
+
+                            <h3 className="font-display font-bold text-2xl text-slate-900 dark:text-white mb-2">{t('landing.about.analytics')}</h3>
+                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8">{t('landing.about.analytics_desc')}</p>
+
+                            <div className="space-y-6">
+                                <div>
+                                    <div className="flex justify-between text-sm font-bold mb-2">
+                                        <span className="text-slate-700 dark:text-slate-300">{t('landing.about.metric1')}</span>
+                                        <span className="text-orange-600 dark:text-orange-400">87%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                                        <div className="bg-orange-500 h-full rounded-full w-[87%] relative overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-full h-full bg-white/20 -skew-x-12 translate-x-[-100%] animate-[shimmer_2s_infinite]"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between text-sm font-bold mb-2">
+                                        <span className="text-slate-700 dark:text-slate-300">{t('landing.about.metric2')}</span>
+                                        <span className="text-slate-900 dark:text-white">92%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                                        <div className="bg-slate-800 dark:bg-slate-400 h-full rounded-full w-[92%]"></div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between text-sm font-bold mb-2">
+                                        <span className="text-slate-700 dark:text-slate-300">{t('landing.about.metric3')}</span>
+                                        <span className="text-slate-900 dark:text-white">64%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                                        <div className="bg-slate-300 dark:bg-slate-600 h-full rounded-full w-[64%]"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button className="w-full mt-10 border-2 border-slate-200 dark:border-slate-700 hover:border-orange-500 dark:hover:border-orange-500 text-slate-700 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 font-bold p-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+                                {t('landing.about.portal_btn')} <ArrowRight size={16} />
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            </section>
+
+            {/* Comprehensive Professional Footer */}
+            <footer className="relative z-10 bg-slate-900 border-t border-slate-800 pt-24 pb-12 text-slate-300">
+                <div className="max-w-7xl mx-auto px-6 lg:px-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
+
+                        {/* Brand Column */}
+                        <div className="flex flex-col gap-6">
+                            <div className="flex items-center gap-3 text-orange-500 font-extrabold text-2xl tracking-tight">
+                                <PulsoLogo />
+                                <span className="text-white">PULSO</span>
+                            </div>
+                            <p className="text-slate-400 text-sm leading-relaxed pr-4">
+                                {t('landing.footer.desc')}
+                            </p>
+                            <div className="flex items-center gap-4 mt-2">
+                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors cursor-pointer text-slate-400">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
+                                </div>
+                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors cursor-pointer text-slate-400">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" /></svg>
+                                </div>
+                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors cursor-pointer text-slate-400">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Quick Links */}
+                        <div>
+                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.portals')}</h4>
+                            <ul className="flex flex-col gap-3 font-medium text-sm">
+                                <li><a href="/login" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> {t('landing.footer.p_resident')}</a></li>
+                                <li><a href="#" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> {t('landing.footer.p_engineering')}</a></li>
+                                <li><a href="#" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> {t('landing.footer.p_admin')}</a></li>
+                                <li><a href="#" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> {t('landing.footer.p_api')}</a></li>
+                            </ul>
+                        </div>
+
+                        {/* Platform Features */}
+                        <div>
+                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.platform')}</h4>
+                            <ul className="flex flex-col gap-3 font-medium text-sm">
+                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ActivitySquare size={14} className="text-slate-500" /> {t('landing.features.f1_title')}</a></li>
+                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><Activity size={14} className="text-slate-500" /> {t('landing.features.f2_title')}</a></li>
+                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><BrainCircuit size={14} className="text-slate-500" /> {t('landing.features.f3_title')}</a></li>
+                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><MapPinned size={14} className="text-slate-500" /> Caloocan North Grid</a></li>
+                            </ul>
+                        </div>
+
+                        {/* Contact Info */}
+                        <div>
+                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.contact')}</h4>
+                            <ul className="flex flex-col gap-4 text-sm">
+                                <li className="flex items-start gap-3">
+                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0"><MapPinned size={16} /></div>
+                                    <span className="text-slate-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('landing.footer.address') }} />
+                                </li>
+                                <li className="flex items-center gap-3">
+                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+                                    </div>
+                                    <span className="text-slate-400">(02) 8-288-8888</span>
+                                </li>
+                                <li className="flex items-center gap-3">
+                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
+                                    </div>
+                                    <span className="text-slate-400">engineering@caloocancity.gov.ph</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* Footer Bottom Sheet */}
+                    <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="text-slate-500 text-sm font-medium">
+                            &copy; {new Date().getFullYear()} {t('landing.footer.copyright')}
+                        </div>
+                        <div className="flex gap-6 text-sm font-medium text-slate-500">
+                            <a href="#" className="hover:text-orange-400 transition-colors">{t('landing.footer.privacy')}</a>
+                            <a href="#" className="hover:text-orange-400 transition-colors">{t('landing.footer.terms')}</a>
+                            <a href="#" className="hover:text-orange-400 transition-colors">{t('landing.footer.cookie')}</a>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+
+        </div>
+    );
+}
+
+export default Landing;
