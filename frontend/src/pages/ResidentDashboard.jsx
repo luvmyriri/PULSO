@@ -17,6 +17,7 @@ export default function ResidentDashboard() {
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [reports, setReports] = useState([]);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isSidebarShrunk, setIsSidebarShrunk] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
 
     // Form State for Quick Report
@@ -532,32 +533,56 @@ export default function ResidentDashboard() {
     );
 
     const SidebarContent = () => (
-        <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 w-64 lg:w-72 shadow-xl shadow-slate-200/20 dark:shadow-none transition-colors">
-            <a href="/dashboard" className="p-6 flex items-center gap-2 sm:gap-3 shrink-0 group hover:opacity-90 transition-opacity">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 min-w-[32px] min-h-[32px] sm:min-w-[40px] sm:min-h-[40px] shrink-0 flex items-center justify-center">
-                    <PulsoLogo className="w-full h-full shrink-0 group-hover:scale-110 transition-transform" />
-                </div>
-                <span className="font-extrabold text-xl sm:text-2xl tracking-tight text-orange-500 shrink-0">PULSO</span>
-            </a>
-            <div className="px-6 mb-8">
+        <div className={`flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none transition-all duration-300 ${isSidebarShrunk ? 'w-20' : 'w-64 lg:w-72'}`}>
+            <div className={`flex items-center justify-between p-6 ${isSidebarShrunk ? 'px-4' : 'px-6'}`}>
+                <a href="/dashboard" className={`flex items-center gap-2 sm:gap-3 shrink-0 group hover:opacity-90 transition-opacity ${isSidebarShrunk ? 'hidden' : 'flex'}`}>
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 min-w-[32px] min-h-[32px] sm:min-w-[40px] sm:min-h-[40px] shrink-0 flex items-center justify-center">
+                        <PulsoLogo className="w-full h-full shrink-0 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <span className="font-extrabold text-xl sm:text-2xl tracking-tight text-orange-500 shrink-0">PULSO</span>
+                </a>
+                <button
+                    onClick={() => setIsSidebarShrunk(!isSidebarShrunk)}
+                    className="p-2 text-slate-500 hover:text-orange-500 transition-colors bg-slate-100 dark:bg-slate-800 rounded-lg focus:outline-none shrink-0 ml-auto hidden lg:block"
+                >
+                    <Menu size={20} />
+                </button>
+            </div>
+
+            <div className={`px-6 mb-8 text-center ${isSidebarShrunk ? 'hidden' : 'block'} shrink-0`}>
                 <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold text-slate-500 dark:text-slate-400 tracking-widest uppercase">{t('dashboard.sidebar.portal')}</span>
             </div>
 
-            <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
+            <nav className={`flex-1 px-4 space-y-2 overflow-x-hidden ${isSidebarShrunk ? 'overflow-y-hidden' : 'overflow-y-auto'}`} style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <style>{`
+                    nav::-webkit-scrollbar {
+                        display: none;
+                    }
+                `}</style>
                 {navItems.map(item => (
                     <button
                         key={item.id}
                         onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
-                        className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-semibold transition-all ${activeTab === item.id
+                        className={`w-full flex items-center px-4 py-3.5 rounded-xl font-semibold transition-all group/navitem ${isSidebarShrunk ? 'justify-center relative' : 'justify-between'} ${activeTab === item.id
                             ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-500 shadow-sm shadow-orange-500/10'
-                            : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none'
+                            : 'text-slate-500 hover:text-orange-500 dark:text-slate-400 hover:bg-orange-50 dark:hover:bg-orange-500/10 focus:outline-none'
                             }`}
                     >
-                        <div className="flex items-center gap-3">
-                            {item.icon}
-                            <span>{item.label}</span>
+                        <div className={`flex items-center ${isSidebarShrunk ? 'justify-center' : 'gap-3'}`}>
+                            {React.cloneElement(item.icon, {
+                                className: activeTab === item.id ? 'text-orange-500' : 'text-slate-500 group-hover/navitem:text-orange-500 transition-colors'
+                            })}
+                            {!isSidebarShrunk && <span className="transition-colors">{item.label}</span>}
                         </div>
-                        {item.badge && (
+
+                        {/* Tooltip for Shrunk State */}
+                        {isSidebarShrunk && (
+                            <div className="absolute left-14 opacity-0 group-hover/navitem:opacity-100 pointer-events-none transition-opacity bg-slate-800 text-white text-xs font-bold py-1 px-2 rounded whitespace-nowrap z-50">
+                                {item.label}
+                            </div>
+                        )}
+
+                        {!isSidebarShrunk && item.badge && (
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${activeTab === item.id
                                 ? 'bg-orange-500 text-white'
                                 : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
@@ -565,21 +590,32 @@ export default function ResidentDashboard() {
                                 {item.badge}
                             </span>
                         )}
+                        {/* Shrunk Badge Indicator */}
+                        {isSidebarShrunk && item.badge && (
+                            <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></div>
+                        )}
                     </button>
                 ))}
             </nav>
 
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-4">
                 {/* Mobile/Sidebar Theme Switcher */}
-                <div className="md:hidden flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 w-full shrink-0">
+                <div className={`md:hidden flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 w-full shrink-0 ${isSidebarShrunk ? 'flex-col' : ''}`}>
                     <button onClick={() => changeTheme('light')} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Sun size={16} /></button>
                     <button onClick={() => changeTheme('system')} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Monitor size={16} /></button>
                     <button onClick={() => changeTheme('dark')} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Moon size={16} /></button>
                 </div>
 
-                <a href="/login" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:text-slate-400 dark:hover:bg-red-500/10 transition-colors focus:outline-none shrink-0">
-                    <LogOut size={20} />
-                    <span>{t('dashboard.sidebar.signOut')}</span>
+                <a href="/login" className={`w-full flex items-center px-4 py-3 rounded-xl font-semibold text-slate-500 hover:text-orange-500 hover:bg-orange-50 dark:text-slate-400 dark:hover:bg-orange-500/10 transition-colors focus:outline-none shrink-0 group/logout ${isSidebarShrunk ? 'justify-center relative' : 'gap-3'}`}>
+                    <LogOut size={20} className="group-hover/logout:text-orange-500 transition-colors" />
+                    {!isSidebarShrunk && <span>{t('dashboard.sidebar.signOut')}</span>}
+
+                    {/* Tooltip for Logout when shrunk */}
+                    {isSidebarShrunk && (
+                        <div className="absolute left-14 opacity-0 group-hover/logout:opacity-100 pointer-events-none transition-opacity bg-orange-500 text-white text-xs font-bold py-1 px-2 rounded whitespace-nowrap z-50">
+                            {t('dashboard.sidebar.signOut')}
+                        </div>
+                    )}
                 </a>
             </div>
         </div>
