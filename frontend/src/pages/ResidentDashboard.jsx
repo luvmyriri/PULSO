@@ -553,10 +553,21 @@ export default function ResidentDashboard() {
                 <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold text-slate-500 dark:text-slate-400 tracking-widest uppercase">{t('dashboard.sidebar.portal')}</span>
             </div>
 
-            <nav className={`flex-1 px-4 space-y-2 overflow-x-hidden ${isSidebarShrunk ? 'overflow-y-hidden' : 'overflow-y-auto'}`} style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <nav className={`flex-1 px-4 space-y-2 ${isSidebarShrunk ? '' : 'overflow-y-auto'}`} style={{ scrollbarWidth: isSidebarShrunk ? 'none' : 'thin', scrollbarColor: '#f97316 transparent' }}>
                 <style>{`
                     nav::-webkit-scrollbar {
-                        display: none;
+                         width: ${isSidebarShrunk ? '0px' : '6px'};
+                         display: ${isSidebarShrunk ? 'none' : 'block'};
+                    }
+                    nav::-webkit-scrollbar-track {
+                        background: transparent;
+                    }
+                    nav::-webkit-scrollbar-thumb {
+                        background-color: #f97316; /* orange-500 */
+                        border-radius: 20px;
+                    }
+                    nav::-webkit-scrollbar-thumb:hover {
+                        background-color: #ea580c; /* orange-600 */
                     }
                 `}</style>
                 {navItems.map(item => (
@@ -577,8 +588,10 @@ export default function ResidentDashboard() {
 
                         {/* Tooltip for Shrunk State */}
                         {isSidebarShrunk && (
-                            <div className="absolute left-14 opacity-0 group-hover/navitem:opacity-100 pointer-events-none transition-opacity bg-slate-800 text-white text-xs font-bold py-1 px-2 rounded whitespace-nowrap z-50">
+                            <div className="absolute left-14 opacity-0 group-hover/navitem:opacity-100 pointer-events-none transition-opacity bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-xl border border-slate-700 dark:border-slate-600 whitespace-nowrap z-50">
                                 {item.label}
+                                {/* Tooltip Arrow */}
+                                <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-slate-800 dark:bg-slate-700 rotate-45 border-l border-b border-slate-700 dark:border-slate-600"></div>
                             </div>
                         )}
 
@@ -612,8 +625,10 @@ export default function ResidentDashboard() {
 
                     {/* Tooltip for Logout when shrunk */}
                     {isSidebarShrunk && (
-                        <div className="absolute left-14 opacity-0 group-hover/logout:opacity-100 pointer-events-none transition-opacity bg-orange-500 text-white text-xs font-bold py-1 px-2 rounded whitespace-nowrap z-50">
+                        <div className="absolute left-14 opacity-0 group-hover/logout:opacity-100 pointer-events-none transition-opacity bg-red-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-xl border border-red-600 whitespace-nowrap z-50">
                             {t('dashboard.sidebar.signOut')}
+                            {/* Tooltip Arrow */}
+                            <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-red-500 rotate-45 border-l border-b border-red-600"></div>
                         </div>
                     )}
                 </a>
