@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, MapPin, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, Calendar, ShieldCheck, AlertCircle, Camera, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, User, Phone, MapPin, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, Calendar, ShieldCheck, AlertCircle, Camera, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { PulsoLogo } from './Landing';
@@ -390,6 +390,11 @@ export default function Register() {
             {/* Background blobs */}
             <div className="fixed top-[-10%] right-[-5%] w-[40rem] h-[40rem] bg-orange-500/15 rounded-full blur-3xl pointer-events-none" />
             <div className="fixed bottom-[-10%] left-[-5%] w-[30rem] h-[30rem] bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Absolute Back Button */}
+            <Link to="/login" className="absolute top-8 left-8 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-2 font-bold z-50 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md px-4 py-2 rounded-full shadow-sm hover:shadow-md">
+                <ArrowLeft size={20} /> Back to Login
+            </Link>
 
             {/* Welcome Modal */}
             <AnimatePresence>

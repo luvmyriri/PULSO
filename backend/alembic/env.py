@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import Base
 import models # Ensure models are loaded
+import gov_models # Include government models
 
 target_metadata = Base.metadata
 
