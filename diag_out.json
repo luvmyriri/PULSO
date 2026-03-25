@@ -1,0 +1,593 @@
+{
+  "id_tests": [
+    {
+      "test": "1_philid",
+      "id_type": "philid",
+      "data": {
+        "id_type": "philid",
+        "first_name": "Maria Elena",
+        "last_name": "Dela Cruz",
+        "dob": "1990-01-01",
+        "sex": "Female",
+        "address": "Brgy 174 Caloocan City Pcn: 1234",
+        "barangay": "174",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 174)."
+      },
+      "checks": {
+        "id_type": {
+          "expected": "philid",
+          "actual": "philid",
+          "ok": true
+        },
+        "first_name": {
+          "expected": "Maria",
+          "actual": "Maria Elena",
+          "ok": true
+        },
+        "last_name": {
+          "expected": "Dela Cruz",
+          "actual": "Dela Cruz",
+          "ok": true
+        },
+        "dob": {
+          "expected": "1990-01-01",
+          "actual": "1990-01-01",
+          "ok": true
+        },
+        "sex": {
+          "expected": "Female",
+          "actual": "Female",
+          "ok": true
+        },
+        "barangay": {
+          "expected": "174",
+          "actual": "174",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": true,
+          "actual": true,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "2_umid",
+      "id_type": "umid",
+      "data": {
+        "id_type": "umid",
+        "first_name": "Jose",
+        "last_name": "Reyes",
+        "dob": "1985-03-15",
+        "sex": "Male",
+        "address": "Barangay 176 Caloocan City",
+        "barangay": "176",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 176)."
+      },
+      "checks": {
+        "id_type": {
+          "expected": "umid",
+          "actual": "umid",
+          "ok": true
+        },
+        "last_name": {
+          "expected": "Reyes",
+          "actual": "Reyes",
+          "ok": true
+        },
+        "first_name": {
+          "expected": "Jose",
+          "actual": "Jose",
+          "ok": true
+        },
+        "dob": {
+          "expected": "1985-03-15",
+          "actual": "1985-03-15",
+          "ok": true
+        },
+        "sex": {
+          "expected": "Male",
+          "actual": "Male",
+          "ok": true
+        },
+        "barangay": {
+          "expected": "176",
+          "actual": "176",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": true,
+          "actual": true,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "3_lto",
+      "id_type": "lto",
+      "data": {
+        "id_type": "lto",
+        "first_name": "Antonio Jose",
+        "last_name": "Garcia",
+        "dob": "1988-06-15",
+        "sex": "Male",
+        "address": "Brgy 180 Caloocan City",
+        "barangay": "180",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 180)."
+      },
+      "checks": {
+        "id_type": {
+          "expected": "lto",
+          "actual": "lto",
+          "ok": true
+        },
+        "last_name": {
+          "expected": "Garcia",
+          "actual": "Garcia",
+          "ok": true
+        },
+        "first_name": {
+          "expected": "Antonio",
+          "actual": "Antonio Jose",
+          "ok": true
+        },
+        "dob": {
+          "expected": "1988-06-15",
+          "actual": "1988-06-15",
+          "ok": true
+        },
+        "sex": {
+          "expected": "Male",
+          "actual": "Male",
+          "ok": true
+        },
+        "barangay": {
+          "expected": "180",
+          "actual": "180",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": true,
+          "actual": true,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "4_prc",
+      "id_type": "prc",
+      "data": {
+        "id_type": "prc",
+        "first_name": "Anita",
+        "last_name": "Santos",
+        "dob": "",
+        "sex": "",
+        "address": "Brgy 167 Caloocan City",
+        "barangay": "167",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 167)."
+      },
+      "checks": {
+        "id_type": {
+          "expected": "prc",
+          "actual": "prc",
+          "ok": true
+        },
+        "last_name": {
+          "expected": "Santos",
+          "actual": "Santos",
+          "ok": true
+        },
+        "first_name": {
+          "expected": "Anita",
+          "actual": "Anita",
+          "ok": true
+        },
+        "barangay": {
+          "expected": "167",
+          "actual": "167",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": true,
+          "actual": true,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "5_philhealth",
+      "id_type": "philhealth",
+      "data": {
+        "id_type": "philhealth",
+        "first_name": "Roberto Carlos",
+        "last_name": "Mendoza",
+        "dob": "1980-07-22",
+        "sex": "Male",
+        "address": "Brgy 177 Caloocan City",
+        "barangay": "177",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 177)."
+      },
+      "checks": {
+        "id_type": {
+          "expected": "philhealth",
+          "actual": "philhealth",
+          "ok": true
+        },
+        "last_name": {
+          "expected": "Mendoza",
+          "actual": "Mendoza",
+          "ok": true
+        },
+        "first_name": {
+          "expected": "Roberto",
+          "actual": "Roberto Carlos",
+          "ok": true
+        },
+        "dob": {
+          "expected": "1980-07-22",
+          "actual": "1980-07-22",
+          "ok": true
+        },
+        "sex": {
+          "expected": "Male",
+          "actual": "Male",
+          "ok": true
+        },
+        "barangay": {
+          "expected": "177",
+          "actual": "177",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": true,
+          "actual": true,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "6_pagibig",
+      "id_type": "pagibig",
+      "data": {
+        "id_type": "pagibig",
+        "first_name": "Cecilia Ann",
+        "last_name": "Flores",
+        "dob": "1992-08-30",
+        "sex": "Female",
+        "address": "Last Name: Flores First Name: Cecilia Ann",
+        "barangay": "171",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171)."
+      },
+      "checks": {
+        "id_type": {
+          "expected": "pagibig",
+          "actual": "pagibig",
+          "ok": true
+        },
+        "last_name": {
+          "expected": "Flores",
+          "actual": "Flores",
+          "ok": true
+        },
+        "first_name": {
+          "expected": "Cecilia",
+          "actual": "Cecilia Ann",
+          "ok": true
+        },
+        "dob": {
+          "expected": "1992-08-30",
+          "actual": "1992-08-30",
+          "ok": true
+        },
+        "sex": {
+          "expected": "Female",
+          "actual": "Female",
+          "ok": true
+        },
+        "barangay": {
+          "expected": "171",
+          "actual": "171",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": true,
+          "actual": true,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "7_postal",
+      "id_type": "postal",
+      "data": {
+        "id_type": "postal",
+        "first_name": "Manuel",
+        "last_name": "Cruz",
+        "dob": "1975-12-05",
+        "sex": "Male",
+        "address": "Phlpost Postal Id Last Name: Cruz First Name: Manuel",
+        "barangay": "168",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 168)."
+      },
+      "checks": {
+        "id_type": {
+          "expected": "postal",
+          "actual": "postal",
+          "ok": true
+        },
+        "last_name": {
+          "expected": "Cruz",
+          "actual": "Cruz",
+          "ok": true
+        },
+        "first_name": {
+          "expected": "Manuel",
+          "actual": "Manuel",
+          "ok": true
+        },
+        "dob": {
+          "expected": "1975-12-05",
+          "actual": "1975-12-05",
+          "ok": true
+        },
+        "sex": {
+          "expected": "Male",
+          "actual": "Male",
+          "ok": true
+        },
+        "barangay": {
+          "expected": "168",
+          "actual": "168",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": true,
+          "actual": true,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "8_comelec",
+      "id_type": "comelec",
+      "data": {
+        "id_type": "comelec",
+        "first_name": "Grace Marie",
+        "last_name": "Villanueva",
+        "dob": "1993-09-22",
+        "sex": "Female",
+        "address": "Voter'S Identification Card Surname: Villanueva Given Name: Grace Marie",
+        "barangay": "182",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 182)."
+      },
+      "checks": {
+        "id_type": {
+          "expected": "comelec",
+          "actual": "comelec",
+          "ok": true
+        },
+        "last_name": {
+          "expected": "Villanueva",
+          "actual": "Villanueva",
+          "ok": true
+        },
+        "first_name": {
+          "expected": "Grace",
+          "actual": "Grace Marie",
+          "ok": true
+        },
+        "dob": {
+          "expected": "1993-09-22",
+          "actual": "1993-09-22",
+          "ok": true
+        },
+        "sex": {
+          "expected": "Female",
+          "actual": "Female",
+          "ok": true
+        },
+        "barangay": {
+          "expected": "182",
+          "actual": "182",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": true,
+          "actual": true,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "9_passport",
+      "id_type": "passport",
+      "data": {
+        "id_type": "passport",
+        "first_name": "Ferdinand Jose",
+        "last_name": "Ramos",
+        "dob": "1979-02-14",
+        "sex": "Male",
+        "address": "Given Names: Ferdinand Jose",
+        "barangay": "165",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 165)."
+      },
+      "checks": {
+        "id_type": {
+          "expected": "passport",
+          "actual": "passport",
+          "ok": true
+        },
+        "last_name": {
+          "expected": "Ramos",
+          "actual": "Ramos",
+          "ok": true
+        },
+        "first_name": {
+          "expected": "Ferdinand",
+          "actual": "Ferdinand Jose",
+          "ok": true
+        },
+        "dob": {
+          "expected": "1979-02-14",
+          "actual": "1979-02-14",
+          "ok": true
+        },
+        "sex": {
+          "expected": "Male",
+          "actual": "Male",
+          "ok": true
+        },
+        "barangay": {
+          "expected": "165",
+          "actual": "165",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": true,
+          "actual": true,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "10_non_caloocan_fail",
+      "id_type": "lto",
+      "data": {
+        "id_type": "lto",
+        "first_name": "Benigno",
+        "last_name": "Aquino",
+        "dob": "1960-02-08",
+        "sex": "Male",
+        "address": "123 Ayala Ave Makati City",
+        "barangay": "",
+        "is_north_caloocan": false,
+        "verification_message": "Verification Failed: Address does not appear to be in Caloocan City."
+      },
+      "checks": {
+        "is_nc": {
+          "expected": false,
+          "actual": false,
+          "ok": true
+        }
+      }
+    },
+    {
+      "test": "11_south_caloocan_fail",
+      "id_type": "umid",
+      "data": {
+        "id_type": "umid",
+        "first_name": "Reyes",
+        "last_name": "Sss",
+        "dob": "1995-05-10",
+        "sex": "Male",
+        "address": "Brgy 100 Caloocan City",
+        "barangay": "100",
+        "is_north_caloocan": false,
+        "verification_message": "Verification Failed: Barangay 100 is in South Caloocan, not North Caloocan (165\u2013188)."
+      },
+      "checks": {
+        "barangay": {
+          "expected": "100",
+          "actual": "100",
+          "ok": true
+        },
+        "is_nc": {
+          "expected": false,
+          "actual": false,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "date_tests": [
+    {
+      "label": "YYYY-MM-DD",
+      "expected": "1990-01-15",
+      "actual": "1990-01-15",
+      "ok": true
+    },
+    {
+      "label": "MM/DD/YYYY",
+      "expected": "1990-01-15",
+      "actual": "1990-01-15",
+      "ok": true
+    },
+    {
+      "label": "DD Month YYYY",
+      "expected": "1990-01-15",
+      "actual": "1990-01-15",
+      "ok": true
+    },
+    {
+      "label": "Month DD YYYY",
+      "expected": "1990-01-15",
+      "actual": "1990-01-15",
+      "ok": true
+    },
+    {
+      "label": "DD-Mon-YYYY",
+      "expected": "1990-01-15",
+      "actual": "1990-01-15",
+      "ok": true
+    },
+    {
+      "label": "Tagalog month",
+      "expected": "1990-01-15",
+      "actual": "1990-01-15",
+      "ok": true
+    },
+    {
+      "label": "YYYY/MM/DD",
+      "expected": "1990-01-15",
+      "actual": "1990-01-15",
+      "ok": true
+    }
+  ],
+  "brgy_tests": [
+    {
+      "label": "BARANGAY NNN",
+      "expected": "174",
+      "actual": "174",
+      "ok": true
+    },
+    {
+      "label": "BRGY. NNN",
+      "expected": "174",
+      "actual": "174",
+      "ok": true
+    },
+    {
+      "label": "BGY. NNN",
+      "expected": "181",
+      "actual": "181",
+      "ok": true
+    },
+    {
+      "label": "BRGY NO. NNN",
+      "expected": "166",
+      "actual": "166",
+      "ok": true
+    },
+    {
+      "label": "ZONE + BRGY",
+      "expected": "173",
+      "actual": "173",
+      "ok": true
+    },
+    {
+      "label": "PUROK + BRGY",
+      "expected": "188",
+      "actual": "188",
+      "ok": true
+    }
+  ]
+}

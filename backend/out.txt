@@ -1,0 +1,480 @@
+﻿python : INFO  
+[alembic.runtime.migration] 
+Context impl PostgresqlImpl.
+At line:1 char:1
++ python -m alembic upgrade 
+head *>&1 | Out-File out.txt 
+-Encoding utf8
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (INFO  [al  
+  embic....PostgresqlImpl.:   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+INFO  
+[alembic.runtime.migration] 
+Will assume transactional DDL.
+INFO  
+[alembic.runtime.migration] 
+Running upgrade fd8361fac77d 
+-> 488a1a0798a1, Seed base 
+data
+Traceback (most recent call 
+last):
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+engine\base.py", line 2125, 
+in _exec_insertmany_context
+    dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~^
+        cursor,
+        ^^^^^^^
+    ...<2 lines>...
+        context,
+        ^^^^^^^^
+    )
+    ^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+engine\default.py", line 952, 
+in do_execute
+    cursor.execute(statement, 
+parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^
+^^^^^^^^^^^
+psycopg2.errors.UniqueViolatio
+n: duplicate key value 
+violates unique constraint 
+"users_pkey"
+DETAIL:  Key (id)=(1) already 
+exists.
+
+
+The above exception was the 
+direct cause of the following 
+exception:
+
+Traceback (most recent call 
+last):
+  File "<frozen runpy>", line 
+198, in _run_module_as_main
+  File "<frozen runpy>", line 
+88, in _run_code
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\__m
+ain__.py", line 4, in <module>
+    main(prog="alembic")
+    ~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\con
+fig.py", line 1047, in main
+    CommandLine(prog=prog).mai
+n(argv=argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~^^^^^^^^^^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\con
+fig.py", line 1037, in main
+    self.run_cmd(cfg, options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\con
+fig.py", line 971, in run_cmd
+    fn(
+    ~~^
+        config,
+        ^^^^^^^
+        *[getattr(options, k, 
+None) for k in positional],
+        ^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        **{k: 
+getattr(options, k, None) for 
+k in kwarg},
+        ^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\com
+mand.py", line 483, in upgrade
+    script.run_env()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\scr
+ipt\base.py", line 545, in 
+run_env
+    util.load_python_file(self
+.dir, "env.py")
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^
+^^^^^^^^^^^^^^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\uti
+l\pyfiles.py", line 116, in 
+load_python_file
+    module = 
+load_module_py(module_id, 
+path)
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\uti
+l\pyfiles.py", line 136, in 
+load_module_py
+    spec.loader.exec_module(mo
+dule)  # type: ignore
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^
+^^^^^
+  File "<frozen importlib._boo
+tstrap_external>", line 759, 
+in exec_module
+  File "<frozen 
+importlib._bootstrap>", line 
+491, in 
+_call_with_frames_removed
+  File "C:\Apache24\htdocs\PUL
+SO\backend\alembic\env.py", 
+line 84, in <module>
+    run_migrations_online()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Apache24\htdocs\PUL
+SO\backend\alembic\env.py", 
+line 78, in 
+run_migrations_online
+    context.run_migrations()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 8, in 
+run_migrations
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\run
+time\environment.py", line 
+969, in run_migrations
+    self.get_context().run_mig
+rations(**kw)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~^^^^^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\run
+time\migration.py", line 626, 
+in run_migrations
+    step.migration_fn(**kw)
+    ~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Apache24\htdocs\PUL
+SO\backend\alembic\versions\48
+8a1a0798a1_seed_base_data.py",
+ line 34, in upgrade
+    op.bulk_insert(t_users, [
+    ~~~~~~~~~~~~~~^^^^^^^^^^^
+        {'id': 1, 
+'full_name': 'Admin Manager', 
+'email': 
+'admin@pulso.gov.ph', 
+'password_hash': '$2b$12$bhZd9
+DkKl4vmqs0XJkUduuvpYoP.bkWduD.
+dEGnZSfQGDpb3f/mD.', 'role': 
+'manager', 'address': 'City 
+Hall, Caloocan', 'barangay': 
+'Grace Park', 'phone_number': 
+'09123456789', 'trust_score': 
+100, 'created_at': 
+'2026-02-27 05:34:34.532'},
+        ^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^
+        {'id': 2, 
+'full_name': 'Dispatcher 
+One', 'email': 
+'dispatcher@pulso.gov.ph', 
+'password_hash': '$2b$12$bhZd9
+DkKl4vmqs0XJkUduuvpYoP.bkWduD.
+dEGnZSfQGDpb3f/mD.', 'role': 
+'dispatcher', 'address': 
+'North Command Center', 
+'barangay': 'Bagong Silang', 
+'phone_number': 
+'09223456789', 'trust_score': 
+100, 'created_at': 
+'2026-02-27 05:34:34.532'},
+        ^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
+        {'id': 3, 
+'full_name': 'Juan Dela 
+Cruz', 'email': 
+'resident@gmail.com', 
+'password_hash': '$2b$12$bhZd9
+DkKl4vmqs0XJkUduuvpYoP.bkWduD.
+dEGnZSfQGDpb3f/mD.', 'role': 
+'resident', 'address': 'Phase 
+1, Block 2, Lot 3', 
+'barangay': 'Brgy 178', 
+'phone_number': 
+'09333456789', 'trust_score': 
+100, 'created_at': 
+'2026-02-27 05:34:34.532'},
+        ^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^
+    ])
+    ^^
+  File "<string>", line 8, in 
+bulk_insert
+  File "<string>", line 3, in 
+bulk_insert
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\ope
+rations\ops.py", line 2511, 
+in bulk_insert
+    operations.invoke(op)
+    ~~~~~~~~~~~~~~~~~^^^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\ope
+rations\base.py", line 452, 
+in invoke
+    return fn(self, operation)
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\ope
+rations\toimpl.py", line 248, 
+in bulk_insert
+    
+operations.impl.bulk_insert(  
+# type: ignore[union-attr]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        operation.table, 
+operation.rows, multiinsert=op
+eration.multiinsert
+        ^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\ddl
+\impl.py", line 516, in 
+bulk_insert
+    self._exec(table.insert().
+inline(), multiparams=rows)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\alembic\ddl
+\impl.py", line 254, in _exec
+    return 
+conn.execute(construct, 
+multiparams)
+           ~~~~~~~~~~~~^^^^^^^
+^^^^^^^^^^^^^^^^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+engine\base.py", line 1419, 
+in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or 
+NO_OPTIONS,
+    )
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+sql\elements.py", line 527, 
+in _execute_on_connection
+    return connection._execute
+_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~^
+        self, 
+distilled_params, 
+execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+engine\base.py", line 1641, 
+in _execute_clauseelement
+    ret = 
+self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+engine\base.py", line 1844, 
+in _execute_context
+    return self._exec_insertma
+ny_context(dialect, context)
+           ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+engine\base.py", line 2133, 
+in _exec_insertmany_context
+    
+self._handle_dbapi_exception(
+    
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e,
+        ^^
+    ...<4 lines>...
+        is_sub_exec=True,
+        ^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+engine\base.py", line 2363, 
+in _handle_dbapi_exception
+    raise sqlalchemy_exception
+.with_traceback(exc_info[2]) 
+from e
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+engine\base.py", line 2125, 
+in _exec_insertmany_context
+    dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~^
+        cursor,
+        ^^^^^^^
+    ...<2 lines>...
+        context,
+        ^^^^^^^^
+    )
+    ^
+  File "C:\Users\Val\AppData\L
+ocal\Python\pythoncore-3.14-64
+\Lib\site-packages\sqlalchemy\
+engine\default.py", line 952, 
+in do_execute
+    cursor.execute(statement, 
+parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^
+^^^^^^^^^^^
+sqlalchemy.exc.IntegrityError:
+ (psycopg2.errors.UniqueViolat
+ion) duplicate key value 
+violates unique constraint 
+"users_pkey"
+DETAIL:  Key (id)=(1) already 
+exists.
+
+[SQL: INSERT INTO users (id, 
+full_name, email, 
+password_hash, role, address, 
+barangay, phone_number, 
+trust_score, created_at) 
+VALUES (%(id__0)s, 
+%(full_name__0)s, 
+%(email__0)s, 
+%(password_hash__0)s, 
+%(role__0)s, %(address__0)s, 
+%(barangay__0)s, %(phone_num 
+... 294 characters truncated 
+... e__2)s, %(address__2)s, 
+%(barangay__2)s, 
+%(phone_number__2)s, 
+%(trust_score__2)s, 
+%(created_at__2)s)]
+[parameters: {'email__0': 
+'admin@pulso.gov.ph', 
+'role__0': 'manager', 
+'address__0': 'City Hall, 
+Caloocan', 'full_name__0': 
+'Admin Manager', 
+'barangay__0': 'Grace Park', 
+'trust_score__0': 100, 
+'id__0': 1, 'created_at__0': 
+'2026-02-27 05:34:34.532', 
+'phone_number__0': 
+'09123456789', 
+'password_hash__0': '$2b$12$bh
+Zd9DkKl4vmqs0XJkUduuvpYoP.bkWd
+uD.dEGnZSfQGDpb3f/mD.', 
+'email__1': 
+'dispatcher@pulso.gov.ph', 
+'role__1': 'dispatcher', 
+'address__1': 'North Command 
+Center', 'full_name__1': 
+'Dispatcher One', 
+'barangay__1': 'Bagong 
+Silang', 'trust_score__1': 
+100, 'id__1': 2, 
+'created_at__1': '2026-02-27 
+05:34:34.532', 
+'phone_number__1': 
+'09223456789', 
+'password_hash__1': '$2b$12$bh
+Zd9DkKl4vmqs0XJkUduuvpYoP.bkWd
+uD.dEGnZSfQGDpb3f/mD.', 
+'email__2': 
+'resident@gmail.com', 
+'role__2': 'resident', 
+'address__2': 'Phase 1, Block 
+2, Lot 3', 'full_name__2': 
+'Juan Dela Cruz', 
+'barangay__2': 'Brgy 178', 
+'trust_score__2': 100, 
+'id__2': 3, 'created_at__2': 
+'2026-02-27 05:34:34.532', 
+'phone_number__2': 
+'09333456789', 
+'password_hash__2': '$2b$12$bh
+Zd9DkKl4vmqs0XJkUduuvpYoP.bkWd
+uD.dEGnZSfQGDpb3f/mD.'}]
+(Background on this error at: 
+https://sqlalche.me/e/20/gkpj)

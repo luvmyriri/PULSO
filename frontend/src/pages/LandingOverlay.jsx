@@ -81,10 +81,7 @@ export default function LandingOverlay({ onNavigate }) {
                         className="max-w-xl bg-white/60 p-8 rounded-3xl backdrop-blur-xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
                         variants={staggerContainer}
                     >
-                        <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-orange-100 text-orange-600 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide mb-6 border border-orange-200 shadow-sm">
-                            <ActivitySquare size={14} />
-                            <span>SYSTEM ONLINE • CALOOCAN NORTH</span>
-                        </motion.div>
+
 
                         <motion.h1 variants={fadeUp} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl leading-[1.1] tracking-tight mb-6 text-slate-900 drop-shadow-sm">
                             Smart Infrastructure,<br /><span className="text-gradient">Smarter City.</span>

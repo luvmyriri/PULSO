@@ -95,12 +95,21 @@ const BarangayMesh = ({ data }) => {
         });
     }, [data]);
 
-    // Interactive elevation on mouse hover
+    // Interactive elevation on mouse hover and subtle breathing effect
     useFrame((state, delta) => {
         if (meshRef.current) {
             // Elevate the Z-axis smoothly when hovered (Z acts as Up because of the group rotation)
             const targetZ = hovered ? -5 : 0;
             meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, targetZ, 8 * delta);
+
+            // Subtle breathing effect on opacity to give it life without harsh lights
+            const time = state.clock.getElapsedTime();
+            const material = meshRef.current.children[0]?.material;
+            if (material) {
+                const baseOpacity = hovered ? 0.95 : 0.85;
+                const breathing = hovered ? 0 : Math.sin(time * 1.5 + data.pos[0]) * 0.03; // Less pulsating
+                material.opacity = THREE.MathUtils.lerp(material.opacity, baseOpacity + breathing, 0.1);
+            }
         }
     });
 
@@ -114,16 +123,16 @@ const BarangayMesh = ({ data }) => {
             >
                 <meshStandardMaterial
                     color={data.color}
-                    roughness={hovered ? 0.2 : 0.4}
+                    roughness={0.5}
                     metalness={0.1}
-                    opacity={0.95}
+                    opacity={0.25}
                     transparent
                 />
                 <meshStandardMaterial
                     attach="material-1"
                     color={hovered ? '#ffffff' : data.border}
                     emissive={hovered ? data.border : '#000000'}
-                    emissiveIntensity={hovered ? 0.8 : 0}
+                    emissiveIntensity={hovered ? 0.3 : 0}
                 />
             </mesh>
 
@@ -151,17 +160,22 @@ const BarangayMesh = ({ data }) => {
 
 const SmartMapAssembly = () => {
     const groupRef = useRef();
+    const pivotRef = useRef();
 
     useFrame((state) => {
         const t = state.clock.getElapsedTime();
         if (groupRef.current) {
-            groupRef.current.position.y = Math.sin(t * 0.4) * 2;
-            groupRef.current.rotation.z = Math.sin(t * 0.1) * 0.05;
+            groupRef.current.position.y = -8 + Math.sin(t * 0.4) * 2; // Lower the baseline position
+        }
+        if (pivotRef.current) {
+            pivotRef.current.rotation.z = t * 0.05; // Moderate rotation showcasing the whole map around its own center
         }
     });
 
     return (
-        <group ref={groupRef} scale={[0.15, -0.15, 0.15]} rotation={[-Math.PI / 2, 0, 0]} position={[-25, 0, -25]}>
+        <group ref={groupRef} scale={[0.11, -0.11, 0.11]} rotation={[-Math.PI / 2.3, 0, 0]} position={[25, 0, -15]}>
+            <group ref={pivotRef}>
+                <group position={[-175, -150, 0]}>
 
             {/* 13 Geometrically accurate Extruded Barangays */}
             {regionsData.map((data, idx) => (
@@ -184,30 +198,28 @@ const SmartMapAssembly = () => {
                 />
             ))}
 
+                </group>
+            </group>
         </group>
     );
 };
 
 export default function HeroMap3D() {
     return (
-        <div style={{ width: '100%', height: '100%', minHeight: '100vh', cursor: 'grab' }}>
-            <Canvas camera={{ position: [0, 45, 45], fov: 40 }}>
-                {/* Crisp lighting for an analytical look */}
-                <ambientLight intensity={1.2} />
-                <directionalLight position={[10, 30, 20]} intensity={1.5} color="#ffffff" castShadow />
-                <spotLight position={[-20, 50, -20]} angle={0.4} penumbra={1} intensity={1} color="#f97316" />
-
-                {/* Soft fog bridging the background edges cleanly */}
-                <fog attach="fog" args={['#f8fafc', 40, 95]} />
+        <div className="relative z-10" style={{ width: '100%', height: '100%', cursor: 'grab' }}>
+            <Canvas camera={{ position: [0, 45, 45], fov: 40 }} gl={{ alpha: true }}>
+                {/* Soft, even lighting without harsh 'sun-like' shadows */}
+                <ambientLight intensity={1.8} />
+                <directionalLight position={[0, 40, 10]} intensity={0.6} color="#ffffff" />
 
                 <SmartMapAssembly />
 
-                {/* Strictly controls view to be Top-Down Isometric (like a physical map on a desk) */}
+                {/* Strictly controls view to be Top-Down Isometric */}
                 <OrbitControls
                     enableZoom={false}
-                    autoRotate
-                    autoRotateSpeed={0.5}
-                    maxPolarAngle={Math.PI / 3}
+                    enablePan={false}
+                    autoRotate={false}
+                    maxPolarAngle={Math.PI / 2.2}
                     minPolarAngle={Math.PI / 6}
                     target={[0, 0, 0]}
                 />
