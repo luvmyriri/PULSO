@@ -10,7 +10,7 @@ import {
     GitBranch, Map, Building2, ShieldCheck, PackageCheck,
     ClipboardList, Ruler, Eye, HardHat, Wrench, FileBarChart2,
     Clock, CheckCircle2, AlertTriangle, Users, Plus, Filter,
-    Search, ChevronRight, Activity, FileCheck2, ArrowRight,
+    Search, ChevronRight, Activity, FileCheck, ArrowRight,
     BookOpen, UserCog, Settings
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
@@ -64,7 +64,7 @@ const PAGE_CONFIG = {
     '/gov/audit-logs': {
         title: 'Audit Logs',
         subtitle: 'Immutable audit trail for all government actions in the system (FR-10).',
-        icon: FileCheck2,
+        icon: FileCheck,
         color: 'red',
         apiPath: '/api/gov/audit-logs',
         statuses: [],

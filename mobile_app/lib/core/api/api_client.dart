@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 
 class ApiClient {
   final Dio _dio = Dio();
-  
+
   // 10.0.2.2 is the special IP for the host machine's localhost on Android Emulator
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:8000';
@@ -16,7 +16,7 @@ class ApiClient {
     _dio.options.baseUrl = baseUrl;
     _dio.options.connectTimeout = const Duration(seconds: 15);
     _dio.options.receiveTimeout = const Duration(seconds: 15);
-    
+
     _dio.interceptors.add(LogInterceptor(
       request: true,
       requestHeader: true,
@@ -27,17 +27,40 @@ class ApiClient {
     ));
   }
 
-  Future<Response> post(String path, {dynamic data, Map<String, dynamic>? queryParameters}) async {
+  /// Build options with optional Bearer token.
+  Options _opts(String? token) => Options(
+        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+      );
+
+  Future<Response> post(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    String? token,
+  }) async {
     try {
-      return await _dio.post(path, data: data, queryParameters: queryParameters);
+      return await _dio.post(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: _opts(token),
+      );
     } on DioException catch (e) {
       rethrow;
     }
   }
 
-  Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+  Future<Response> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    String? token,
+  }) async {
     try {
-      return await _dio.get(path, queryParameters: queryParameters);
+      return await _dio.get(
+        path,
+        queryParameters: queryParameters,
+        options: _opts(token),
+      );
     } on DioException catch (e) {
       rethrow;
     }

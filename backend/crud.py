@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-import models, schemas
+import models, gov_models, schemas
 
 def get_user(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()
@@ -67,12 +67,33 @@ def _create_notification(db: Session, user_id: int, title: str, message: str):
     db.add(db_notification)
     db.commit()
 
-def update_report_status(db: Session, report_id: int, status: str):
+def update_report_status(db: Session, report_id: int, status: str, actor_id: int = None):
     db_report = db.query(models.Report).filter(models.Report.id == report_id).first()
     if db_report:
+        previous_status = db_report.status
         db_report.status = status
         db.commit()
         db.refresh(db_report)
+        
+        # 1. Process Timeline Log
+        timeline_entry = gov_models.ProcessTimeline(
+            report_id=db_report.id,
+            status=status,
+            previous_status=previous_status,
+            actor_id=actor_id,
+            actor_role="dispatcher" if actor_id else "system"
+        )
+        db.add(timeline_entry)
+        
+        # 2. Immutable Audit Log
+        audit_entry = gov_models.AuditLog(
+            trigger_type="status_change",
+            report_id=db_report.id,
+            actor_id=actor_id,
+            action=f"Report {db_report.ticket_id} status changed from {previous_status} to {status}"
+        )
+        db.add(audit_entry)
+        db.commit()
         
         # Notification messages for each status transition
         ticket = db_report.ticket_id or f"RPT-{db_report.id}"
@@ -105,8 +126,8 @@ def update_report_status(db: Session, report_id: int, status: str):
             
     return db_report
 
-def reject_report(db: Session, report_id: int):
-    return update_report_status(db, report_id, "rejected")
+def reject_report(db: Session, report_id: int, actor_id: int = None):
+    return update_report_status(db, report_id, "rejected", actor_id=actor_id)
 
 def delete_report(db: Session, report_id: int) -> bool:
     db_report = db.query(models.Report).filter(models.Report.id == report_id).first()
@@ -164,3 +185,43 @@ def delete_advisory(db: Session, advisory_id: int) -> bool:
     db.delete(db_advisory)
     db.commit()
     return True
+
+# ---------------------------------------------------------------------------
+# Government Workflow CRUD (FR-11 Work Orders, FR-10 Audit Logs)
+# ---------------------------------------------------------------------------
+
+def get_work_orders(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(gov_models.WorkOrder).order_by(gov_models.WorkOrder.created_at.desc()).offset(skip).limit(limit).all()
+
+def create_work_order(db: Session, wo: schemas.WorkOrderCreate, assigned_by_id: int) -> gov_models.WorkOrder:
+    db_wo = gov_models.WorkOrder(
+        title=wo.title,
+        description=wo.description,
+        wo_type=wo.wo_type,
+        status=wo.status,
+        priority=wo.priority,
+        assigned_to_id=wo.assigned_to_id,
+        report_id=wo.report_id,
+        project_id=wo.project_id,
+        assigned_by_id=assigned_by_id
+    )
+    db.add(db_wo)
+    
+    # If this is linked to a citizen report, automatically update its status and audit log
+    if wo.report_id:
+        # Pass actor_id up the chain to audit everything
+        update_report_status(db, report_id=wo.report_id, status="dispatched", actor_id=assigned_by_id)
+
+    # FR-10 Immutable Audit Log for Work Order generation
+    db.commit()
+    db.refresh(db_wo)
+
+    db.add(gov_models.AuditLog(
+        trigger_type="maintenance",
+        work_order_id=db_wo.id,
+        actor_id=assigned_by_id,
+        action=f"Created Work Order ({db_wo.wo_number}) assigned to User {wo.assigned_to_id}"
+    ))
+    db.commit()
+    
+    return db_wo

@@ -10,10 +10,11 @@ import {
     AlertTriangle, LayoutDashboard, ClipboardCheck, Landmark,
     Megaphone, Users, Briefcase, TrendingUp, Settings, LogOut,
     HardHat, Ruler, Building2, ShieldCheck, PackageCheck, FlaskConical,
-    Wrench, FileBarChart2, ChevronDown, ChevronRight, Map,
-    ClipboardList, GitBranch, FileCheck2, Truck, Eye, UserCog,
+    Wrench, BarChart as BarChart2, ChevronDown, ChevronRight, Map,
+    ClipboardList, GitBranch, FileCheck, Truck, Eye, UserCog,
     BookOpen, Activity
 } from 'lucide-react';
+import Branding from './Branding';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Role-based menu visibility
@@ -115,9 +116,15 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
     const role = currentUser?.role || 'dispatcher';
 
     const handleSignOut = () => {
+        const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
+        const wasGov = user?.role && user.role !== 'resident';
         localStorage.removeItem('pulso_token');
         localStorage.removeItem('pulso_user');
-        navigate('/login');
+        if (wasGov) {
+            navigate('/gov');
+        } else {
+            navigate('/login');
+        }
     };
 
     // Role display label mapping
@@ -160,13 +167,9 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
     return (
         <div className="w-64 bg-white dark:bg-slate-900 flex flex-col shrink-0 z-50 relative h-screen">
             {/* Logo */}
-            <div className="h-16 flex items-center px-6 relative shrink-0 border-b border-slate-100 dark:border-slate-800">
-                <Link to="/" className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-xs shadow-md">P</div>
-                    <div>
-                        <span className="font-black text-base text-slate-900 dark:text-white tracking-tight">LGU Portal</span>
-                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">City Engineering</div>
-                    </div>
+            <div className="h-20 flex items-center px-4 relative shrink-0 border-b border-slate-100 dark:border-slate-800">
+                <Link to="/" className="flex items-center">
+                    <Branding size="h-9" />
                 </Link>
             </div>
 
