@@ -1,0 +1,3 @@
+@echo off
+echo Starting PULSO FastAPI Backend...
+"C:\Users\Val\AppData\Local\Python\bin\python.exe" -m uvicorn main:app --reload

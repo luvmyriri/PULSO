@@ -1,0 +1,16 @@
+{
+    "timestamp": "2026-03-12T23:46:19.053576",
+    "raw_text": "REPUBLIC OF THE PHILIPPINES\tSPORTATTO\t\r\nDEPARTMENT OF TRANSPORTATION\t\r\nLAND TRANSPORTATION OFFICE\t\r\nDRIVER'S LICENSE\t\r\nLast Name, First Name, Middle Name\t\r\nTABIOS, GENE GANGE\t\r\nNationality\tSex\tDate of Birth\tWeight (kg)\tHeight (m)\t\r\nPHL\t2005/06/13\t60\t1.65\t\r\nAddress\t\r\nBLK 9 LOT 30, RUBY ST CELINA HOMES 3 BAGUMBONG,\t\r\nBARANGAY 171, CALOOCAN CITY, NCR, THIRD DIS TRICT, 1421\t\r\nLicense No.\tExpiration Date\tAgency Code\t\r\nC08-25-006312\t2029/06/13\tC08\t\r\n2025/05/20\tBlood Type\tEyes Color\t\r\nO+\tBLACK\t\r\nSenefererih\tDL Codes\tB\tConditions\tNONE\tATT)\tY VIGORO MENDOZA II\t\r\nSignature of Licensee\tAssistant Secretary\t\r\n\nI. DL CODES:\t\r\nAddress: BLK 9 LOT 30 RUBY ST. CELINA HOMES 3 BAGUMBONG CALOOCAN CITY\t5. HEARING AID REQUIRED\tII. CONDITIONS:\t1. WEAR CORRECTIVE LENSES\tN\tA\tDRIVE ONLY W/SPECIAL EQPT FOR UPPER/LOWER LIMBS\tDRIVE CUSTOMIZED MOTOR VEHICLE ONLY\tDAYLIGHT DRIVING ONLY\tTRICYCLE\tUP TO 5000 KGS GVWI9 OR MORE SEATS\tMOTORCYCLE\tUP TO 5000 KGS GVW/8 SEATS\tGOODS \u2264 3500 KGS GW\tTRAILERS \u2264 3500 KGS\tARTICULATED C > 3500 KGS COMBINED GW\tGOODS > 3500 KGS GW\tBUS > 5000 KGS GVWI9 OR MORE SEATS\tM1-NP-MT/AT\tSerial Number\t461537862\t\r\nIII. ORGAN DONATION:\tI WILL NOT DONATE ANY ORGAN\tIV. IN CASE OF EMERGENCY NOTIFY:\tName: EMILY G. TABIOS\tTel. No.: 0999884665\t\r\n",
+    "parsed_data": {
+        "id_type": "lto",
+        "first_name": "Gene",
+        "last_name": "Tabios",
+        "middle_name": "Gange",
+        "dob": "2005-06-13",
+        "sex": "",
+        "address": "Blk 9 Lot 30, Ruby St Celina Homes 3 Bagumbong, Barangay 171, Caloocan City, Ncr, Third Dis Trict, 1421",
+        "barangay": "171",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171)."
+    }
+}
