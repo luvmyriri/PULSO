@@ -103,3 +103,61 @@ class ReportStats(BaseModel):
     dispatched: int
     resolved: int
     rejected: int
+
+# ---------------------------------------------------------------------------
+# Government Workflow Schemas (FR-10, FR-11, FR-14)
+# ---------------------------------------------------------------------------
+
+class WorkOrderBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    wo_type: Optional[str] = "standard"
+    status: Optional[str] = "open"
+    priority: Optional[str] = "normal"
+    assigned_to_id: Optional[int] = None
+    report_id: Optional[int] = None
+    project_id: Optional[int] = None
+
+class WorkOrderCreate(WorkOrderBase):
+    pass
+
+class WorkOrderUpdate(BaseModel):
+    status: Optional[str] = None
+    notes: Optional[str] = None
+    assigned_to_id: Optional[int] = None
+
+class WorkOrderResponse(WorkOrderBase):
+    id: int
+    wo_number: str
+    assigned_by_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class AuditLogResponse(BaseModel):
+    id: int
+    trigger_type: str
+    actor_id: Optional[int] = None
+    action: str
+    details: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ProcessTimelineResponse(BaseModel):
+    id: int
+    report_id: Optional[int] = None
+    work_order_id: Optional[int] = None
+    project_id: Optional[int] = None
+    status: str
+    previous_status: Optional[str] = None
+    actor_id: Optional[int] = None
+    note: Optional[str] = None
+    is_public: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

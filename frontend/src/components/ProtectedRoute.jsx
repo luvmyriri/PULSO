@@ -65,9 +65,11 @@ const ROLE_LABELS = {
 
 const UnauthorizedPage = ({ userRole, allowedRoles }) => {
     const handleSignOut = () => {
+        const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
+        const wasGov = user?.role && user.role !== 'resident';
         localStorage.removeItem('pulso_token');
         localStorage.removeItem('pulso_user');
-        window.location.href = '/login';
+        window.location.href = wasGov ? '/gov' : '/login';
     };
 
     return (

@@ -3,6 +3,7 @@ uvicorn
 python-multipart
 requests
 python-dotenv
+httpx
 pillow
 sqlalchemy==2.0.46
 psycopg2-binary==2.9.11

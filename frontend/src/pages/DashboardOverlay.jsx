@@ -4,7 +4,7 @@ import {
     Camera, MapPin, WifiOff, CheckCircle2, AlertTriangle,
     Send, Clock, Truck, HardHat, Bell, LogOut, Loader2
 } from 'lucide-react';
-import { PulsoLogo } from './LandingOverlay';
+import Branding from '../components/Branding';
 
 export default function DashboardOverlay({ onNavigate }) {
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -131,7 +131,7 @@ export default function DashboardOverlay({ onNavigate }) {
                 {/* Removed top shadow border */}
                 <div className="max-w-2xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2 text-orange-600 font-extrabold text-xl tracking-tight">
-                        <PulsoLogo />
+                        <Branding size="h-8" showText={false} />
                         <span>PULSO | Resident</span>
                     </div>
                     <div className="flex items-center gap-5 text-slate-500">

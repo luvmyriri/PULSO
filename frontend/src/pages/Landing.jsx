@@ -9,69 +9,13 @@ import {
     UserCheck, Accessibility, Heart, FileText
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import Branding from '../components/Branding';
 import Hero3D from '../Hero3D';
+import PremiumHeroBackground from '../components/PremiumHeroBackground';
+import ErrorBoundary from '../components/ErrorBoundary';
 import '../index.css';
 
-// SVG Logo Component for Professional Look (Rebuilt from User Concept)
-export const PulsoLogo = ({ className = "w-9 h-9 shrink-0" }) => (
-    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={`transform hover:scale-105 transition-transform drop-shadow-md shrink-0 ${className}`}>
-        <defs>
-            <linearGradient id="pulsoGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#f97316" />
-                <stop offset="1" stopColor="#ea580c" />
-            </linearGradient>
-            <linearGradient id="pinGrad" x1="50" y1="15" x2="50" y2="59" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#ffffff" />
-                <stop offset="1" stopColor="#f8fafc" />
-            </linearGradient>
-            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.2" />
-            </filter>
-        </defs>
-
-        {/* Main Background Circle */}
-        <circle cx="50" cy="50" r="48" fill="url(#pulsoGrad)" />
-
-        {/* Buildings (Bottom Left) */}
-        <path d="M 16 85 L 16 55 L 28 55 L 28 85 Z" fill="#ffffff" />
-        <rect x="19" y="60" width="3" height="4" rx="1" fill="#ea580c" />
-        <rect x="24" y="60" width="3" height="4" rx="1" fill="#ea580c" />
-        <rect x="19" y="68" width="3" height="4" rx="1" fill="#ea580c" />
-        <rect x="24" y="68" width="3" height="4" rx="1" fill="#ea580c" />
-        <rect x="19" y="76" width="3" height="4" rx="1" fill="#ea580c" />
-        <rect x="24" y="76" width="3" height="4" rx="1" fill="#ea580c" />
-
-        <path d="M 29 85 L 29 42 L 43 42 L 43 85 Z" fill="#ffffff" />
-        <rect x="32" y="48" width="4" height="4" rx="1" fill="#ea580c" />
-        <rect x="38" y="48" width="4" height="4" rx="1" fill="#ea580c" />
-        <rect x="32" y="58" width="4" height="4" rx="1" fill="#ea580c" />
-        <rect x="38" y="58" width="4" height="4" rx="1" fill="#ea580c" />
-        <rect x="32" y="68" width="4" height="4" rx="1" fill="#ea580c" />
-        <rect x="38" y="68" width="4" height="4" rx="1" fill="#ea580c" />
-        <rect x="32" y="78" width="4" height="4" rx="1" fill="#ea580c" />
-        <rect x="38" y="78" width="4" height="4" rx="1" fill="#ea580c" />
-
-        {/* Network / Connections (Right Side) */}
-        <path d="M 52 75 A 32 32 0 0 0 82 45" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx="52" cy="75" r="2.5" fill="#ffffff" />
-        <circle cx="82" cy="45" r="2.5" fill="#ffffff" />
-
-        <path d="M 64 68 A 20 20 0 0 0 78 54" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx="64" cy="68" r="2.5" fill="#ffffff" />
-        <circle cx="78" cy="54" r="2.5" fill="#ffffff" />
-
-        {/* Gear Segment */}
-        <path d="M 68 28 A 20 20 0 0 1 85 43 M 72 23 L 75 19 M 82 27 L 86 24 M 88 35 L 94 35" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-
-        {/* Map Pin (Top Center) */}
-        <path d="M 50 12 C 40 12 32 20 32 30 C 32 44 50 62 50 62 C 50 62 68 44 68 30 C 68 20 60 12 50 12 Z M 50 38 C 45.58 38 42 34.42 42 30 C 42 25.58 45.58 22 50 22 C 54.42 22 58 25.58 58 30 C 58 34.42 54.42 38 50 38 Z" fill="url(#pinGrad)" filter="url(#shadow)" />
-
-        {/* Heartbeat Line (Slicing Across) */}
-        <polyline points="8 50, 20 50, 28 35, 42 65, 50 48, 55 52, 65 50, 92 50" fill="none" stroke="#ffffff" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" filter="url(#shadow)" />
-        <circle cx="8" cy="50" r="3" fill="#ffffff" />
-        <circle cx="92" cy="50" r="3" fill="#ffffff" />
-    </svg>
-);
+// Using unified Branding component instead of inline SVG
 
 function Landing() {
     const { t } = useTranslation();
@@ -102,41 +46,23 @@ function Landing() {
 
     return (
         <div className="min-h-screen flex flex-col font-sans bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative transition-colors duration-500">
-
-            {/* Top background behind navbar/hero */}
-            <div className={`absolute top-0 left-0 w-full h-[120vh] z-0 overflow-hidden transition-colors duration-1000 ${theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'bg-[#060b14]' : 'bg-slate-50'}`}>
-                
-                {/* Subtle animated gradient background to fill empty space */}
-                <motion.div 
-                    animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.15, 0.1] }} 
-                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full filter blur-[100px] bg-indigo-500 mix-blend-screen"
-                />
-                <motion.div 
-                    animate={{ scale: [1, 1.2, 1], opacity: [0.08, 0.12, 0.08] }} 
-                    transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                    className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] rounded-full filter blur-[100px] bg-sky-500 mix-blend-screen"
-                />
-                <motion.div 
-                    animate={{ scale: [1, 1.1, 1], opacity: [0.12, 0.18, 0.12] }} 
-                    transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-                    className="absolute bottom-[-10%] left-[20%] w-[60vw] h-[60vw] rounded-full filter blur-[120px] bg-purple-500 mix-blend-screen"
-                />
-
-                {/* 3D Map in the background */}
-                <div className="absolute inset-0 z-0">
-                    <Hero3D />
+            <PremiumHeroBackground>
+                <div className="absolute inset-0">
+                    <ErrorBoundary fallback={<div className="w-full h-full" />}>
+                        <Hero3D />
+                    </ErrorBoundary>
                 </div>
-                {/* Gradient fade at the bottom to blend into the features section smoothly */}
-                <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-t from-white dark:from-slate-950 to-transparent pointer-events-none transition-colors duration-500 z-10"></div>
-            </div>
+                {/* Bottom transition gradient to help text readability */}
+                <div className="absolute bottom-0 left-0 w-full h-[30vh] bg-gradient-to-t from-white dark:from-[#020617] to-transparent z-30 pointer-events-none" />
+            </PremiumHeroBackground>
+
+            {/* Navbar Fixed */}
 
             {/* Navbar Fixed */}
             <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? 'glass-nav py-3' : 'bg-transparent py-6'}`}>
                 <div className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
-                    <div className="flex items-center gap-3 text-orange-500 font-extrabold text-2xl tracking-tight">
-                        <PulsoLogo />
-                        <span>PULSO</span>
+                    <div className="flex items-center">
+                        <Branding size={scrolled ? "h-9" : "h-11"} />
                     </div>
                     <ul className="hidden md:flex gap-8 items-center text-sm font-medium text-slate-600 dark:text-slate-300">
                         <li><a href="#home" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.home')}</a></li>
@@ -639,12 +565,8 @@ function Landing() {
                 <div className="max-w-7xl mx-auto px-6 lg:px-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
 
-                        {/* Brand Column */}
                         <div className="flex flex-col gap-6">
-                            <div className="flex items-center gap-3 text-orange-500 font-extrabold text-2xl tracking-tight">
-                                <PulsoLogo />
-                                <span className="text-white">PULSO</span>
-                            </div>
+                            <Branding size="h-10" />
                             <p className="text-slate-400 text-sm leading-relaxed pr-4">
                                 {t('landing.footer.desc')}
                             </p>
@@ -661,14 +583,14 @@ function Landing() {
                             </div>
                         </div>
 
-                        {/* Quick Links */}
+                        {/* Quick Portals */}
                         <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.portals')}</h4>
+                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">Access Portals</h4>
                             <ul className="flex flex-col gap-3 font-medium text-sm">
-                                <li><a href="/login" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> {t('landing.footer.p_resident')}</a></li>
-                                <li><a href="/dispatcher" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> {t('landing.footer.p_engineering')}</a></li>
-                                <li><a href="/management" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> {t('landing.footer.p_admin')}</a></li>
-                                <li><a href="#" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> {t('landing.footer.p_api')}</a></li>
+                                <li><a href="/login" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Resident Login</a></li>
+                                <li><a href="/gov" className="hover:text-orange-400 transition-colors flex items-center gap-2 font-bold text-white bg-white/5 p-2 rounded-lg border border-white/10 hover:bg-orange-500/20 transition-all"><Shield size={14} className="text-orange-500" /> Internal Gateway (Staff)</a></li>
+                                <li><a href="/dispatcher" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Engineering Dispatch</a></li>
+                                <li><a href="/management" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Command Management</a></li>
                             </ul>
                         </div>
 
