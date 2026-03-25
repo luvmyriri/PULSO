@@ -254,7 +254,13 @@ const ManagementDashboard = () => {
                             Generate Report
                         </button>
                         <button
-                            onClick={() => { localStorage.removeItem('pulso_token'); localStorage.removeItem('pulso_user'); navigate('/login'); }}
+                            onClick={() => { 
+                                const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
+                                const wasGov = user?.role && user.role !== 'resident';
+                                localStorage.removeItem('pulso_token'); 
+                                localStorage.removeItem('pulso_user'); 
+                                navigate(wasGov ? '/gov' : '/login'); 
+                            }}
                             className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                             title="Sign Out"
                         >

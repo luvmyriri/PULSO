@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, User, Phone, MapPin, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, Calendar, ShieldCheck, AlertCircle, Camera, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { PulsoLogo } from './Landing';
+import Branding from '../components/Branding';
 import IDCameraModal from '../components/IDCameraModal';
 
 // ---------------------------------------------------------------------------
@@ -413,8 +413,8 @@ export default function Register() {
                             <button onClick={() => setShowWelcome(false)} className="absolute top-4 right-4 text-white/70 hover:text-white bg-black/10 hover:bg-black/30 p-2 rounded-full transition-all">
                                 <X size={18} />
                             </button>
-                            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg mb-5 mx-auto">
-                                <div className="scale-[1.3]"><PulsoLogo /></div>
+                            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg mb-5 mx-auto">
+                                <Branding size="h-10" showText={false} vertical={true} />
                             </div>
                             <h2 className="text-sm font-bold tracking-widest uppercase text-orange-200 mb-1">{t('register.welcome')}</h2>
                             <h1 className="text-3xl font-black tracking-tight mb-4">{t('register.pulso')}</h1>
@@ -447,9 +447,8 @@ export default function Register() {
             </AnimatePresence>
 
             {/* PULSO logo */}
-            <Link to="/" className="flex items-center gap-2 mb-6 mt-2">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white font-black text-sm shadow-md">P</div>
-                <span className="font-black text-xl text-slate-900 dark:text-white tracking-tight">PULSO</span>
+            <Link to="/" className="mb-6 mt-2">
+                <Branding size="h-10" />
             </Link>
 
             {/* Main card */}

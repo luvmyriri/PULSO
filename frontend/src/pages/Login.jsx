@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { ArrowLeft, User, Lock, Eye, EyeOff } from 'lucide-react';
-import { PulsoLogo } from './Landing';
+import Branding from '../components/Branding';
 
 // Custom complex overlapping wave divider (imitating the reference image's 'cloud' edge, but tailored to PULSO colors)
 const WaveDivider = () => (
@@ -111,11 +111,8 @@ export default function Login() {
                         <h2 className="text-2xl font-display font-medium mb-8">{t('login.welcome')}</h2>
 
                         {/* Enlarged White Circle for Logo (matching the reference image's rocket circle) */}
-                        <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-xl mb-4 transform hover:scale-105 transition-transform duration-300">
-                            {/* We scale the PulsoLogo slightly larger inside its container */}
-                            <div className="scale-[1.8]">
-                                <PulsoLogo />
-                            </div>
+                        <div className="w-40 h-40 bg-white rounded-full flex items-center justify-center shadow-xl mb-4 transform hover:scale-105 transition-transform duration-300">
+                             <Branding size="h-16" showText={false} vertical={true} />
                         </div>
                         <h1 className="text-3xl font-extrabold tracking-tight mb-8">{t('login.pulso')}</h1>
 

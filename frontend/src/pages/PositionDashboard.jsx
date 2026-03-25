@@ -15,9 +15,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     AlertTriangle, CheckCircle2, Clock, ChevronRight, ChevronDown,
-    GitBranch, Building2, PackageCheck, ShieldCheck, FileBarChart2,
+    GitBranch, Building2, PackageCheck, ShieldCheck, BarChart2,
     Users, Wrench, HardHat, Ruler, Eye, Activity, Megaphone,
-    ClipboardList, ArrowRight, Plus, Bell, Map, FileCheck2,
+    ClipboardList, ArrowRight, Plus, Bell, Map, FileCheck,
     TrendingUp, UserCog, BookOpen, Truck, RefreshCw, XCircle,
     CircleDot, AlertCircle, CheckSquare
 } from 'lucide-react';
@@ -51,7 +51,7 @@ const ROLE_CONFIG = {
         quickActions: [
             { label: 'View All Projects', to: '/gov/projects', icon: Map },
             { label: 'Post Advisory', to: '/management', tab: 'advisories', icon: Megaphone },
-            { label: 'Audit Logs', to: '/gov/audit-logs', icon: FileBarChart2 },
+            { label: 'Audit Logs', to: '/gov/audit-logs', icon: BarChart2 },
             { label: 'View All Users', to: '/management', tab: 'users', icon: Users },
         ],
     },
@@ -64,7 +64,7 @@ const ROLE_CONFIG = {
         description: 'Assists the City Engineer in day-to-day operations. Reviews project phases and issues Certificates of Completion.',
         myActions: [
             { label: 'New Project Requests to Review (Phase 1)', endpoint: '/api/gov/projects?status=request_received', icon: Map, urgency: 'high', action: 'Accept/Reject' },
-            { label: 'Projects Ready for CoC (Phase 6)', endpoint: '/api/gov/projects?status=resolved', icon: FileCheck2, urgency: 'high', action: 'Issue Certificate' },
+            { label: 'Projects Ready for CoC (Phase 6)', endpoint: '/api/gov/projects?status=resolved', icon: FileCheck, urgency: 'high', action: 'Issue Certificate' },
             { label: 'Work Orders Pending Dispatch Approval', endpoint: '/api/gov/work-orders?status=open', icon: GitBranch, urgency: 'medium', action: 'Approve Dispatch' },
         ],
         workflow: [
@@ -89,7 +89,7 @@ const ROLE_CONFIG = {
         description: 'Manages the office budget, HR, and validates procurement requests before forwarding to the City Engineer.',
         myActions: [
             { label: 'Procurement Requests to Validate', endpoint: '/api/gov/procurement?status=submitted', icon: PackageCheck, urgency: 'high', action: 'Validate' },
-            { label: 'Budget Check Required', endpoint: '/api/gov/projects?status=boq_submitted', icon: FileBarChart2, urgency: 'high', action: 'Check Budget' },
+            { label: 'Budget Check Required', endpoint: '/api/gov/projects?status=boq_submitted', icon: BarChart2, urgency: 'high', action: 'Check Budget' },
             { label: 'Posts for Advisory Approval', endpoint: null, icon: Megaphone, urgency: 'low', action: 'Review' },
         ],
         workflow: [
@@ -139,7 +139,7 @@ const ROLE_CONFIG = {
         description: 'Maintains all official documents of the City Engineering Office and manages the OBO permit application registry.',
         myActions: [
             { label: 'OBO Applications to Schedule', endpoint: '/api/gov/obo?status=application_received', icon: ShieldCheck, urgency: 'high', action: 'Schedule Inspection' },
-            { label: 'Completed Inspections to Archive', endpoint: '/api/gov/obo?status=inspection_complete', icon: FileCheck2, urgency: 'medium', action: 'Archive' },
+            { label: 'Completed Inspections to Archive', endpoint: '/api/gov/obo?status=inspection_complete', icon: FileCheck, urgency: 'medium', action: 'Archive' },
         ],
         workflow: [
             { step: 'Receive OBO permit applications from window/online', color: 'teal' },
@@ -151,7 +151,7 @@ const ROLE_CONFIG = {
         quickActions: [
             { label: 'OBO Registry', to: '/gov/obo', icon: ShieldCheck },
             { label: 'Records Archive', to: '/gov/records', icon: BookOpen },
-            { label: 'Reports Archive', to: '/gov/reports-archive', icon: FileBarChart2 },
+            { label: 'Reports Archive', to: '/gov/reports-archive', icon: BarChart2 },
         ],
     },
 
@@ -270,7 +270,7 @@ const ROLE_CONFIG = {
         quickActions: [
             { label: 'My Procurement Requests', to: '/gov/procurement', icon: PackageCheck },
             { label: 'Cost Estimation', to: '/gov/estimation', icon: ClipboardList },
-            { label: 'Bill of Quantities', to: '/gov/boq', icon: FileBarChart2 },
+            { label: 'Bill of Quantities', to: '/gov/boq', icon: BarChart2 },
         ],
     },
 
@@ -389,7 +389,7 @@ const ROLE_CONFIG = {
         description: 'Manages all system users, roles, and configurations. Full access to all modules.',
         myActions: [
             { label: 'All System Users', endpoint: '/api/gov/users', icon: Users, urgency: 'low', action: 'Manage Roles' },
-            { label: 'Recent Audit Events', endpoint: '/api/gov/audit-logs', icon: FileBarChart2, urgency: 'low', action: 'Review' },
+            { label: 'Recent Audit Events', endpoint: '/api/gov/audit-logs', icon: BarChart2, urgency: 'low', action: 'Review' },
         ],
         workflow: [
             { step: 'Create user accounts for new staff', color: 'red' },
@@ -400,7 +400,7 @@ const ROLE_CONFIG = {
         quickActions: [
             { label: 'User Management', to: '/management', tab: 'users', icon: Users },
             { label: 'Role Management', to: '/gov/users', icon: UserCog },
-            { label: 'Audit Logs', to: '/gov/audit-logs', icon: FileBarChart2 },
+            { label: 'Audit Logs', to: '/gov/audit-logs', icon: BarChart2 },
             { label: 'System Settings', to: '/gov/settings', icon: TrendingUp },
         ],
     },
@@ -423,7 +423,7 @@ const ROLE_CONFIG = {
         quickActions: [
             { label: 'Exec Overview', to: '/management', icon: TrendingUp },
             { label: 'All Projects', to: '/gov/projects', icon: Map },
-            { label: 'Audit Logs', to: '/gov/audit-logs', icon: FileBarChart2 },
+            { label: 'Audit Logs', to: '/gov/audit-logs', icon: BarChart2 },
         ],
     },
 

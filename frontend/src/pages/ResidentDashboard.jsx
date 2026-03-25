@@ -56,7 +56,7 @@ import {
     Loader2
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { PulsoLogo } from './Landing';
+import Branding from '../components/Branding';
 import { useTranslation } from 'react-i18next';
 import IDCameraModal from '../components/IDCameraModal';
 
@@ -220,6 +220,8 @@ export default function ResidentDashboard() {
     const [submittingReport, setSubmittingReport] = useState(false);
     const [reportLocation, setReportLocation] = useState({ lat: 14.7566, lng: 121.0450 }); // Center of Caloocan North
     const [isSelectingLocation, setIsSelectingLocation] = useState(false);
+    const [mapFilter, setMapFilter] = useState('Nearby'); // State for new map UI filter
+    const [selectedHazard, setSelectedHazard] = useState(null); // Tracks the clicked map marker
 
     const REPORT_CATEGORIES = [
         'Road Issue',
@@ -230,6 +232,51 @@ export default function ResidentDashboard() {
         'Flooding',
         'Other',
     ];
+
+    // SVG Marker Pin Generator for Map Symbols
+    const getMarkerSVG = (category, status) => {
+        let color = status === 'resolved' ? '#22c55e' : (status === 'pending' || status === 'unverified' ? '#ef4444' : '#f97316');
+        let svgIcon = ''; 
+        const cat = (category || '').toLowerCase();
+        
+        if (cat.includes('flood') || cat.includes('water') || cat.includes('drainage')) {
+            svgIcon = `<path d="M12 22a7.5 7.5 0 0 0 7.5-7.5c0-4.14-7.5-12.5-7.5-12.5S4.5 10.36 4.5 14.5A7.5 7.5 0 0 0 12 22z" fill="white"/>`;
+        } else if (cat.includes('electric') || cat.includes('wire') || cat.includes('power') || cat.includes('lighting')) {
+            svgIcon = `<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/>`;
+        } else if (cat.includes('road') || cat.includes('pothole') || cat.includes('infrastructure')) {
+            svgIcon = `<path d="M12 2a6 6 0 0 0-6 6v2H4v2h16v-2h-2V8a6 6 0 0 0-6-6zm0 2a4 4 0 0 1 4 4v2H8V8a4 4 0 0 1 4-4z" fill="white"/>`;
+        } else {
+            svgIcon = `<path d="M12 2L1 21h22L12 2zm0 3.5l7 13.5H5l7-13.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z" fill="white"/>`;
+        }
+
+        const svgString = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 46" width="40" height="46">
+                <!-- Large Pin Body -->
+                <path d="M20 44c0 0 16-15.5 16-24a16 16 0 0 0-32 0c0 8.5 16 24 16 24z" fill="${color}" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0px 3px 2px rgba(0,0,0,0.3))" />
+                <!-- Dark Inner Circle background -->
+                <circle cx="20" cy="18" r="11" fill="rgba(0,0,0,0.15)"/>
+                <!-- Centered White Icon -->
+                <g transform="translate(10, 8) scale(0.8)">
+                    ${svgIcon}
+                </g>
+            </svg>
+        `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
+
+        return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
+    };
+
+    // Simulated data for presentation layer
+    const simulatedHazards = [
+        { id: 1, category: 'Flooding', title: 'Deep Puddles on Highway', lat: 14.7566, lng: 121.0450, status: 'pending', time: '10 mins ago', distance: '1.2 km' }, 
+        { id: 2, category: 'Road Issue', title: 'Cracked Surface', lat: 14.7610, lng: 121.0480, status: 'unverified', time: '1 hr ago', distance: '2.5 km' }, 
+        { id: 3, category: 'Electrical', title: 'Fallen Wire Hazard', lat: 14.7520, lng: 121.0410, status: 'pending', time: '5 hrs ago', distance: '0.8 km' },
+        { id: 4, category: 'Waste Management', title: 'Uncollected Trash Blockage', lat: 14.7590, lng: 121.0390, status: 'pending', time: '1 day ago', distance: '3.1 km' }, 
+        { id: 5, category: 'Flooding', title: 'Blocked City Drainage', lat: 14.7650, lng: 121.0500, status: 'pending', time: '30 mins ago', distance: '4.0 km' }, 
+        { id: 6, category: 'Road Issue', title: 'Severe Pothole', lat: 14.7480, lng: 121.0350, status: 'resolved', time: '2 days ago', distance: '1.5 km' },
+        { id: 7, category: 'Public Safety', title: 'Broken Street Light', lat: 14.7630, lng: 121.0420, status: 'pending', time: '2 hrs ago', distance: '0.5 km' }, 
+        { id: 8, category: 'Electrical', title: 'Transformer Sparking', lat: 14.7540, lng: 121.0550, status: 'pending', time: '4 hrs ago', distance: '2.2 km' }
+    ];
+
 
     // Auto-fetch location when report modal opens
     useEffect(() => {
@@ -244,12 +291,16 @@ export default function ResidentDashboard() {
                         };
                         console.log("PULSO: Successfully fetched GPS location:", newLoc);
                         setReportLocation(newLoc);
+                        reverseGeocode(newLoc.lat, newLoc.lng);
                     },
                     (error) => {
                         console.error("PULSO: Geolocation error:", error);
+                        reverseGeocode(reportLocation.lat, reportLocation.lng);
                     },
                     { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
                 );
+            } else {
+                reverseGeocode(reportLocation.lat, reportLocation.lng);
             }
         }
     }, [activeModal]);
@@ -257,18 +308,42 @@ export default function ResidentDashboard() {
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+        libraries: ['places'],
     });
+
+    // Reverse-geocoded address for the report location picker
+    const [locationAddress, setLocationAddress] = useState('');
+    const [geocodingAddress, setGeocodingAddress] = useState(false);
+
+    const reverseGeocode = async (lat, lng) => {
+        setGeocodingAddress(true);
+        try {
+            const res = await fetch(
+                `http://localhost:8000/api/geocode/reverse?lat=${lat}&lng=${lng}`,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            if (res.ok) {
+                const data = await res.json();
+                setLocationAddress(data.address);
+            }
+        } catch (_) {
+            setLocationAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        } finally {
+            setGeocodingAddress(false);
+        }
+    };
 
     const handleFileReport = async () => {
         setSubmittingReport(true);
         try {
         const payload = {
                 category: reportCategory,
-                description: reportNotes || "Citizen report from PULSO mobile app.",
+                description: reportNotes || "Citizen report from PULSO app.",
                 location_lat: reportLocation.lat,
                 location_lng: reportLocation.lng,
-                location_string: `Lat: ${reportLocation.lat.toFixed(4)}, Lng: ${reportLocation.lng.toFixed(4)}`
+                // Send human-readable address as location string (backend will also auto-reverse-geocode as fallback)
+                location_string: locationAddress || `Lat: ${reportLocation.lat.toFixed(4)}, Lng: ${reportLocation.lng.toFixed(4)}`
             };
 
             const response = await fetch('http://localhost:8000/api/reports', {
@@ -415,9 +490,7 @@ export default function ResidentDashboard() {
                 {/* Left Area: Logo & Search (Facebook Style) */}
                 <div className="flex items-center gap-4 w-1/4 min-w-[200px] relative">
                     <a href="/dashboard" className="flex items-center gap-2 group focus:outline-none shrink-0">
-                        <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-                            <PulsoLogo className="w-full h-full shrink-0 group-hover:scale-110 transition-transform" />
-                        </div>
+                        <Branding size="h-9" showText={false} />
                         <span className="font-extrabold text-2xl tracking-tight text-orange-500 hidden xl:block">PULSO</span>
                     </a>
                     
@@ -934,7 +1007,11 @@ export default function ResidentDashboard() {
                         {/* Modal Content Wrapper - stop propagation so clicks inside don't close it */}
                         <motion.div 
                             initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 my-8"
+                            className={`w-full flex flex-col my-8 pointer-events-auto ${
+                                activeModal === 'map'
+                                    ? 'max-w-7xl max-h-none h-[95vh] bg-transparent shadow-none border-none overflow-visible' 
+                                    : 'max-w-lg max-h-[90vh] bg-white dark:bg-slate-900 shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 rounded-3xl'
+                            }`}
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* File Report Modal (AI Vision Triage Flow) */}
@@ -1028,7 +1105,11 @@ export default function ResidentDashboard() {
                                                         mapContainerStyle={{ width: '100%', height: '100%' }}
                                                         center={reportLocation}
                                                         zoom={15}
-                                                        onClick={(e) => setReportLocation({ lat: e.latLng.lat(), lng: e.latLng.lng() })}
+                                                        onClick={(e) => {
+                                                            const newLoc = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+                                                            setReportLocation(newLoc);
+                                                            reverseGeocode(newLoc.lat, newLoc.lng);
+                                                        }}
                                                         options={{
                                                             disableDefaultUI: true,
                                                             zoomControl: false,
@@ -1038,14 +1119,29 @@ export default function ResidentDashboard() {
                                                             ]
                                                         }}
                                                     >
-                                                        <MarkerF position={reportLocation} />
+                                                        <MarkerF
+                                                            position={reportLocation}
+                                                            icon={{
+                                                                path: window.google?.maps?.SymbolPath?.CIRCLE ?? 0,
+                                                                fillColor: '#f97316',
+                                                                fillOpacity: 1,
+                                                                strokeColor: '#ffffff',
+                                                                strokeWeight: 2,
+                                                                scale: 9,
+                                                            }}
+                                                        />
                                                     </GoogleMap>
                                                 )}
                                             </div>
 
                                             {!isSelectingLocation && (
-                                                <div className="px-3 py-1.5 bg-blue-500/5 text-[10px] font-mono text-slate-500 text-center border-t border-blue-100/20">
-                                                    Coordinates: {reportLocation.lat.toFixed(6)}, {reportLocation.lng.toFixed(6)}
+                                                <div className="px-3 py-2 flex items-center gap-2">
+                                                    <MapPin size={13} className="text-blue-500 shrink-0" />
+                                                    <span className="text-[12px] text-slate-600 dark:text-slate-300 font-medium leading-tight">
+                                                        {geocodingAddress ? (
+                                                            <span className="text-slate-400 italic">Resolving address...</span>
+                                                        ) : locationAddress || `${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)}`}
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
@@ -1149,50 +1245,104 @@ export default function ResidentDashboard() {
                                 </div>
                             )}
 
-                            {/* Map Modal */}
+                            {/* Enhanced Light-Mode Hazards Map Modal */}
                             {activeModal === 'map' && (
-                                <div className="flex flex-col h-full max-h-[80vh]">
-                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0">
-                                        <h3 className="font-bold font-display text-lg flex items-center gap-2"><Map className="text-blue-500"/> Barangay Map</h3>
-                                        <button onClick={() => setActiveModal(null)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors"><X size={20}/></button>
+                                <div className="flex flex-col h-[92vh] w-[95vw] max-w-7xl mx-auto rounded-2xl overflow-hidden bg-slate-50 relative pointer-events-auto shadow-2xl">
+                                    {/* Clean White Card Header */}
+                                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 m-4 mb-2 flex flex-col gap-4 relative z-10 shrink-0">
+                                        <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
+                                            <X size={20} />
+                                        </button>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
+                                                <MapPin size={28} strokeWidth={2.5}/>
+                                            </div>
+                                            <div>
+                                                <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1 mt-1">Nearby Hazards Map</h2>
+                                                <p className="text-sm font-semibold text-slate-500">Incidents within 5 km of your detected location.</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-3 mt-1">
+                                            <button 
+                                                onClick={() => setMapFilter('North Caloocan')}
+                                                className={`px-5 py-2 rounded-full font-bold text-sm transition-colors ${mapFilter === 'North Caloocan' ? 'bg-blue-600 text-white shadow-sm' : 'border border-blue-100 text-blue-600 hover:bg-blue-50'}`}
+                                            >North Caloocan</button>
+                                            <button 
+                                                onClick={() => setMapFilter('Nearby')}
+                                                className={`px-5 py-2 rounded-full font-bold text-sm transition-colors ${mapFilter === 'Nearby' ? 'bg-blue-600 text-white shadow-sm' : 'border border-blue-100 text-blue-600 hover:bg-blue-50'}`}
+                                            >Nearby</button>
+                                            <button 
+                                                onClick={() => setMapFilter('Citywide')}
+                                                className={`px-5 py-2 rounded-full font-bold text-sm transition-colors ${mapFilter === 'Citywide' ? 'bg-blue-600 text-white shadow-sm' : 'border border-blue-100 text-blue-600 hover:bg-blue-50'}`}
+                                            >Citywide</button>
+                                        </div>
                                     </div>
-                                    <div className="p-0 overflow-hidden relative h-[500px] w-full shrink-0">
+
+                                    {/* Full-view Map Container */}
+                                    <div className="flex-1 mx-4 mb-4 rounded-2xl overflow-hidden shadow-sm border border-slate-200 relative">
                                         {isLoaded ? (
                                             <GoogleMap
                                                 mapContainerStyle={{ width: '100%', height: '100%' }}
                                                 center={{ lat: 14.7566, lng: 121.0450 }}
-                                                zoom={14}
+                                                zoom={13}
                                                 options={{
                                                     disableDefaultUI: false,
-                                                    styles: [
-                                                        { "elementType": "geometry", "stylers": [{ "color": "#242f3e" }] },
-                                                        { "elementType": "labels.text.stroke", "stylers": [{ "color": "#242f3e" }] },
-                                                        { "elementType": "labels.text.fill", "stylers": [{ "color": "#746855" }] },
-                                                    ]
+                                                    styles: [] // Standard light mode styling
                                                 }}
+                                                onClick={() => setSelectedHazard(null)} // Click map to close info windows
                                             >
-                                                {/* Mock markers for barangay resources */}
-                                                <MarkerF position={{ lat: 14.7580, lng: 121.0460 }} label="Police" />
-                                                <MarkerF position={{ lat: 14.7550, lng: 121.0430 }} label="Health" />
+                                                {/* Category-aware Semantic Icons */}
+                                                {simulatedHazards.map((hazard) => (
+                                                    <MarkerF 
+                                                        key={hazard.id} 
+                                                        position={{ lat: hazard.lat, lng: hazard.lng }} 
+                                                        onClick={() => setSelectedHazard(hazard)}
+                                                        icon={window.google && window.google.maps ? {
+                                                            url: getMarkerSVG(hazard.category, hazard.status),
+                                                            scaledSize: new window.google.maps.Size(46, 52), // Larger icon footprint
+                                                            anchor: new window.google.maps.Point(23, 52)
+                                                        } : undefined}
+                                                    />
+                                                ))}
+
+                                                {/* InfoWindow popover when an icon is selected */}
+                                                {selectedHazard && (
+                                                    <InfoWindowF
+                                                        position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }}
+                                                        onCloseClick={() => setSelectedHazard(null)}
+                                                        options={{
+                                                            pixelOffset: new window.google.maps.Size(0, -52)
+                                                        }}
+                                                    >
+                                                        <div className="p-2 min-w-[200px]">
+                                                            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${selectedHazard.status === 'resolved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                    {selectedHazard.status}
+                                                                </span>
+                                                                <span className="text-xs font-semibold text-slate-500">{selectedHazard.distance} away</span>
+                                                            </div>
+                                                            <h4 className="font-bold text-slate-800 text-base leading-tight">
+                                                                {selectedHazard.title}
+                                                            </h4>
+                                                            <p className="text-sm font-semibold text-blue-600 mt-1">
+                                                                {selectedHazard.category}
+                                                            </p>
+                                                            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                                                                <Clock size={12}/> Reported {selectedHazard.time}
+                                                            </p>
+                                                        </div>
+                                                    </InfoWindowF>
+                                                )}
                                             </GoogleMap>
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-800">
-                                                <div className="text-center">
-                                                    <Loader2 className="animate-spin mx-auto text-orange-500 mb-2" />
-                                                    <p className="text-sm font-bold">Loading Satellite Infrastructure...</p>
+                                            <div className="w-full h-full flex items-center justify-center bg-slate-100">
+                                                <div className="text-center flex flex-col items-center">
+                                                    <Loader2 className="animate-spin text-blue-500 mb-2" size={30} />
+                                                    <p className="text-sm font-bold text-slate-500">Loading Map Data...</p>
                                                 </div>
                                             </div>
                                         )}
-                                        
-                                        {/* Overlay Controls */}
-                                        <div className="absolute bottom-4 left-4 right-4 flex gap-2 overflow-x-auto pb-2 z-10">
-                                            <button className="whitespace-nowrap bg-white/90 dark:bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-1">
-                                                <ShieldCheck size={12} className="text-blue-500"/> Police Outposts
-                                            </button>
-                                            <button className="whitespace-nowrap bg-white/90 dark:bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-1">
-                                                <AlertTriangle size={12} className="text-red-500"/> Evacuation Sites
-                                            </button>
-                                        </div>
                                     </div>
                                 </div>
                             )}

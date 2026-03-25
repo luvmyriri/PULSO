@@ -42,8 +42,12 @@ const DispatcherDashboard = () => {
         if (!token || !currentUser) {
             navigate('/login');
         } else {
-            if (currentUser.role !== 'dispatcher' && currentUser.role !== 'manager') {
-                navigate('/dashboard'); // Not authorized
+            const allowedRoles = [
+                'dispatcher', 'manager', 'system_admin', 'city_engineer',
+                'asst_city_engineer', 'admin_officer', 'admin_clerk', 'division_chief'
+            ];
+            if (!allowedRoles.includes(currentUser.role)) {
+                navigate('/dashboard'); // Kick back citizens / outside roles
             }
         }
     }, [token, currentUser, navigate]);
@@ -58,12 +62,22 @@ const DispatcherDashboard = () => {
     const [selectedMarker, setSelectedMarker] = useState(null);
     const [map, setMap] = useState(null);
 
+    // New State for Work Order Generation Modal
+    const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
+    const [dispatchForm, setDispatchForm] = useState({
+        assigned_to_id: 2, // Dummy ID for field engineer
+        priority: 'normal',
+        title: '',
+        description: ''
+    });
+
     const center = { lat: 14.7566, lng: 121.0450 }; // Caloocan North Center
     const mapContainerStyle = { width: '100%', height: '100%' };
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+        libraries: ['places'],
     });
 
     const onUnmount = useCallback(function callback(map) {
@@ -133,8 +147,47 @@ const DispatcherDashboard = () => {
 
     const handleVerifyReport  = (id) => handleStatusAction(id, '/status');
     const handleRejectReport  = (id) => handleStatusAction(id, '/reject');
-    const handleDispatchReport = (id) => handleStatusAction(id, '/dispatch');
     const handleResolveReport  = (id) => handleStatusAction(id, '/resolve');
+
+    // Replaces the generic handleStatusAction('/dispatch') with actual Work Order creation
+    const handleCreateWorkOrder = async (e) => {
+        e.preventDefault();
+        setActionLoading(selectedReport.id);
+        
+        try {
+            const payload = {
+                title: dispatchForm.title || `Fix ${selectedReport.ai_category || selectedReport.category}`,
+                description: dispatchForm.description || selectedReport.ai_summary || "Please address the reported issue.",
+                wo_type: "standard",
+                status: "open",
+                priority: dispatchForm.priority,
+                assigned_to_id: parseInt(dispatchForm.assigned_to_id, 10),
+                report_id: selectedReport.id
+            };
+
+            const response = await fetch('http://localhost:8000/api/work-orders', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                setIsDispatchModalOpen(false);
+                fetchReports();
+                setSelectedReport(null);
+            } else {
+                const err = await response.json();
+                console.error("Failed to create Work Order:", err);
+            }
+        } catch (error) {
+            console.error("Error creating Work Order:", error);
+        } finally {
+            setActionLoading(null);
+        }
+    };
 
     const activeReports = allReports.filter(report => 
         dashboardMode === 'triage' 
@@ -156,9 +209,46 @@ const DispatcherDashboard = () => {
         if (!category) return 'slate';
         const cat = category.toLowerCase();
         if (cat.includes('water') || cat.includes('flood')) return 'blue';
-        if (cat.includes('electrical') || cat.includes('wire')) return 'red';
-        if (cat.includes('road') || cat.includes('pothole')) return 'orange';
+        if (cat.includes('electrical') || cat.includes('wire') || cat.includes('power')) return 'red';
+        if (cat.includes('road') || cat.includes('pothole') || cat.includes('infrastructure')) return 'orange';
         return 'slate';
+    };
+
+    // Beautiful Dynamic SVG Pin Generator
+    const getMarkerSVG = (category, status) => {
+        let color = status === 'resolved' ? '#22c55e' : (status === 'pending' || status === 'unverified' ? '#ef4444' : '#f97316');
+        let svgIcon = ''; 
+        const cat = (category || '').toLowerCase();
+        
+        // Crisp, solid vector shapes corresponding to report classifications
+        if (cat.includes('flood') || cat.includes('water')) {
+            // Droplet
+            svgIcon = `<path d="M12 22a7.5 7.5 0 0 0 7.5-7.5c0-4.14-7.5-12.5-7.5-12.5S4.5 10.36 4.5 14.5A7.5 7.5 0 0 0 12 22z" fill="white"/>`;
+        } else if (cat.includes('electric') || cat.includes('wire') || cat.includes('power')) {
+            // Zap
+            svgIcon = `<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/>`;
+        } else if (cat.includes('road') || cat.includes('pothole') || cat.includes('infrastructure')) {
+            // Hardhat / Cone approximation
+            svgIcon = `<path d="M12 2a6 6 0 0 0-6 6v2H4v2h16v-2h-2V8a6 6 0 0 0-6-6zm0 2a4 4 0 0 1 4 4v2H8V8a4 4 0 0 1 4-4z" fill="white"/>`;
+        } else {
+            // Alert triangle
+            svgIcon = `<path d="M12 2L1 21h22L12 2zm0 3.5l7 13.5H5l7-13.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z" fill="white"/>`;
+        }
+
+        const svgString = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 46" width="40" height="46">
+                <!-- Large Pin Body -->
+                <path d="M20 44c0 0 16-15.5 16-24a16 16 0 0 0-32 0c0 8.5 16 24 16 24z" fill="${color}" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0px 3px 2px rgba(0,0,0,0.3))" />
+                <!-- Dark Inner Circle background -->
+                <circle cx="20" cy="18" r="11" fill="rgba(0,0,0,0.15)"/>
+                <!-- Centered White Icon -->
+                <g transform="translate(10, 8) scale(0.8)">
+                    ${svgIcon}
+                </g>
+            </svg>
+        `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
+
+        return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
     };
 
     // Mock Fleet Data
@@ -299,10 +389,14 @@ const DispatcherDashboard = () => {
                                                 )}
                                                 {report.status === 'approved_internal' && (
                                                     <span 
-                                                        onClick={(e) => { e.stopPropagation(); handleDispatchReport(report.id); }}
+                                                        onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            setSelectedReport({...report, aiConfidence, color, icon});
+                                                            setIsDispatchModalOpen(true); 
+                                                        }}
                                                         className="text-[10px] bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider hover:bg-blue-600 hover:text-white dark:hover:bg-blue-500 transition-colors cursor-pointer"
                                                     >
-                                                        {actionLoading === report.id ? '...' : 'Dispatch'}
+                                                        {actionLoading === report.id ? '...' : 'Create W.O.'}
                                                     </span>
                                                 )}
                                                 {report.status === 'dispatched' && (
@@ -354,15 +448,11 @@ const DispatcherDashboard = () => {
                                             setSelectedReport(report);
                                             setSelectedMarker(report);
                                         }}
-                                        icon={{
-                                            path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
-                                            fillColor: report.status === 'resolved' ? '#22c55e' : (report.status === 'pending' ? '#ef4444' : '#f97316'),
-                                            fillOpacity: 1,
-                                            strokeWeight: 2,
-                                            strokeColor: '#ffffff',
-                                            scale: 1.5,
-                                            anchor: new window.google.maps.Point(12, 22)
-                                        }}
+                                        icon={window.google && window.google.maps ? {
+                                            url: getMarkerSVG(report.ai_category || report.category, report.status),
+                                            scaledSize: new window.google.maps.Size(44, 50),
+                                            anchor: new window.google.maps.Point(22, 50)
+                                        } : undefined}
                                     />
                                 )
                             ))}
@@ -486,11 +576,10 @@ const DispatcherDashboard = () => {
                                                     )}
                                                     {selectedReport.status === 'approved_internal' && (
                                                         <button 
-                                                            onClick={() => handleDispatchReport(selectedReport.id)}
-                                                            disabled={actionLoading === selectedReport.id}
-                                                            className="bg-blue-600 hover:bg-blue-500 text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50"
+                                                            onClick={() => setIsDispatchModalOpen(true)}
+                                                            className="bg-blue-600 hover:bg-blue-500 text-white py-2 rounded text-xs font-bold transition-colors shadow flex items-center justify-center gap-2"
                                                         >
-                                                            {actionLoading === selectedReport.id ? '...' : 'Dispatch Team'}
+                                                            <Briefcase size={14} /> Generate Work Order
                                                         </button>
                                                     )}
                                                     {selectedReport.status === 'dispatched' && (
@@ -541,6 +630,117 @@ const DispatcherDashboard = () => {
                         )}
                     </div>
                 </div>
+
+                {/* Dispatch / Generate Work Order Modal */}
+                <AnimatePresence>
+                    {isDispatchModalOpen && selectedReport && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full border border-slate-200 dark:border-slate-800 flex flex-col"
+                            >
+                                <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/50">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-100/50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                            <Briefcase size={20} />
+                                        </div>
+                                        <div>
+                                            <h2 className="font-bold text-slate-900 dark:text-white text-lg leading-tight">Generate Work Order</h2>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">For Ticket RPT-[{selectedReport.id}]</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setIsDispatchModalOpen(false)}
+                                        className="w-8 h-8 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 transition-colors"
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                                
+                                <form onSubmit={handleCreateWorkOrder} className="p-6 flex flex-col gap-4">
+                                    
+                                    <div className="bg-slate-50 dark:bg-slate-950/50 rounded-lg p-3 border border-slate-200 dark:border-slate-800 mb-2">
+                                        <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1">Issue Location</div>
+                                        <div className="text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                                            <MapPin size={14} className="text-slate-400"/>
+                                            {selectedReport.location_string || `${selectedReport.location_lat?.toFixed(4)}, ${selectedReport.location_lng?.toFixed(4)}`}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Assign To (Field Engineer)</label>
+                                        <select 
+                                            required
+                                            value={dispatchForm.assigned_to_id}
+                                            onChange={(e) => setDispatchForm({...dispatchForm, assigned_to_id: e.target.value})}
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                        >
+                                            <option value="2">Engr. Dela Cruz (Team Alpha - Electrical)</option>
+                                            <option value="3">Engr. Bautista (Team Beta - General)</option>
+                                            <option value="4">Engr. Reyes (Team Gamma - Plumbing)</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Priority Level</label>
+                                        <select 
+                                            value={dispatchForm.priority}
+                                            onChange={(e) => setDispatchForm({...dispatchForm, priority: e.target.value})}
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                        >
+                                            <option value="low">Low Priority (Maintenance)</option>
+                                            <option value="normal">Normal (Standard SLA)</option>
+                                            <option value="high">High Priority (Urgent repair)</option>
+                                            <option value="critical">Critical (Immediate danger)</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Task Title</label>
+                                        <input 
+                                            type="text"
+                                            placeholder={`Fix ${selectedReport.ai_category || selectedReport.category}`}
+                                            value={dispatchForm.title}
+                                            onChange={(e) => setDispatchForm({...dispatchForm, title: e.target.value})}
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Dispatcher Notes / Action Plan</label>
+                                        <textarea 
+                                            rows="3"
+                                            placeholder="Provide specific instructions to the field team..."
+                                            value={dispatchForm.description}
+                                            onChange={(e) => setDispatchForm({...dispatchForm, description: e.target.value})}
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors custom-scrollbar"
+                                        ></textarea>
+                                    </div>
+
+                                    <div className="mt-2 flex gap-3">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setIsDispatchModalOpen(false)}
+                                            className="flex-1 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            type="submit"
+                                            disabled={actionLoading === selectedReport.id}
+                                            className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            {actionLoading === selectedReport.id ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div> : <Navigation size={16}/>}
+                                            Execute Dispatch
+                                        </button>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
 
                 </main>
             </div>
