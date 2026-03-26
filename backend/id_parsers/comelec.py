@@ -14,7 +14,7 @@ Card format:
 
 import re
 from .base import BaseIDParser, ParsedIDData
-from typing import List, Tuple
+from typing import List
 
 
 class COMLECParser(BaseIDParser):
@@ -41,8 +41,11 @@ class COMLECParser(BaseIDParser):
              
         if vin_match:
             result['vin'] = vin_match.group(1)
-        elif re.search(r'\b(\d{4}-\d{4}[A-Z]-\d{5})\b', upper): # partial
-            result['vin'] = re.search(r'\b(\d{4}-\d{4}[A-Z]-\d{5})\b', upper).group(1)
+        else:
+            # partial VIN fallback
+            vin_partial = re.search(r'\b(\d{4}-\d{4}[A-Z]-\d{5})\b', upper)
+            if vin_partial:
+                result['vin'] = vin_partial.group(1)
 
         # 3. Precinct Number
         # More resilient: look for PRECINCT/PRESINTO follow by optional label/colon + numbers/letters

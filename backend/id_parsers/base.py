@@ -26,6 +26,10 @@ MONTH_MAP = {
     'ENERO': 1, 'PEBRERO': 2, 'MARSO': 3, 'ABRIL': 4,
     'MAYO': 5, 'HUNYO': 6, 'HULYO': 7, 'AGOSTO': 8,
     'SETYEMBRE': 9, 'OKTUBRE': 10, 'NOBYEMBRE': 11, 'DISYEMBRE': 12,
+    # Common OCR Typos
+    '0CTOBER': 10, 'N0VEMBER': 11, 'DECEM8ER': 12, '1ANUARY': 1, 'IANUARY': 1, 
+    'FE8RUARY': 2, 'HAY': 5, 'J0NE': 6, 'J0LY': 7, 'A0GUST': 8,
+    '0CT': 10, 'N0V': 11, 'DBC': 12, 'FE8': 2, 'J0N': 6, 'J0L': 7, 'A0G': 8,
 }
 
 # ---------------------------------------------------------------------------
@@ -181,10 +185,10 @@ class BaseIDParser:
         cleaned = re.sub(r'(VALID|EXPIR|ISSU)\w*[\s\S]{0,40}', '', upper)
 
         patterns = [
-            # YYYY-MM-DD or YYYY/MM/DD
-            r'(\d{4})[-/](\d{2})[-/](\d{2})',
+            # YYYY-MM-DD or YYYY/MM/DD, allow . and spaces
+            r'(\d{4})\s*[-/\.]\s*(\d{2})\s*[-/\.]\s*(\d{2})',
             # MM/DD/YYYY or MM-DD-YYYY
-            r'(\d{2})[-/](\d{2})[-/](\d{4})',
+            r'(\d{2})\s*[-/\.]\s*(\d{2})\s*[-/\.]\s*(\d{4})',
         ]
 
         for pat in patterns:
@@ -204,10 +208,10 @@ class BaseIDParser:
         text_patterns = [
             rf'(\d{{1,2}})\s+({month_re})\s+(\d{{4}})',
             rf'({month_re})\s+(\d{{1,2}})[,\s]+(\d{{4}})',
-            rf'(\d{{1,2}})-({month_re})-(\d{{4}})',
+            rf'(\d{{1,2}})[\s\-\.]*({month_re})[\s\-\.]*(\d{{4}})',
         ]
         for pat in text_patterns:
-            m = re.search(pat, upper)
+            m: Optional[re.Match[str]] = re.search(pat, upper)
             if m:
                 try:
                     g = m.groups()
@@ -224,18 +228,18 @@ class BaseIDParser:
 
     def _extract_sex(self, upper: str) -> str:
         for p in (
-            r'(?:SEX|GENDER|KASARIAN|GENDER/SEX)[:\s\|]+([MF])\b',
-            r'(?:SEX|GENDER|KASARIAN)[:\s\|]+(MALE|FEMALE)',
-            r'\bSEX\s+([MF])\b', # No colon
-            r'\bSEX\s+(MALE|FEMALE)\b',
-            r'\bSEX\b[:\s]+(LALAKI|BABAE)',
+            r'(?:SEX|SEK|GENDER|KASARIAN|GENDER/SEX)[:\s\|]+([MFHN])\b',
+            r'(?:SEX|SEK|GENDER|KASARIAN)[:\s\|]+(MALE|FEMALE|HALE|NALE|FEHALE|PEMALE)',
+            r'\b(?:SEX|SEK)\s+([MFHN])\b', # No colon
+            r'\b(?:SEX|SEK)\s+(MALE|FEMALE|HALE|NALE|FEHALE|PEMALE)\b',
+            r'\b(?:SEX|SEK)\b[:\s]+(LALAKI|BABAE)',
         ):
             m = re.search(p, upper)
             if m:
                 g = m.group(1)
-                if g in ('M', 'MALE', 'LALAKI'):
+                if g in ('M', 'H', 'N', 'MALE', 'HALE', 'NALE', 'LALAKI'):
                     return 'Male'
-                if g in ('F', 'FEMALE', 'BABAE'):
+                if g in ('F', 'P', 'FEMALE', 'FEHALE', 'PEMALE', 'BABAE'):
                     return 'Female'
         
         # Heuristic for LTO: Look for M or F near "RESTRICTION" or "CONDITIONS"
@@ -245,9 +249,9 @@ class BaseIDParser:
             g = m.group(1)
             return 'Male' if g == 'M' else 'Female'
 
-        if 'FEMALE' in upper:
+        if any(x in upper for x in ('FEMALE', 'FEHALE', 'PEMALE')):
             return 'Female'
-        if 'MALE' in upper:
+        if any(x in upper for x in ('MALE', 'HALE', 'NALE')):
             return 'Male'
         return ''
 
@@ -319,8 +323,8 @@ class BaseIDParser:
         full = re.sub(r'^(ADDRESS|RESIDENCE|TIRAHAN|HOME ADDRESS)\s*:?\s*', '', full, flags=re.I)
 
         # Inline metadata noise: truncate at first occurrence of OCR bleed words
-        for noise_word in ('KASARIAN', 'SEX', 'GENDER', 'BLOOD', 'DATE OF', 'DOB',
-                           'PHILIPPINE', 'REPUBLIC', 'DATE ISSUED', 'LICENSE', 'RESTRICTION', 
+        for noise_word in ('KASARIAN', 'KASAR1AN', 'SEX', 'SEK', 'GENDER', 'BLOOD', 'DATE OF', 'DATE 0F', 'DOB', 'D0B',
+                           'PHILIPPINE', 'REPUBLIC', 'DATE ISSUED', 'DATE 1SSUED', 'LICENSE', 'L1CENSE', 'RESTRICTION', 
                            'AGENCY', 'EXPIRATION', 'SERIAL', 'PLACE', 'OFFICE'):
             idx = full.upper().find(noise_word)
             if idx != -1:
@@ -339,8 +343,8 @@ class BaseIDParser:
         # Normalized mapping of all labels to their category
         labels = {
             'LAST NAME': 'ln', 'SURNAME': 'ln', 'FAMILY NAME': 'ln', 'APELYIDO': 'ln', 'APELLIDO': 'ln',
-            'FIRST NAME': 'fn', 'GIVEN NAME': 'fn', 'GIVEN NAMES': 'fn', 'PANGALAN': 'fn', 'FIRST NAME(S)': 'fn',
-            'MIDDLE NAME': 'mn', 'MIDDLE INITIAL': 'mn', 'GITNANG PANGALAN': 'mn', 'M.I.': 'mn',
+            'FIRST NAME': 'fn', 'GIVEN NAME': 'fn', 'GIVEN NAMES': 'fn', 'PANGALAN': 'fn', 'FIRST NAME(S)': 'fn', 'MGA PANGALAN': 'fn',
+            'MIDDLE NAME': 'mn', 'MIDDLE INITIAL': 'mn', 'GITNANG PANGALAN': 'mn', 'GITNANG APELYIDO': 'mn', 'M.I.': 'mn',
         }
 
         # Strategy 1: Multi-label line splitting
@@ -375,9 +379,10 @@ class BaseIDParser:
                 ul = line.upper()
                 for label, cat in labels.items():
                     if label in ul:
-                        # Value on SAME line after colon
-                        if ':' in ul:
-                            val = ul.split(label, 1)[1].replace(':', '').strip()
+                        # Value on SAME line after colon or slash
+                        normalized_line = ul.replace('/', ' ') # Convert slash to space for label matching
+                        if ':' in ul or '/' in ul:
+                            val = normalized_line.split(label, 1)[1].replace(':', '').strip()
                             # If there's another label in this string, this strategy is weak (Strategy 1 should have caught it)
                             # But if Strategy 1 missed it, we snip at the next known label
                             for other_label in labels.keys():

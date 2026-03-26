@@ -13,7 +13,7 @@ Card format:
 
 import re
 from .base import BaseIDParser, ParsedIDData
-from typing import List, Tuple
+from typing import List
 
 
 class PRCParser(BaseIDParser):
@@ -73,11 +73,7 @@ class PRCParser(BaseIDParser):
         elif len(all_matches) == 1:
              result['expiry_date'] = all_matches[0]
 
-        # Reg Date & Expiry
-        all_dates = []
-        for d_iso in re.findall(r'(\d{4}-\d{2}-\d{2})', re.sub(r'\d{4}-\d{2}-\d{2}', '', self._extract_dob(upper))): # This is wrong, self._extract_dob returns one.
-             pass
-             
+        
         # Use regex directly for MM/DD/YYYY candidates
         candidates = re.findall(r'\b(\d{2}/\d{2}/\d{4})\b', upper)
         if len(candidates) >= 2:

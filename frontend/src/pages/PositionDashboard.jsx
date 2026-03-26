@@ -598,7 +598,7 @@ const PositionDashboard = () => {
     });
 
     useEffect(() => {
-        if (!token || !currentUser) navigate('/login');
+        if (!token || !currentUser) navigate('/gov');
     }, [token, currentUser, navigate]);
 
     const role = currentUser?.role || 'dispatcher';

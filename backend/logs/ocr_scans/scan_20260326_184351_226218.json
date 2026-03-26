@@ -1,0 +1,17 @@
+{
+    "timestamp": "2026-03-26T18:43:51.226218",
+    "raw_text": "REPUBLIKA NG PILIPINAS\nRepublic of the Philippines\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine National ID\nREPUBLIKA\nNG\nPILIPINAS\n5043-5793-0864-2584\nAUTHORITY\nIPPINES\nAPELYIDO/LAST NAME\nEVANGELISTA\nMGA PANGALAN GIVEN NAMES\nMARC ALEXIS\nTYPH\nGITNANG APELYIDO/MIDDLE NAME\nNATIVIDAD\nPETSA NG KAPANGANAKAN/DATE OF BIRTH\nJanuary 05, 2005\nLIKA\n\u2610\u2610\nDIGITAL ID NUMBER\nKFF209\nTIRAHAN ADDRESS\nBLK 40 LOT 3 NORTHVILLE 2B BAGUMBONG,\nBARANGAY 171, CITY OF CALOOCAN, NCR, THIRD\nDISTRICT, PHILIPPINES, 1421\nPUL\nUSL\nSREPU\nPUBLI\nASREPUB\nMASREP\nPHL\nEssazadi\n",
+    "parsed_data": {
+        "id_type": "unknown",
+        "id_type_label": "Unknown Document",
+        "first_name": "Mga",
+        "last_name": "/",
+        "middle_name": "Gitnang",
+        "dob": "2005-01-05",
+        "sex": "",
+        "address": "Address Blk 40 Lot 3 Northville 2B Bagumbong, Barangay 171, City Of Caloocan, Ncr, Third",
+        "barangay": "171",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171)."
+    }
+}

@@ -159,7 +159,11 @@ def detect_id_type(text: str) -> str:
     u = text.upper()
 
     # Order matters — more specific checks first
-    if any(k in u for k in ('PHILSYS', 'PHILIPPINE IDENTIFICATION SYSTEM', 'PCN', 'PHILID')):
+    if any(k in u for k in (
+        'PHILSYS', 'PHILIPPINE IDENTIFICATION SYSTEM', 'PCN', 'PHILID',
+        'PAMBANSANG PAGKAKAKILANLAN', 'PHILIPPINE NATIONAL ID',
+        'PAMBANSANG ID', 'APELYIDO/LAST NAME', 'MGA PANGALAN', 'GITNANG APELYIDO'
+    )):
         return 'philid'
     if any(k in u for k in ('UNIFIED MULTI-PURPOSE', 'UMID', 'SSS')):
         return 'umid'
@@ -612,6 +616,42 @@ def extract_address(lines: list, full_text: str) -> str:
 # Main Extraction Orchestrator
 # ---------------------------------------------------------------------------
 
+ID_TYPE_LABELS = {
+    'philid':     'Philippine National ID',
+    'umid':       'UMID / SSS Card',
+    'lto':        'LTO Driver\'s License',
+    'prc':        'PRC Professional ID',
+    'philhealth': 'PhilHealth ID',
+    'pagibig':    'Pag-IBIG ID',
+    'postal':     'Postal ID',
+    'comelec':    'COMELEC Voter\'s ID',
+    'passport':   'Philippine Passport',
+    'gsis':       'GSIS ID',
+    'unknown':    'Unknown Document',
+}
+
+# North Caloocan Postal Mapping provided by USER
+# Only the numeric code should be returned to the frontend.
+CALOOCAN_POSTAL_MAP = {
+    '1420': ['KAYBIGA', 'DEPARO'],
+    '1421': ['BAGUMBONG', 'PAG-ASA', 'PAGASA', 'NORTHVILLE 2B'],
+    '1422': ['NOVALICHES NORTH', 'BF HOMES'],
+    '1423': ['LILLES VILLE'],
+    '1424': ['CAPITOL PARKLAND'],
+    '1425': ['AMPARO SUBDIVISION', 'AMPARO'],
+    '1426': ['BANKERS VILLAGE'],
+    '1427': ['TALA LEPROSARIUM', 'VICTORY HEIGHTS', 'TALA'],
+    '1428': ['BAGONG SILANG', 'SILANG'],
+}
+
+def infer_postal_code(text: str) -> str:
+    """Infer the 4-digit zip code if its name equivalent is found in text."""
+    u = text.upper()
+    for code, keywords in CALOOCAN_POSTAL_MAP.items():
+        if any(k in u for k in keywords):
+            return code
+    return ''
+
 def extract_id_details(text: str) -> Dict[str, Any]:
     """
     Dispatch OCR text to the appropriate per-ID-type parser module,
@@ -651,11 +691,17 @@ def extract_id_details(text: str) -> Dict[str, Any]:
     if not address:
         address = text[:200].replace('\n', ' ').strip()
 
-    # 4. Residency verification
+    # 4. Smart Postal Code inference if missing
+    postal_code = parsed.get('postal_code', '')
+    if not postal_code:
+        postal_code = infer_postal_code(upper_text)
+    
+    # 5. Residency verification
     is_nc, msg = verify_north_caloocan_residency(upper_text, barangay)
 
     res = {
         'id_type':              id_type,
+        'id_type_label':        ID_TYPE_LABELS.get(id_type, 'Unknown Document'),
         'first_name':           first_name,
         'last_name':            last_name,
         'middle_name':          middle_name,
@@ -663,6 +709,7 @@ def extract_id_details(text: str) -> Dict[str, Any]:
         'sex':                  sex,
         'address':              address,
         'barangay':             barangay,
+        'postal_code':          postal_code,
         'is_north_caloocan':    is_nc,
         'verification_message': msg,
     }
@@ -797,10 +844,25 @@ async def perform_ocr(front_bytes: bytes, back_bytes: bytes = None) -> Dict[str,
     """
     start_total = time.time()
     from dotenv import load_dotenv
+    import os as _os
     load_dotenv(override=True)
+    # Explicitly remove stale simulation var from memory — handles the case
+    # where the var was set before .env was edited (no restart needed).
+    _os.environ.pop('SIMULATED_OCR_TEXT', None)
     
-    # 0. Check for Manual Simulation
-    sim_text = os.getenv('SIMULATED_OCR_TEXT')
+    # open the .env file and check if it explicitly has SIMULATED_OCR_TEXT
+    _env_path = _os.path.join(_os.path.dirname(__file__), '.env')
+    sim_text = ''
+    try:
+        with open(_env_path) as _f:
+            for _line in _f:
+                _stripped = _line.strip()
+                if _stripped.startswith('SIMULATED_OCR_TEXT='):
+                    sim_text = _stripped.split('=', 1)[1].strip().strip('"')
+                    break
+    except Exception:
+        pass
+    
     if sim_text:
         return {
             "success": True,

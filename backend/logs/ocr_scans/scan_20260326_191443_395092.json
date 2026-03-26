@@ -1,0 +1,22 @@
+{
+    "timestamp": "2026-03-26T19:14:43.395092",
+    "raw_text": "REPUBLIKA NG PILIPINAS\nRepublic of the Philippines\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine National ID\nREPUBLIKA\nNG\nPILIPINAS\n5043-5793-0864-2584\nAUTHORITY\nIPPINES\nAPELYIDO/LAST NAME\nEVANGELISTA\nMGA PANGALAN GIVEN NAMES\nMARC ALEXIS\nTYPH\nGITNANG APELYIDO/MIDDLE NAME\nNATIVIDAD\nPETSA NG KAPANGANAKAN/DATE OF BIRTH\nJanuary 05, 2005\nLIKA\n\u2610\u2610\nDIGITAL ID NUMBER\nKFF209\nTIRAHAN ADDRESS\nBLK 40 LOT 3 NORTHVILLE 2B BAGUMBONG,\nBARANGAY 171, CITY OF CALOOCAN, NCR, THIRD\nDISTRICT, PHILIPPINES, 1421\nPUL\nUSL\nSREPU\nPUBLI\nASREPUB\nMASREP\nPHL\nEssazadi\n",
+    "parsed_data": {
+        "id_type": "philid",
+        "id_type_label": "Philippine National ID",
+        "first_name": "Marc Alexis",
+        "last_name": "Evangelista",
+        "middle_name": "Natividad",
+        "dob": "2005-01-05",
+        "sex": "",
+        "address": "Blk 40 Lot 3 Northville 2B Bagumbong None",
+        "barangay": "171",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "pcn": "5043-5793-0864-2584",
+        "block_lot": "Blk 40 Lot 3",
+        "subdivision": "Northville 2B Bagumbong",
+        "street": "None",
+        "postal_code": "1421"
+    }
+}

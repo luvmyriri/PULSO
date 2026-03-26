@@ -40,7 +40,7 @@ const DispatcherDashboard = () => {
 
     useEffect(() => {
         if (!token || !currentUser) {
-            navigate('/login');
+            navigate('/gov');
         } else {
             const allowedRoles = [
                 'dispatcher', 'manager', 'system_admin', 'city_engineer',
