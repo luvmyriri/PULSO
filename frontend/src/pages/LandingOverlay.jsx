@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MapPinned, Activity, BrainCircuit, ArrowRight, ActivitySquare, Menu, X } from 'lucide-react';
-
-// SVG Logo Component
-export const PulsoLogo = () => (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="32" height="32" rx="8" fill="#f97316" />
-        <path d="M7 16H11L14 8L18 24L21 16H25" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-);
+import Branding from '../components/Branding';
 
 export default function LandingOverlay({ onNavigate }) {
     const [scrolled, setScrolled] = useState(false);
@@ -44,7 +37,7 @@ export default function LandingOverlay({ onNavigate }) {
             <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? 'glass-nav py-3' : 'bg-transparent py-6'}`}>
                 <div className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
                     <div className="flex items-center gap-3 text-orange-600 font-extrabold text-2xl tracking-tight">
-                        <PulsoLogo />
+                        <Branding size="h-8" showText={false} />
                         <span>PULSO</span>
                     </div>
                     <ul className="hidden md:flex gap-8 items-center text-sm font-medium text-slate-800 mix-blend-multiply">
@@ -81,10 +74,7 @@ export default function LandingOverlay({ onNavigate }) {
                         className="max-w-xl bg-white/60 p-8 rounded-3xl backdrop-blur-xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
                         variants={staggerContainer}
                     >
-                        <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-orange-100 text-orange-600 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide mb-6 border border-orange-200 shadow-sm">
-                            <ActivitySquare size={14} />
-                            <span>SYSTEM ONLINE • CALOOCAN NORTH</span>
-                        </motion.div>
+
 
                         <motion.h1 variants={fadeUp} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl leading-[1.1] tracking-tight mb-6 text-slate-900 drop-shadow-sm">
                             Smart Infrastructure,<br /><span className="text-gradient">Smarter City.</span>

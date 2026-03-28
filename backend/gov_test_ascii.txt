@@ -1,0 +1,94 @@
+
+--- 0. HEALTH CHECK ---
+  [PASS] [200] GET /api/health
+
+--- 1. AUTH ? Register & Login ---
+  [PASS] [200] POST /api/auth/login (sysadmin)
+
+--- 2. SECOND USER ? Project Engineer ---
+  [PASS] [200] Second user ready (project_engineer)
+
+--- 3. CITIZEN REPORT ? Create seed report ---
+  [FAIL] [500] POST /api/reports (seed)  => Internal Server Error
+
+--- 4. GOV DASHBOARD ? Stats ---
+  [PASS] [200] GET /api/gov/dashboard/stats
+       -> WOs: 0 | Projects: 0 | PRQs: 0
+
+--- 5. WORK ORDERS ---
+  [PASS] [200] POST /api/gov/work-orders (standard)
+  [PASS] [200] POST /api/gov/work-orders (preemptive / FR-11)
+  [PASS] [200] GET /api/gov/work-orders (list all)
+  [PASS] [200] GET /api/gov/work-orders?wo_type=preemptive
+  [PASS] [200] GET /api/gov/work-orders/1
+  [PASS] [200] PATCH /api/gov/work-orders/1/status -> assigned
+  [PASS] [200] PATCH /api/gov/work-orders/1/status -> in_progress
+
+--- 6. PROCUREMENT REQUESTS (RA 9184 / FR-12) ---
+  [PASS] [200] POST /api/gov/procurement (draft + 3 BoQ items)
+       -> PR# PRQ-744527 | Total BoQ: P8,850.00
+  [PASS] [200] GET /api/gov/procurement (list)
+  [PASS] [200] GET /api/gov/procurement/1
+  [PASS] [200] POST /api/gov/procurement/1/items (add BoQ item)
+  [PASS] [200] PATCH /procurement/status -> submitted
+  [PASS] [200] PATCH /procurement/status -> validated (Admin Officer V)
+  [PASS] [200] PATCH /procurement/status -> sent_to_procurement (City Engineer)
+
+--- 7. LGU PROJECTS ? 6-Phase Infrastructure Lifecycle ---
+  [PASS] [200] POST /api/gov/projects (Phase 1 ? Request)
+       -> PROJ# PROJ-527860 | Status: request_received
+  [PASS] [200] GET /api/gov/projects (list)
+  [PASS] [200] PATCH /api/gov/projects/1 (assign personnel)
+  [PASS] [200] PATCH /advance -> survey_in_progress
+  [PASS] [200] PATCH /advance -> survey_complete
+  [PASS] [200] PATCH /advance -> design_in_progress
+  [PASS] [200] PATCH /advance -> boq_submitted
+  [PASS] [200] PATCH /advance -> pending_budget_check
+  [PASS] [200] PATCH /advance -> budget_confirmed
+  [PASS] [200] PATCH /advance -> approved_by_city_engineer
+  [PASS] [200] PATCH /advance -> dispatched
+  [PASS] [200] PATCH /advance -> in_progress
+  [PASS] [200] PATCH /advance -> milestone_inspections
+  [PASS] [200] PATCH /advance -> resolved
+  [PASS] [200] POST /projects/certificate ? Certificate of Completion issued
+       -> PROJ-527860 | Status: closed_completion_certified | Certificate: True
+
+--- 8. PROCESS TIMELINE (FR-14) ---
+  [PASS] [200] GET /timeline/work-order/1
+       -> 3 timeline entries
+  [PASS] [200] GET /timeline/project/1
+       -> 13 timeline entries (all 13 phases)
+  [PASS] [200] GET /timeline/report/1
+
+--- 9. AUDIT LOGS (FR-10) ---
+  [PASS] [200] GET /api/gov/audit-logs (all)
+       -> 23 audit entries auto-generated
+  [PASS] [200] GET /api/gov/audit-logs?trigger_type=procurement
+  [PASS] [200] GET /api/gov/audit-logs?trigger_type=status_change
+
+--- 10. OBO INSPECTIONS (Building Official) ---
+  [PASS] [200] POST /api/gov/obo (building inspection)
+       -> OBO-178849 | Status: application_received
+  [PASS] [200] POST /api/gov/obo (mechanical ? elevator inspection)
+  [PASS] [200] GET /api/gov/obo (list)
+  [PASS] [200] GET /api/gov/obo?inspection_type=building
+  [PASS] [200] GET /api/gov/obo?barangay=172
+  [PASS] [200] GET /api/gov/obo/1
+  [PASS] [200] PATCH /obo/1 -> inspection_scheduled
+  [PASS] [200] PATCH /obo/1 -> inspection_complete (compliant)
+  [PASS] [200] PATCH /obo/1 -> permit_issued (City Engineer)
+
+--- 11. USER ROLE MANAGEMENT (FR-13 RBAC) ---
+  [PASS] [200] GET /api/gov/users (list all)
+       -> 5 users in system
+  [PASS] [200] GET /api/gov/users?role=resident
+  [PASS] [200] PATCH /users/5/role -> estimator
+       -> project_engineer -> estimator
+  [PASS] [422] PATCH /role with INVALID role (expect 422)
+
+=======================================================
+  RESULTS: 52/53 passed  |  1 failed
+=======================================================
+
+  Failed tests:
+    [FAIL] POST /api/reports (seed)

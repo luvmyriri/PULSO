@@ -14,21 +14,20 @@
   --color-light-offset: #f8fafc;
   --color-light: #ffffff;
 
-  --font-sans: 'Inter', sans-serif;
-  --font-display: 'Oswald', sans-serif;
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Oswald", sans-serif;
 }
 
 @layer base {
   body {
-    background-color: var(--color-light);
+    background-color: transparent;
     color: var(--color-dark);
     -webkit-font-smoothing: antialiased;
   }
 
   .dark body,
   body.dark {
-    background-color: #020617;
-    /* slate-950 */
+    background-color: transparent;
     color: var(--color-light);
   }
 
@@ -75,7 +74,9 @@
     font-family: var(--font-sans);
     border: 1px solid var(--color-light-offset) !important;
     border-radius: 1rem !important;
-    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+    box-shadow:
+      0 20px 25px -5px rgb(0 0 0 / 0.1),
+      0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
     background-color: white !important;
     overflow: hidden;
   }
@@ -246,6 +247,30 @@
   .dark .react-datepicker__portal {
     background-color: rgba(0, 0, 0, 0.8) !important;
   }
+
+  /* Hide Google Maps InfoWindow default white bezel/pointer */
+  .gm-style-iw-c {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+  }
+
+  /* Hide the default close button if needed (we use our own logic or maps handles it) */
+  .gm-style-iw-d {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  .gm-style-iw-t::after {
+    display: none !important; /* Hide the default white arrow */
+  }
+
+  .gm-ui-hover-effect {
+    display: none !important; /* Hide default X button to use our clean design */
+  }
 }
 
 @layer utilities {
@@ -268,18 +293,53 @@
   }
 
   .dark .glass-card {
-    background-color: color-mix(in srgb, var(--color-dark-light) 60%, transparent);
+    background-color: color-mix(
+      in srgb,
+      var(--color-dark-light) 60%,
+      transparent
+    );
     border: 1px solid color-mix(in srgb, var(--color-dark-light) 80%, white);
   }
 
   .glass-card:hover {
-    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    box-shadow:
+      0 20px 25px -5px rgb(0 0 0 / 0.1),
+      0 8px 10px -6px rgb(0 0 0 / 0.1);
     transform: translateY(-0.25rem);
   }
 
   .text-gradient {
     background-clip: text;
     color: transparent;
-    background-image: linear-gradient(to right, var(--color-primary), var(--color-primary-light));
+    background-image: linear-gradient(
+      to right,
+      var(--color-primary),
+      var(--color-primary-light)
+    );
+  }
+
+  @keyframes marquee {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+  }
+
+  /* Wave sonar animation for the user's location marker */
+  @keyframes wave-ring {
+    0% {
+      transform: scale(0.6);
+      opacity: 0.9;
+    }
+    100% {
+      transform: scale(2.8);
+      opacity: 0;
+    }
+  }
+
+  .animate-wave-ring {
+    animation: wave-ring 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 }

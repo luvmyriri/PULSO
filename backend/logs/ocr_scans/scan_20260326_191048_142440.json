@@ -1,0 +1,22 @@
+{
+    "timestamp": "2026-03-26T19:10:48.142440",
+    "raw_text": "REPUBLIKA NG PILIPINAS\nRepublic of the Philippines\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine Identification Card\n2672-1495-4873-0538\nTirahan/Address\nApelyido/Last Name\nTABIOS\nMga Pangalan/Given Names\nGENE\nGitnang Apelyido/Middle Name\nGANGE\nPetsa ng Kapanganakan/Date of Birth\nJUNE 13, 2005\nBLK 9 LOT 30 RUBY ST. CELINA HOMES 3 BAGUMBONG\nBARANGAY 171, CITY OF CALOOCAN, NCR, THIRD DISTRICT\nPHL\n",
+    "parsed_data": {
+        "id_type": "philid",
+        "id_type_label": "Philippine National ID",
+        "first_name": "Gene",
+        "last_name": "Tabios",
+        "middle_name": "Gange",
+        "dob": "2005-06-13",
+        "sex": "",
+        "address": "Blk 9 Lot 30 Celina Homes 3 Ruby St. Bagumbong Barangay 171  Barangay 171 City Of Caloocan Ncr Third Barangay 171 City Of Caloocan Ncr  Barangay 171 City Of Caloocan",
+        "barangay": "171",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "pcn": "2672-1495-4873-0538",
+        "block_lot": "Blk 9 Lot 30",
+        "subdivision": "Celina Homes 3",
+        "street": "Ruby St.  Bagumbong Barangay 171   Barangay 171  City Of Caloocan  Ncr  Third  Barangay 171  City Of Caloocan  Ncr   Barangay 171  City Of Caloocan",
+        "postal_code": "1495"
+    }
+}

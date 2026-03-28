@@ -1,0 +1,8 @@
+{
+    "timestamp": "2026-03-13T00:20:33.481385",
+    "raw_text": "FAILURE_LOG: Google Vision: Google Vision API Error 403: {\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"This API method requires billing to be enabled. Please enable billing on project #368015836447 by visiting https://console.developers.google.com/billing/enable?project=368015836447 then retry. If you enabled billing for this project recently, wait a fe | OCR.space: HTTPSConnectionPool(host='api.ocr.space', port=443): Max retries exceeded with url: /parse/image (Caused by NameResolutionError(\"HTTPSConnection(host='api.ocr.space', port=443): Failed to resolve 'api.ocr.space' ([Errno 11001] getaddrinfo failed)\"))",
+    "parsed_data": {
+        "error": "All engines failed",
+        "mock_returned": false
+    }
+}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, User, MapPin, Phone, Lock, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { PulsoLogo } from './LandingOverlay';
+import Branding from '../components/Branding';
 
 export default function AuthModal({ view, onNavigate }) {
     // 'login' | 'register-1' | 'register-2'
@@ -39,7 +39,7 @@ export default function AuthModal({ view, onNavigate }) {
                         <ArrowLeft size={20} />
                     </button>
                     <div className="flex items-center gap-2 text-orange-600 font-extrabold text-lg tracking-tight">
-                        <PulsoLogo /> PULSO
+                        <Branding size="h-6" showText={false} /> PULSO
                     </div>
                     <div className="w-8"></div> {/* Spacer for centering */}
                 </div>

@@ -1,0 +1,79 @@
+
+--- 0. HEALTH CHECK ---
+  [PASS] [200] GET /api/health
+
+--- 1. AUTH ? Register & Login ---
+  [PASS] [200] POST /api/auth/login (sysadmin)
+
+--- 2. SECOND USER ? Project Engineer ---
+  [PASS] [200] Second user ready (project_engineer)
+
+--- 3. CITIZEN REPORT ? Create seed report ---
+  [FAIL] [500] POST /api/reports (seed)  => Internal Server Error
+
+--- 4. GOV DASHBOARD ? Stats ---
+  [PASS] [200] GET /api/gov/dashboard/stats
+       -> WOs: 0 | Projects: 0 | PRQs: 0
+
+--- 5. WORK ORDERS ---
+  [FAIL] [500] POST /api/gov/work-orders (standard)  => Internal Server Error
+  [FAIL] [500] POST /api/gov/work-orders (preemptive / FR-11)  => Internal Server Error
+  [FAIL] [500] GET /api/gov/work-orders (list all)  => Internal Server Error
+  [FAIL] [500] GET /api/gov/work-orders?wo_type=preemptive  => Internal Server Error
+
+--- 6. PROCUREMENT REQUESTS (RA 9184 / FR-12) ---
+  [FAIL] [500] POST /api/gov/procurement (draft + 3 BoQ items)  => Internal Server Error
+  [FAIL] [500] GET /api/gov/procurement (list)  => Internal Server Error
+
+--- 7. LGU PROJECTS ? 6-Phase Infrastructure Lifecycle ---
+  [FAIL] [500] POST /api/gov/projects (Phase 1 ? Request)  => Internal Server Error
+  [FAIL] [500] GET /api/gov/projects (list)  => Internal Server Error
+
+--- 8. PROCESS TIMELINE (FR-14) ---
+  [FAIL] [500] GET /timeline/report/1  => Internal Server Error
+
+--- 9. AUDIT LOGS (FR-10) ---
+  [FAIL] [500] GET /api/gov/audit-logs (all)  => Internal Server Error
+  [FAIL] [500] GET /api/gov/audit-logs?trigger_type=procurement  => Internal Server Error
+  [FAIL] [500] GET /api/gov/audit-logs?trigger_type=status_change  => Internal Server Error
+
+--- 10. OBO INSPECTIONS (Building Official) ---
+  [FAIL] [500] POST /api/gov/obo (building inspection)  => Internal Server Error
+  [FAIL] [500] POST /api/gov/obo (mechanical ? elevator inspection)  => Internal Server Error
+  [FAIL] [500] GET /api/gov/obo (list)  => Internal Server Error
+  [FAIL] [500] GET /api/gov/obo?inspection_type=building  => Internal Server Error
+  [FAIL] [500] GET /api/gov/obo?barangay=172  => Internal Server Error
+
+--- 11. USER ROLE MANAGEMENT (FR-13 RBAC) ---
+  [FAIL] [500] GET /api/gov/users (list all)  => Internal Server Error
+  [FAIL] [500] GET /api/gov/users?role=resident  => Internal Server Error
+  [FAIL] [500] PATCH /users/5/role -> estimator  => Internal Server Error
+  [FAIL] [500] PATCH /role with INVALID role (expect 422)  => Internal Server Error
+
+=======================================================
+  RESULTS: 4/26 passed  |  22 failed
+=======================================================
+
+  Failed tests:
+    [FAIL] POST /api/reports (seed)
+    [FAIL] POST /api/gov/work-orders (standard)
+    [FAIL] POST /api/gov/work-orders (preemptive / FR-11)
+    [FAIL] GET /api/gov/work-orders (list all)
+    [FAIL] GET /api/gov/work-orders?wo_type=preemptive
+    [FAIL] POST /api/gov/procurement (draft + 3 BoQ items)
+    [FAIL] GET /api/gov/procurement (list)
+    [FAIL] POST /api/gov/projects (Phase 1 ? Request)
+    [FAIL] GET /api/gov/projects (list)
+    [FAIL] GET /timeline/report/1
+    [FAIL] GET /api/gov/audit-logs (all)
+    [FAIL] GET /api/gov/audit-logs?trigger_type=procurement
+    [FAIL] GET /api/gov/audit-logs?trigger_type=status_change
+    [FAIL] POST /api/gov/obo (building inspection)
+    [FAIL] POST /api/gov/obo (mechanical ? elevator inspection)
+    [FAIL] GET /api/gov/obo (list)
+    [FAIL] GET /api/gov/obo?inspection_type=building
+    [FAIL] GET /api/gov/obo?barangay=172
+    [FAIL] GET /api/gov/users (list all)
+    [FAIL] GET /api/gov/users?role=resident
+    [FAIL] PATCH /users/5/role -> estimator
+    [FAIL] PATCH /role with INVALID role (expect 422)

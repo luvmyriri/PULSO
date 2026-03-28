@@ -1,0 +1,23 @@
+{
+    "timestamp": "2026-03-26T18:56:05.714208",
+    "raw_text": "REPUBLIC OF THE PHILIPPINES\nDEPARTMENT OF TRANSPORTATION\nLAND TRANSPORTATION OFFICE\nNON-PROFESSIONAL DRIVER'S LICENSE\nLast Name. First Name, Middle Name\nTABIOS, EMILY GANGE\nNationality Sex Date of Birth\n1972/04/16\nPHL\nAddress\nF\nWeight (kg) Height(m)\n58\n1.55\nB-9 L-30 RUBY ST. CELINA HOMES 3\nBACUMBONG KALOOKAN CITY\nLicense No.\nBlood Type\n2018/0\n0+\nEyes Color\nBROWN\nRestrictions\nConditions\nNONE\nSignature of Licensee\nN25-14-016594 2022/04/16\nSummit\nEDGAR C GALVANTE\nAssistant Secretary\nExpiration Date\nAgency Code\nN06\n",
+    "parsed_data": {
+        "id_type": "lto",
+        "id_type_label": "LTO Driver's License",
+        "first_name": "Emily",
+        "last_name": "Tabios",
+        "middle_name": "Gange",
+        "dob": "1972-04-16",
+        "sex": "",
+        "address": "REPUBLIC OF THE PHILIPPINES DEPARTMENT OF TRANSPORTATION LAND TRANSPORTATION OFFICE NON-PROFESSIONAL DRIVER'S LICENSE Last Name. First Name, Middle Name TABIOS, EMILY GANGE Nationality Sex Date of Bir",
+        "barangay": "",
+        "is_north_caloocan": false,
+        "verification_message": "Verification Failed: Caloocan City detected but could not determine barangay number.",
+        "block_lot": "",
+        "street": "",
+        "subdivision": "",
+        "city": "",
+        "province": "",
+        "postal_code": ""
+    }
+}
