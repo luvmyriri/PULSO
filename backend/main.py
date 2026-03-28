@@ -543,7 +543,13 @@ async def get_directions_proxy(
     """
     route = await maps_service.get_directions(origin, destination, mode)
     if not route:
-        raise HTTPException(status_code=400, detail="Could not calculate route")
+        raise HTTPException(status_code=400, detail="Could not calculate route due to server error")
+    
+    # Check if we got an error response from Google (status != OK)
+    if route.get("status") and route.get("status") != "OK":
+        error_msg = route.get("error_detail") or f"Google Maps Error: {route.get('status')}"
+        raise HTTPException(status_code=400, detail=error_msg)
+        
     return route
 
 @app.patch("/api/reports/{report_id}/status", response_model=schemas.ReportResponse)

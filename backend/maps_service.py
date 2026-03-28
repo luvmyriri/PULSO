@@ -121,11 +121,18 @@ async def get_directions(origin: str, destination: str, mode: str = "driving") -
                 "duration": leg["duration"]["text"],
                 "start_address": leg["start_address"],
                 "end_address": leg["end_address"],
-                "bounds": route["bounds"]
+                "bounds": route["bounds"],
+                "status": "OK"
             }
-        return None
+        
+        print(f"[GOOGLE MAPS ERROR] Status: {data.get('status')} - Error Message: {data.get('error_message')}")
+        return {
+            "status": data.get("status"),
+            "error_detail": data.get("error_message")
+        }
 
-    except Exception:
+    except Exception as e:
+        print(f"[GOOGLE MAPS EXCEPTION] {str(e)}")
         return None
 
 
