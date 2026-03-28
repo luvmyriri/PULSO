@@ -1,0 +1,23 @@
+{
+    "timestamp": "2026-03-26T19:22:39.157595",
+    "raw_text": "REPUBLIC OF THE PHILIPPINES\nDEPARTMENT OF TRANSPORTATION\nLAND TRANSPORTATION OFFICE\nDRIVER'S LICENSE\nLast Name, First Name, Middle Name\nTABIOS, GENE GANGE\n2025/05/20\nSene Jovorit\nSignature of Licensee\nNationality\nPHL\nAddress\nLAND TRA\nof\nOFFICE\nSex\nM\nDate of Birth\n2005/06/13\nWeight (kg) Height (m)\n60\n1.65\nBLK 9 LOT 30, RUBY ST CELINA HOMES 3 BAGUMBONG,\nBARANGAY 171, CALOOCAN CITY, NCR, THIRD DISTRICT, 1421\nLicense No.\nC08-25-006312\nExpiration Date\n2029/06/13\nAgency Code\nC08\nBlood Type\nO+\nEyes Color\nDL Codes\nB\nBLACK\nConditions\nNONE\nATTY VIGOR D. MENDOZA II\nAssistant Secretary\n",
+    "parsed_data": {
+        "id_type": "lto",
+        "id_type_label": "LTO Driver's License",
+        "first_name": "Gene",
+        "last_name": "Tabios",
+        "middle_name": "Gange",
+        "dob": "2005-06-13",
+        "sex": "Male",
+        "address": "REPUBLIC OF THE PHILIPPINES DEPARTMENT OF TRANSPORTATION LAND TRANSPORTATION OFFICE DRIVER'S LICENSE Last Name, First Name, Middle Name TABIOS, GENE GANGE 2025/05/20 Sene Jovorit Signature of Licensee",
+        "barangay": "171",
+        "postal_code": "1421",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "block_lot": "",
+        "street": "",
+        "subdivision": "",
+        "city": "",
+        "province": ""
+    }
+}

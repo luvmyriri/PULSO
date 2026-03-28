@@ -1,0 +1,22 @@
+{
+    "timestamp": "2026-03-26T18:24:33.880527",
+    "raw_text": "REPUBLIC OF THE PHILIPPINES\nDEPARTMENT OF TRANSPORTATION\nLAND TRANSPORTATION OFFICE\nDRIVER'S LICENSE\nLAST NAME, FIRST NAME, MIDDLE NAME\nTABIOS, GENE GANGE\nDOB: 2005/06/13 SEX: M\nADDRESS\nBLK 9 LOT 30, RUBY ST CELINA HOMES 3 BAGUMBONG,\nBARANGAY 171, CALOOCAN CITY, NCR, THIRD DISTRICT, 1421",
+    "parsed_data": {
+        "id_type": "lto",
+        "first_name": "Gene",
+        "last_name": "Tabios",
+        "middle_name": "Gange",
+        "dob": "2005-06-13",
+        "sex": "Male",
+        "address": "Blk 9 Lot 30, Ruby St, Celina Homes 3 Bagumbong, 171, Caloocan City",
+        "barangay": "171",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "block_lot": "Blk 9 Lot 30",
+        "street": "Ruby St",
+        "subdivision": "Celina Homes 3 Bagumbong",
+        "city": "Caloocan City",
+        "province": "Metro Manila",
+        "postal_code": "1421"
+    }
+}

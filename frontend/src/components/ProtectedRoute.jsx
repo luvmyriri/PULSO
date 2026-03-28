@@ -146,9 +146,11 @@ const ProtectedRoute = ({ children, allowedRoles = null }) => {
     let user = null;
     try { user = JSON.parse(localStorage.getItem('pulso_user')); } catch {}
 
-    // Not authenticated → to login
+    // Not authenticated → to login or gov portal depending on allowedRoles
     if (!token || !user) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
+        const isGovRoute = allowedRoles !== null && !allowedRoles.includes('resident');
+        const redirectPath = isGovRoute ? '/gov' : '/login';
+        return <Navigate to={redirectPath} state={{ from: location }} replace />;
     }
 
     // Role check — if allowedRoles is null, any authenticated user is OK

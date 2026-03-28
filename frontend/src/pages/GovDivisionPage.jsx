@@ -58,7 +58,7 @@ const PAGE_CONFIG = {
         subtitle: 'Full lifecycle audit trail for all reports, work orders and projects.',
         icon: Activity,
         color: 'orange',
-        apiPath: null,
+        apiPath: '/api/gov/timeline',
         statuses: [],
     },
     '/gov/audit-logs': {
@@ -74,7 +74,7 @@ const PAGE_CONFIG = {
         subtitle: 'Administrative records management for the City Engineering Office.',
         icon: BookOpen,
         color: 'purple',
-        apiPath: null,
+        apiPath: '/api/gov/records',
         statuses: [],
     },
     '/gov/surveys': {
@@ -182,6 +182,116 @@ const ItemRow = ({ item, path }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Timeline Event Component (FR-14)
+// ─────────────────────────────────────────────────────────────────────────────
+const TimelineEvent = ({ entry }) => {
+    let contextLabel = 'System Event';
+    let contextColor = 'bg-slate-500';
+
+    if (entry.report_id) {
+        contextLabel = `Citizen Report #${entry.report_id}`;
+        contextColor = 'bg-rose-500';
+    } else if (entry.work_order_id) {
+        contextLabel = `Work Order #${entry.work_order_id}`;
+        contextColor = 'bg-blue-500';
+    } else if (entry.project_id) {
+        contextLabel = `Project #${entry.project_id}`;
+        contextColor = 'bg-indigo-500';
+    }
+
+    const statusText = (entry.status || '').replace(/_/g, ' ').toUpperCase();
+    const dateObj = entry.created_at ? new Date(entry.created_at) : new Date();
+    const dateStr = dateObj.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = dateObj.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+
+    return (
+        <div className="relative pl-8 sm:pl-32 py-4 group">
+            <div className="hidden sm:block absolute left-0 top-6 w-24 text-right">
+                <div className="text-xs font-bold text-slate-900 dark:text-white">{dateStr}</div>
+                <div className="text-[10px] text-slate-500">{timeStr}</div>
+            </div>
+
+            <div className="absolute left-0 sm:left-28 top-0 bottom-0 w-px bg-slate-200 dark:bg-slate-800 min-h-[100px] group-last:h-full"></div>
+            <div className={`absolute left-[-4px] sm:left-[108px] top-7 w-2.5 h-2.5 rounded-full ${contextColor} ring-4 ring-white dark:ring-slate-900 z-10 shadow-sm`}></div>
+
+            <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow relative">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black tracking-widest uppercase text-white ${contextColor}`}>
+                            {contextLabel}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                            <span className="text-slate-300 dark:text-slate-700">→</span>
+                            <span className="text-slate-900 dark:text-slate-200">{statusText}</span>
+                        </span>
+                    </div>
+                    <div className="sm:hidden text-[10px] font-medium text-slate-400">
+                        {dateStr} • {timeStr}
+                    </div>
+                </div>
+                
+                <p className="text-sm text-slate-700 dark:text-slate-300 mb-3 leading-relaxed">
+                    {entry.note || `Status updated to ${statusText.toLowerCase()}`}
+                </p>
+                
+                <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950/50 rounded-xl p-2.5 border border-slate-100 dark:border-slate-800/80">
+                    <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[9px] font-black text-slate-500 dark:text-slate-400 shrink-0">
+                            {(entry.actor_name || 'S').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                            {entry.actor_name || 'System Automated'}
+                            {entry.actor_role && <span className="text-slate-400 dark:text-slate-500"> • {entry.actor_role.replace(/_/g, ' ')}</span>}
+                        </div>
+                    </div>
+                    {entry.previous_status && (
+                        <div className="text-[10px] text-slate-400 italic hidden sm:block">
+                            Prev: {entry.previous_status.replace(/_/g, ' ')}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Record log row (Records & Registry)
+// ─────────────────────────────────────────────────────────────────────────────
+const RecordRow = ({ entry }) => {
+    let typeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+    if (entry.record_type.includes('Completion')) typeColor = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400';
+    else if (entry.record_type.includes('Permit')) typeColor = 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400';
+    else if (entry.record_type.includes('Award')) typeColor = 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400';
+
+    return (
+        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group text-sm">
+            <td className="p-4">
+                <div className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs">{entry.record_id}</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">Ref: {entry.reference_no}</div>
+            </td>
+            <td className="p-4">
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${typeColor}`}>
+                    {entry.record_type}
+                </span>
+            </td>
+            <td className="p-4">
+                <div className="font-bold text-slate-900 dark:text-white max-w-sm truncate">{entry.title_or_applicant}</div>
+            </td>
+            <td className="p-4 text-xs text-slate-500">
+                {entry.date_issued ? new Date(entry.date_issued).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+            </td>
+            <td className="p-4 text-xs font-medium text-slate-600 dark:text-slate-400">{entry.issued_by_name}</td>
+            <td className="p-4 text-right">
+                <button className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ml-auto">
+                    Open <ArrowRight size={12} />
+                </button>
+            </td>
+        </tr>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Audit log row
 // ─────────────────────────────────────────────────────────────────────────────
 const AuditRow = ({ entry }) => (
@@ -224,7 +334,7 @@ const GovDivisionPage = () => {
     const Icon = config.icon;
 
     useEffect(() => {
-        if (!token || !currentUser) { navigate('/login'); return; }
+        if (!token || !currentUser) { navigate('/gov'); return; }
         if (!config.apiPath) return;
         setLoading(true);
         const params = statusFilter ? `?status=${statusFilter}` : '';
@@ -248,11 +358,17 @@ const GovDivisionPage = () => {
             (item.pr_number || '').toLowerCase().includes(s) ||
             (item.obo_number || '').toLowerCase().includes(s) ||
             (item.status || '').toLowerCase().includes(s) ||
-            (item.action || '').toLowerCase().includes(s)
+            (item.action || '').toLowerCase().includes(s) ||
+            (item.record_id || '').toLowerCase().includes(s) ||
+            (item.record_type || '').toLowerCase().includes(s) ||
+            (item.title_or_applicant || '').toLowerCase().includes(s) ||
+            (item.issued_by_name || '').toLowerCase().includes(s)
         );
     });
 
     const isAuditLog = location.pathname === '/gov/audit-logs';
+    const isTimeline = location.pathname === '/gov/timeline';
+    const isRecords = location.pathname === '/gov/records';
     const isStatic = !config.apiPath;
 
     return (
@@ -341,6 +457,10 @@ const GovDivisionPage = () => {
                                             <p className="font-bold text-slate-500">No {config.title.toLowerCase()} found</p>
                                             {search && <p className="text-sm text-slate-400 mt-1">Try a different search term</p>}
                                         </div>
+                                    ) : isTimeline ? (
+                                        <div className="max-w-4xl mx-auto py-2 px-2 overflow-hidden">
+                                            {filtered.map(item => <TimelineEvent key={item.id} entry={item} />)}
+                                        </div>
                                     ) : (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left">
@@ -353,6 +473,15 @@ const GovDivisionPage = () => {
                                                                 <th className="p-3">Type</th>
                                                                 <th className="p-3">Actor</th>
                                                                 <th className="p-3">Timestamp</th>
+                                                            </>
+                                                        ) : isRecords ? (
+                                                            <>
+                                                                <th className="p-4">Record ID</th>
+                                                                <th className="p-4">Document Type</th>
+                                                                <th className="p-4">Subject / Applicant</th>
+                                                                <th className="p-4">Date Finalized</th>
+                                                                <th className="p-4">Finalized By</th>
+                                                                <th className="p-4 text-right">Action</th>
                                                             </>
                                                         ) : (
                                                             <>
@@ -367,9 +496,9 @@ const GovDivisionPage = () => {
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                                                     {filtered.map(item =>
-                                                        isAuditLog
-                                                            ? <AuditRow key={item.id} entry={item} />
-                                                            : <ItemRow key={item.id} item={item} path={location.pathname} />
+                                                        isAuditLog ? <AuditRow key={item.id || item.record_id} entry={item} /> :
+                                                        isRecords ? <RecordRow key={item.record_id} entry={item} /> :
+                                                        <ItemRow key={item.id} item={item} path={location.pathname} />
                                                     )}
                                                 </tbody>
                                             </table>

@@ -16,7 +16,7 @@ Card format:
 
 import re
 from .base import BaseIDParser, ParsedIDData
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 
 class LTOParser(BaseIDParser):
@@ -46,7 +46,7 @@ class LTOParser(BaseIDParser):
         # Fallback for generic 'address' field
         full_addr = result.get('address', '')
         if not full_addr and addr_fields.get('street'):
-             parts = [addr_fields.get(k) for k in ('block_lot', 'street', 'subdivision', 'barangay', 'city') if addr_fields.get(k)]
+             parts: List[str] = [addr_fields[k] for k in ('block_lot', 'street', 'subdivision', 'barangay', 'city') if addr_fields.get(k)]  # type: ignore[misc]
              result['address'] = ', '.join(parts)
 
         return result
@@ -114,7 +114,8 @@ class LTOParser(BaseIDParser):
 
         for i, line in enumerate(lines):
             ul = line.upper().strip()
-            if 'ADDRESS' in ul:
+            # Allow OCR typos for ADDRESS
+            if any(k in ul for k in ('ADDRESS', 'A0DRESS', 'ADDRES5', 'ADORESS')):
                 found_label = True
                 if len(ul) > 10:
                     addr_lines.append(ul.replace('ADDRESS', '').strip())
@@ -149,10 +150,11 @@ class LTOParser(BaseIDParser):
         for n in noise:
             addr_line = addr_line.replace(n, '').strip()
 
-        # 1. Postal Code (Last 4 numeric digits)
-        postal_match = re.search(r'\b(\d{4})\b(?:$|\s)', addr_line)
+        # 1. Postal Code (Last 4 numeric digits or common OCR misreads)
+        postal_match = re.search(r'\b([I1lO0]{1}\d{3}|\d{4}|14[O0]{2})\b(?:$|\s)', addr_line, re.I)
         if postal_match:
-            res['postal_code'] = postal_match.group(1)
+            pc = postal_match.group(1).upper().replace('O', '0').replace('I', '1').replace('L', '1')
+            res['postal_code'] = pc
             # Remove from line to avoid interference
             addr_line = addr_line.replace(postal_match.group(0), '').strip()
 
@@ -170,10 +172,12 @@ class LTOParser(BaseIDParser):
         if 'NCR' in addr_line or 'METRO MANILA' in addr_line:
             res['province'] = 'Metro Manila'
 
-        # 4. Block & Lot (text matching BLK # LOT #)
-        blk_match = re.search(r'\b(BLK\.?\s*\d+[\w\s]*?LOT\.?\s*\d+[\w\s]*?)\b', addr_line)
+        # 4. Block & Lot (text matching BLK # LOT #, handle typos like 8LK, L0T)
+        blk_match = re.search(r'\b((?:BLK|8LK|B1K)\.?\s*[\dO]+\s*(?:[\w\s]*?)(?:LOT|L0T|L07)\.?\s*[\dO]+[\w\s]*?)\b', addr_line)
         if blk_match:
-            res['block_lot'] = blk_match.group(1).strip()
+            # Normalize back to BLK and LOT
+            normalized = blk_match.group(1).upper().replace('8LK', 'BLK').replace('B1K', 'BLK').replace('L0T', 'LOT').replace('L07', 'LOT')
+            res['block_lot'] = normalized.strip()
 
         # 5. Street (word(s) ending in ST, AVE, RD, etc.)
         # 6. Subdivision (proper noun phrase after street)

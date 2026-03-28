@@ -25,9 +25,27 @@ import {
     MapPin,
     Truck
 } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer } from '@react-google-maps/api';
 import { Link, useNavigate } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
+
+const CALOOCAN_CENTER = { lat: 14.7566, lng: 121.0450 };
+const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7505408, lng: 121.0540317 }; // Adjusted to exact Zapote Rd building footprint
+const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
+const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry'];
+
+const NORTH_CALOOCAN_BOUNDARY = [
+    { lat: 14.825, lng: 121.060 }, // North Tip (Tala Area)
+    { lat: 14.805, lng: 121.140 }, // NE Corner (Boundary with SJDM/Rizal)
+    { lat: 14.745, lng: 121.140 }, // SE Side (Bagong Silang - Brgy 176)
+    { lat: 14.740, lng: 121.100 }, // Under Bagong Silang (Brgy 177 area)
+    { lat: 14.710, lng: 121.070 }, // Southern Edge (Brgy 178/174 Camarin)
+    { lat: 14.675, lng: 121.040 }, // Deep South Extension (To include Brgy 164/169 areas)
+    { lat: 14.680, lng: 120.990 }, // SW Corner (Expansion towards Valenzuela/Meycauayan)
+    { lat: 14.760, lng: 120.970 }, // West Side (Expansion towards Marilao)
+    { lat: 14.820, lng: 120.970 }, // NW Corner (Marilao Border)
+    { lat: 14.825, lng: 121.030 }  // Back to North Tip
+];
 
 const DispatcherDashboard = () => {
     const { t } = useTranslation();
@@ -40,7 +58,7 @@ const DispatcherDashboard = () => {
 
     useEffect(() => {
         if (!token || !currentUser) {
-            navigate('/login');
+            navigate('/gov');
         } else {
             const allowedRoles = [
                 'dispatcher', 'manager', 'system_admin', 'city_engineer',
@@ -61,9 +79,134 @@ const DispatcherDashboard = () => {
     const [loadingReports, setLoadingReports] = useState(true);
     const [selectedMarker, setSelectedMarker] = useState(null);
     const [map, setMap] = useState(null);
+    const [panorama, setPanorama] = useState(null);
+
+    const centerOnHQ = () => {
+        if (map) {
+            map.panTo(CALOOCAN_CITY_HALL_NORTH_LOC);
+            map.setZoom(16);
+        }
+    };
 
     // New State for Work Order Generation Modal
     const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
+    const [isStreetViewConfirmOpen, setIsStreetViewConfirmOpen] = useState(false);
+    const [pendingStreetViewLoc, setPendingStreetViewLoc] = useState(null);
+    const [isStreetActive, setIsStreetActive] = useState(false);
+    const [svLocation, setSvLocation] = useState(null);
+    const [isStreetViewVisible, setIsStreetViewVisible] = useState(false);
+    const [pulseRadius, setPulseRadius] = useState(0);
+    const [isJurisdictionModalOpen, setIsJurisdictionModalOpen] = useState(false);
+    const [jurisdictionErrorMsg, setJurisdictionErrorMsg] = useState("");
+    
+    // Routing state
+    const [directionsResponse, setDirectionsResponse] = useState(null);
+    const [distance, setDistance] = useState('');
+    const [duration, setDuration] = useState('');
+    
+    // Reset route when selected marker changes
+    useEffect(() => {
+        setDirectionsResponse(null);
+        setDistance('');
+        setDuration('');
+    }, [selectedMarker]);
+
+    const handleGetDirections = () => {
+        if (selectedMarker && selectedMarker.location_lat && selectedMarker.location_lng && window.google) {
+            const directionsService = new window.google.maps.DirectionsService();
+            directionsService.route(
+                {
+                    origin: CALOOCAN_CITY_HALL_NORTH_LOC,
+                    destination: { 
+                        lat: parseFloat(selectedMarker.location_lat), 
+                        lng: parseFloat(selectedMarker.location_lng) 
+                    },
+                    travelMode: window.google.maps.TravelMode.DRIVING,
+                },
+                (result, status) => {
+                    if (status === window.google.maps.DirectionsStatus.OK) {
+                        setDirectionsResponse(result);
+                        setDistance(result.routes[0].legs[0].distance.text);
+                        setDuration(result.routes[0].legs[0].duration.text);
+                    } else {
+                        console.error('Directions request failed due to ' + status);
+                        setDirectionsResponse(null);
+                        setDistance('');
+                        setDuration('');
+                    }
+                }
+            );
+        }
+    };
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setPulseRadius(prev => (prev + 1) % 40); // Pulse scale from 0 to 40
+        }, 40);
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        if (panorama) {
+            const posListener = panorama.addListener('position_changed', () => {
+                const pos = panorama.getPosition();
+                if (pos) {
+                    const loc = { lat: pos.lat(), lng: pos.lng() };
+                    
+                    // Validate position on every change (drag or nav)
+                    if (!checkJurisdiction(loc)) {
+                        panorama.setVisible(false);
+                        return;
+                    }
+                    
+                    setSvLocation(loc);
+                }
+            });
+            const visListener = panorama.addListener('visible_changed', () => {
+                const nowVisible = panorama.getVisible();
+                setIsStreetViewVisible(nowVisible);
+                
+                if (!nowVisible && panorama.getPosition() && map) {
+                    const pos = panorama.getPosition();
+                    map.panTo({ lat: pos.lat(), lng: pos.lng() });
+                }
+            });
+            return () => {
+                if (window.google && window.google.maps) {
+                    window.google.maps.event.removeListener(posListener);
+                    window.google.maps.event.removeListener(visListener);
+                }
+            };
+        }
+    }, [panorama]);
+
+    const checkJurisdiction = (location) => {
+        if (!window.google || !window.google.maps || !window.google.maps.geometry) return true;
+        
+        const polygon = new window.google.maps.Polygon({ paths: NORTH_CALOOCAN_BOUNDARY });
+        const latLng = new window.google.maps.LatLng(location.lat, location.lng);
+        const isIn = window.google.maps.geometry.poly.containsLocation(latLng, polygon);
+        
+        if (!isIn && !isJurisdictionModalOpen) {
+            setJurisdictionErrorMsg(t('This location is outside North Caloocan City jurisdiction. Visual verification tools and Street View are restricted to authorized areas.'));
+            setIsJurisdictionModalOpen(true);
+        }
+        return isIn;
+    };
+
+    const handleStreetViewClick = (location) => {
+        if (checkJurisdiction(location)) {
+            setPendingStreetViewLoc(location);
+            setIsStreetViewConfirmOpen(true);
+        }
+    };
+
+    useEffect(() => {
+        if (map && !panorama) {
+            const sv = map.getStreetView();
+            setPanorama(sv);
+        }
+    }, [map, panorama]);
     const [dispatchForm, setDispatchForm] = useState({
         assigned_to_id: 2, // Dummy ID for field engineer
         priority: 'normal',
@@ -71,13 +214,27 @@ const DispatcherDashboard = () => {
         description: ''
     });
 
-    const center = { lat: 14.7566, lng: 121.0450 }; // Caloocan North Center
-    const mapContainerStyle = { width: '100%', height: '100%' };
+    const mapOptions = React.useMemo(() => ({
+        styles: [
+            { "elementType": "geometry", "stylers": [{ "color": "#121826" }] },
+            { "elementType": "labels.text.fill", "stylers": [{ "color": "#637282" }] },
+            { "elementType": "labels.text.stroke", "stylers": [{ "color": "#121826" }] },
+            { "featureType": "administrative", "elementType": "geometry.stroke", "stylers": [{ "color": "#2c3e50" }] },
+            { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#232b3d" }] },
+            { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0d1117" }] }
+        ],
+        disableDefaultUI: true,
+        zoomControl: true,
+        streetViewControl: true,
+        streetViewControlOptions: {
+            position: window.google?.maps?.ControlPosition?.RIGHT_BOTTOM
+        }
+    }), []);
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
         googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-        libraries: ['places'],
+        libraries: GOOGLE_MAPS_LIBRARIES,
     });
 
     const onUnmount = useCallback(function callback(map) {
@@ -264,7 +421,6 @@ const DispatcherDashboard = () => {
             {/* Unified Left Sidebar Navigation */}
             <GovSidebar currentUser={currentUser} />
 
-
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 
@@ -368,45 +524,56 @@ const DispatcherDashboard = () => {
                                                 <MapPin size={12}/> {report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}
                                             </div>
                                             
-                                            <div className="flex items-center justify-between mt-2 pt-2 relative">
-                                                <div className="absolute -top-4 left-0 w-full h-4 bg-gradient-to-t from-slate-100/50 to-transparent dark:from-slate-800/50 dark:to-transparent pointer-events-none"></div>
+                                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
                                                 <div className="flex items-center gap-1">
                                                     <span className={`w-2 h-2 rounded-full ${aiConfidence < 75 ? 'bg-orange-500' : 'bg-blue-500'}`}></span>
                                                     <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
                                                         {report.ai_urgency ? `AI: ${report.ai_urgency}` : `Conf: ${aiConfidence}%`}
                                                     </span>
                                                 </div>
-                                                {(report.status === 'unverified' || report.status === 'pending') && (
-                                                    <span 
-                                                        onClick={(e) => { e.stopPropagation(); handleVerifyReport(report.id); }}
-                                                        className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded uppercase font-bold tracking-wider hover:bg-orange-500 hover:text-white dark:hover:bg-orange-500 transition-colors cursor-pointer"
-                                                    >
-                                                        {actionLoading === report.id ? '...' : 'Verify'}
-                                                    </span>
-                                                )}
-                                                {report.status === 'pending_approval' && (
-                                                    <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider flex items-center gap-1"><Clock size={10}/> Pending Eng</span>
-                                                )}
-                                                {report.status === 'approved_internal' && (
-                                                    <span 
+                                                <div className="flex items-center gap-2">
+                                                    <button 
                                                         onClick={(e) => { 
                                                             e.stopPropagation(); 
-                                                            setSelectedReport({...report, aiConfidence, color, icon});
-                                                            setIsDispatchModalOpen(true); 
+                                                            handleStreetViewClick({ lat: report.location_lat, lng: report.location_lng });
                                                         }}
-                                                        className="text-[10px] bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider hover:bg-blue-600 hover:text-white dark:hover:bg-blue-500 transition-colors cursor-pointer"
+                                                        className="p-1 px-1.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                                                        title="Quick Street View"
                                                     >
-                                                        {actionLoading === report.id ? '...' : 'Create W.O.'}
-                                                    </span>
-                                                )}
-                                                {report.status === 'dispatched' && (
-                                                    <span 
-                                                        onClick={(e) => { e.stopPropagation(); handleResolveReport(report.id); }}
-                                                        className="text-[10px] bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider hover:bg-green-600 hover:text-white dark:hover:bg-green-500 transition-colors cursor-pointer"
-                                                    >
-                                                        {actionLoading === report.id ? '...' : 'Resolve'}
-                                                    </span>
-                                                )}
+                                                        <Eye size={14} />
+                                                    </button>
+                                                    {(report.status === 'unverified' || report.status === 'pending') && (
+                                                        <span 
+                                                            onClick={(e) => { e.stopPropagation(); handleVerifyReport(report.id); }}
+                                                            className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-orange-500 hover:text-white dark:hover:bg-orange-500 transition-colors cursor-pointer"
+                                                        >
+                                                            {actionLoading === report.id ? '...' : 'Verify'}
+                                                        </span>
+                                                    )}
+                                                    {report.status === 'pending_approval' && (
+                                                        <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400 px-2 py-1 rounded uppercase font-bold tracking-wider flex items-center gap-1"><Clock size={10}/> Pending Eng</span>
+                                                    )}
+                                                    {report.status === 'approved_internal' && (
+                                                        <span 
+                                                            onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                setSelectedReport({...report, aiConfidence, color, icon});
+                                                                setIsDispatchModalOpen(true); 
+                                                            }}
+                                                            className="text-[10px] bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-blue-600 hover:text-white dark:hover:bg-blue-500 transition-colors cursor-pointer"
+                                                        >
+                                                            {actionLoading === report.id ? '...' : 'Create W.O.'}
+                                                        </span>
+                                                    )}
+                                                    {report.status === 'dispatched' && (
+                                                        <span 
+                                                            onClick={(e) => { e.stopPropagation(); handleResolveReport(report.id); }}
+                                                            className="text-[10px] bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-green-600 hover:text-white dark:hover:bg-green-500 transition-colors cursor-pointer"
+                                                        >
+                                                            {actionLoading === report.id ? '...' : 'Resolve'}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </button>
                                     )})
@@ -420,23 +587,15 @@ const DispatcherDashboard = () => {
                 <div className="flex-1 bg-slate-100 dark:bg-slate-950 relative">
                     {isLoaded ? (
                         <GoogleMap
-                            mapContainerStyle={mapContainerStyle}
-                            center={center}
+                            mapContainerStyle={MAP_CONTAINER_STYLE}
+                            center={CALOOCAN_CENTER}
                             zoom={14}
-                            onLoad={map => setMap(map)}
-                            onUnmount={onUnmount}
-                            options={{
-                                styles: [
-                                    { "elementType": "geometry", "stylers": [{ "color": "#121826" }] },
-                                    { "elementType": "labels.text.fill", "stylers": [{ "color": "#637282" }] },
-                                    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#121826" }] },
-                                    { "featureType": "administrative", "elementType": "geometry.stroke", "stylers": [{ "color": "#2c3e50" }] },
-                                    { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#232b3d" }] },
-                                    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0d1117" }] }
-                                ],
-                                disableDefaultUI: true,
-                                zoomControl: true
+                            onLoad={map => {
+                                setMap(map);
+                                setPanorama(map.getStreetView());
                             }}
+                            onUnmount={onUnmount}
+                            options={mapOptions}
                         >
                             {/* Render markers for all reports */}
                             {allReports.map(report => (
@@ -444,9 +603,17 @@ const DispatcherDashboard = () => {
                                     <MarkerF
                                         key={report.id}
                                         position={{ lat: report.location_lat, lng: report.location_lng }}
+                                        panorama={panorama}
                                         onClick={() => {
                                             setSelectedReport(report);
                                             setSelectedMarker(report);
+                                        }}
+                                        onDblClick={() => {
+                                            handleStreetViewClick({ lat: report.location_lat, lng: report.location_lng });
+                                        }}
+                                        options={{
+                                            optimized: false,
+                                            clickable: true
                                         }}
                                         icon={window.google && window.google.maps ? {
                                             url: getMarkerSVG(report.ai_category || report.category, report.status),
@@ -462,14 +629,140 @@ const DispatcherDashboard = () => {
                                     position={{ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng }}
                                     onCloseClick={() => setSelectedMarker(null)}
                                 >
-                                    <div className="p-2 text-slate-900 min-w-[150px]">
-                                        <div className="font-bold text-xs mb-1">RPT-[{selectedMarker.id}]</div>
-                                        <div className="text-[10px] mb-1 capitalize">{selectedMarker.category || 'Uncategorized'}</div>
-                                        <div className={`text-[10px] font-bold ${selectedMarker.status === 'resolved' ? 'text-green-600' : 'text-orange-600'}`}>
-                                            {selectedMarker.status.replace('_', ' ').toUpperCase()}
-                                        </div>
+                                    {/* All inline styles — Tailwind dark: classes are unreliable inside Google Maps DOM */}
+                                    <div style={{ background:'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)', borderRadius:'16px', padding:'16px', minWidth:'220px', border:'1px solid rgba(255,255,255,0.07)', margin:'-10px', boxShadow:'0 25px 50px rgba(0,0,0,0.7)', fontFamily:'Inter,sans-serif', display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', position:'relative' }}>
+                                        {/* Close */}
+                                        <button onClick={() => setSelectedMarker(null)} style={{ position:'absolute', top:'10px', right:'10px', background:'rgba(255,255,255,0.07)', border:'none', borderRadius:'50%', width:'26px', height:'26px', cursor:'pointer', color:'#94a3b8', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                                        {/* Icon */}
+                                        <div style={{ width:'42px', height:'42px', borderRadius:'50%', background:'rgba(249,115,22,0.12)', border:'1px solid rgba(249,115,22,0.25)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'10px', color:'#f97316' }}><AlertTriangle size={18} /></div>
+                                        {/* Ticket ID */}
+                                        <div style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.1em', color:'#94a3b8', marginBottom:'4px', fontFamily:'monospace' }}>RPT-{selectedMarker.id}</div>
+                                        {/* Category */}
+                                        <h4 style={{ fontWeight:700, fontSize:'14px', color:'#f1f5f9', lineHeight:1.3, margin:'0 0 6px', padding:'0 16px' }}>{selectedMarker.ai_category || selectedMarker.category || 'Uncategorized'}</h4>
+                                        {/* Distance & Duration from HQ or Get Route Button */}
+                                        {!directionsResponse ? (
+                                            <button
+                                                onClick={handleGetDirections}
+                                                style={{ width:'100%', padding:'10px 0', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'12px', color:'#f1f5f9', fontSize:'12px', fontWeight:600, cursor:'pointer', marginBottom:'14px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'all 0.2s' }}
+                                                onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                                                onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                                            >
+                                                <Navigation size={14} color="#f97316" /> Get Directions
+                                            </button>
+                                        ) : (
+                                            <div style={{ display:'flex', alignItems:'center', gap:'6px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'999px', padding:'4px 14px', marginBottom:'14px' }}>
+                                                <span style={{ color:'#f97316', display:'flex' }}><Truck size={12} /></span>
+                                                <span style={{ fontSize:'10px', fontWeight:700, color:'#cbd5e1' }}>HQ → {distance} ({duration})</span>
+                                            </div>
+                                        )}
+                                        {/* Status pill */}
+                                        <div style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.12em', color: selectedMarker.status==='resolved'?'#4ade80': selectedMarker.status==='rejected'?'#f87171':'#fb923c', background: selectedMarker.status==='resolved'?'rgba(74,222,128,0.12)': selectedMarker.status==='rejected'?'rgba(248,113,113,0.12)':'rgba(251,146,60,0.12)', padding:'3px 12px', borderRadius:'999px', marginBottom:'14px', textTransform:'uppercase' }}>{(selectedMarker.status || '').replace(/_/g,' ')}</div>
+                                        {/* Street View button */}
+                                        <button
+                                            onClick={() => handleStreetViewClick({ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng })}
+                                            style={{ width:'100%', padding:'10px 0', background:'linear-gradient(135deg,#ea580c,#f97316)', border:'none', borderRadius:'12px', color:'white', fontSize:'12px', fontWeight:700, cursor:'pointer', boxShadow:'0 4px 20px rgba(249,115,22,0.35)', letterSpacing:'0.02em', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}
+                                        >
+                                            <Eye size={14} /> Open Street View
+                                        </button>
                                     </div>
                                 </InfoWindowF>
+                            )}
+
+                            {/* User Position Marker */}
+                            {/* North Caloocan Jurisdiction Boundary Display */}
+                             <PolygonF
+                                paths={NORTH_CALOOCAN_BOUNDARY}
+                                options={{
+                                    fillColor: "#6366f1",
+                                    fillOpacity: 0.08,
+                                    strokeColor: "#6366f1",
+                                    strokeOpacity: 0.6,
+                                    strokeWeight: 3,
+                                    clickable: false,
+                                }}
+                            />
+
+                            {/* Caloocan City Hall North Pin */}
+                            <MarkerF 
+                                position={CALOOCAN_CITY_HALL_NORTH_LOC}
+                                zIndex={200}
+                                icon={window.google && window.google.maps ? {
+                                    path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+                                    fillColor: '#3b82f6',
+                                    fillOpacity: 1,
+                                    scale: 6,
+                                    strokeColor: 'white',
+                                    strokeWeight: 2,
+                                } : undefined}
+                                title="Caloocan City Hall North (HQ)"
+                            />
+
+                            {/* Route to Selected Hazard */}
+                            {directionsResponse && (
+                                <DirectionsRenderer
+                                    directions={directionsResponse}
+                                    options={{
+                                        suppressMarkers: true,
+                                        polylineOptions: {
+                                            strokeColor: '#f97316',
+                                            strokeOpacity: 0.8,
+                                            strokeWeight: 5
+                                        }
+                                    }}
+                                />
+                            )}
+
+                            {/* Street View Camera Position Marker (on Map & Street View) - Pulsing Signal Waves */}
+                            {svLocation && (
+                                <>
+                                    {/* Stable Core Marker */}
+                                    <MarkerF
+                                        position={svLocation}
+                                        panorama={panorama}
+                                        zIndex={160}
+                                        icon={window.google && window.google.maps ? {
+                                            path: window.google.maps.SymbolPath.CIRCLE,
+                                            fillColor: '#ef4444',
+                                            fillOpacity: 1,
+                                            scale: 7,
+                                            strokeColor: 'white',
+                                            strokeWeight: 2,
+                                        } : undefined}
+                                        title={isStreetViewVisible ? "Live Street View Camera" : "Last Viewed Location"}
+                                    />
+                                    
+                                    {/* Animated Signal Waves using Markers (Persistent on Map) */}
+                                    <MarkerF
+                                        position={svLocation}
+                                        panorama={panorama}
+                                        zIndex={155}
+                                        icon={window.google && window.google.maps ? {
+                                            path: window.google.maps.SymbolPath.CIRCLE,
+                                            fillColor: '#ef4444',
+                                            fillOpacity: 0.3 * (1 - pulseRadius / 40) * (isStreetViewVisible ? 1 : 0.6),
+                                            scale: pulseRadius,
+                                            strokeColor: '#ef4444',
+                                            strokeOpacity: 0.6 * (1 - pulseRadius / 40) * (isStreetViewVisible ? 1 : 0.6),
+                                            strokeWeight: 1,
+                                        } : undefined}
+                                        options={{ clickable: false }}
+                                    />
+                                    <MarkerF
+                                        position={svLocation}
+                                        panorama={panorama}
+                                        zIndex={154}
+                                        icon={window.google && window.google.maps ? {
+                                            path: window.google.maps.SymbolPath.CIRCLE,
+                                            fillColor: '#ef4444',
+                                            fillOpacity: 0.2 * (1 - ((pulseRadius + 20) % 40) / 40) * (isStreetViewVisible ? 1 : 0.6),
+                                            scale: (pulseRadius + 20) % 40,
+                                            strokeColor: '#ef4444',
+                                            strokeOpacity: 0.4 * (1 - ((pulseRadius + 20) % 40) / 40) * (isStreetViewVisible ? 1 : 0.6),
+                                            strokeWeight: 1,
+                                        } : undefined}
+                                        options={{ clickable: false }}
+                                    />
+                                </>
                             )}
                         </GoogleMap>
                     ) : (
@@ -479,7 +772,7 @@ const DispatcherDashboard = () => {
                     )}
 
                     {/* Map UI Floating Controls */}
-                    <div className="absolute bottom-6 left-6 flex flex-col gap-2 pointer-events-none">
+                    <div className="absolute bottom-32 left-6 flex flex-col gap-2 pointer-events-none">
                         <div className="bg-slate-900/90 backdrop-blur border border-slate-800 rounded-xl p-3 flex flex-col gap-3 shadow-xl pointer-events-auto">
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Live Map Feed</h4>
                             <div className="flex items-center gap-3">
@@ -494,6 +787,30 @@ const DispatcherDashboard = () => {
                                 </span>
                             </div>
                         </div>
+
+                        {/* Center on HQ Button */}
+                        <button 
+                            onClick={centerOnHQ}
+                            className="bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 p-3 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center pointer-events-auto transition-colors group"
+                            title="Center on Dispatch HQ"
+                            style={{ position: 'relative', zIndex: 10 }}
+                        >
+                            <ShieldAlert size={20} className="group-hover:text-blue-500" />
+                        </button>
+
+                        {/* Custom Street View Toggle */}
+                        <button 
+                            onClick={() => {
+                                if (panorama) {
+                                    panorama.setVisible(!panorama.getVisible());
+                                }
+                            }}
+                            className="bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 p-3 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center pointer-events-auto transition-colors group"
+                            title="Toggle Street View"
+                            style={{ position: 'relative', zIndex: 10 }}
+                        >
+                            <Navigation size={20} className="group-hover:text-blue-500" />
+                        </button>
                     </div>
                 </div>
 
@@ -531,10 +848,21 @@ const DispatcherDashboard = () => {
                                                 
                                                 <div className="bg-white dark:bg-slate-900 rounded-lg p-2 mb-3 border border-slate-200 dark:border-slate-800">
                                                     <div className="text-xs font-bold text-slate-500 mb-2">Attached Image:</div>
-                                                    <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden flex items-center justify-center text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700">
+                                                    <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden flex items-center justify-center text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 relative group">
                                                         {selectedReport.image_url ? (
                                                             <img src={selectedReport.image_url} alt="Report" className="w-full h-full object-cover" />
                                                         ) : "[ Citizen Uploaded Media ]"}
+                                                        
+                                                        {/* Quick Street View Toggle for Current Report Location */}
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleStreetViewClick({ lat: selectedReport.location_lat, lng: selectedReport.location_lng });
+                                                            }}
+                                                            className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur text-white p-2 rounded-lg text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black"
+                                                        >
+                                                            <Eye size={12}/> View Street View
+                                                        </button>
                                                     </div>
                                                 </div>
 
@@ -737,6 +1065,79 @@ const DispatcherDashboard = () => {
                                         </button>
                                     </div>
                                 </form>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* Jurisdiction Error Modal */}
+                    <AnimatePresence>
+                        {isJurisdictionModalOpen && (
+                            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm text-center">
+                                <motion.div
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.9, opacity: 0 }}
+                                    className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-red-500/20"
+                                >
+                                    <div className="w-20 h-20 bg-red-100 dark:bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <ShieldAlert className="text-red-600 dark:text-red-500" size={40} />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Access Denied</h3>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-8 leading-relaxed">
+                                        {jurisdictionErrorMsg}
+                                    </p>
+                                    <button
+                                        onClick={() => setIsJurisdictionModalOpen(false)}
+                                        className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-red-500/20 uppercase tracking-widest text-xs"
+                                    >
+                                        Understood
+                                    </button>
+                                </motion.div>
+                            </div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Street View Confirmation Modal */}
+                    {isStreetViewConfirmOpen && pendingStreetViewLoc && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden max-w-sm w-full border border-slate-200 dark:border-slate-800 p-6 text-center"
+                            >
+                                <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-4">
+                                    <Eye size={32} />
+                                </div>
+                                <h2 className="font-bold text-slate-900 dark:text-white text-xl mb-2">Switch to Street View?</h2>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 font-medium leading-relaxed">
+                                    Would you like to enter Street View at this location to inspect the report surroundings?
+                                </p>
+                                <div className="flex gap-3">
+                                    <button 
+                                        onClick={() => {
+                                            setIsStreetViewConfirmOpen(false);
+                                            setPendingStreetViewLoc(null);
+                                        }}
+                                        className="flex-1 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            if (map) {
+                                                const sv = map.getStreetView();
+                                                sv.setPosition(pendingStreetViewLoc);
+                                                sv.setVisible(true);
+                                            }
+                                            setIsStreetViewConfirmOpen(false);
+                                            setPendingStreetViewLoc(null);
+                                        }}
+                                        className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        Confirm
+                                    </button>
+                                </div>
                             </motion.div>
                         </div>
                     )}

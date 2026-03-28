@@ -77,7 +77,7 @@ const ManagementDashboard = () => {
     const [loadingUsers, setLoadingUsers] = useState(false);
 
     useEffect(() => {
-        if (!token || !currentUser) { navigate('/login'); }
+        if (!token || !currentUser) { navigate('/gov'); }
     }, [token, currentUser, navigate]);
 
     useEffect(() => {

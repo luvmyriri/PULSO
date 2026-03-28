@@ -248,6 +248,13 @@ def get_timeline_for_project(db: Session, project_id: int, public_only: bool = F
     return q.order_by(gov_models.ProcessTimeline.created_at.asc()).all()
 
 
+def list_all_timelines(db: Session, skip: int = 0, limit: int = 100):
+    """Fetch recent process timeline entries across all modules."""
+    return db.query(gov_models.ProcessTimeline)\
+             .order_by(gov_models.ProcessTimeline.created_at.desc())\
+             .offset(skip).limit(limit).all()
+
+
 def enrich_timeline(entries: list, db: Session) -> list:
     for e in entries:
         e.actor_name = _name(db, e.actor_id)
@@ -255,8 +262,64 @@ def enrich_timeline(entries: list, db: Session) -> list:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Audit Logs
+# Audit Logs & Records Registry (FR-10 & Records)
 # ─────────────────────────────────────────────────────────────────────────────
+
+def list_all_records(db: Session, skip: int = 0, limit: int = 200) -> list:
+    """
+    Registry of all official finalized documents across the system branches:
+    - Projects: closed_completion_certified -> Certificate of Completion
+    - OBO Inspections: permit_issued / cleared -> Building/Occupancy Permit
+    - Procurements: procured -> Notice of Award / Contract
+    """
+    records = []
+    
+    # 1. Project Certificates of Completion
+    projects = db.query(gov_models.ProjectRequest).filter(
+        gov_models.ProjectRequest.status == "closed_completion_certified"
+    ).all()
+    for p in projects:
+        records.append({
+            "record_id": f"REC-PROJ-{p.id}",
+            "record_type": "Certificate of Completion",
+            "reference_no": p.proj_number,
+            "title_or_applicant": p.title,
+            "date_issued": p.completed_at or p.updated_at,
+            "issued_by_name": _name(db, p.certificate_issued_by_id) or "City Engineer"
+        })
+
+    # 2. OBO Permits
+    obos = db.query(gov_models.OBOInspection).filter(
+        gov_models.OBOInspection.status.in_(["permit_issued", "cleared"])
+    ).all()
+    for o in obos:
+        records.append({
+            "record_id": f"REC-OBO-{o.id}",
+            "record_type": f"{str(o.inspection_type).capitalize()} Permit",
+            "reference_no": o.obo_number,
+            "title_or_applicant": o.applicant_name,
+            "date_issued": o.updated_at,
+            "issued_by_name": _name(db, o.cleared_by_id) or "Building Official"
+        })
+
+    # 3. Procurements (Awards)
+    prs = db.query(gov_models.ProcurementRequest).filter(
+        gov_models.ProcurementRequest.status == "procured"
+    ).all()
+    for p in prs:
+        records.append({
+            "record_id": f"REC-PRQ-{p.id}",
+            "record_type": "Notice of Award / Contract",
+            "reference_no": p.pr_number,
+            "title_or_applicant": p.title,
+            "date_issued": p.approved_at or p.updated_at,
+            "issued_by_name": _name(db, p.approved_by_id) or "City Engineer"
+        })
+
+    # Sort descending by date_issued
+    records.sort(key=lambda x: x["date_issued"], reverse=True)
+    return records[skip : skip + limit]
+
 
 def list_audit_logs(
     db: Session,

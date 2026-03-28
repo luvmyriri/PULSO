@@ -1,0 +1,17 @@
+{
+    "timestamp": "2026-03-26T19:02:10.215216",
+    "raw_text": "ELELL\n18\n",
+    "parsed_data": {
+        "id_type": "unknown",
+        "id_type_label": "Unknown Document",
+        "first_name": "",
+        "last_name": "",
+        "middle_name": "",
+        "dob": "",
+        "sex": "",
+        "address": "ELELL 18",
+        "barangay": "",
+        "is_north_caloocan": false,
+        "verification_message": "Verification Failed: Address does not appear to be in Caloocan City."
+    }
+}

@@ -169,6 +169,22 @@ def update_work_order_status(
 # Process Timeline  (FR-14)
 # ─────────────────────────────────────────────────────────────────────────────
 
+@router.get("/timeline", response_model=List[gov_schemas.ProcessTimelineResponse])
+def get_all_timelines(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Global process timeline across all modules (reports, work orders, projects).
+    LGU staff only. Allows rendering of the 'Process Timeline' dashboard.
+    """
+    _assert_role(current_user, *GOV_ROLES)
+    entries = gov_crud.list_all_timelines(db, skip, limit)
+    return gov_crud.enrich_timeline(entries, db)
+
+
 @router.get("/timeline/report/{report_id}", response_model=List[gov_schemas.ProcessTimelineResponse])
 def get_report_timeline(
     report_id: int,
@@ -217,8 +233,23 @@ def get_project_timeline(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Audit Logs  (FR-10)
+# Audit Logs & Records  (FR-10 & Records)
 # ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/records")
+def list_records_registry(
+    skip: int = 0,
+    limit: int = 200,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Returns the unified Records & Registry:
+    Certificates of Completion, OBO Permits, and Procurement Awards.
+    """
+    _assert_role(current_user, *GOV_ROLES)
+    return gov_crud.list_all_records(db, skip, limit)
+
 
 @router.get("/audit-logs", response_model=List[gov_schemas.AuditLogResponse])
 def list_audit_logs(

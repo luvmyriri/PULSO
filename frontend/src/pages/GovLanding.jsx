@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Spline from '@splinetool/react-spline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Lock, User, Eye, EyeOff, ChevronRight, Activity, Sun, Moon, Monitor, Mail, ArrowLeft, CheckCircle, FileCheck, BookOpen, ExternalLink, Map, ShieldCheck } from 'lucide-react';
+import { Shield, Lock, User, Eye, EyeOff, ChevronRight, Activity, Sun, Moon, Monitor, Mail, ArrowLeft, CheckCircle, FileCheck, BookOpen, ExternalLink, Map, ShieldCheck, Home } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Branding from '../components/Branding';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -174,6 +174,12 @@ export default function GovLanding() {
 
                 <div className="flex items-center gap-6">
                     <div className="hidden md:flex items-center gap-6 text-sm font-medium pr-6 border-r border-slate-200 dark:border-white/10">
+                        <button
+                            onClick={() => navigate('/')}
+                            className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors font-semibold"
+                        >
+                            <Home size={15} /> Home
+                        </button>
                         <button 
                             onClick={() => setActiveModal('directives')}
                             className="text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors"

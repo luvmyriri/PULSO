@@ -93,12 +93,14 @@ const PremiumHeroBackground = ({ children }) => {
                         x: mousePos.x * 0.5
                     }}
                     transition={{ y: { duration: 7, repeat: Infinity, ease: "easeInOut" } }}
-                    className="absolute top-[10%] left-[5%] w-40 h-40 rounded-full
+                    className="absolute top-[10%] left-[5%] w-40 h-40 rounded-full flex items-center justify-center
                     bg-white/10 dark:bg-white/5 backdrop-blur-[10px]
                     border border-white/20 dark:border-white/10
                     shadow-xl
                     before:absolute before:inset-0 before:rounded-full before:bg-gradient-to-tr before:from-blue-500/10 before:to-transparent"
-                />
+                >
+                    <img src="/engineering-logo.jpg" alt="City Engineering" className="w-24 h-24 object-contain rounded-full relative z-10 shadow-lg" />
+                </motion.div>
 
                 {/* Floating Glass Orb 2 — Moved to Bottom-Right */}
                 <motion.div
@@ -109,12 +111,14 @@ const PremiumHeroBackground = ({ children }) => {
                         x: mousePos.x * -0.4
                     }}
                     transition={{ y: { duration: 9, repeat: Infinity, ease: "easeInOut" }, delay: 1 }}
-                    className="absolute bottom-[15%] right-[5%] w-32 h-32 rounded-3xl
+                    className="absolute bottom-[15%] right-[5%] w-32 h-32 rounded-3xl flex items-center justify-center
                     bg-white/5 dark:bg-white/[0.04] backdrop-blur-[8px]
                     border border-white/20 dark:border-white/5
                     shadow-xl rotate-12
                     before:absolute before:inset-0 before:rounded-3xl before:bg-gradient-to-bl before:from-orange-500/10 before:to-transparent"
-                />
+                >
+                    <img src="/pulso-logo.png" alt="PULSO Logo" className="w-20 h-20 object-contain relative z-10 drop-shadow-lg" />
+                </motion.div>
             </div>
 
             {/* 5. Refined Noise Grain */}
