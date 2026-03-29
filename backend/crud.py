@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import models, gov_models, schemas
+import json
 
 def get_user(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()
@@ -50,6 +51,7 @@ def create_report(db: Session, report: schemas.ReportCreate, user_id: int, ai_an
         report_data["ai_summary"] = ai_analysis.get("smart_summary")
         report_data["ai_reasoning"] = ai_analysis.get("reasoning")
         report_data["severity_score"] = ai_analysis.get("severity_score", 0.0)
+        report_data["ai_metadata"] = json.dumps(ai_analysis) if ai_analysis else None
         
     db_report = models.Report(**report_data, user_id=user_id)
     db.add(db_report)

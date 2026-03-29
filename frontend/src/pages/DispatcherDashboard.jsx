@@ -101,6 +101,44 @@ const DispatcherDashboard = () => {
     const [svHeading, setSvHeading] = useState(0);
     const miniMapRef = useRef(null);
 
+    // AI Omni-Assistant State
+    const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+    const [aiQuery, setAiQuery] = useState('');
+    const [aiMessages, setAiMessages] = useState([
+        { role: 'assistant', text: `Greetings, Dispatcher ${currentUser?.full_name || ''}. I am your Engineering Co-pilot. How can I assist with triage today?` }
+    ]);
+    const [isAILoading, setIsAILoading] = useState(false);
+
+    const handleAIChat = async (e) => {
+        e.preventDefault();
+        if (!aiQuery.trim() || isAILoading) return;
+        
+        const userMsg = { role: 'user', text: aiQuery };
+        setAiMessages(prev => [...prev, userMsg]);
+        setAiQuery('');
+        setIsAILoading(true);
+
+        try {
+            const resp = await fetch('http://localhost:8000/api/ai/assistant', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ 
+                    query: aiQuery,
+                    context: `Dispatcher View. Active Mode: ${dashboardMode}. Current Selection: ${selectedReport?.category || 'None'}`
+                })
+            });
+            const data = await resp.json();
+            setAiMessages(prev => [...prev, { role: 'assistant', text: data.response }]);
+        } catch (err) {
+            setAiMessages(prev => [...prev, { role: 'assistant', text: "Error connecting to PULSO Brain." }]);
+        } finally {
+            setIsAILoading(false);
+        }
+    };
+
     // Sync Street View with State
     useEffect(() => {
         if (!panorama || !miniMapRef.current) return;
@@ -1449,6 +1487,78 @@ const DispatcherDashboard = () => {
                 </AnimatePresence>
 
                 </main>
+
+                {/* PULSO Omni-Assistant FAB */}
+                <div className="fixed bottom-8 right-8 z-[100] flex flex-col items-end gap-4">
+                    <AnimatePresence>
+                        {isAIChatOpen && (
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                className="w-[380px] h-[500px] bg-slate-900 shadow-2xl rounded-2xl border border-slate-700 overflow-hidden flex flex-col"
+                            >
+                                <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center animate-pulse">
+                                            <Brain size={18} className="text-white" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-white text-sm">PULSO Omni-Assistant</h4>
+                                            <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Engineering Co-pilot</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setIsAIChatOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                                        <MoreHorizontal size={20} />
+                                    </button>
+                                </div>
+                                
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
+                                    {aiMessages.map((msg, i) => (
+                                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium leading-relaxed ${
+                                                msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
+                                            }`}>
+                                                {msg.text}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isAILoading && (
+                                        <div className="flex justify-start">
+                                            <div className="bg-slate-800 p-3 rounded-2xl flex gap-1">
+                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
+                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <form onSubmit={handleAIChat} className="p-4 bg-slate-800 border-t border-slate-700">
+                                    <div className="relative">
+                                        <input 
+                                            type="text" 
+                                            value={aiQuery}
+                                            onChange={(e) => setAiQuery(e.target.value)}
+                                            placeholder="Ask PULSO Brain..."
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                        />
+                                        <button type="submit" disabled={isAILoading} className="absolute right-2 top-1.5 text-blue-500 hover:text-blue-400">
+                                            <Search size={16} />
+                                        </button>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <button 
+                        onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                        className="w-16 h-16 rounded-full bg-blue-600 shadow-2xl flex items-center justify-center text-white hover:bg-blue-500 transition-all hover:scale-105 active:scale-95 group"
+                    >
+                        <Brain size={32} className="group-hover:animate-pulse" />
+                    </button>
+                </div>
             </div>
         </div>
     );
