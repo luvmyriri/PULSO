@@ -1,11 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
+import shutil
 from typing import Optional, List
 from sqlalchemy.orm import Session
 import auth
+import secrets
 from dotenv import load_dotenv
 import os
 load_dotenv()
@@ -30,6 +33,14 @@ app = FastAPI(
     description="City services platform for North Caloocan citizens.",
     version="2.0.0"
 )
+
+# ---------------------------------------------------------------------------
+# Static File Serving (for report images & assets)
+# ---------------------------------------------------------------------------
+UPLOAD_DIR = "uploads/reports"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Configure CORS so the Vite frontend and Flutter mobile app can access the backend
 app.add_middleware(
@@ -497,9 +508,17 @@ async def create_new_report(
     image_url = None
     if image:
         image_bytes = await image.read()
-        # In a real app, save to S3/Cloud Storage here. 
-        # For now, we mock the URL but pre-read bytes for the AI.
-        image_url = f"https://mock-storage.pulso.gov.ph/reports/{image.filename}"
+        
+        # Save file locally for demo persistence
+        file_extension = os.path.splitext(image.filename)[1] or ".jpg"
+        unique_filename = f"report_{db.query(models.Report).count() + 1}_{secrets.token_hex(4)}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        
+        with open(file_path, "wb") as buffer:
+            buffer.write(image_bytes)
+            
+        # Real relative URL for frontend consumption
+        image_url = f"/api/uploads/reports/{unique_filename}"
 
     # 1. ADVANCED AI TRIAGE (Multi-modal)
     # The AI now "sees" the hazard if an image was provided and checks for appropriateness.

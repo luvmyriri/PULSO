@@ -442,6 +442,9 @@ const GovDivisionPage = () => {
     const [trustFilter, setTrustFilter] = useState('');
     const [editingUser, setEditingUser] = useState(null); // { id, role }
     const [savingRole, setSavingRole] = useState(false);
+    const [page, setPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+
 
     const config = PAGE_CONFIG[location.pathname] || {
         title: 'Division Page',
@@ -499,12 +502,17 @@ const GovDivisionPage = () => {
         return matchesSearch && matchesRole && matchesTrust;
     });
 
+
     const isAuditLog = location.pathname === '/gov/audit-logs';
     const isTimeline = location.pathname === '/gov/timeline';
     const isRecords = location.pathname === '/gov/records';
     const isStatic = !config.apiPath;
     const isSettings = location.pathname === '/gov/settings';
     const isUsers = location.pathname === '/gov/users';
+
+    // Pagination — computed after route flags are known
+    const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+    const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
     const GOV_ROLE_OPTIONS = [
         'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
@@ -517,6 +525,9 @@ const GovDivisionPage = () => {
     // Title-case helper: "city_engineer" → "City Engineer"
     const toTitleCase = str => str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
+    // Reset page when filters/search change
+    useEffect(() => { setPage(1); }, [search, roleFilter, trustFilter, statusFilter, location.pathname]);
+
     const activeFilterCount = [roleFilter, trustFilter].filter(Boolean).length;
 
     // Role-change handler for /gov/users
@@ -727,60 +738,114 @@ const GovDivisionPage = () => {
 
 
 
-                                     {/* Status filter — for non-user pages */}
-                                     {config.statuses.length > 0 && !isUsers && (
-                                         <OrangeSelect
-                                             value={statusFilter}
-                                             onChange={v => setStatusFilter(v)}
-                                             placeholder="All Statuses"
-                                             minWidth="180px"
-                                             options={[
-                                                 { value: '', label: 'All Statuses' },
-                                                 ...config.statuses.map(s => ({ value: s, label: s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }))
-                                             ]}
-                                         />
-                                     )}
-
-                                     {/* Users-specific filters */}
-                                     {isUsers && (
-                                         <>
-                                             <OrangeSelect
-                                                 value={roleFilter}
-                                                 onChange={v => setRoleFilter(v)}
-                                                 placeholder="All Roles"
-                                                 minWidth="190px"
-                                                 options={[
-                                                     { value: '', label: 'All Roles' },
-                                                     ...GOV_ROLE_OPTIONS.map(r => ({ value: r, label: toTitleCase(r) }))
-                                                 ]}
-                                             />
-
-                                             <OrangeSelect
-                                                 value={trustFilter}
-                                                 onChange={v => setTrustFilter(v)}
-                                                 placeholder="All Trust Scores"
-                                                 minWidth="175px"
-                                                 options={[
-                                                     { value: '', label: 'All Trust Scores' },
-                                                     { value: '100', label: 'Perfect (100)' },
-                                                     { value: '90',  label: 'High (90–99)' },
-                                                     { value: '70',  label: 'Medium (70–89)' },
-                                                     { value: 'low', label: 'Low (<70)' },
-                                                 ]}
-                                             />
-
-                                             {activeFilterCount > 0 && (
-                                                 <button
-                                                     onClick={() => { setRoleFilter(''); setTrustFilter(''); setSearch(''); }}
-                                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-xs font-bold border border-orange-200 dark:border-orange-800 hover:bg-orange-100 transition-colors whitespace-nowrap"
-                                                 >
-                                                     <Filter size={11} />
-                                                     {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active · clear
-                                                 </button>
-                                             )}
-                                         </>
-                                     )}
-
+                                     {/* Status filter — for non-user pages */}
+
+                                     {config.statuses.length > 0 && !isUsers && (
+
+                                         <OrangeSelect
+
+                                             value={statusFilter}
+
+                                             onChange={v => setStatusFilter(v)}
+
+                                             placeholder="All Statuses"
+
+                                             minWidth="180px"
+
+                                             options={[
+
+                                                 { value: '', label: 'All Statuses' },
+
+                                                 ...config.statuses.map(s => ({ value: s, label: s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }))
+
+                                             ]}
+
+                                         />
+
+                                     )}
+
+
+
+                                     {/* Users-specific filters */}
+
+                                     {isUsers && (
+
+                                         <>
+
+                                             <OrangeSelect
+
+                                                 value={roleFilter}
+
+                                                 onChange={v => setRoleFilter(v)}
+
+                                                 placeholder="All Roles"
+
+                                                 minWidth="190px"
+
+                                                 options={[
+
+                                                     { value: '', label: 'All Roles' },
+
+                                                     ...GOV_ROLE_OPTIONS.map(r => ({ value: r, label: toTitleCase(r) }))
+
+                                                 ]}
+
+                                             />
+
+
+
+                                             <OrangeSelect
+
+                                                 value={trustFilter}
+
+                                                 onChange={v => setTrustFilter(v)}
+
+                                                 placeholder="All Trust Scores"
+
+                                                 minWidth="175px"
+
+                                                 options={[
+
+                                                     { value: '', label: 'All Trust Scores' },
+
+                                                     { value: '100', label: 'Perfect (100)' },
+
+                                                     { value: '90',  label: 'High (90–99)' },
+
+                                                     { value: '70',  label: 'Medium (70–89)' },
+
+                                                     { value: 'low', label: 'Low (<70)' },
+
+                                                 ]}
+
+                                             />
+
+
+
+                                             {activeFilterCount > 0 && (
+
+                                                 <button
+
+                                                     onClick={() => { setRoleFilter(''); setTrustFilter(''); setSearch(''); }}
+
+                                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-xs font-bold border border-orange-200 dark:border-orange-800 hover:bg-orange-100 transition-colors whitespace-nowrap"
+
+                                                 >
+
+                                                     <Filter size={11} />
+
+                                                     {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active · clear
+
+                                                 </button>
+
+                                             )}
+
+                                         </>
+
+                                     )}
+
+
+
                                     <div className="text-xs text-slate-400 font-bold whitespace-nowrap ml-auto">
 
                                         {loading ? 'Loading…' : `${filtered.length} record${filtered.length !== 1 ? 's' : ''}`}
@@ -806,7 +871,7 @@ const GovDivisionPage = () => {
                                         </div>
                                     ) : isTimeline ? (
                                         <div className="max-w-4xl mx-auto py-2 px-2 overflow-hidden">
-                                            {filtered.map(item => <TimelineEvent key={item.id} entry={item} />)}
+                                            {paginated.map(item => <TimelineEvent key={item.id} entry={item} />)}
                                         </div>
                                     ) : (
                                         <div className="overflow-x-auto">
@@ -952,6 +1017,59 @@ const GovDivisionPage = () => {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="flex flex-col items-center gap-3 py-4">
+                                        <div className="text-xs text-slate-400 font-medium">
+                                            Showing <span className="font-bold text-slate-600 dark:text-slate-300">{Math.min((page - 1) * ITEMS_PER_PAGE + 1, filtered.length)}</span>–<span className="font-bold text-slate-600 dark:text-slate-300">{Math.min(page * ITEMS_PER_PAGE, filtered.length)}</span> of <span className="font-bold text-slate-600 dark:text-slate-300">{filtered.length}</span> records
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {/* Prev */}
+                                            <button
+                                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                                disabled={page === 1}
+                                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-orange-400 hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                                            </button>
+
+                                            {/* Page numbers */}
+                                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                                .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
+                                                .reduce((acc, n, idx, arr) => {
+                                                    if (idx > 0 && n - arr[idx - 1] > 1) acc.push('…');
+                                                    acc.push(n);
+                                                    return acc;
+                                                }, [])
+                                                .map((n, idx) =>
+                                                    typeof n === 'string' ? (
+                                                        <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-xs text-slate-400 select-none">{n}</span>
+                                                    ) : (
+                                                        <button
+                                                            key={n}
+                                                            onClick={() => setPage(n)}
+                                                            className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all ${
+                                                                n === page
+                                                                    ? 'bg-orange-500 text-white border border-orange-500 shadow-sm shadow-orange-500/30'
+                                                                    : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-orange-400 hover:text-orange-500'
+                                                            }`}
+                                                        >{n}</button>
+                                                    )
+                                                )
+                                            }
+
+                                            {/* Next */}
+                                            <button
+                                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                                disabled={page === totalPages}
+                                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-orange-400 hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         )}
                     </motion.div>

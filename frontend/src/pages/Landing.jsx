@@ -6,7 +6,8 @@ import {
     Menu, X, Trash2, Route as RouteIcon, Zap, Shield, BarChart3,
     Users, CheckCircle2, Sun, Moon, Monitor, ClipboardCheck, Camera,
     Bot, Headphones, Wrench, ExternalLink, Clock, Phone, Mail,
-    UserCheck, Accessibility, Heart, FileText
+    UserCheck, Accessibility, Heart, FileText, Droplets, Lightbulb,
+    Building2, ShieldCheck
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Branding from '../components/Branding';
@@ -300,59 +301,59 @@ function Landing() {
                     </motion.div>
 
                     <motion.div
-                        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6"
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
                     >
-                        {/* Solution 1 */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/20">
-                                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center mb-6 shadow-sm">
-                                    <Trash2 size={24} />
-                                </div>
-                                <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t('landing.solutions.s1_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
-                                    {t('landing.solutions.s1_desc')}
-                                </p>
-                                <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> {t('landing.solutions.s1_l1')}</li>
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> {t('landing.solutions.s1_l2')}</li>
-                                </ul>
-                            </div>
-                        </motion.div>
+                        {[
+                            { id: 's1', icon: <RouteIcon size={24} />, color: 'orange' },
+                            { id: 's2', icon: <Droplets size={24} />, color: 'blue' },
+                            { id: 's3', icon: <Lightbulb size={24} />, color: 'yellow' },
+                            { id: 's4', icon: <Shield size={24} />, color: 'red' },
+                            { id: 's5', icon: <Building2 size={24} />, color: 'green' },
+                        ].map((solution, i) => {
+                            const colors = {
+                                orange: 'hover:border-orange-200 dark:hover:border-orange-500/50 group-hover:bg-orange-50/50 dark:group-hover:bg-orange-900/20 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 check:text-orange-500',
+                                blue: 'hover:border-blue-200 dark:hover:border-blue-500/50 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 check:text-blue-500',
+                                yellow: 'hover:border-yellow-200 dark:hover:border-yellow-500/50 group-hover:bg-yellow-50/50 dark:group-hover:bg-yellow-900/20 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 check:text-yellow-600',
+                                red: 'hover:border-red-200 dark:hover:border-red-500/50 group-hover:bg-red-50/50 dark:group-hover:bg-red-900/20 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 check:text-red-500',
+                                green: 'hover:border-emerald-200 dark:hover:border-emerald-500/50 group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/20 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 check:text-emerald-500',
+                            }[solution.color];
 
-                        {/* Solution 2 */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-orange-200 dark:hover:border-orange-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors group-hover:bg-orange-50/50 dark:group-hover:bg-orange-900/20">
-                                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center mb-6 shadow-sm">
-                                    <RouteIcon size={24} />
-                                </div>
-                                <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t('landing.solutions.s2_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
-                                    {t('landing.solutions.s2_desc')}
-                                </p>
-                                <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-orange-500" /> {t('landing.solutions.s2_l1')}</li>
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-orange-500" /> {t('landing.solutions.s2_l2')}</li>
-                                </ul>
-                            </div>
-                        </motion.div>
+                            const colorParts = colors.split(' ');
+                            const hoverBorder = colorParts[0] + ' ' + colorParts[1];
+                            const hoverBg = colorParts[2] + ' ' + colorParts[3];
+                            const iconBg = colorParts[4] + ' ' + colorParts[5];
+                            const iconText = colorParts[6] + ' ' + colorParts[7];
+                            const checkText = colorParts[8].replace('check:', '');
 
-                        {/* Solution 3 */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-yellow-200 dark:hover:border-yellow-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors group-hover:bg-yellow-50/50 dark:group-hover:bg-yellow-900/20">
-                                <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-xl flex items-center justify-center mb-6 shadow-sm">
-                                    <Zap size={24} />
-                                </div>
-                                <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t('landing.solutions.s3_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
-                                    {t('landing.solutions.s3_desc')}
-                                </p>
-                                <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-yellow-600" /> {t('landing.solutions.s3_l1')}</li>
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-yellow-600" /> {t('landing.solutions.s3_l2')}</li>
-                                </ul>
-                            </div>
-                        </motion.div>
+                            // Alignment logic: 
+                            // 3 per row on LG (cols 1-2, 3-4, 5-6). 
+                            // Bottom row has 2 cards staggered (col-start-2: cols 2-3, col-start-4: cols 4-5)
+                            const gridClasses = i < 3 
+                                ? "lg:col-span-2" 
+                                : i === 3 ? "lg:col-span-2 lg:col-start-2" : "lg:col-span-2 lg:col-start-4";
+
+                            // Tablet logic: 2 per row. 5th card is centered.
+                            const tabletClasses = i === 4 ? "md:col-span-2 md:max-w-md md:mx-auto" : "";
+
+                            return (
+                                <motion.div key={solution.id} variants={fadeUp} className={`group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 ${hoverBorder} ${gridClasses} ${tabletClasses}`}>
+                                    <div className={`bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors ${hoverBg}`}>
+                                        <div className={`w-12 h-12 ${iconBg} ${iconText} rounded-xl flex items-center justify-center mb-6 shadow-sm`}>
+                                            {solution.icon}
+                                        </div>
+                                        <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t(`landing.solutions.${solution.id}_title`)}</h3>
+                                        <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
+                                            {t(`landing.solutions.${solution.id}_desc`)}
+                                        </p>
+                                        <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                            <li className="flex items-center gap-2"><CheckCircle2 size={14} className={checkText} /> {t(`landing.solutions.${solution.id}_l1`)}</li>
+                                            <li className="flex items-center gap-2"><CheckCircle2 size={14} className={checkText} /> {t(`landing.solutions.${solution.id}_l2`)}</li>
+                                        </ul>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
                     </motion.div>
                 </div>
             </section>
@@ -616,11 +617,11 @@ function Landing() {
                             </ul>
                         </div>
 
-                        {/* Contact Info */}
-                        <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.contact')}</h4>
-                            <ul className="flex flex-col gap-4 text-sm">
-                                <li className="flex items-start gap-3">
+                        {/* Contact Info - Full Width Horizontal */}
+                        <div className="lg:col-span-4 mt-8 pt-12 border-t border-slate-800/30">
+                            <h4 className="text-white font-bold text-lg mb-8 tracking-tight">{t('landing.footer.contact')}</h4>
+                            <ul className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 text-sm">
+                                <li className="flex items-start gap-3 max-w-xs">
                                     <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0"><MapPinned size={16} /></div>
                                     <span className="text-slate-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('landing.footer.address') }} />
                                 </li>
@@ -628,7 +629,7 @@ function Landing() {
                                     <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
                                         <Phone size={16} />
                                     </div>
-                                    <span className="text-slate-400">(02) 336-5576</span>
+                                    <span className="text-slate-400 font-bold">(02) 336-5576</span>
                                 </li>
                                 <li className="flex items-center gap-3">
                                     <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
@@ -643,7 +644,7 @@ function Landing() {
                                     <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
                                         <Mail size={16} />
                                     </div>
-                                    <span className="text-slate-400">engineering@caloocancity.gov.ph</span>
+                                    <span className="text-slate-400 font-medium">engineering@caloocancity.gov.ph</span>
                                 </li>
                             </ul>
                         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -82,13 +82,11 @@ const NORTH_CALOOCAN_BOUNDARY = [
 const LIBRARIES = ['places', 'geometry'];
 
 const REPORT_CATEGORIES = [
-    'Road Issue',
-    'Water / Drainage',
-    'Waste Management',
+    'Roads & Bridges',
+    'Water & Drainage',
     'Street Lighting',
-    'Public Safety',
-    'Flooding',
-    'Other',
+    'Public Safety & Regulatory',
+    'Public Facilities',
 ];
 
 const SIMULATED_HAZARDS = [
@@ -354,7 +352,7 @@ const StatusBadge = ({ status }) => {
     );
 };
 
-const MyReports = ({ userReports, loadingReports, handleSetModal, containerVariants }) => (
+const MyReports = ({ userReports, loadingReports, handleSetModal, containerVariants, setZoomedImage }) => (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 md:p-8">
         <div className="flex justify-between items-center mb-6">
             <div>
@@ -379,12 +377,26 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
                 </div>
             ) : userReports.map((report) => (
                 <div key={report.id} className={`border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-start gap-4 transition-all hover:border-orange-500/40 hover:shadow-sm ${report.status === 'resolved' ? 'opacity-75' : ''}`}>
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                        report.status === 'resolved' ? 'bg-green-50 dark:bg-green-900/20 text-green-500' :
-                        report.status === 'rejected' ? 'bg-red-50 dark:bg-red-900/20 text-red-500' :
-                        'bg-orange-50 dark:bg-orange-900/20 text-orange-500'
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5 overflow-hidden border ${
+                        report.status === 'resolved' ? 'bg-green-50 dark:bg-green-900/20 text-green-500 border-green-100 dark:border-green-900/30' :
+                        report.status === 'rejected' ? 'bg-red-50 dark:bg-red-900/20 text-red-500 border-red-100 dark:border-red-900/30' :
+                        'bg-orange-50 dark:bg-orange-900/20 text-orange-500 border-orange-100 dark:border-orange-900/30'
                     }`}>
-                        <Zap size={18} />
+                        {report.image_url ? (
+                            <button 
+                                onClick={() => setZoomedImage(`http://localhost:8000${report.image_url}`)}
+                                className="w-full h-full cursor-zoom-in"
+                                title="Click to Zoom"
+                            >
+                                <img 
+                                    src={`http://localhost:8000${report.image_url}`} 
+                                    alt="Report" 
+                                    className="w-full h-full object-cover" 
+                                />
+                            </button>
+                        ) : (
+                            <Zap size={18} />
+                        )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -433,69 +445,270 @@ const SettingsView = ({ handleLogout, containerVariants }) => (
     </motion.div>
 );
 
-const ReportCategoryDropdown = ({ value, onChange, options }) => {
-    const [isOpen, setIsOpen] = useState(false);
+// Rich metadata for each report category — color + info popover content
+const CATEGORY_META = {
+    'Roads & Bridges': {
+        color: 'orange',
+        icon: '🛣️',
+        scope: [
+            'Local city roads and barangay road repair',
+            'Pothole patching and broken pavement',
+            'Sidewalks, gutters, and drainage channels beside roads',
+            'Pavement markings (pedestrian crossings, lane dividers)',
+        ],
+    },
+    'Water & Drainage': {
+        color: 'blue',
+        icon: '💧',
+        scope: [
+            'De-clogging of blocked canals and manholes',
+            'Pumping stations and estero flood control (city jurisdiction)',
+            'Maintenance of public water fountains and toilets in city parks',
+            'Note: Potable water supply (Maynilad) and major rivers are NOT covered',
+        ],
+    },
+    'Street Lighting': {
+        color: 'yellow',
+        icon: '💡',
+        scope: [
+            'Installation and replacement of burned-out streetlight bulbs',
+            'Repair of city-owned electrical wiring and lamp posts',
+            'Ensuring nighttime safety along city and barangay roads',
+        ],
+    },
+    'Public Safety & Regulatory': {
+        color: 'red',
+        icon: '🛡️',
+        scope: [
+            'Structural safety inspection of buildings (especially post-earthquake)',
+            'Building permit evaluation — compliance with National Building Code',
+            'Debris and fallen tree clearing after typhoons or disasters',
+            'Fire safety and electrical compliance checks for new constructions',
+        ],
+    },
+    'Public Facilities': {
+        color: 'green',
+        icon: '🏛️',
+        scope: [
+            'Construction and maintenance of public school buildings',
+            'Barangay health centers and City Hall office repairs',
+            'Basketball courts, plazas, and recreational areas',
+            'Covered courts, parks, and other city-owned public spaces',
+        ],
+    },
+};
+
+const COLOR_MAP = {
+    orange: { ring: 'ring-orange-500', bg: 'bg-orange-500/10 dark:bg-orange-500/15', dot: 'bg-orange-500', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-400', badge: 'bg-orange-500' },
+    blue:   { ring: 'ring-blue-500',   bg: 'bg-blue-500/10 dark:bg-blue-500/15',     dot: 'bg-blue-500',   text: 'text-blue-600 dark:text-blue-400',     border: 'border-blue-400',   badge: 'bg-blue-500'   },
+    yellow: { ring: 'ring-yellow-500', bg: 'bg-yellow-500/10 dark:bg-yellow-500/15', dot: 'bg-yellow-500', text: 'text-yellow-600 dark:text-yellow-400', border: 'border-yellow-400', badge: 'bg-yellow-500' },
+    red:    { ring: 'ring-red-500',    bg: 'bg-red-500/10 dark:bg-red-500/15',       dot: 'bg-red-500',    text: 'text-red-600 dark:text-red-400',       border: 'border-red-400',    badge: 'bg-red-500'    },
+    green:  { ring: 'ring-green-500',  bg: 'bg-green-500/10 dark:bg-green-500/15',   dot: 'bg-green-500',  text: 'text-green-600 dark:text-green-400',   border: 'border-green-400',  badge: 'bg-green-500'  },
+};
+
+const ReportCategoryRadio = ({ value, onChange, options }) => {
+    const [tooltip, setTooltip] = useState(null); // key of open tooltip
+    const tooltipRef = useRef(null);
+
+    // Ensure array format for toggling
+    const selectedOptions = Array.isArray(value) ? value : [value];
+
+    useEffect(() => {
+        const handler = e => {
+            if (tooltipRef.current && !tooltipRef.current.contains(e.target)) setTooltip(null);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const handleToggle = (opt) => {
+        if (selectedOptions.includes(opt)) {
+            // Cannot deselect if it's the very last one (prevents empty submit) — optional, or allow it
+            if (selectedOptions.length > 1) {
+                onChange(selectedOptions.filter(v => v !== opt));
+            }
+        } else {
+            if (selectedOptions.length < 3) {
+                onChange([...selectedOptions, opt]);
+            }
+        }
+    };
+
     return (
-        <div className="relative">
-            <button
-                type="button"
-                className="w-full flex items-center justify-between bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white p-3 rounded-xl focus:ring-2 focus:ring-orange-500/50 outline-none"
-                onClick={() => setIsOpen(!isOpen)}
-            >
-                <span className="font-medium text-[15px]">{value || "Select Category"}</span>
-                <ChevronDown size={18} className={`transition-transform text-slate-500 dark:text-slate-400 ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className="absolute z-10 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden drop-shadow-2xl"
-                    >
-                        {options.map((option) => (
-                            <button
-                                key={option}
-                                type="button"
-                                className={`w-full text-left px-4 py-3 hover:bg-orange-500 hover:text-white transition-colors text-[15px] font-medium ${value === option ? 'bg-orange-500/10 text-orange-500' : 'text-slate-900 dark:text-white'}`}
-                                onClick={() => {
-                                    onChange(option);
-                                    setIsOpen(false);
-                                }}
-                            >
-                                {option}
-                            </button>
-                        ))}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <div>
+            <div className="flex justify-between items-center mb-3">
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Issue Type</p>
+                <p className="text-[10px] font-bold text-slate-400">Max 3 selections</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2" ref={tooltipRef}>
+                {options.map(opt => {
+                    const meta     = CATEGORY_META[opt];
+                    const clr      = COLOR_MAP[meta.color];
+                    const selected = selectedOptions.includes(opt);
+                    const infoOpen = tooltip === opt;
+                    const atCapacity = !selected && selectedOptions.length >= 3;
+
+                    return (
+                        <div key={opt} className="relative">
+                            {/* Card row */}
+                            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+                                selected
+                                    ? `${clr.bg} ${clr.border} ring-1 ${clr.ring} shadow-sm`
+                                    : atCapacity
+                                        ? 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 opacity-60 cursor-not-allowed'
+                                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-600'
+                            }`}>
+                                {/* Checkbox — clicking toggles */}
+                                <button
+                                    type="button"
+                                    disabled={atCapacity}
+                                    onClick={() => { handleToggle(opt); setTooltip(null); }}
+                                    className="flex items-center gap-3 flex-1 text-left disabled:cursor-not-allowed"
+                                >
+                                    <span className={`w-4 h-4 rounded shadow-sm border-2 flex items-center justify-center shrink-0 transition-all ${
+                                        selected ? `${clr.border}` : 'border-slate-300 dark:border-slate-600'
+                                    }`}>
+                                        {selected && <span className={`w-2 h-2 rounded-[2px] ${clr.dot}`} />}
+                                    </span>
+                                    <span className={`text-sm font-bold leading-tight ${
+                                        selected ? clr.text : 'text-slate-700 dark:text-slate-200'
+                                    }`}>{opt}</span>
+                                </button>
+                                {/* Info button */}
+                                <button
+                                    type="button"
+                                    onClick={e => { e.stopPropagation(); setTooltip(infoOpen ? null : opt); }}
+                                    className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black transition-colors border ${
+                                        infoOpen
+                                            ? `${clr.badge} text-white border-transparent`
+                                            : 'border-slate-200 dark:border-slate-600 text-slate-400 hover:border-slate-400 dark:hover:border-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                                    }`}
+                                    title="What does this category cover?"
+                                >i</button>
+                            </div>
+
+                            {/* Info popover */}
+                            {infoOpen && (
+                                <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-black/20 p-4 pointer-events-auto">
+                                    {/* Top accent */}
+                                    <div className={`h-0.5 w-full rounded-full ${clr.badge} mb-3 -mt-1 opacity-70`} />
+                                    <div className="flex items-center gap-2 mb-2.5">
+                                        <span className="text-xl">{meta.icon}</span>
+                                        <span className={`text-xs font-black uppercase tracking-widest ${clr.text}`}>{opt}</span>
+                                    </div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Scope of Service</p>
+                                    <ul className="space-y-1.5">
+                                        {meta.scope.map((line, i) => (
+                                            <li key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300 leading-snug">
+                                                <span className={`mt-1 w-1.5 h-1.5 rounded-full ${clr.badge} shrink-0 opacity-80`} />
+                                                {line}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 };
+
 
 const ResidentModals = ({ 
     activeModal, setActiveModal, selectedPost, setSelectedPost, isLoaded, map, setMap, panorama, setPanorama, reportLocation, setReportLocation, 
     locationAddress, geocodingAddress, reportCategory, setReportCategory, reportNotes, setReportNotes, selectedImage, setSelectedImage, 
     submittingReport, handleFileReport, isSelectingLocation, setIsSelectingLocation, isIDCameraOpen, setIsIDCameraOpen, checkJurisdiction, 
     reverseGeocode, mapOptions, pulseRadius, processedHazards, selectedHazard, setSelectedHazard, svLocation, handleStreetViewClick, 
-    getIconForCategory, getMarkerSVG, mapFilter, setMapFilter 
+    getIconForCategory, getMarkerSVG, getCategoryColor, mapFilter, setMapFilter 
 }) => (
     <AnimatePresence>
         {activeModal && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setActiveModal(null)}>
-                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`w-full flex flex-col my-8 pointer-events-auto ${activeModal === 'map' ? 'max-w-7xl h-[90vh]' : 'max-w-lg bg-white dark:bg-slate-900 rounded-3xl'}`} onClick={e => e.stopPropagation()}>
+                <motion.div
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.95, opacity: 0 }}
+                    className={`pointer-events-auto ${
+                        activeModal === 'map'
+                            ? 'w-full max-w-7xl h-[90vh] flex flex-col my-8 bg-white dark:bg-slate-900 rounded-3xl'
+                            : activeModal === 'file-report'
+                                ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[70] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl flex flex-col overflow-hidden'
+                                : 'w-full max-w-xl flex flex-col my-8 bg-white dark:bg-slate-900 rounded-3xl'
+                    }`}
+                    onClick={e => e.stopPropagation()}
+                >
                     {activeModal === 'file-report' && (
-                        <div className="p-6 space-y-5">
-                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-slate-900 dark:text-white">New AI Report</h3><button onClick={() => setActiveModal(null)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full transition-colors"><X size={20}/></button></div>
-                            {selectedImage ? <img src={selectedImage} className="w-full rounded-2xl aspect-video object-cover" /> : <button onClick={() => setIsIDCameraOpen(true)} className="w-full bg-slate-900 rounded-2xl aspect-video flex flex-col items-center justify-center text-white"><Camera size={40} className="text-orange-500 mb-2"/><span>Open Camera</span></button>}
-                            <IDCameraModal isOpen={isIDCameraOpen} onClose={() => setIsIDCameraOpen(false)} onCapture={file => setSelectedImage(URL.createObjectURL(file))} title="Issue Photo" side="ISSUE" />
-                            <div className="space-y-3">
-                                <ReportCategoryDropdown value={reportCategory} onChange={setReportCategory} options={REPORT_CATEGORIES} />
-                                <textarea className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white p-3 rounded-xl focus:ring-2 focus:ring-orange-500/50 outline-none placeholder:text-slate-500 dark:placeholder:text-slate-400" rows="2" placeholder="Additional notes..." value={reportNotes} onChange={e => setReportNotes(e.target.value)} />
+                        <div className="flex flex-col h-full p-8">
+                            {/* Header */}
+                            <div className="flex justify-between items-center mb-6 shrink-0">
+                                <div>
+                                    <h3 className="font-black text-2xl text-slate-900 dark:text-white">New AI Report</h3>
+                                    <p className="text-sm text-slate-400 font-medium mt-0.5">Submit an infrastructure issue to PULSO</p>
+                                </div>
+                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full transition-colors"><X size={22}/></button>
                             </div>
-                            <div className="flex gap-3 pt-2">
-                                <button className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors hover:bg-slate-200 dark:hover:bg-slate-700" onClick={() => setActiveModal(null)}>Cancel</button>
-                                <button className="flex-1 py-3 bg-orange-500 text-white font-bold rounded-xl" onClick={handleFileReport} disabled={submittingReport}>{submittingReport ? '...' : 'Submit Report'}</button>
+
+                            {/* Landscape 2-col layout — fills remaining height */}
+                            <div className="grid grid-cols-2 gap-8 flex-1 min-h-0">
+                                {/* LEFT — Camera / Photo */}
+                                <div className="flex flex-col gap-4 min-h-0">
+                                    <div className="flex-1 min-h-0">
+                                        {selectedImage
+                                            ? <img src={selectedImage} className="w-full h-full rounded-2xl object-cover ring-2 ring-orange-500/30" />
+                                            : <button
+                                                onClick={() => setIsIDCameraOpen(true)}
+                                                className="w-full h-full bg-slate-100 dark:bg-slate-800/80 rounded-2xl flex flex-col items-center justify-center text-white border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-orange-500 dark:hover:border-orange-500 transition-colors group"
+                                              >
+                                                <Camera size={48} className="text-orange-500 mb-3 group-hover:scale-110 transition-transform"/>
+                                                <span className="text-base font-bold text-slate-700 dark:text-white">Open Camera</span>
+                                                <span className="text-xs text-slate-400 mt-1">Take or upload a photo of the issue</span>
+                                              </button>
+                                        }
+                                    </div>
+                                    {selectedImage && (
+                                        <button
+                                            onClick={() => setIsIDCameraOpen(true)}
+                                            className="shrink-0 w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-500 hover:border-orange-400 hover:text-orange-500 transition-colors"
+                                        >
+                                            Retake Photo
+                                        </button>
+                                    )}
+                                    <IDCameraModal 
+                                        isOpen={isIDCameraOpen} 
+                                        onClose={() => setIsIDCameraOpen(false)} 
+                                        onCapture={file => setSelectedImage(URL.createObjectURL(file))} 
+                                        title="Infrastructure Issue Photo" 
+                                        side="ISSUE" 
+                                        metadata={{ 
+                                            lat: reportLocation.lat, 
+                                            lng: reportLocation.lng, 
+                                            address: locationAddress 
+                                        }}
+                                        guideText="Center the infrastructure issue in the frame"
+                                    />
+                                </div>
+
+                                {/* RIGHT — Issue type + notes */}
+                                <div className="flex flex-col gap-5">
+                                    <ReportCategoryRadio value={reportCategory} onChange={setReportCategory} options={REPORT_CATEGORIES} />
+                                    <div className="flex-1 flex flex-col">
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Additional Notes</p>
+                                        <textarea
+                                            className="flex-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white p-4 rounded-xl focus:ring-2 focus:ring-orange-500/50 outline-none placeholder:text-slate-400 text-sm resize-none"
+                                            placeholder="Describe the issue in detail — type, severity, location landmarks, and any other relevant information..."
+                                            value={reportNotes}
+                                            onChange={e => setReportNotes(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Actions — pinned to bottom */}
+                            <div className="flex gap-4 mt-6 shrink-0">
+                                <button className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 text-sm" onClick={() => setActiveModal(null)}>Cancel</button>
+                                <button className="flex-1 py-3.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 text-sm shadow-lg shadow-orange-500/25" onClick={handleFileReport} disabled={submittingReport}>{submittingReport ? 'Submitting…' : 'Submit Report'}</button>
                             </div>
                         </div>
                     )}
@@ -528,20 +741,25 @@ const ResidentModals = ({
                                         {processedHazards.map(h => <MarkerF key={h.id} position={{ lat: h.lat, lng: h.lng }} onClick={() => setSelectedHazard(h)} icon={{ url: getMarkerSVG(h.category, h.status), scaledSize: new window.google.maps.Size(40, 46) }} />)}
                                          {selectedHazard && (
                                             <InfoWindowF position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }} onCloseClick={() => setSelectedHazard(null)}>
-                                                <div style={{ background:'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)', borderRadius:'16px', padding:'18px', minWidth:'230px', border:'1px solid rgba(255,255,255,0.07)', margin:'-10px', boxShadow:'0 25px 50px rgba(0,0,0,0.7)', fontFamily:'Inter,sans-serif', display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', position:'relative' }}>
-                                                    <button onClick={() => setSelectedHazard(null)} style={{ position:'absolute', top:'10px', right:'10px', background:'rgba(255,255,255,0.07)', border:'none', borderRadius:'50%', width:'28px', height:'28px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8' }}>×</button>
-                                                    <div style={{ width:'46px', height:'46px', borderRadius:'50%', background:'rgba(249,115,22,0.12)', border:'1px solid rgba(249,115,22,0.25)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'12px', color:'#f97316' }}><AlertTriangle size={20} /></div>
-                                                    <div style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.12em', color: selectedHazard.status==='resolved'?'#4ade80':'#fb923c', background: selectedHazard.status==='resolved'?'rgba(74,222,128,0.12)':'rgba(251,146,60,0.12)', padding:'3px 12px', borderRadius:'999px', marginBottom:'10px', textTransform:'uppercase' }}>{selectedHazard.status}</div>
-                                                    <h4 style={{ fontWeight:700, fontSize:'15px', color:'#f1f5f9', lineHeight:'1.35', margin:'0 0 4px', padding:'0 20px' }}>{selectedHazard.title}</h4>
-                                                    <p style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.15em', color:'#60a5fa', marginBottom:'12px', textTransform:'uppercase' }}>{selectedHazard.category}</p>
-                                                    <div style={{ display:'flex', alignItems:'center', gap:'6px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'999px', padding:'5px 14px', marginBottom:'14px' }}>
-                                                        <span style={{ color:'#f97316', display:'flex' }}><MapPin size={12} /></span>
-                                                        <span style={{ fontSize:'12px', fontWeight:700, color:'#cbd5e1' }}>{selectedHazard.dynamicDistance || selectedHazard.distance} away</span>
-                                                    </div>
-                                                    <button onClick={() => handleStreetViewClick({ lat:selectedHazard.lat, lng:selectedHazard.lng })} style={{ width:'100%', padding:'11px 0', background:'linear-gradient(135deg,#ea580c,#f97316)', border:'none', borderRadius:'12px', color:'white', fontSize:'13px', fontWeight:700, cursor:'pointer', boxShadow:'0 4px 20px rgba(249,115,22,0.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
-                                                        <Eye size={14} /> Open Street View
-                                                    </button>
-                                                </div>
+                                                {(() => {
+                                                    const catColor = getCategoryColor(selectedHazard.category);
+                                                    return (
+                                                        <div style={{ background:'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)', borderRadius:'16px', padding:'18px', minWidth:'230px', border:'1px solid rgba(255,255,255,0.07)', margin:'-10px', boxShadow:'0 25px 50px rgba(0,0,0,0.7)', fontFamily:'Inter,sans-serif', display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', position:'relative' }}>
+                                                            <button onClick={() => setSelectedHazard(null)} style={{ position:'absolute', top:'10px', right:'10px', background:'rgba(255,255,255,0.07)', border:'none', borderRadius:'50%', width:'28px', height:'28px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8' }}>×</button>
+                                                            <div style={{ width:'46px', height:'46px', borderRadius:'50%', background:`${catColor}20`, border:`1px solid ${catColor}40`, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'12px', color:catColor }}><AlertTriangle size={20} /></div>
+                                                            <div style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.12em', color: selectedHazard.status==='resolved'?'#4ade80':'#fb923c', background: selectedHazard.status==='resolved'?'rgba(74,222,128,0.12)':'rgba(251,146,60,0.12)', padding:'3px 12px', borderRadius:'999px', marginBottom:'10px', textTransform:'uppercase' }}>{selectedHazard.status}</div>
+                                                            <h4 style={{ fontWeight:700, fontSize:'15px', color:'#f1f5f9', lineHeight:'1.35', margin:'0 0 4px', padding:'0 20px' }}>{selectedHazard.title}</h4>
+                                                            <p style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.15em', color:catColor, marginBottom:'12px', textTransform:'uppercase' }}>{selectedHazard.category}</p>
+                                                            <div style={{ display:'flex', alignItems:'center', gap:'6px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'999px', padding:'5px 14px', marginBottom:'14px' }}>
+                                                                <span style={{ color:catColor, display:'flex' }}><MapPin size={12} /></span>
+                                                                <span style={{ fontSize:'12px', fontWeight:700, color:'#cbd5e1' }}>{selectedHazard.dynamicDistance || selectedHazard.distance} away</span>
+                                                            </div>
+                                                            <button onClick={() => handleStreetViewClick({ lat:selectedHazard.lat, lng:selectedHazard.lng })} style={{ width:'100%', padding:'11px 0', background:`linear-gradient(135deg,${catColor},${catColor}dd)`, border:'none', borderRadius:'12px', color:'white', fontSize:'13px', fontWeight:700, cursor:'pointer', boxShadow:`0 4px 20px ${catColor}40`, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
+                                                                <Eye size={14} /> Open Street View
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </InfoWindowF>
                                         )}
                                         {/* Street View Overlay */}
@@ -797,6 +1015,7 @@ export default function ResidentDashboard() {
     const navigate = useNavigate();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [activeModal, setActiveModal] = useState(null); // 'file-report', 'post-details'
+    const [zoomedImage, setZoomedImage] = useState(null);
 
     // Auth State - Initialize synchronously from localStorage to prevent race conditions on reload
     const [token, setToken] = useState(() => localStorage.getItem('pulso_token'));
@@ -921,12 +1140,12 @@ export default function ResidentDashboard() {
     const [selectedPost, setSelectedPost] = useState(null);
     const [showSearchDropdown, setShowSearchDropdown] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
-    const [toastMessage, setToastMessage] = useState('');
+    const [toast, setToast] = useState({ message: '', type: 'success' });
     const [isIDCameraOpen, setIsIDCameraOpen] = useState(false);
 
-    const showToast = (message) => {
-        setToastMessage(message);
-        setTimeout(() => setToastMessage(''), 3000);
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast({ message: '', type: 'success' }), 3000);
     };
 
     const [lguUpdates, setLguUpdates] = useState([]);
@@ -1044,49 +1263,63 @@ export default function ResidentDashboard() {
     }, [currentUser]);
 
     const [reportNotes, setReportNotes] = useState('');
-    const [reportCategory, setReportCategory] = useState('Road Issue');
+    const [reportCategory, setReportCategory] = useState(['Roads & Bridges']);
     const [submittingReport, setSubmittingReport] = useState(false);
     const [reportLocation, setReportLocation] = useState({ lat: 14.7566, lng: 121.0450 }); // Center of Caloocan North
     const [isSelectingLocation, setIsSelectingLocation] = useState(false);
     const [mapFilter, setMapFilter] = useState('Nearby'); // State for new map UI filter
     const [selectedHazard, setSelectedHazard] = useState(null); // Tracks the clicked map marker
 
-    const REPORT_CATEGORIES = [
-        'Road Issue',
-        'Water / Drainage',
-        'Waste Management',
-        'Street Lighting',
-        'Public Safety',
-        'Flooding',
-        'Other',
-    ];
+    const getCategoryColor = (category) => {
+        const cat = (category || '').toLowerCase();
+        if (cat.includes('road') || cat.includes('bridge')) return '#f97316';
+        if (cat.includes('water') || cat.includes('drainage') || cat.includes('flood')) return '#3b82f6';
+        if (cat.includes('lighting') || cat.includes('street') || cat.includes('electric')) return '#eab308';
+        if (cat.includes('safety') || cat.includes('regulatory') || cat.includes('emergency')) return '#ef4444';
+        if (cat.includes('facilit') || cat.includes('build') || cat.includes('park')) return '#22c55e';
+        return '#94a3b8';
+    };
 
     // SVG Marker Pin Generator for Map Symbols
     const getMarkerSVG = (category, status) => {
-        let color = status === 'resolved' ? '#22c55e' : (status === 'pending' || status === 'unverified' ? '#ef4444' : '#f97316');
+        let color = getCategoryColor(category);
         let svgIcon = ''; 
         const cat = (category || '').toLowerCase();
         
-        if (cat.includes('flood') || cat.includes('water') || cat.includes('drainage')) {
-            svgIcon = `<path d="M12 22a7.5 7.5 0 0 0 7.5-7.5c0-4.14-7.5-12.5-7.5-12.5S4.5 10.36 4.5 14.5A7.5 7.5 0 0 0 12 22z" fill="white"/>`;
-        } else if (cat.includes('electric') || cat.includes('wire') || cat.includes('power') || cat.includes('lighting')) {
-            svgIcon = `<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/>`;
-        } else if (cat.includes('road') || cat.includes('pothole') || cat.includes('infrastructure')) {
+        // Match specific category keywords to their designated HEX colors and icons
+        if (cat.includes('road') || cat.includes('bridge')) {
             svgIcon = `<path d="M12 2a6 6 0 0 0-6 6v2H4v2h16v-2h-2V8a6 6 0 0 0-6-6zm0 2a4 4 0 0 1 4 4v2H8V8a4 4 0 0 1 4-4z" fill="white"/>`;
+        } else if (cat.includes('water') || cat.includes('drainage') || cat.includes('flood')) {
+            svgIcon = `<path d="M12 22a7.5 7.5 0 0 0 7.5-7.5c0-4.14-7.5-12.5-7.5-12.5S4.5 10.36 4.5 14.5A7.5 7.5 0 0 0 12 22z" fill="white"/>`;
+        } else if (cat.includes('lighting') || cat.includes('street') || cat.includes('electric')) {
+            svgIcon = `<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/>`;
+        } else if (cat.includes('safety') || cat.includes('regulatory') || cat.includes('emergency')) {
+            color = '#ef4444'; // red (Shield)
+            svgIcon = `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="white"/>`;
+        } else if (cat.includes('facilit') || cat.includes('build') || cat.includes('park')) {
+            color = '#22c55e'; // green (Building)
+            svgIcon = `<path d="M3 21h18v-2H3v2zm9-18L2 9h2v10h16V9h2L12 3zm-3 14v-4h6v4H9z" fill="white"/>`;
         } else {
+            // Default generic warning
             svgIcon = `<path d="M12 2L1 21h22L12 2zm0 3.5l7 13.5H5l7-13.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z" fill="white"/>`;
         }
 
+        const statusColor = status === 'resolved' ? '#22c55e' : (status === 'pending' ? '#ef4444' : '#f97316');
+
         const svgString = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 46" width="40" height="46">
-                <!-- Large Pin Body -->
-                <path d="M20 44c0 0 16-15.5 16-24a16 16 0 0 0-32 0c0 8.5 16 24 16 24z" fill="${color}" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0px 3px 2px rgba(0,0,0,0.3))" />
-                <!-- Dark Inner Circle background -->
-                <circle cx="20" cy="18" r="11" fill="rgba(0,0,0,0.15)"/>
-                <!-- Centered White Icon -->
-                <g transform="translate(10, 8) scale(0.8)">
-                    ${svgIcon}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 46 50" width="46" height="50">
+                <!-- Large Pin Body (Offset to make room for badge) -->
+                <g transform="translate(3, 4)">
+                    <path d="M20 44c0 0 16-15.5 16-24a16 16 0 0 0-32 0c0 8.5 16 24 16 24z" fill="${color}" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0px 3px 2px rgba(0,0,0,0.3))" />
+                    <!-- Dark Inner Circle background -->
+                    <circle cx="20" cy="18" r="11" fill="rgba(0,0,0,0.15)"/>
+                    <!-- Centered White Icon -->
+                    <g transform="translate(10, 8) scale(0.8)">
+                        ${svgIcon}
+                    </g>
                 </g>
+                <!-- Status Badge Indicator top right -->
+                <circle cx="36" cy="10" r="7" fill="${statusColor}" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0px 2px 2px rgba(0,0,0,0.2))"/>
             </svg>
         `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
 
@@ -1095,14 +1328,14 @@ export default function ResidentDashboard() {
 
     // Simulated data for presentation layer
     const simulatedHazards = [
-        { id: 1, category: 'Flooding', title: 'Deep Puddles on Highway', lat: 14.7566, lng: 121.0450, status: 'pending', time: '10 mins ago', distance: '1.2 km' }, 
-        { id: 2, category: 'Road Issue', title: 'Cracked Surface', lat: 14.7610, lng: 121.0480, status: 'unverified', time: '1 hr ago', distance: '2.5 km' }, 
-        { id: 3, category: 'Electrical', title: 'Fallen Wire Hazard', lat: 14.7520, lng: 121.0410, status: 'pending', time: '5 hrs ago', distance: '0.8 km' },
-        { id: 4, category: 'Waste Management', title: 'Uncollected Trash Blockage', lat: 14.7590, lng: 121.0390, status: 'pending', time: '1 day ago', distance: '3.1 km' }, 
-        { id: 5, category: 'Flooding', title: 'Blocked City Drainage', lat: 14.7650, lng: 121.0500, status: 'pending', time: '30 mins ago', distance: '4.0 km' }, 
-        { id: 6, category: 'Road Issue', title: 'Severe Pothole', lat: 14.7480, lng: 121.0350, status: 'resolved', time: '2 days ago', distance: '1.5 km' },
-        { id: 7, category: 'Public Safety', title: 'Broken Street Light', lat: 14.7630, lng: 121.0420, status: 'pending', time: '2 hrs ago', distance: '0.5 km' }, 
-        { id: 8, category: 'Electrical', title: 'Transformer Sparking', lat: 14.7540, lng: 121.0550, status: 'pending', time: '4 hrs ago', distance: '2.2 km' }
+        { id: 1, category: 'Water & Drainage', title: 'Deep Puddles on Highway', lat: 14.7566, lng: 121.0450, status: 'pending', time: '10 mins ago', distance: '1.2 km' }, 
+        { id: 2, category: 'Roads & Bridges', title: 'Cracked Surface', lat: 14.7610, lng: 121.0480, status: 'unverified', time: '1 hr ago', distance: '2.5 km' }, 
+        { id: 3, category: 'Street Lighting', title: 'Fallen Wire Hazard', lat: 14.7520, lng: 121.0410, status: 'pending', time: '5 hrs ago', distance: '0.8 km' },
+        { id: 4, category: 'Public Facilities', title: 'Uncollected Trash Blockage', lat: 14.7590, lng: 121.0390, status: 'pending', time: '1 day ago', distance: '3.1 km' }, 
+        { id: 5, category: 'Water & Drainage', title: 'Blocked City Drainage', lat: 14.7650, lng: 121.0500, status: 'pending', time: '30 mins ago', distance: '4.0 km' }, 
+        { id: 6, category: 'Roads & Bridges', title: 'Severe Pothole', lat: 14.7480, lng: 121.0350, status: 'resolved', time: '2 days ago', distance: '1.5 km' },
+        { id: 7, category: 'Public Safety & Regulatory', title: 'Broken Street Light', lat: 14.7630, lng: 121.0420, status: 'pending', time: '2 hrs ago', distance: '0.5 km' }, 
+        { id: 8, category: 'Street Lighting', title: 'Transformer Sparking', lat: 14.7540, lng: 121.0550, status: 'pending', time: '4 hrs ago', distance: '2.2 km' }
     ];
 
     // Distance Calculation Logic
@@ -1120,8 +1353,26 @@ export default function ResidentDashboard() {
     };
 
     const processedHazards = React.useMemo(() => {
-        if (!isLoaded) return simulatedHazards;
-        return simulatedHazards.map(hazard => {
+        if (!isLoaded) return [];
+
+        const myReportMarkers = (userReports || []).map(r => {
+            const lat = parseFloat(r.location_lat || r.lat);
+            const lng = parseFloat(r.location_lng || r.lng);
+            return {
+                id: r.id || `user-report-${r.ticket_id}`,
+                lat,
+                lng,
+                title: r.description || `Resident Report - ${r.ticket_id}`,
+                category: r.ai_category || r.category || 'Resident Report',
+                status: (r.status || 'pending').toLowerCase(),
+                location: r.location_string || 'N/A'
+            };
+        }).filter(r => !isNaN(r.lat) && !isNaN(r.lng));
+
+        // Combine simulated hazards with the resident's actual reports
+        const combined = [...simulatedHazards, ...myReportMarkers];
+
+        return combined.map(hazard => {
             const meters = getDistance(reportLocation, { lat: hazard.lat, lng: hazard.lng });
             return {
                 ...hazard,
@@ -1129,7 +1380,7 @@ export default function ResidentDashboard() {
                 distanceValue: meters || 999999
             };
         }).sort((a, b) => a.distanceValue - b.distanceValue);
-    }, [reportLocation, simulatedHazards, isLoaded]);
+    }, [reportLocation, simulatedHazards, userReports, isLoaded]);
 
 
     // Auto-fetch location on mount and periodic updates for proximity tracking
@@ -1191,7 +1442,7 @@ export default function ResidentDashboard() {
         setSubmittingReport(true);
         try {
             const formData = new FormData();
-            formData.append('category', reportCategory);
+            formData.append('category', Array.isArray(reportCategory) ? reportCategory.join(', ') : reportCategory);
             formData.append('description', reportNotes || "Citizen report from PULSO app.");
             formData.append('lat', reportLocation.lat);
             formData.append('lng', reportLocation.lng);
@@ -1222,11 +1473,11 @@ export default function ResidentDashboard() {
             } else {
                 const errorData = await response.json();
                 const errorMsg = errorData.detail || 'Failed to submit report.';
-                showToast(errorMsg);
+                showToast(errorMsg, 'error');
             }
         } catch (error) {
             console.error("PULSO: Error submitting report:", error);
-            showToast('Error connecting to server.');
+            showToast('Error connecting to server.', 'error');
         } finally {
             setSubmittingReport(false);
         }
@@ -1288,11 +1539,11 @@ export default function ResidentDashboard() {
                 showToast(`${field === 'email' ? 'Email' : 'Mobile Number'} updated successfully`);
                 fetchUser(currentUser.id); // Refresh user data
             } else {
-                showToast("Failed to update profile");
+                showToast("Failed to update profile", 'error');
             }
         } catch (error) {
             console.error("Error updating profile:", error);
-            showToast("An error occurred");
+            showToast("An error occurred", 'error');
         } finally {
             setUpdatingProfile(false);
         }
@@ -1369,12 +1620,17 @@ export default function ResidentDashboard() {
 
             {/* Global Toast Notification */}
             <AnimatePresence>
-                {toastMessage && (
+                {toast.message && (
                     <motion.div 
                         initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 50, scale: 0.9 }}
-                        className="fixed bottom-20 sm:bottom-8 left-1/2 -translate-x-1/2 z-[70] bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2 text-sm whitespace-nowrap"
+                        className="fixed bottom-20 sm:bottom-8 left-1/2 -translate-x-1/2 z-[70] bg-slate-900 border border-slate-700/50 backdrop-blur-xl dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-3 text-sm whitespace-nowrap"
                     >
-                        <CheckCircle2 size={16} className="text-green-500"/> {toastMessage}
+                        {toast.type === 'error' ? (
+                            <X size={18} className="text-red-500 stroke-[3px]"/>
+                        ) : (
+                            <CheckCircle2 size={18} className="text-green-500 stroke-[3px]"/>
+                        )}
+                        {toast.message}
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -1431,6 +1687,7 @@ export default function ResidentDashboard() {
                 handleStreetViewClick={handleStreetViewClick}
                 getIconForCategory={getIconForCategory}
                 getMarkerSVG={getMarkerSVG}
+                getCategoryColor={getCategoryColor}
                 mapFilter={mapFilter}
                 setMapFilter={setMapFilter}
             />
@@ -1543,6 +1800,7 @@ export default function ResidentDashboard() {
                                         loadingReports={loadingReports} 
                                         handleSetModal={handleSetModal} 
                                         containerVariants={containerVariants} 
+                                        setZoomedImage={setZoomedImage}
                                     />
                                 </div>
                             )}
@@ -1721,6 +1979,38 @@ export default function ResidentDashboard() {
                     {isAIChatOpen ? <X size={22} /> : <Brain size={24} />}
                 </motion.button>
             </div>
+            {/* ── Image Zoom Overlay ── */}
+            <AnimatePresence>
+                {zoomedImage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setZoomedImage(null)}
+                        className="fixed inset-0 z-[1000] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 sm:p-12 cursor-zoom-out"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            className="relative max-w-5xl w-full h-full flex items-center justify-center"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <img 
+                                src={zoomedImage} 
+                                alt="Inspection" 
+                                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-white/10"
+                            />
+                            <button 
+                                onClick={() => setZoomedImage(null)}
+                                className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full backdrop-blur-md transition-colors border border-white/20"
+                            >
+                                <X size={24} />
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

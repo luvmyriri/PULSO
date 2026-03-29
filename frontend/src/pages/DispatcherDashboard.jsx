@@ -25,16 +25,20 @@ import {
     Settings,
     Radio,
     MapPin,
-    Truck
+    Truck,
+    Flame,
+    Activity,
+    X,
+    Image as ImageIcon
 } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, HeatmapLayerF } from '@react-google-maps/api';
 import { Link, useNavigate } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 
 const CALOOCAN_CENTER = { lat: 14.7566, lng: 121.0450 };
 const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7505408, lng: 121.0540317 }; // Adjusted to exact Zapote Rd building footprint
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
-const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry'];
+const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry', 'visualization'];
 
 const NORTH_CALOOCAN_BOUNDARY = [
     { lat: 14.825, lng: 121.060 }, // North Tip (Tala Area)
@@ -47,6 +51,22 @@ const NORTH_CALOOCAN_BOUNDARY = [
     { lat: 14.760, lng: 120.970 }, // West Side (Expansion towards Marilao)
     { lat: 14.820, lng: 120.970 }, // NW Corner (Marilao Border)
     { lat: 14.825, lng: 121.030 }  // Back to North Tip
+];
+
+const CALOOCAN_NORTH_BARANGAYS = [
+    'All Barangays', 'Brgy. 165', 'Brgy. 166', 'Brgy. 167', 'Brgy. 168', 'Brgy. 169', 
+    'Brgy. 170', 'Brgy. 171', 'Brgy. 172', 'Brgy. 173', 'Brgy. 174', 'Brgy. 175', 
+    'Brgy. 176', 'Brgy. 177', 'Brgy. 178', 'Brgy. 179', 'Brgy. 180', 'Brgy. 181', 
+    'Brgy. 182', 'Brgy. 183', 'Brgy. 184', 'Brgy. 185', 'Brgy. 186', 'Brgy. 187', 'Brgy. 188'
+];
+
+const INFRASTRUCTURE_CATEGORIES = [
+    'All Categories',
+    'Roads & Bridges',
+    'Water & Drainage',
+    'Street Lighting',
+    'Public Safety & Regulatory',
+    'Public Facilities'
 ];
 
 const DispatcherDashboard = () => {
@@ -82,6 +102,8 @@ const DispatcherDashboard = () => {
     const [selectedMarker, setSelectedMarker] = useState(null);
     const [map, setMap] = useState(null);
     const [panorama, setPanorama] = useState(null);
+    const heatmapLayerRef = useRef(null);
+    const [zoomedImage, setZoomedImage] = useState(null);
 
     const centerOnHQ = () => {
         if (map) {
@@ -101,6 +123,10 @@ const DispatcherDashboard = () => {
     const [isJurisdictionModalOpen, setIsJurisdictionModalOpen] = useState(false);
     const [jurisdictionErrorMsg, setJurisdictionErrorMsg] = useState("");
     const [svHeading, setSvHeading] = useState(0);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
+    const [selectedCategory, setSelectedCategory] = useState('All Categories');
+    const [showHeatmap, setShowHeatmap] = useState(false);
     const miniMapRef = useRef(null);
 
     // AI Omni-Assistant State
@@ -114,8 +140,8 @@ const DispatcherDashboard = () => {
 
     const aiChatEndRef = useRef(null);
 
-    // Location-intent keyword detection
     const LOCATION_KEYWORDS = /location|where|report|map|address|barangay|coordinates|lat|lng|pin|incident|hazard|site|area|place/i;
+
 
     const handleAIChat = async (e) => {
         e.preventDefault();
@@ -507,11 +533,151 @@ const DispatcherDashboard = () => {
         }
     };
 
-    const activeReports = allReports.filter(report => 
-        dashboardMode === 'triage' 
-            ? ['unverified', 'pending', 'pending_approval'].includes(report.status) // In phase 1 reports are created as 'pending'
-            : report.status === 'approved_internal'
-    );
+    const filteredReports = React.useMemo(() => {
+        return allReports.filter(report => {
+            // 1. Dashboard Mode Filter (Triage vs Active)
+            const matchesMode = dashboardMode === 'triage' 
+                ? ['unverified', 'pending', 'pending_approval'].includes(report.status)
+                : report.status === 'approved_internal';
+            
+            if (!matchesMode) return false;
+
+            // 2. Search Query Filter
+            const searchLower = searchQuery.toLowerCase();
+            const matchesSearch = !searchQuery || 
+                report.id.toString().includes(searchLower) || 
+                (report.ai_category || report.category || '').toLowerCase().includes(searchLower) ||
+                (report.location_string || '').toLowerCase().includes(searchLower);
+            
+            if (!matchesSearch) return false;
+
+            // 3. Barangay Filter (Robust Match)
+            if (selectedBarangay !== 'All Barangays') {
+                const selectedDigits = selectedBarangay.replace(/\D/g, '');
+                const reportBarangayRaw = (report.barangay || '').toString();
+                const reportBarangayDigits = reportBarangayRaw.replace(/\D/g, '');
+                const locationString = (report.location_string || '').toLowerCase();
+                
+                const matchesBarangay = 
+                    (reportBarangayDigits && reportBarangayDigits === selectedDigits) ||
+                    (reportBarangayRaw && reportBarangayRaw.includes(selectedBarangay)) ||
+                    locationString.includes(selectedBarangay.toLowerCase()) ||
+                    locationString.includes(`barangay ${selectedDigits}`) ||
+                    locationString.includes(`brgy. ${selectedDigits}`) ||
+                    locationString.includes(`brgy ${selectedDigits}`);
+                
+                if (!matchesBarangay) return false;
+            }
+
+            // 4. Issue Type (Category) Filter (Robust / Fuzzy Match)
+            if (selectedCategory !== 'All Categories') {
+                const reportCat = (report.ai_category || report.category || '').toLowerCase();
+                
+                // Map of keywords for each high-level category
+                const CATEGORY_KEYWORDS = {
+                    'Roads & Bridges': ['road', 'bridge', 'pothole', 'pavement', 'asphalt', 'infrastructure', 'sidewalk'],
+                    'Water & Drainage': ['water', 'drain', 'flood', 'leak', 'pipe', 'sewage', 'canal', 'clog'],
+                    'Street Lighting': ['light', 'lamp', 'electric', 'power', 'post', 'wire', 'dark', 'bulb'],
+                    'Public Safety & Regulatory': ['safety', 'hazard', 'regulatory', 'security', 'emergency', 'danger', 'risk', 'collapsed', 'obstacle'],
+                    'Public Facilities': ['facility', 'building', 'park', 'playground', 'library', 'school', 'office', 'center']
+                };
+
+                const keywords = CATEGORY_KEYWORDS[selectedCategory] || [];
+                const matchesKeyword = keywords.some(key => reportCat.includes(key));
+                const matchesDirect = reportCat.includes(selectedCategory.toLowerCase().split(' & ')[0]); // e.g. "roads" matches "Roads & Bridges"
+
+                if (!matchesKeyword && !matchesDirect) return false;
+            }
+            
+            return true;
+        });
+    }, [allReports, dashboardMode, searchQuery, selectedBarangay, selectedCategory]);
+
+    const activeReports = filteredReports; // Re-alias for minimal code disruption
+
+    // Weighted Urban Glow Heatmap Logic (Reactive to Barangay Density)
+    const heatmapData = React.useMemo(() => {
+        // Return empty array EARLY if toggle is off OR there are no reports to show
+        if (!showHeatmap || filteredReports.length === 0) {
+            return [];
+        }
+        
+        // Count reports per group (Barangay x Issue Type) to highlight "Pressure Zones"
+        const densityMap = filteredReports.reduce((acc, r) => {
+            const groupKey = `${r.barangay || 'unknown'}-${r.ai_category || r.category || 'misc'}`;
+            acc[groupKey] = (acc[groupKey] || 0) + 1;
+            return acc;
+        }, {});
+
+        // Build weighted heatmap points
+        return filteredReports.map(report => {
+            const groupKey = `${report.barangay || 'unknown'}-${report.ai_category || report.category || 'misc'}`;
+            const groupDensity = densityMap[groupKey] || 1;
+            
+            // Urgency Base (1-10 scale)
+            const urgencyWeight = report.ai_urgency?.toLowerCase() === 'critical' ? 10 : 
+                                  report.ai_urgency?.toLowerCase() === 'high' ? 6 : 
+                                  report.ai_urgency?.toLowerCase() === 'medium' ? 3 : 1;
+            
+            // Final intensity is a product of Urgency + Group Density (Pressure)
+            const finalWeight = urgencyWeight * (1 + (groupDensity / 5));
+
+            return {
+                location: new window.google.maps.LatLng(report.location_lat, report.location_lng),
+                weight: finalWeight
+            };
+        });
+    }, [filteredReports, showHeatmap, selectedBarangay, selectedCategory]);
+
+    // Memoize heatmap options to prevent unnecessary layer updates
+    const heatmapOptions = React.useMemo(() => ({
+        radius: 60,
+        opacity: 0.85,
+        gradient: [
+            'rgba(249, 115, 22, 0)',   // Transparent Base
+            'rgba(249, 115, 22, 0.4)', // Faint Glow
+            'rgba(249, 115, 22, 0.6)', 
+            'rgba(249, 115, 22, 0.8)', 
+            'rgba(249, 115, 22, 1)',   // Solid Orange
+            'rgba(234, 88, 12, 1)',    // Darker Orange
+            'rgba(194, 65, 12, 1)',    // Orange-Brown
+            'rgba(154, 52, 18, 1)',    // Deep Burnt Orange
+            'rgba(220, 38, 38, 1)'     // Critical Red Core
+        ]
+    }), []);
+
+    // Manual Heatmap Lifecycle Management (Fixes the "Stacking/Persistence" bug)
+    useEffect(() => {
+        if (!map || !window.google || !window.google.maps || !window.google.maps.visualization) return;
+
+        // Cleanup: remove if toggle is OFF or no data
+        if (!showHeatmap || heatmapData.length === 0) {
+            if (heatmapLayerRef.current) {
+                heatmapLayerRef.current.setMap(null);
+            }
+            return;
+        }
+
+        // Initialize layer if it doesn't exist
+        if (!heatmapLayerRef.current) {
+            heatmapLayerRef.current = new window.google.maps.visualization.HeatmapLayer({
+                map: map,
+                ...heatmapOptions
+            });
+        }
+
+        // Sync data and map instance
+        heatmapLayerRef.current.setData(heatmapData);
+        heatmapLayerRef.current.setOptions(heatmapOptions);
+        heatmapLayerRef.current.setMap(map);
+
+        return () => {
+            // Safe cleanup on component unmount or dependency change
+            if (heatmapLayerRef.current) {
+                heatmapLayerRef.current.setMap(null);
+            }
+        };
+    }, [map, showHeatmap, heatmapData, heatmapOptions]);
 
     // Fallback UI mapping for DB fields
     const getReportIcon = (category) => {
@@ -647,9 +813,63 @@ const DispatcherDashboard = () => {
                                         <><Radio size={18} className="text-blue-500"/> Dispatched Work</>
                                     )}
                                 </h2>
-                                <div className="relative">
-                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
-                                    <input type="text" placeholder="Search reports..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 transition-colors" />
+                                <div className="flex flex-col gap-2">
+                                    <div className="relative">
+                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Search reports..." 
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 transition-colors" 
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <div className="relative w-full">
+                                            <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+                                            <select 
+                                                value={selectedBarangay}
+                                                onChange={(e) => setSelectedBarangay(e.target.value)}
+                                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-8 py-2 text-[11px] font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 appearance-none transition-colors"
+                                            >
+                                                {CALOOCAN_NORTH_BARANGAYS.map(brgy => (
+                                                    <option key={brgy} value={brgy}>{brgy}</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 opacity-50">
+                                                <ChevronRight size={12} className="rotate-90" />
+                                            </div>
+                                        </div>
+                                        <div className="relative w-full">
+                                            <AlertTriangle size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+                                            <select 
+                                                value={selectedCategory}
+                                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-8 py-2 text-[11px] font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 appearance-none transition-colors"
+                                            >
+                                                {INFRASTRUCTURE_CATEGORIES.map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 opacity-50">
+                                                <ChevronRight size={12} className="rotate-90" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Professional Visualizer Control */}
+                                    <div className="mt-1 pt-3 border-t border-slate-100 dark:border-slate-800/50 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Flame size={14} className={`${showHeatmap ? 'text-orange-500 animate-pulse' : 'text-slate-400'}`} />
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{showHeatmap ? 'Hide Heatmap' : 'Show Heatmap'}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => setShowHeatmap(!showHeatmap)}
+                                            className={`relative w-8 h-4 rounded-full transition-colors duration-200 focus:outline-none ${showHeatmap ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-800'}`}
+                                        >
+                                            <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${showHeatmap ? 'translate-x-4' : 'translate-x-0'}`} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -665,6 +885,15 @@ const DispatcherDashboard = () => {
                                         const icon = getReportIcon(report.ai_category || report.category);
                                         const aiConfidence = urgencyToConfidence(report.ai_urgency);
                                         
+                                        const selectionClass = selectedReport?.id === report.id 
+                                            ? {
+                                                orange: 'bg-orange-500/10 border-orange-500/50 ring-1 ring-orange-500/20',
+                                                blue: 'bg-blue-500/10 border-blue-500/50 ring-1 ring-blue-500/20',
+                                                red: 'bg-red-500/10 border-red-500/50 ring-1 ring-red-500/20',
+                                                slate: 'bg-slate-800/80 border-slate-500/50 ring-1 ring-slate-500/20'
+                                            }[color] || 'bg-slate-800 border-blue-500'
+                                            : 'bg-white dark:bg-slate-950/50 border-slate-200 dark:border-slate-800/50 hover:border-slate-300 dark:hover:border-slate-700 shadow-sm';
+
                                         return (
                                         <button 
                                             key={report.id}
@@ -674,11 +903,16 @@ const DispatcherDashboard = () => {
                                                 setSelectedMarker(report);
                                                 if (map) map.panTo({ lat: report.location_lat, lng: report.location_lng });
                                             }}
-                                            className={`w-full text-left p-3 rounded-xl border transition-all ${selectedReport?.id === report.id ? `bg-${color}-50 dark:bg-${color}-900/20 border-${color}-200 dark:border-${color}-500/50` : 'bg-white dark:bg-slate-950/50 border-slate-200 dark:border-slate-800/50 hover:border-slate-300 dark:hover:border-slate-700 shadow-sm'}`}
+                                            className={`w-full text-left p-3 rounded-xl border transition-all ${selectionClass}`}
                                         >
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="flex items-center gap-2">
-                                                    <div className={`w-6 h-6 rounded bg-${color}-100 dark:bg-${color}-900/50 text-${color}-600 dark:text-${color}-400 flex items-center justify-center`}>
+                                                    <div className={`w-6 h-6 rounded flex items-center justify-center ${
+                                                        color === 'orange' ? 'bg-orange-500/10 text-orange-500' :
+                                                        color === 'blue' ? 'bg-blue-500/10 text-blue-500' :
+                                                        color === 'red' ? 'bg-red-500/10 text-red-500' :
+                                                        'bg-slate-500/10 text-slate-500'
+                                                    }`}>
                                                         {icon}
                                                     </div>
                                                     <span className="font-bold text-slate-900 dark:text-white text-sm">{report.ticket_id || `RPT-${report.id}`}</span>
@@ -752,19 +986,23 @@ const DispatcherDashboard = () => {
                 {/* Map Area (Center) */}
                 <div className="flex-1 bg-slate-100 dark:bg-slate-950 relative">
                     {isLoaded ? (
-                        <GoogleMap
-                            mapContainerStyle={MAP_CONTAINER_STYLE}
-                            center={CALOOCAN_CENTER}
-                            zoom={14}
-                            onLoad={map => {
-                                setMap(map);
-                                setPanorama(map.getStreetView());
-                            }}
-                            onUnmount={onUnmount}
-                            options={mapOptions}
-                        >
-                            {/* Render markers for all reports */}
-                            {allReports.map(report => (
+                        <>
+                            <GoogleMap
+                                mapContainerStyle={MAP_CONTAINER_STYLE}
+                                center={CALOOCAN_CENTER}
+                                zoom={14}
+                                onLoad={map => {
+                                    setMap(map);
+                                    setPanorama(map.getStreetView());
+                                }}
+                                onUnmount={onUnmount}
+                                options={mapOptions}
+                            >
+                             {/* Urban Glow Heatmap Layer - Managed manually via heatmapLayerRef for stability */}
+                             {/* (No <HeatmapLayerF> here to prevent stacking) */}
+
+                            {/* Render markers for all reports (Filtered) - Always visible per request */}
+                            {filteredReports.map(report => (
                                 (report.location_lat && report.location_lng) && (
                                     <MarkerF
                                         key={report.id}
@@ -1097,11 +1335,6 @@ const DispatcherDashboard = () => {
                                 </>
                             )}
                         </GoogleMap>
-                    ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-950">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                        </div>
-                    )}
 
                     {/* Map UI Floating Controls - Stacked Above the MiniMap */}
                     <div className="absolute bottom-[205px] left-[30px] flex flex-col gap-2 pointer-events-none mb-1">
@@ -1143,7 +1376,13 @@ const DispatcherDashboard = () => {
                         >
                             <Navigation size={20} className="group-hover:text-blue-500" />
                         </button>
-                    </div>
+                        </div>
+                        </>
+                    ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-950">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right Sidebar - Selected Details or AI Validation Queue */}
@@ -1182,8 +1421,23 @@ const DispatcherDashboard = () => {
                                                     <div className="text-xs font-bold text-slate-500 mb-2">Attached Image:</div>
                                                     <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden flex items-center justify-center text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 relative group">
                                                         {selectedReport.image_url ? (
-                                                            <img src={selectedReport.image_url} alt="Report" className="w-full h-full object-cover" />
-                                                        ) : "[ Citizen Uploaded Media ]"}
+                                                            <button 
+                                                                onClick={() => setZoomedImage(`http://localhost:8000${selectedReport.image_url}`)}
+                                                                className="w-full h-full cursor-zoom-in"
+                                                                title="Click to Zoom"
+                                                            >
+                                                                <img 
+                                                                    src={`http://localhost:8000${selectedReport.image_url}`} 
+                                                                    alt="Report Evidence" 
+                                                                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" 
+                                                                />
+                                                            </button>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <ImageIcon size={24} className="opacity-20"/>
+                                                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">No citizen media</span>
+                                                            </div>
+                                                        )}
                                                         
                                                         {/* Quick Street View Toggle for Current Report Location */}
                                                         <button 
@@ -1714,8 +1968,75 @@ const DispatcherDashboard = () => {
                     </button>
                 </div>
             </div>
+            {/* ── Image Zoom Overlay ── */}
+            <AnimatePresence>
+                {zoomedImage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setZoomedImage(null)}
+                        className="fixed inset-0 z-[1000] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 sm:p-12 cursor-zoom-out"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            className="relative max-w-5xl w-full h-full flex items-center justify-center"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <img 
+                                src={zoomedImage} 
+                                alt="Inspection" 
+                                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-white/10"
+                            />
+                            <button 
+                                onClick={() => setZoomedImage(null)}
+                                className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full backdrop-blur-md transition-colors border border-white/20"
+                            >
+                                <X size={24} />
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
+};
+
+/**
+ * Tactical Hull Analytics: Monotone Chain algorithm for Convex Hull
+ * Defines the mission boundary around a set of reports.
+ */
+const getConvexHull = (points) => {
+    if (points.length === 0) return [];
+    if (points.length < 3) return points.map(p => ({ lat: p.location_lat, lng: p.location_lng }));
+    
+    // Sort points by latitude, then longitude
+    const sorted = [...points].sort((a, b) => 
+        a.location_lat !== b.location_lat ? a.location_lat - b.location_lat : a.location_lng - b.location_lng
+    );
+    
+    const crossProduct = (a, b, c) => 
+        (b.location_lng - a.location_lng) * (c.location_lat - a.location_lat) - 
+        (b.location_lat - a.location_lat) * (c.location_lng - a.location_lng);
+    
+    const upper = [];
+    for (const p of sorted) {
+        while (upper.length >= 2 && crossProduct(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+        upper.push(p);
+    }
+    
+    const lower = [];
+    for (let i = sorted.length - 1; i >= 0; i--) {
+        const p = sorted[i];
+        while (lower.length >= 2 && crossProduct(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+        lower.push(p);
+    }
+    
+    upper.pop();
+    lower.pop();
+    return [...upper, ...lower].map(p => ({ lat: p.location_lat, lng: p.location_lng }));
 };
 
 export default DispatcherDashboard;

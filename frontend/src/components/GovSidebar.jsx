@@ -190,7 +190,7 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
                 {/* ── WORK & TRIAGE ── */}
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Triage & Work Orders</div>
                 {hasRole(role, SENIOR_ROLES) && (
-                    <NavItem icon={ClipboardCheck} label="W.O. Approvals" tab="approvals" activeTab={activeTab} onTabChange={onTabChange} badge={2} to="/management" />
+                    <NavItem icon={ClipboardCheck} label="W.O. Approvals" tab="approvals" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
                 )}
                 {hasRole(role, GOV_ROLES) && (
                     <NavItem icon={GitBranch} label="Work Orders" to="/gov/work-orders" />
