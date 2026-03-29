@@ -1,8 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RefreshCw, AlertCircle, CameraOff } from 'lucide-react';
+import { X, RefreshCw, AlertCircle, CameraOff, MapPin } from 'lucide-react';
 
-const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subtitle }) => {
+const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subtitle, metadata, guideText }) => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const streamRef = useRef(null);
@@ -97,11 +97,86 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
 
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
+        
+        // Final Mirror compensation for captured image
+        if (facingMode === 'user') {
+            context.translate(canvas.width, 0);
+            context.scale(-1, 1);
+        }
+        
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Reset transform to draw watermark correctly
+        if (facingMode === 'user') {
+            context.setTransform(1, 0, 0, 1, 0, 0);
+        }
+
+        // Draw Professional GPS Watermark/Stamp
+        if (metadata) {
+            const padding = canvas.width * 0.02;
+            const logoSize = canvas.width * 0.04;
+            const fontSizeMain = Math.max(14, canvas.width * 0.018);
+            const fontSizeSmall = Math.max(10, canvas.width * 0.012);
+            const timestamp = new Date().toLocaleString();
+
+            // 1. Semi-transparent backdrop for the entire watermark zone
+            const boxWidth = canvas.width * 0.45;
+            const boxHeight = canvas.height * 0.18;
+            // 1. No card backdrop - drawing directly on canvas
+            // We still use boxX, boxY for layout alignment
+            const boxX = padding;
+            const boxY = canvas.height - boxHeight - padding;
+
+            // Added a slight shadow to the text for legibility without a box
+            context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            context.shadowBlur = 4;
+            context.shadowOffsetX = 2;
+            context.shadowOffsetY = 2;
+
+            // 2. Draw "PULSO GPS VERIFIED" header with green dot
+            context.fillStyle = '#22c55e'; // Green
+            context.beginPath();
+            context.arc(boxX + 20, boxY + 25, 4, 0, Math.PI * 2);
+            context.fill();
+
+            context.font = `black ${fontSizeSmall}px system-ui, -apple-system, sans-serif`;
+            context.fillStyle = 'white';
+            context.fillText(`PULSO GPS VERIFIED • ${timestamp}`, boxX + 35, boxY + 28);
+
+            // 3. Draw Coordinates
+            context.font = `bold ${fontSizeMain}px monospace`;
+            context.fillStyle = '#f97316'; // Orange
+            context.fillText('LAT', boxX + 20, boxY + 60);
+            context.fillStyle = 'white';
+            context.fillText(metadata.lat?.toFixed(6) || '0.000000', boxX + 80, boxY + 60);
+
+            context.fillStyle = '#f97316';
+            context.fillText('LNG', boxX + 20, boxY + 90);
+            context.fillStyle = 'white';
+            context.fillText(metadata.lng?.toFixed(6) || '0.000000', boxX + 80, boxY + 90);
+
+            // 4. Draw Address (Truncated for clean look)
+            if (metadata.address) {
+                context.font = `bold ${fontSizeSmall}px system-ui, -apple-system, sans-serif`;
+                context.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                const addressLines = [
+                    metadata.address.slice(0, 45),
+                    metadata.address.length > 45 ? metadata.address.slice(45, 90) : ''
+                ];
+                addressLines.forEach((line, i) => {
+                    context.fillText(line, boxX + 20, boxY + 120 + (i * 18));
+                });
+            }
+            
+            // Reset shadows for any potential subsequent drawing
+            context.shadowBlur = 0;
+            context.shadowOffsetX = 0;
+            context.shadowOffsetY = 0;
+        }
 
         canvas.toBlob((blob) => {
             if (blob) {
-                const file = new File([blob], `id_${side}_capture.jpg`, { type: 'image/jpeg' });
+                const file = new File([blob], `captured_report_metadata.jpg`, { type: 'image/jpeg' });
                 onCapture(file);
                 onClose();
             }
@@ -133,7 +208,7 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
                             bg-white dark:bg-slate-900">
                             <div>
                                 {title ? (
-                                    <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white uppercase">
+                                    <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white uppercase truncate max-w-[200px] sm:max-w-none">
                                         {title}
                                     </h3>
                                 ) : (
@@ -147,9 +222,15 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
                                     </p>
                                 ) : (
                                     <p className="text-[10px] sm:text-xs text-gray-500 dark:text-slate-400">
-                                        Capture the{' '}
-                                        <span className="text-orange-500 font-bold uppercase">{side}</span>
-                                        {' '}of your ID
+                                        {side === 'ISSUE' ? (
+                                            "Capture a clear photo of the infrastructure issue for AI verification"
+                                        ) : (
+                                            <>
+                                                Capture the{' '}
+                                                <span className="text-orange-500 font-bold uppercase">{side}</span>
+                                                {' '}of your ID
+                                            </>
+                                        )}
                                     </p>
                                 )}
                             </div>
@@ -195,22 +276,46 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
                                         className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
                                     />
 
-                                    {/* Scanning Overlay */}
-                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                        <div className="w-[85%] aspect-[1.586/1] border-2 border-white/60 rounded-2xl relative shadow-[0_0_0_1000px_rgba(0,0,0,0.45)]">
-                                            <div className="absolute top-[-2px] left-[-2px] w-8 h-8 border-t-4 border-l-4 border-orange-500 rounded-tl-xl" />
-                                            <div className="absolute top-[-2px] right-[-2px] w-8 h-8 border-t-4 border-r-4 border-orange-500 rounded-tr-xl" />
-                                            <div className="absolute bottom-[-2px] left-[-2px] w-8 h-8 border-b-4 border-l-4 border-orange-500 rounded-bl-xl" />
-                                            <div className="absolute bottom-[-2px] right-[-2px] w-8 h-8 border-b-4 border-r-4 border-orange-500 rounded-br-xl" />
- 
-                                            {/* Guide text */}
-                                            <div className="absolute -bottom-6 sm:-bottom-8 left-0 right-0 flex justify-center">
-                                                <span className="text-white/70 text-[10px] sm:text-xs font-medium tracking-wide drop-shadow">
-                                                    Align your ID within the frame
-                                                </span>
-                                            </div>
+                                    {/* Camera UI Overlays */}
+                                    <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-6">
+                                        {/* Top spacer or potential top-aligned UI */}
+                                        <div />
+
+                                        {/* Middle-Bottom Guide text (Floating Pill) */}
+                                        <div className="mb-32">
+                                            <span className="text-white text-[11px] sm:text-xs font-bold tracking-wide drop-shadow-lg bg-black/40 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
+                                                {guideText || "Center the issue in your view"}
+                                            </span>
                                         </div>
                                     </div>
+
+                                    {/* Geospatial Metadata Overlay */}
+                                    {metadata && (
+                                        <div className="absolute bottom-4 left-4 right-4 pointer-events-none flex flex-col items-start gap-1">
+                                            <div className="flex flex-col gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse border border-white/20 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                                                    <span className="text-[11px] font-black text-white uppercase tracking-[0.25em]">PULSO GPS LENS</span>
+                                                </div>
+                                                <div className="flex flex-col gap-1 pl-4.5">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-[10px] font-black text-orange-500 w-8 uppercase">LAT</span>
+                                                        <span className="text-[13px] font-mono font-bold text-white tracking-tight">{metadata.lat?.toFixed(6)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-[10px] font-black text-orange-500 w-8 uppercase">LNG</span>
+                                                        <span className="text-[13px] font-mono font-bold text-white tracking-tight">{metadata.lng?.toFixed(6)}</span>
+                                                    </div>
+                                                    {metadata.address && (
+                                                        <div className="flex items-start gap-2 mt-2 border-t border-white/20 pt-2 max-w-[280px] sm:max-w-[350px]">
+                                                            <MapPin size={11} className="text-orange-500 mt-0.5 shrink-0" />
+                                                            <span className="text-[11px] font-bold text-white/90 leading-tight tracking-wide">{metadata.address}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {isLoading && (
                                         <div className="absolute inset-0 
