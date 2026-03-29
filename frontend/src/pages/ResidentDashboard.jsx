@@ -1147,33 +1147,39 @@ export default function ResidentDashboard() {
     const handleFileReport = async () => {
         setSubmittingReport(true);
         try {
-        const payload = {
-                category: reportCategory,
-                description: reportNotes || "Citizen report from PULSO app.",
-                location_lat: reportLocation.lat,
-                location_lng: reportLocation.lng,
-                // Send human-readable address as location string (backend will also auto-reverse-geocode as fallback)
-                location_string: locationAddress || `Lat: ${reportLocation.lat.toFixed(4)}, Lng: ${reportLocation.lng.toFixed(4)}`
-            };
+            const formData = new FormData();
+            formData.append('category', reportCategory);
+            formData.append('description', reportNotes || "Citizen report from PULSO app.");
+            formData.append('lat', reportLocation.lat);
+            formData.append('lng', reportLocation.lng);
+            formData.append('location_string', locationAddress || `Lat: ${reportLocation.lat.toFixed(4)}, Lng: ${reportLocation.lng.toFixed(4)}`);
+            
+            if (selectedImage) {
+                // selectedImage is a blob URL. We need the actual file.
+                const response = await fetch(selectedImage);
+                const blob = await response.blob();
+                formData.append('image', blob, `report-${Date.now()}.jpg`);
+            }
 
             const response = await fetch('http://localhost:8000/api/reports', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(payload)
+                body: formData
             });
 
             if (response.ok) {
-                showToast('Report sent to Gemini AI for verification!');
+                showToast('Report verified and submitted!');
                 setActiveModal(null);
                 setActiveTab('reports');
                 setReportNotes(''); // Reset form
                 setSelectedImage(null);
                 fetchUserReports(currentUser.id); // Refresh the list
             } else {
-                showToast('Failed to submit report.');
+                const errorData = await response.json();
+                const errorMsg = errorData.detail || 'Failed to submit report.';
+                showToast(errorMsg);
             }
         } catch (error) {
             console.error("PULSO: Error submitting report:", error);

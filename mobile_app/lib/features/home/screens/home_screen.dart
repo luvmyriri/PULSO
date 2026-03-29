@@ -65,12 +65,127 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Material(
                   color: AppTheme.primaryOrange,
                   child: InkWell(
-                    onTap: () {
-                      Navigator.of(context).push(
+                    onTap: () async {
+                      final File? imageFile = await Navigator.of(context).push<File>(
                         MaterialPageRoute(
                           builder: (_) => const CameraScreen(side: 'incident_report'),
                         ),
                       );
+
+                      if (imageFile != null && mounted) {
+                        // Show Quick Review / Submission Dialog
+                        String selectedCategory = 'Road Issue';
+                        final TextEditingController notesController = TextEditingController();
+
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => StatefulBuilder(
+                            builder: (context, setModalState) => Container(
+                              height: MediaQuery.of(context).size.height * 0.75,
+                              decoration: const BoxDecoration(
+                                color: AppTheme.primaryDark,
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                              ),
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'New AI Report',
+                                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                      ),
+                                      IconButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        icon: const Icon(Icons.close, color: Colors.white54),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Image.file(imageFile, height: 180, width: double.infinity, fit: BoxShape.fill == 'fill' ? BoxFit.fill : BoxFit.cover),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  const Text('Category', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.white10),
+                                    ),
+                                    child: DropdownButton<String>(
+                                      value: selectedCategory,
+                                      dropdownColor: AppTheme.primaryDark,
+                                      isExpanded: true,
+                                      underline: const SizedBox(),
+                                      items: ['Road Issue', 'Water / Drainage', 'Waste Management', 'Street Lighting', 'Public Safety']
+                                          .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(color: Colors.white))))
+                                          .toList(),
+                                      onChanged: (val) => setModalState(() => selectedCategory = val!),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  const Text('Description', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: notesController,
+                                    maxLines: 3,
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      hintText: 'Describe the hazard...',
+                                      hintStyle: const TextStyle(color: Colors.white24),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.05),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 55,
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        Navigator.pop(context); // Close bottom sheet
+                                        
+                                        // Trigger submission via Provider
+                                        final result = await provider.submitReport(
+                                          category: selectedCategory,
+                                          description: notesController.text,
+                                          lat: 14.7566, // Placeholder: Use real GPS in production
+                                          lng: 121.0450,
+                                          image: imageFile,
+                                        );
+
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(result['message'] ?? (result['success'] ? 'Report submitted successfully!' : 'Submission failed')),
+                                              backgroundColor: result['success'] ? Colors.green : Colors.redAccent,
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primaryOrange,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      ),
+                                      child: const Text('Verify & Submit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }
                     },
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,

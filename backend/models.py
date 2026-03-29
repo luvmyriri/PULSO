@@ -59,6 +59,7 @@ class Report(Base):
     ai_summary = Column(String, nullable=True)
     ai_reasoning = Column(String, nullable=True)
     severity_score = Column(Float, default=0.0)
+    ai_metadata = Column(Text, nullable=True)  # Formatted JSON: {image_description: "...", tags: [...]}
     
     # Deduplication Fields
     cluster_id = Column(Integer, nullable=True)
