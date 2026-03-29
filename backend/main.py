@@ -457,8 +457,8 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Check verification status
-    if not user.is_verified:
+    # Check verification status (Mandatory for public residents)
+    if not user.is_verified and user.role == "resident":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account not verified. Please check your email for the verification code.",
