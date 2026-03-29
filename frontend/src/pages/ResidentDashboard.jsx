@@ -63,8 +63,6 @@ import Branding from '../components/Branding';
 import { useTranslation } from 'react-i18next';
 import IDCameraModal from '../components/IDCameraModal';
 
-<<<<<<< HEAD
-=======
 const NORTH_CALOOCAN_BOUNDARY = [
     { lat: 14.825, lng: 121.060 }, // North Tip (Tala Area)
     { lat: 14.805, lng: 121.140 }, // NE Corner (Boundary with SJDM/Rizal)
@@ -790,7 +788,6 @@ const TopNavigation = ({
     </header>
 );
 
->>>>>>> 9056a898c9b2270d413c2765c439026f6f7a0522
 export default function ResidentDashboard() {
     const { t } = useTranslation();
     const { theme, changeTheme } = useTheme();
