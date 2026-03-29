@@ -5,10 +5,10 @@ from database import Base
 import uuid
 
 def generate_ticket_id():
-    return f"RPT-{str(uuid.uuid4().int)[:4]}"
+    return f"RPT-{str(uuid.uuid4().int)[:8]}"
 
 def generate_advisory_id():
-    return f"PUB-{str(uuid.uuid4().int)[:4]}"
+    return f"PUB-{str(uuid.uuid4().int)[:8]}"
 
 class User(Base):
     __tablename__ = "users"

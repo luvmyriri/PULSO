@@ -12,7 +12,7 @@ import {
     HardHat, Ruler, Building2, ShieldCheck, PackageCheck, FlaskConical,
     Wrench, BarChart as BarChart2, ChevronDown, ChevronRight, Map,
     ClipboardList, GitBranch, FileCheck, Truck, Eye, UserCog,
-    BookOpen, Activity, FileBarChart2, FileCheck2
+    BookOpen, Activity, FileBarChart2, FileCheck2, Brain
 } from 'lucide-react';
 import Branding from './Branding';
 
@@ -33,7 +33,7 @@ const INSPECTOR_ROLES = ['building_inspector','electrical_inspector','mechanical
 const PROCUREMENT_ROLES = ['project_engineer','admin_officer','estimator','city_engineer','asst_city_engineer','manager','system_admin'];
 const ADMIN_ONLY = ['system_admin','manager'];
 const DESIGN_ROLES = ['design_engineer','cad_operator','division_chief','city_engineer','asst_city_engineer','system_admin'];
-const SURVEY_ROLES = ['project_engineer','construction_foreman','division_chief','city_engineer','asst_city_engineer','system_admin'];
+const SURVEY_ROLES = ['project_engineer','estimator','construction_foreman','division_chief','city_engineer','asst_city_engineer','system_admin'];
 const CONSTRUCTION_ROLES = ['project_engineer','construction_foreman','field_worker','dispatcher','division_chief','city_engineer','asst_city_engineer','system_admin'];
 
 const hasRole = (userRole, allowed) => allowed.includes(userRole);
@@ -83,11 +83,43 @@ const NavItem = ({ icon: Icon, label, to, tab, activeTab, onTabChange, badge, in
 
 // Collapsible section
 const NavSection = ({ title, icon: Icon, children, defaultOpen = false, color = 'slate' }) => {
-    const [open, setOpen] = useState(defaultOpen);
+    const location = useLocation();
+
+    // Check if any child NavItem matches the current location
+    const hasActiveChild = React.Children.toArray(children).some(child => {
+        if (!React.isValidElement(child)) return false;
+        const to = child.props.to;
+        return to && (location.pathname === to || location.pathname.startsWith(to + '/'));
+    });
+
+    const storageKey = `pulso_sidebar_${title.replace(/\s+/g, '_')}`;
+    const [open, setOpen] = useState(() => {
+        if (hasActiveChild) return true;
+        const saved = localStorage.getItem(storageKey);
+        if (saved !== null) return saved === 'true';
+        return defaultOpen;
+    });
+
+    // Make sure it automatically opens if a child link becomes active
+    React.useEffect(() => {
+        if (hasActiveChild) {
+            setOpen(true);
+            localStorage.setItem(storageKey, 'true');
+        }
+    }, [hasActiveChild, storageKey]);
+
+    const handleToggle = () => {
+        setOpen(o => {
+            const newState = !o;
+            localStorage.setItem(storageKey, String(newState));
+            return newState;
+        });
+    };
+
     return (
         <div className="mb-1">
             <button
-                onClick={() => setOpen(o => !o)}
+                onClick={handleToggle}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all hover:bg-slate-50 dark:hover:bg-slate-800/50 group`}
             >
                 <span className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest text-${color}-500`}>
@@ -187,6 +219,14 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
                     <NavItem icon={LayoutDashboard} label="Exec Overview" tab="overview" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
                 )}
 
+                {/* ── ANALYTICS INTELLIGENCE (admin + exec only) ── */}
+                {hasRole(role, ['system_admin', 'city_engineer', 'asst_city_engineer']) && (
+                    <>
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Intelligence</div>
+                        <NavItem icon={Brain} label="Analytics Command Center" to="/gov/analytics" />
+                    </>
+                )}
+
                 {/* ── WORK & TRIAGE ── */}
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Triage & Work Orders</div>
                 {hasRole(role, SENIOR_ROLES) && (
@@ -205,7 +245,7 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
                 {/* Administrative Division */}
                 {hasRole(role, ['admin_officer','admin_clerk','records_officer','system_admin','manager','city_engineer','asst_city_engineer']) && (
                     <NavSection title="Administrative" icon={Briefcase} defaultOpen={['admin_officer','admin_clerk','records_officer'].includes(role)}>
-                        <NavItem icon={Users} label="Manage Users" tab="users" activeTab={activeTab} onTabChange={onTabChange} indent to="/management" />
+                        <NavItem icon={Users} label="Manage Users" tab="users" activeTab={activeTab} onTabChange={onTabChange} indent to="/gov/users" />
                         <NavItem icon={BookOpen} label="Records & Registry" to="/gov/records" indent />
                         <NavItem icon={FileBarChart2} label="Reports Archive" to="/gov/reports-archive" indent />
                         <NavItem icon={FileCheck2} label="Audit Logs" to="/gov/audit-logs" indent />

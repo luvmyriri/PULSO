@@ -243,20 +243,37 @@ const ManagementDashboard = () => {
         },
     ];
 
-    // Permit Tracking Data
-    const permits = [
-        { id: 'BLD-2026-001', type: 'Building', applicant: 'MegaCorp Inc.', status: 'Pending Review', date: '2026-02-24' },
-        { id: 'ELE-2026-042', type: 'Electrical', applicant: 'John Doe', status: 'Approved', date: '2026-02-23' },
-        { id: 'SAN-2026-015', type: 'Sanitary', applicant: 'Fresh Eats Cafe', status: 'Under Inspection', date: '2026-02-22' },
-        { id: 'OCC-2026-008', type: 'Occupancy', applicant: 'Skyline Towers', status: 'Approved', date: '2026-02-20' },
-    ];
+    // Permit Tracking — live from /api/gov/obo
+    const [permits, setPermits] = useState([]);
+    const [loadingPermits, setLoadingPermits] = useState(false);
+    useEffect(() => {
+        if (activeTab === 'permits' && token) {
+            setLoadingPermits(true);
+            fetch('http://localhost:8000/api/gov/obo?limit=50', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(r => r.ok ? r.json() : [])
+            .then(data => setPermits(Array.isArray(data) ? data : []))
+            .catch(() => setPermits([]))
+            .finally(() => setLoadingPermits(false));
+        }
+    }, [activeTab, token]);
 
-    // Mock Procurement Data
-    const procurementProjects = [
-        { id: 'ITB-2026-041', title: 'Rehabilitation of Drainage System - Phase 2', location: 'Barangay 176', abc: '₱ 15,450,000.00', status: 'pre_procurement', deadline: 'Aug 25, 2026' },
-        { id: 'ITB-2026-038', title: 'Asphalt Overlay of Main Avenue', location: 'Victory Heights', abc: '₱ 8,200,000.00', status: 'bidding', deadline: 'Aug 18, 2026' },
-        { id: 'ITB-2026-022', title: 'Construction of New Multi-Purpose Hall', location: 'Block 5', abc: '₱ 22,500,000.00', status: 'awarded', contractor: 'AlphaBuild Corp.', deadline: 'Complete' }
-    ];
+    // Procurement — live from /api/gov/procurement
+    const [procurementProjects, setProcurementProjects] = useState([]);
+    const [loadingProcurement, setLoadingProcurement] = useState(false);
+    useEffect(() => {
+        if (activeTab === 'procurement' && token) {
+            setLoadingProcurement(true);
+            fetch('http://localhost:8000/api/gov/procurement?limit=50', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(r => r.ok ? r.json() : [])
+            .then(data => setProcurementProjects(Array.isArray(data) ? data : []))
+            .catch(() => setProcurementProjects([]))
+            .finally(() => setLoadingProcurement(false));
+        }
+    }, [activeTab, token]);
 
 
     return (
@@ -456,21 +473,31 @@ const ManagementDashboard = () => {
                         {activeTab === 'permits' && (
                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
                                 <div className="p-4 flex justify-between items-center bg-slate-50 dark:bg-slate-800/20 relative z-10">
-                                    {/* Removed fading border */}
+                                    <span className="font-bold text-slate-700 dark:text-slate-300">
+                                        {loadingPermits ? 'Loading...' : `${permits.length} OBO Inspection${permits.length !== 1 ? 's' : ''}`}
+                                    </span>
                                     <div className="relative w-64">
                                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input type="text" placeholder="Search Application ID..." className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
+                                        <input type="text" placeholder="Search OBO records..." className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
                                     </div>
-                                    <button className="flex items-center gap-2 font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
-                                        <Filter size={16}/> Filter
-                                    </button>
                                 </div>
+                                {loadingPermits ? (
+                                    <div className="text-center py-12 text-slate-400">
+                                        <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3" />
+                                        Loading OBO records...
+                                    </div>
+                                ) : permits.length === 0 ? (
+                                    <div className="text-center py-16 text-slate-400">
+                                        <Building2 size={40} className="mx-auto mb-3 opacity-20" />
+                                        <p className="font-bold">No OBO inspections found</p>
+                                    </div>
+                                ) : (
                                 <table className="w-full text-left">
                                     <thead className="text-xs uppercase text-slate-500 font-bold bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
                                         <tr>
                                             <th className="p-4">Tracking ID</th>
                                             <th className="p-4">Applicant / Entity</th>
-                                            <th className="p-4">Permit Category</th>
+                                            <th className="p-4">Inspection Type</th>
                                             <th className="p-4">Filing Date</th>
                                             <th className="p-4">Status</th>
                                             <th className="p-4 text-right">Actions</th>
@@ -478,25 +505,27 @@ const ManagementDashboard = () => {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                                         {permits.map((permit, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                                                <td className="p-4 font-mono font-bold text-slate-900 dark:text-white">{permit.id}</td>
+                                            <tr key={permit.id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                <td className="p-4 font-mono font-bold text-slate-900 dark:text-white text-xs">{permit.obo_number || `OBO-${permit.id}`}</td>
                                                 <td className="p-4 font-bold text-slate-700 dark:text-slate-300">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">
                                                             <Building2 size={16}/>
                                                         </div>
-                                                        {permit.applicant}
+                                                        {permit.applicant_name || permit.building_name || 'Applicant'}
                                                     </div>
                                                 </td>
-                                                <td className="p-4 font-semibold text-slate-500">{permit.type}</td>
-                                                <td className="p-4 text-slate-500">{permit.date}</td>
+                                                <td className="p-4 font-semibold text-slate-500 capitalize">{(permit.inspection_type || 'Building').replace(/_/g, ' ')}</td>
+                                                <td className="p-4 text-slate-500 text-xs">{permit.created_at ? new Date(permit.created_at).toLocaleDateString('en-PH') : '—'}</td>
                                                 <td className="p-4">
                                                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                                        permit.status === 'Approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                                        permit.status === 'Pending Review' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                                                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                        permit.status === 'permit_issued' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                        permit.status === 'application_received' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                                                        permit.status === 'inspection_scheduled' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                        permit.status === 'failed_inspection' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                        'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                                                     }`}>
-                                                        {permit.status}
+                                                        {(permit.status || 'pending').replace(/_/g, ' ')}
                                                     </span>
                                                 </td>
                                                 <td className="p-4 text-right">
@@ -506,6 +535,7 @@ const ManagementDashboard = () => {
                                         ))}
                                     </tbody>
                                 </table>
+                                )}
                             </motion.div>
                         )}
                         {activeTab === 'approvals' && (
@@ -580,57 +610,73 @@ const ManagementDashboard = () => {
                         {activeTab === 'procurement' && (
                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                                 <div className="bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-6 mb-6">
-                                    <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Public Bidding Pipeline (RA 9184)</h2>
+                                    <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Procurement Requests (RA 9184)</h2>
                                     <p className="text-slate-600 dark:text-slate-400 text-sm">
-                                        Major structural repairs that exceed internal LGU capabilities. Generated Programs of Work are automatically staged here for the Bids and Awards Committee (BAC) compliance tracking.
+                                        Live procurement requests submitted through the PULSO workflow — from draft BoQ through City Engineer signature to BAC.
                                     </p>
                                 </div>
                                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
                                     <div className="p-4 flex justify-between items-center bg-slate-50 dark:bg-slate-800/20 relative z-10">
-                                        {/* Removed fading border */}
+                                        <span className="font-bold text-slate-700 dark:text-slate-300">
+                                            {loadingProcurement ? 'Loading...' : `${procurementProjects.length} Procurement Request${procurementProjects.length !== 1 ? 's' : ''}`}
+                                        </span>
                                         <div className="relative w-64">
                                             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input type="text" placeholder="Search ITB No..." className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
+                                            <input type="text" placeholder="Search PR No..." className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
                                         </div>
-                                        <button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-bold text-sm px-4 py-2 rounded-lg transition-colors">New Procurement Plan</button>
                                     </div>
+                                    {loadingProcurement ? (
+                                        <div className="text-center py-12 text-slate-400">
+                                            <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3" />
+                                            Loading procurement data...
+                                        </div>
+                                    ) : procurementProjects.length === 0 ? (
+                                        <div className="text-center py-16 text-slate-400">
+                                            <Landmark size={40} className="mx-auto mb-3 opacity-20" />
+                                            <p className="font-bold">No procurement requests found</p>
+                                            <p className="text-sm mt-1">New requests are created by Estimators via the Procurement module.</p>
+                                        </div>
+                                    ) : (
                                     <table className="w-full text-left">
                                         <thead className="text-xs uppercase text-slate-500 font-bold bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
                                             <tr>
-                                                <th className="p-4">ITB No.</th>
+                                                <th className="p-4">PR No.</th>
                                                 <th className="p-4">Project Title</th>
-                                                <th className="p-4">Approved Budget (ABC)</th>
-                                                <th className="p-4">Bid Status</th>
+                                                <th className="p-4">Total Estimate</th>
+                                                <th className="p-4">Status</th>
                                                 <th className="p-4 text-right">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                                             {procurementProjects.map((project, idx) => (
-                                                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                                                    <td className="p-4 font-mono font-bold text-indigo-600 dark:text-indigo-400">{project.id}</td>
+                                                <tr key={project.id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                    <td className="p-4 font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs">{project.pr_number}</td>
                                                     <td className="p-4">
                                                         <div className="font-bold text-slate-900 dark:text-white">{project.title}</div>
-                                                        <div className="text-xs text-slate-500">{project.location}</div>
+                                                        {project.barangay && <div className="text-xs text-slate-500">Brgy {project.barangay}</div>}
                                                     </td>
-                                                    <td className="p-4 font-mono font-bold text-slate-700 dark:text-slate-300">{project.abc}</td>
+                                                    <td className="p-4 font-mono font-bold text-slate-700 dark:text-slate-300">
+                                                        {project.total_estimated_cost != null ? `₱${Number(project.total_estimated_cost).toLocaleString('en-PH', { minimumFractionDigits: 2 })}` : '—'}
+                                                    </td>
                                                     <td className="p-4">
                                                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                            project.status === 'pre_procurement' ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' :
-                                                            project.status === 'bidding' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                                                            project.status === 'draft' ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' :
+                                                            project.status === 'submitted' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                                                            project.status === 'validated' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                            project.status === 'sent_to_procurement' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' :
                                                             'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                                         }`}>
-                                                            {project.status === 'pre_procurement' ? 'Pre-Procurement' : 
-                                                             project.status === 'bidding' ? 'Active Bidding' : 'Awarded'}
+                                                            {(project.status || 'draft').replace(/_/g, ' ')}
                                                         </span>
-                                                        {project.contractor && <div className="text-xs text-slate-500 mt-1 font-semibold">To: {project.contractor}</div>}
                                                     </td>
                                                     <td className="p-4 text-right">
-                                                        <button className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-bold text-sm bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-lg transition-colors">View BAC Docs</button>
+                                                        <button className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-bold text-sm bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-lg transition-colors">View</button>
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
+                                    )}
                                 </div>
                             </motion.div>
                         )}

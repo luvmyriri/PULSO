@@ -30,6 +30,7 @@ import maps_service
 # Database imports
 import models, schemas, crud
 import gov_models, gov_router           # Government-side modules
+import analytics_router                 # AI Analytics & Intelligence Engine
 from database import engine, get_db
 
 # Create ALL tables — citizen-side + government-side
@@ -207,6 +208,8 @@ async def verify_recaptcha(token: str):
 
 # gov_router imports get_current_user directly from auth.py
 app.include_router(gov_router.router)
+# AI Analytics & Intelligence Engine
+app.include_router(analytics_router.router)
 
 # ---------------------------------------------------------------------------
 # Health & Root

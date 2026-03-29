@@ -13,7 +13,7 @@ import {
     Search, ChevronRight, Activity, FileCheck, ArrowRight,
     BookOpen, UserCog, Settings, FlaskConical, Bell, Globe,
     Shield, Database, RefreshCw, Monitor, Lock, Server, User,
-    ChevronDown, Check
+    ChevronDown, Check, X
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
 
@@ -147,22 +147,7 @@ const PAGE_CONFIG = {
         apiPath: '/api/gov/records',
         statuses: [],
     },
-    '/gov/surveys': {
-        title: 'Field Surveys',
-        subtitle: 'Geodetic and civil engineering field survey assignments and results.',
-        icon: Eye,
-        color: 'green',
-        apiPath: null,
-        statuses: [],
-    },
-    '/gov/boq': {
-        title: 'Bill of Quantities',
-        subtitle: 'Material and labor cost estimates for all active engineering projects.',
-        icon: ClipboardList,
-        color: 'amber',
-        apiPath: null,
-        statuses: [],
-    },
+
     '/gov/design-requests': {
         title: 'Design Requests',
         subtitle: 'Active design and planning requests across infrastructure project phases.',
@@ -269,7 +254,7 @@ const colorMap = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Generic Row renderer for list items
 // ─────────────────────────────────────────────────────────────────────────────
-const ItemRow = ({ item, path }) => {
+const ItemRow = ({ item, path, onView }) => {
     const idKey = item.wo_number || item.project_number || item.pr_number || item.obo_number || `#${item.id}`;
     const title = item.title || item.description?.substring(0, 60) || item.scope_of_work?.substring(0, 60) || item.project_name || item.building_name || idKey;
     const status = item.status || 'unknown';
@@ -277,7 +262,7 @@ const ItemRow = ({ item, path }) => {
     const date = item.created_at ? new Date(item.created_at).toLocaleDateString('en-PH') : '—';
 
     return (
-        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
+        <tr onClick={() => onView?.(item)} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
             <td className="p-4 font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs">{idKey}</td>
             <td className="p-4">
                 <div className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-xs">{title}</div>
@@ -440,11 +425,14 @@ const GovDivisionPage = () => {
     const [statusFilter, setStatusFilter] = useState('');
     const [roleFilter, setRoleFilter] = useState('');
     const [trustFilter, setTrustFilter] = useState('');
-    const [editingUser, setEditingUser] = useState(null); // { id, role }
+    const [editingUser, setEditingUser] = useState(null);
     const [savingRole, setSavingRole] = useState(false);
-    const [page, setPage] = useState(1);
-    const ITEMS_PER_PAGE = 10;
-
+    const [page, setPage] = useState(1);
+    const [jurisdictionMode, setJurisdictionMode] = useState('strict'); // strict or emergency
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [showNewModal, setShowNewModal] = useState(false);
+    const ITEMS_PER_PAGE = 10;
+
 
     const config = PAGE_CONFIG[location.pathname] || {
         title: 'Division Page',
@@ -499,7 +487,20 @@ const GovDivisionPage = () => {
             trustFilter === '70' ? (item.trust_score ?? 100) >= 70 && (item.trust_score ?? 100) < 90 :
             trustFilter === 'low' ? (item.trust_score ?? 100) < 70 : true
         );
-        return matchesSearch && matchesRole && matchesTrust;
+        
+        let matchesJurisdiction = true;
+        const IS_FIELD_ENGINEER = ['project_engineer', 'design_engineer', 'estimator', 'cad_operator', 'construction_foreman', 'building_inspector', 'electrical_inspector', 'mechanical_inspector'].includes(currentUser?.role);
+        if (IS_FIELD_ENGINEER && jurisdictionMode === 'strict' && currentUser?.barangay) {
+            const targetBg = currentUser.barangay.replace(/\D/g, ''); 
+            const itemString = ((item.barangay || '') + ' ' + (item.location_string || '')).toLowerCase();
+            if (itemString.trim() !== '' && targetBg !== '') {
+                if (!itemString.includes(targetBg) && !itemString.includes(currentUser.barangay.toLowerCase())) {
+                    matchesJurisdiction = false;
+                }
+            }
+        }
+        
+        return matchesSearch && matchesRole && matchesTrust && matchesJurisdiction;
     });
 
 
@@ -525,9 +526,9 @@ const GovDivisionPage = () => {
     // Title-case helper: "city_engineer" → "City Engineer"
     const toTitleCase = str => str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-    // Reset page when filters/search change
-    useEffect(() => { setPage(1); }, [search, roleFilter, trustFilter, statusFilter, location.pathname]);
-
+    // Reset page when filters/search change
+    useEffect(() => { setPage(1); }, [search, roleFilter, trustFilter, statusFilter, location.pathname]);
+
     const activeFilterCount = [roleFilter, trustFilter].filter(Boolean).length;
 
     // Role-change handler for /gov/users
@@ -567,11 +568,23 @@ const GovDivisionPage = () => {
                             <p className="text-[11px] text-slate-500 hidden sm:block">{config.subtitle}</p>
                         </div>
                     </div>
-                    {config.apiPath && !isAuditLog && (
-                        <button className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors bg-indigo-600 hover:bg-indigo-700`}>
-                            <Plus size={14} /> New
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => { setLoading(true); fetch(`${API_BASE}${config.apiPath}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.ok ? r.json() : []).then(data => setItems(Array.isArray(data) ? data : [])).catch(() => setItems([])).finally(() => setLoading(false)); }}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-600 hover:text-indigo-600 transition-all"
+                            title="Refresh"
+                        >
+                            <RefreshCw size={14} />
                         </button>
-                    )}
+                        {config.apiPath && !isAuditLog && !isTimeline && (
+                            <button
+                                onClick={() => setShowNewModal(true)}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors bg-indigo-600 hover:bg-indigo-700`}
+                            >
+                                <Plus size={14} /> New
+                            </button>
+                        )}
+                    </div>
                 </header>
 
                 {/* Main Content */}
@@ -693,17 +706,22 @@ const GovDivisionPage = () => {
                             </div>
                         )}
 
-                        {/* Static placeholder for other non-API pages (should be none after this update) */}
+                        {/* Static placeholder for pages without an API path */}
                         {isStatic && !isSettings && (
                             <div className={`rounded-2xl border p-10 text-center ${colors.bg} ${colors.border}`}>
                                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${colors.icon}`}>
                                     <Icon size={32} />
                                 </div>
                                 <h2 className={`text-2xl font-black mb-2 ${colors.text}`}>{config.title}</h2>
-                                <p className="text-slate-500 max-w-md mx-auto text-sm leading-relaxed">{config.subtitle}</p>
-                                <p className="mt-4 text-xs text-slate-400 bg-white/60 dark:bg-slate-900/60 inline-block px-3 py-1 rounded-full">
-                                    This module is under active development.
-                                </p>
+                                <p className="text-slate-500 max-w-md mx-auto text-sm leading-relaxed">This module is currently under development. Please check back later for updates or contact the system administrator.</p>
+                                <div className="mt-6 flex gap-3 justify-center flex-wrap">
+                                    <button onClick={() => navigate(-1)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700 text-sm font-bold text-slate-600 dark:text-slate-300 hover:border-indigo-400 hover:text-indigo-600 transition-all">
+                                        ← Go Back
+                                    </button>
+                                    <button onClick={() => navigate('/gov/my-dashboard')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-colors shadow-sm">
+                                        My Dashboard
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -717,24 +735,34 @@ const GovDivisionPage = () => {
                                     {/* Search */}
 
                                     <div className="relative flex-1 min-w-48">
-
                                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-
                                         <input
-
                                             type="text"
-
                                             placeholder={isUsers ? 'Search by name, email, role, barangay…' : `Search ${config.title.toLowerCase()}...`}
-
                                             value={search}
-
                                             onChange={e => setSearch(e.target.value)}
-
                                             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-orange-500 transition-colors"
-
                                         />
-
                                     </div>
+                                    
+                                    {/* J-ABAC Jurisdiction Toggle (Engineers Only) */}
+                                    {['project_engineer', 'design_engineer', 'estimator', 'cad_operator', 'construction_foreman', 'building_inspector', 'electrical_inspector', 'mechanical_inspector'].includes(currentUser?.role) && currentUser?.barangay && (
+                                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-sm">
+                                            <button
+                                                onClick={() => setJurisdictionMode('strict')}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${jurisdictionMode === 'strict' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                                            >
+                                                My Jurisdiction
+                                            </button>
+                                            <button
+                                                onClick={() => setJurisdictionMode('emergency')}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${jurisdictionMode === 'emergency' ? 'bg-red-500 text-white shadow-sm' : 'text-slate-500 hover:text-red-500'}`}
+                                            >
+                                                <AlertTriangle size={12} />
+                                                Emergency Access
+                                            </button>
+                                        </div>
+                                    )}
 
 
 
@@ -917,7 +945,7 @@ const GovDivisionPage = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                                                    {filtered.map(item =>
+                                                    {paginated.map(item =>
                                                         isAuditLog ? <AuditRow key={item.id || item.record_id} entry={item} /> :
                                                         isRecords ? <RecordRow key={item.record_id} entry={item} /> :
                                                         isUsers ? (
@@ -1010,7 +1038,7 @@ const GovDivisionPage = () => {
                                                                 </td>
                                                             </tr>
                                                         ) :
-                                                        <ItemRow key={item.id} item={item} path={location.pathname} />
+                                                        <ItemRow key={item.id} item={item} path={location.pathname} onView={setSelectedItem} />
                                                     )}
                                                 </tbody>
                                             </table>
@@ -1075,6 +1103,124 @@ const GovDivisionPage = () => {
                     </motion.div>
                 </main>
             </div>
+
+            {/* ── Item Detail Modal ── */}
+            {selectedItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelectedItem(null)}>
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        onClick={e => e.stopPropagation()}
+                        className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg p-6 z-10"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div className={`flex items-center gap-2`}>
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${colors.icon}`}>
+                                    <Icon size={16} />
+                                </div>
+                                <span className="font-black text-slate-900 dark:text-white">
+                                    {selectedItem.wo_number || selectedItem.project_number || selectedItem.pr_number || selectedItem.obo_number || `Record #${selectedItem.id}`}
+                                </span>
+                            </div>
+                            <button onClick={() => setSelectedItem(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors">
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {selectedItem.title && (
+                                <div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Title</div>
+                                    <div className="font-bold text-slate-900 dark:text-white">{selectedItem.title}</div>
+                                </div>
+                            )}
+                            {selectedItem.description && (
+                                <div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Description</div>
+                                    <div className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{selectedItem.description}</div>
+                                </div>
+                            )}
+                            {selectedItem.scope_of_work && (
+                                <div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Scope of Work</div>
+                                    <div className="text-sm text-slate-600 dark:text-slate-400">{selectedItem.scope_of_work}</div>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-2 gap-3">
+                                {selectedItem.status && (
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Status</div>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${STATUS_COLORS[selectedItem.status] || 'bg-slate-100 text-slate-600'}`}>
+                                            {selectedItem.status.replace(/_/g, ' ')}
+                                        </span>
+                                    </div>
+                                )}
+                                {selectedItem.barangay && (
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Barangay</div>
+                                        <div className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedItem.barangay}</div>
+                                    </div>
+                                )}
+                                {selectedItem.current_phase && (
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Phase</div>
+                                        <div className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedItem.current_phase}</div>
+                                    </div>
+                                )}
+                                {selectedItem.created_at && (
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Filed</div>
+                                        <div className="text-sm font-bold text-slate-700 dark:text-slate-300">{new Date(selectedItem.created_at).toLocaleDateString('en-PH', { dateStyle: 'medium' })}</div>
+                                    </div>
+                                )}
+                            </div>
+                            {(selectedItem.location || selectedItem.location_description) && (
+                                <div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Location</div>
+                                    <div className="text-sm text-slate-600 dark:text-slate-400">{selectedItem.location || selectedItem.location_description}</div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-2 mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <button onClick={() => setSelectedItem(null)} className="flex-1 py-2 rounded-xl font-bold text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                Close
+                            </button>
+                            {(location.pathname === '/gov/work-orders' || location.pathname === '/gov/projects') && (
+                                <button onClick={() => { setSelectedItem(null); navigate(location.pathname === '/gov/work-orders' ? '/dispatcher' : '/gov/projects'); }} className="flex-1 py-2 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+                                    {location.pathname === '/gov/work-orders' ? 'Open in Command Center' : 'View Timeline'}
+                                </button>
+                            )}
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
+            {/* ── New Record Modal Stub ── */}
+            {showNewModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowNewModal(false)}>
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        onClick={e => e.stopPropagation()}
+                        className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 z-10 text-center"
+                    >
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 ${colors.icon}`}>
+                            <Plus size={28} />
+                        </div>
+                        <h2 className="font-black text-xl text-slate-900 dark:text-white mb-2">New {config.title.replace(/s$/, '')}</h2>
+                        <p className="text-sm text-slate-500 mb-4">Full creation form for {config.title.toLowerCase()} is being finalized. Use the Command Center or your division workflow to create new records.</p>
+                        <div className="flex gap-2">
+                            <button onClick={() => setShowNewModal(false)} className="flex-1 py-2 rounded-xl font-bold text-sm border border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+                            {location.pathname === '/gov/work-orders' && (
+                                <button onClick={() => { setShowNewModal(false); navigate('/dispatcher'); }} className="flex-1 py-2 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">Go to Command Center</button>
+                            )}
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 };

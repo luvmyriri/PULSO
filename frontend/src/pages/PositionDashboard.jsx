@@ -19,7 +19,7 @@ import {
     Users, Wrench, HardHat, Ruler, Eye, Activity, Megaphone,
     ClipboardList, ArrowRight, Plus, Bell, Map, FileCheck,
     TrendingUp, UserCog, BookOpen, Truck, RefreshCw, XCircle,
-    CircleDot, AlertCircle, CheckSquare
+    CircleDot, AlertCircle, CheckSquare, Brain
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
 
@@ -49,10 +49,10 @@ const ROLE_CONFIG = {
             { step: 'Sign Certificates of Completion', color: 'green' },
         ],
         quickActions: [
+            { label: 'Intelligence Analytics', to: '/gov/analytics', icon: Brain },
             { label: 'View All Projects', to: '/gov/projects', icon: Map },
             { label: 'Post Advisory', to: '/management', tab: 'advisories', icon: Megaphone },
             { label: 'Audit Logs', to: '/gov/audit-logs', icon: BarChart2 },
-            { label: 'View All Users', to: '/management', tab: 'users', icon: Users },
         ],
     },
 
@@ -75,6 +75,7 @@ const ROLE_CONFIG = {
             { step: 'Issue Certificate of Completion (CoC, Phase 6)', color: 'green' },
         ],
         quickActions: [
+            { label: 'Intelligence Analytics', to: '/gov/analytics', icon: Brain },
             { label: 'All Projects', to: '/gov/projects', icon: Map },
             { label: 'Work Orders', to: '/gov/work-orders', icon: GitBranch },
             { label: 'Exec Overview', to: '/management', icon: TrendingUp },
@@ -477,6 +478,7 @@ const COLOR_MAP = {
 const ActionCard = ({ action, token }) => {
     const [count, setCount] = useState(null);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (!action.endpoint || !token) { setLoading(false); return; }
@@ -490,11 +492,27 @@ const ActionCard = ({ action, token }) => {
     const Icon = action.icon;
     const hasItems = count !== null && count > 0;
 
+    // Derive navigation target from endpoint pattern
+    const getNavTarget = () => {
+        if (!action.endpoint) return null;
+        if (action.endpoint.includes('/reports')) return '/dispatcher';
+        if (action.endpoint.includes('/work-orders')) return '/gov/work-orders';
+        if (action.endpoint.includes('/projects')) return '/gov/projects';
+        if (action.endpoint.includes('/procurement')) return '/gov/procurement';
+        if (action.endpoint.includes('/obo')) return '/gov/obo';
+        if (action.endpoint.includes('/users')) return '/gov/users';
+        if (action.endpoint.includes('/audit-logs')) return '/gov/audit-logs';
+        return null;
+    };
+
+    const navTarget = getNavTarget();
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`rounded-2xl border p-4 flex items-center justify-between gap-4 transition-all hover:shadow-md ${URGENCY_COLORS[action.urgency]} ${hasItems ? 'cursor-pointer' : ''}`}
+            onClick={() => navTarget && navigate(navTarget)}
+            className={`rounded-2xl border p-4 flex items-center justify-between gap-4 transition-all hover:shadow-md ${URGENCY_COLORS[action.urgency]} ${navTarget ? 'cursor-pointer' : ''}`}
         >
             <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-white/60 dark:bg-slate-800/60 flex items-center justify-center shrink-0 shadow-sm">
@@ -515,7 +533,7 @@ const ActionCard = ({ action, token }) => {
                 ) : (
                     <span className="text-xs text-slate-400">—</span>
                 )}
-                {hasItems && <ChevronRight size={16} className="text-slate-400" />}
+                {navTarget && <ChevronRight size={16} className="text-slate-400" />}
             </div>
         </motion.div>
     );
