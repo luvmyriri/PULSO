@@ -120,6 +120,22 @@ const NAV_ITEMS = (t) => [
     { id: 'settings', icon: <Settings size={28} />, label: t('dashboard.sidebar.settings', { defaultValue: 'Settings' }) },
 ];
 
+const LGU_SERVICES_LIST = [
+    { id: 1, name: 'Business Permit', icon: <TrendingUp size={24} />, desc: 'Renew or apply for new business permits online.', color: 'blue' },
+    { id: 2, name: 'Barangay Clearance', icon: <FileText size={24} />, desc: 'Request official residency documents.', color: 'orange' },
+    { id: 3, name: 'Health Service', icon: <Droplets size={24} />, desc: 'Book appointments at local health centers.', color: 'red' },
+    { id: 4, name: 'PWD/Senior ID', icon: <User size={24} />, desc: 'Apply for social welfare identification.', color: 'green' },
+    { id: 5, name: 'Tax Payment', icon: <Zap size={24} />, desc: 'Pay property and occupation taxes.', color: 'yellow' },
+    { id: 6, name: 'Scholarships', icon: <BookOpen size={24} />, desc: 'City-funded educational assistance programs.', color: 'indigo' },
+];
+
+const KNOWLEDGE_BASE_ARTICLES = [
+    { id: 1, title: 'How AI Reporting Works', category: 'Tech Guide', excerpt: 'Learn how Gemini AI verifies your incident reports in real-time.' },
+    { id: 2, title: 'Flood Evacuation Routes', category: 'Emergency', excerpt: 'Safe zones and routes for residents in Low-lying North Caloocan areas.' },
+    { id: 3, title: 'Waste Management 101', category: 'Environment', excerpt: 'Official garbage collection schedule and segregration rules.' },
+    { id: 4, title: 'Noise Ordinance Info', category: 'Community', excerpt: 'Understanding the city wide peace and order regulations.' },
+];
+
 const LeftSidebar = ({ user, handleSetTab, handleSetModal }) => (
     <div className="w-full h-full pb-6 hidden md:block pl-2 pr-4 lg:pr-6 pt-6">
         <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-4 rounded-xl hover:bg-slate-200/50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group">
@@ -510,6 +526,59 @@ const ResidentModals = ({
                             </div>
                         </div>
                     )}
+                    {activeModal === 'services' && (
+                        <div className="p-8">
+                            <div className="flex justify-between items-center mb-8">
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white">LGU Services</h3>
+                                    <p className="text-slate-500 font-medium">Official Digital Portal Services</p>
+                                </div>
+                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={24}/></button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {LGU_SERVICES_LIST.map(service => (
+                                    <button key={service.id} className="flex items-start gap-4 p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-orange-500/30 hover:bg-white dark:hover:bg-slate-800 transition-all text-left group">
+                                        <div className={`w-12 h-12 rounded-2xl bg-${service.color}-500/10 text-${service.color}-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+                                            {service.icon}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 dark:text-white mb-1">{service.name}</h4>
+                                            <p className="text-xs text-slate-500 leading-relaxed font-medium">{service.desc}</p>
+                                            <span className="text-[10px] font-black uppercase text-orange-500 mt-2 inline-block tracking-widest">Apply Now →</span>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {activeModal === 'knowledge' && (
+                        <div className="p-8">
+                            <div className="flex justify-between items-center mb-8">
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white">Knowledge Base</h3>
+                                    <p className="text-slate-500 font-medium">Guides, Tips & Information Hub</p>
+                                </div>
+                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={24}/></button>
+                            </div>
+                            <div className="space-y-4">
+                                {KNOWLEDGE_BASE_ARTICLES.map(article => (
+                                    <button key={article.id} className="w-full p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-orange-500/30 hover:bg-white dark:hover:bg-slate-800 transition-all text-left flex flex-col items-start gap-1">
+                                        <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">{article.category}</span>
+                                        <h4 className="font-bold text-lg text-slate-900 dark:text-white">{article.title}</h4>
+                                        <p className="text-sm text-slate-500 font-medium">{article.excerpt}</p>
+                                        <div className="mt-2 h-0 w-0 group-hover:w-full border-b border-orange-500 transition-all"></div>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="mt-8 p-4 bg-orange-500 text-white rounded-3xl flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center"><Info size={20}/></div>
+                                    <div><p className="text-sm font-bold">Need more help?</p><p className="text-[10px] opacity-80">Message our AI Assistant available 24/7.</p></div>
+                                </div>
+                                <button className="px-5 py-2 bg-white text-orange-500 rounded-2xl font-black text-xs uppercase shadow-lg">Chat Support</button>
+                            </div>
+                        </div>
+                    )}
                 </motion.div>
             </motion.div>
         )}
@@ -610,9 +679,6 @@ const TopNavigation = ({
                     <button onClick={() => changeTheme('dark')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="Dark"><Moon size={15} /></button>
                 </div>
 
-                <button className="relative w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none" onClick={() => showToast('Opening App Drawer...')}>
-                    <Grid size={20} />
-                </button>
                 <div className="relative">
                     <button 
                         className="relative w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none" 
