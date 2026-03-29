@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import ReCAPTCHA from 'react-google-recaptcha';
 import Spline from '@splinetool/react-spline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     User, Shield, Eye, EyeOff, ChevronRight,
     Activity, Sun, Moon, Monitor, Mail, ArrowLeft,
-    CheckCircle, Home,
+    CheckCircle, Home, Lock
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Branding from '../components/Branding';
@@ -19,9 +20,18 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError]               = useState('');
     const [loading, setLoading]           = useState(false);
+    const [captchaValue, setCaptchaValue] = useState(null);
     const [view, setView]                 = useState('login'); // 'login' | 'forgot'
     const [recoverySent, setRecoverySent] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');
+    const [recoveryStep, setRecoveryStep] = useState(1); // 1: Email, 2: Code/New Password
+    const [recoveryOtp, setRecoveryOtp] = useState(['', '', '', '', '', '']);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+    const [recoveryRefId, setRecoveryRefId] = useState('');
+    const otpRefs = React.useRef([]);
 
     /* ── Same Spline scenes as GovLanding ──────────────────────────────── */
     const DARK_SCENE  = 'https://prod.spline.design/us1Y6xfaQLiI2cim/scene.splinecode';
@@ -55,10 +65,17 @@ export default function Login() {
         setLoading(true);
         setError('');
 
+        if (!captchaValue) {
+            setError('Please verify that you are not a robot.');
+            setLoading(false);
+            return;
+        }
+
         try {
             const formData = new URLSearchParams();
             formData.append('username', email);
             formData.append('password', password);
+            formData.append('captcha_token', captchaValue);
 
             const response = await fetch('http://localhost:8000/api/auth/login', {
                 method: 'POST',
@@ -100,10 +117,11 @@ export default function Login() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: recoveryEmail }),
             });
+            const data = await response.json();
             if (response.ok) {
-                setRecoverySent(true);
+                setRecoveryRefId(data.reference_id);
+                setRecoveryStep(2);
             } else {
-                const data = await response.json();
                 setError(data.detail || 'Recovery request failed.');
             }
         } catch {
@@ -111,6 +129,87 @@ export default function Login() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleVerifyCode = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            const response = await fetch('http://localhost:8000/api/auth/verify-reset-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: recoveryEmail,
+                    code: recoveryOtp.join('')
+                }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setRecoveryStep(3);
+            } else {
+                setError(data.detail || 'Identity synchronization failed: Invalid code.');
+            }
+        } catch {
+            setError('System synchronization error.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
+        if (newPassword !== confirmNewPassword) {
+            setError('Synchronization Error: Access keys do not match.');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+        try {
+            const response = await fetch('http://localhost:8000/api/auth/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: recoveryEmail,
+                    code: recoveryOtp.join(''),
+                    new_password: newPassword
+                }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setRecoverySent(true);
+            } else {
+                setError(data.detail || 'Identity synchronization failed.');
+            }
+        } catch (err) {
+            setError('System synchronization error.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleOtpChange = (index, value) => {
+        if (!/^\d*$/.test(value)) return;
+        const newOtp = [...recoveryOtp];
+        newOtp[index] = value.slice(-1);
+        setRecoveryOtp(newOtp);
+        if (value && index < 5) otpRefs.current[index + 1].focus();
+    };
+
+    const handleOtpKeyDown = (index, e) => {
+        if (e.key === 'Backspace' && !recoveryOtp[index] && index > 0) otpRefs.current[index - 1].focus();
+    };
+
+    const handleOtpPaste = (e) => {
+        e.preventDefault();
+        const data = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+        if (!data) return;
+        const newOtp = [...recoveryOtp];
+        data.split('').forEach((char, i) => { if (i < 6) newOtp[i] = char; });
+        setRecoveryOtp(newOtp);
+        const nextIndex = Math.min(data.length, 5);
+        if (otpRefs.current[nextIndex]) otpRefs.current[nextIndex].focus();
     };
 
     /* ── Render ─────────────────────────────────────────────────────────── */
@@ -137,9 +236,8 @@ export default function Login() {
                 <div className="absolute inset-0 bg-gradient-to-t from-white/40 via-transparent to-transparent dark:from-[#020617]/40 dark:via-transparent dark:to-transparent pointer-events-none z-20" />
             </div>
 
-            {/* ── Navigation Header (identical structure to GovLanding) ────── */}
+            {/* ── Navigation Header ────── */}
             <nav className="absolute top-0 left-0 w-full p-8 flex justify-between items-center z-50">
-                {/* Brand + portal badge */}
                 <div className="flex items-center gap-3">
                     <Branding size="h-10" showText={false} />
                     <div>
@@ -150,83 +248,46 @@ export default function Login() {
                     </div>
                 </div>
 
-                {/* Right controls */}
                 <div className="flex items-center gap-6">
-                    {/* Home link */}
                     <div className="hidden md:flex items-center gap-6 text-sm font-medium pr-6 border-r border-slate-200 dark:border-white/10">
-                        <button
-                            onClick={() => navigate('/')}
-                            className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors font-semibold"
-                        >
+                        <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-orange-600 transition-colors font-semibold">
                             <Home size={15} /> Home
                         </button>
                     </div>
 
-                    {/* Theme switcher (identical to GovLanding) */}
                     <div className="flex bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-full p-1 border border-slate-200 dark:border-white/10 shadow-sm">
-                        <button
-                            onClick={() => changeTheme('light')}
-                            className={`p-2 rounded-full transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                        >
-                            <Sun size={14} />
-                        </button>
-                        <button
-                            onClick={() => changeTheme('system')}
-                            className={`p-2 rounded-full transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                        >
-                            <Monitor size={14} />
-                        </button>
-                        <button
-                            onClick={() => changeTheme('dark')}
-                            className={`p-2 rounded-full transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                        >
-                            <Moon size={14} />
-                        </button>
+                        <button onClick={() => changeTheme('light')} className={`p-2 rounded-full transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400'}`}><Sun size={14} /></button>
+                        <button onClick={() => changeTheme('system')} className={`p-2 rounded-full transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400'}`}><Monitor size={14} /></button>
+                        <button onClick={() => changeTheme('dark')} className={`p-2 rounded-full transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400'}`}><Moon size={14} /></button>
                     </div>
                 </div>
             </nav>
 
-            {/* ── Main Content Grid (identical layout to GovLanding) ─────── */}
+            {/* ── Main Content Grid ─────── */}
             <main className="relative z-10 grid lg:grid-cols-2 min-h-screen items-center px-12 lg:px-32">
-
-                {/* Left: Hero Text */}
                 <div className="pt-20 lg:pt-0 max-w-xl">
-                    <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.8 }}
-                    >
-                        <div className="flex items-center gap-2 mb-6 text-orange-600 dark:text-orange-500">
+                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                        <div className="flex items-center gap-2 mb-6 text-orange-600">
                             <Activity size={18} />
                             <span className="text-sm font-bold tracking-[0.3em] uppercase">Citizen Access Portal</span>
                         </div>
                         <h1 className="text-5xl lg:text-8xl font-black text-slate-900 dark:text-white leading-[0.9] mb-8 tracking-tighter">
                             THE PULSE OF <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-l dark:bg-gradient-to-r from-orange-500 to-orange-600">
+                            <span className="text-transparent bg-clip-text bg-gradient-to-l from-orange-500 to-orange-600">
                                 COMMUNITY
                             </span>
                         </h1>
                         <p className="text-base lg:text-xl text-slate-600 dark:text-slate-400 leading-relaxed mb-10 max-w-md font-medium">
-                            Access your resident dashboard to track local hazard reports,
-                            interact with community engineering teams, and stay updated
-                            with the latest city infrastructure news.
+                            Access your resident dashboard to track local hazard reports and interact with community engineering teams.
                         </p>
                     </motion.div>
                 </div>
 
-                {/* Right: Login Panel */}
                 <div className="flex justify-center lg:justify-end py-20 lg:py-0">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
-                        className="w-full max-w-md"
-                    >
+                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md">
                         <div className="relative group">
-                            {/* Decorative glow */}
-                            <div className="absolute -inset-1 bg-gradient-to-r from-orange-600/20 to-blue-600/20 rounded-[2.5rem] blur-2xl opacity-30 dark:opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
-
-                            <div className="relative bg-white/20 dark:bg-slate-900/40 backdrop-blur-md border border-white/30 dark:border-white/5 rounded-[2.5rem] p-8 lg:p-12 shadow-2xl overflow-hidden min-h-[500px] flex flex-col justify-center">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-orange-600/20 to-blue-600/20 rounded-[2.5rem] blur-2xl opacity-30" />
+                            <div className="relative bg-white/20 dark:bg-slate-900/40 backdrop-blur-md border border-white/30 dark:border-white/5 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden min-h-[500px] flex flex-col justify-center">
                                 <AnimatePresence mode="wait">
                                     {view === 'login' ? (
                                         /* ── Login Form ──────────────────────────────── */
@@ -243,7 +304,7 @@ export default function Login() {
                                                     <User className="text-orange-600 dark:text-orange-500" size={40} />
                                                 </div>
                                                 <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
-                                                    Resident Gateway
+                                                    Login
                                                 </h2>
                                                 <p className="text-slate-600 dark:text-slate-500 text-sm font-medium">
                                                     Sign in to access your community dashboard
@@ -322,7 +383,15 @@ export default function Login() {
                                                     </div>
                                                 </div>
 
-                                                {/* Submit */}
+                                                {/* reCAPTCHA */}
+                                                <div className="flex justify-center py-2">
+                                                    <ReCAPTCHA
+                                                        sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                        onChange={(val) => setCaptchaValue(val)}
+                                                        theme={theme === 'dark' ? 'dark' : 'light'}
+                                                    />
+                                                </div>
+
                                                 <button
                                                     type="submit"
                                                     disabled={loading}
@@ -362,15 +431,14 @@ export default function Login() {
                                                         <CheckCircle className="text-emerald-500" size={40} />
                                                     </div>
                                                     <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
-                                                        Link Sent
+                                                        Reset Complete
                                                     </h2>
                                                     <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-10">
-                                                        A password reset link was sent to{' '}
-                                                        <span className="text-orange-600 font-bold">{recoveryEmail}</span>.
-                                                        Please check your inbox.
+                                                        Your password has been successfully updated.
+                                                        You may now sign in with your new credentials.
                                                     </p>
                                                     <button
-                                                        onClick={() => { setView('login'); setRecoverySent(false); }}
+                                                        onClick={() => { setView('login'); setRecoverySent(false); setRecoveryStep(1); }}
                                                         className="flex items-center gap-2 mx-auto text-orange-600 font-bold uppercase tracking-widest text-[10px] hover:text-orange-500 transition-colors"
                                                     >
                                                         <ArrowLeft size={16} /> Back to Sign In
@@ -378,73 +446,109 @@ export default function Login() {
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <div className="mb-10 text-center">
-                                                        <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 border border-slate-200 dark:border-white/10 shadow-inner">
-                                                            <Mail className="text-orange-600 dark:text-orange-500" size={40} />
-                                                        </div>
-                                                        <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
-                                                            Reset Password
-                                                        </h2>
-                                                        <p className="text-slate-600 dark:text-slate-500 text-sm font-medium">
-                                                            Enter your email to receive a reset link
-                                                        </p>
-                                                    </div>
+                                                    {recoveryStep === 1 ? (
+                                                        <>
+                                                            <div className="mb-10 text-center">
+                                                                <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 border border-slate-200 dark:border-white/10 shadow-inner">
+                                                                    <Shield size={40} className="text-orange-600 dark:text-orange-400" />
+                                                                </div>
+                                                                <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
+                                                                    Identity Retrieval
+                                                                </h2>
+                                                                <p className="text-slate-600 dark:text-slate-500 text-sm font-medium">
+                                                                    Enter your email for security synchronization
+                                                                </p>
+                                                            </div>
 
-                                                    {error && (
-                                                        <motion.div
-                                                            initial={{ opacity: 0, y: -10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold flex items-center gap-3 shadow-lg"
-                                                        >
-                                                            <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shrink-0" />
-                                                            {error}
-                                                        </motion.div>
+                                                            {error && (
+                                                                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold flex items-center gap-3">
+                                                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                                                                    {error}
+                                                                </motion.div>
+                                                            )}
+
+                                                            <form onSubmit={handleRecovery} className="space-y-6">
+                                                                <div className="space-y-2">
+                                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Official Email Address</label>
+                                                                    <div className="relative group/input">
+                                                                        <Mail size={18} className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within/input:text-orange-500" />
+                                                                        <input type="email" value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white/5 block pl-12 p-4 transition-all" placeholder="your@email.com" required />
+                                                                    </div>
+                                                                </div>
+                                                                <button type="submit" disabled={loading} className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3">
+                                                                    {loading ? <div className="w-5 h-5 border-2 border-slate-400 border-t-slate-800 rounded-full animate-spin" /> : <>Identify Subject <ChevronRight size={18} /></>}
+                                                                </button>
+                                                            </form>
+                                                        </>
+                                                    ) : recoveryStep === 2 ? (
+                                                        <>
+                                                            <div className="mb-8 text-center">
+                                                                {recoveryRefId && <div className="px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full text-[9px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest mb-4 inline-block">Ref: {recoveryRefId}</div>}
+                                                                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Verify Identity</h2>
+                                                                <p className="text-slate-500 text-xs font-bold leading-relaxed">Enter the 6-digit sync code sent to<br/><span className="text-orange-600 underline">{recoveryEmail}</span></p>
+                                                            </div>
+
+                                                            {error && (
+                                                                <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-2">
+                                                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full" /> {error}
+                                                                </div>
+                                                            )}
+
+                                                            <form onSubmit={handleVerifyCode} className="space-y-6">
+                                                                <div className="flex justify-center gap-2 mb-8">
+                                                                    {recoveryOtp.map((digit, index) => (
+                                                                        <input key={index} ref={(el) => (otpRefs.current[index] = el)} type="text" maxLength="1" value={digit} onChange={(e) => handleOtpChange(index, e.target.value)} onKeyDown={(e) => handleOtpKeyDown(index, e)} onPaste={handleOtpPaste}
+                                                                            className="w-10 h-12 text-center text-xl font-black bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl focus:border-orange-500 outline-none transition-all" />
+                                                                    ))}
+                                                                </div>
+
+                                                                <button type="submit" disabled={loading || recoveryOtp.join('').length < 6} className="w-full bg-orange-600 hover:bg-orange-500 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-orange-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                                                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Synchronize Identity'}
+                                                                </button>
+                                                            </form>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="mb-8 text-center">
+                                                                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Security Update</h2>
+                                                                <p className="text-slate-500 text-xs font-bold leading-relaxed">Identify verified. Please set your new<br/><span className="text-orange-600">secure access credentials</span></p>
+                                                            </div>
+
+                                                            {error && (
+                                                                <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-2">
+                                                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full" /> {error}
+                                                                </div>
+                                                            )}
+
+                                                            <form onSubmit={handleResetPassword} className="space-y-6">
+                                                                <div className="space-y-2 relative">
+                                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">New Access Key</label>
+                                                                    <div className="relative group/input">
+                                                                        <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                                        <input type={showNewPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-xs rounded-xl pl-10 pr-10 p-3.5 focus:outline-none focus:border-orange-500" placeholder="••••••••" required />
+                                                                        <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"> {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />} </button>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div className="space-y-2">
+                                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Confirm Access Key</label>
+                                                                    <div className="relative group/input">
+                                                                        <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                                        <input type={showConfirmNewPassword ? "text" : "password"} value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-xs rounded-xl pl-10 pr-10 p-3.5 focus:outline-none focus:border-orange-500" placeholder="••••••••" required />
+                                                                        <button type="button" onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"> {showConfirmNewPassword ? <EyeOff size={16} /> : <Eye size={16} />} </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                <button type="submit" disabled={loading || newPassword.length < 6} className="w-full bg-orange-600 hover:bg-orange-500 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-orange-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                                                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Finalize Update'}
+                                                                </button>
+                                                            </form>
+                                                        </>
                                                     )}
 
-                                                    <form onSubmit={handleRecovery} className="space-y-6">
-                                                        <div className="space-y-2">
-                                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                                                                Email Address
-                                                            </label>
-                                                            <div className="relative group/input">
-                                                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within/input:text-orange-500 transition-colors">
-                                                                    <Mail size={18} />
-                                                                </div>
-                                                                <input
-                                                                    type="email"
-                                                                    value={recoveryEmail}
-                                                                    onChange={(e) => setRecoveryEmail(e.target.value)}
-                                                                    className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white/5 block pl-12 p-4 transition-all shadow-inner"
-                                                                    placeholder="your@email.com"
-                                                                    required
-                                                                    autoComplete="email"
-                                                                />
-                                                            </div>
-                                                        </div>
-
-                                                        <button
-                                                            type="submit"
-                                                            disabled={loading}
-                                                            className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl flex items-center justify-center gap-3 group disabled:opacity-50"
-                                                        >
-                                                            {loading ? (
-                                                                <div className="w-5 h-5 border-2 border-slate-400 border-t-slate-800 rounded-full animate-spin" />
-                                                            ) : (
-                                                                <>
-                                                                    Send Reset Link
-                                                                    <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                                                                </>
-                                                            )}
-                                                        </button>
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => { setView('login'); setError(''); }}
-                                                            className="flex items-center gap-2 mx-auto text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-slate-900 dark:hover:text-white transition-colors"
-                                                        >
-                                                            <ArrowLeft size={14} /> Back to Sign In
-                                                        </button>
-                                                    </form>
+                                                    <button type="button" onClick={() => { setView('login'); setError(''); setRecoveryStep(1); }} className="flex items-center gap-2 mx-auto text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-slate-900 dark:hover:text-white transition-colors mt-8">
+                                                        <ArrowLeft size={14} /> Back to Sign In
+                                                    </button>
                                                 </>
                                             )}
                                         </motion.div>
@@ -456,21 +560,12 @@ export default function Login() {
                 </div>
             </main>
 
-            {/* ── Bottom Info Bar (identical to GovLanding) ───────────────── */}
-            <div className="absolute bottom-0 left-0 w-full bg-white/60 dark:bg-[#020617]/70 backdrop-blur-md border-t border-slate-200 dark:border-white/5 py-4 px-8 flex flex-col md:flex-row justify-between items-center gap-4 z-50 transition-colors">
-                <div className="flex items-center gap-6 overflow-hidden max-w-4xl">
-                    <span className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-[0.2em] whitespace-nowrap">
-                        Notice:
-                    </span>
-                    <div className="text-[10px] font-bold text-slate-500 dark:text-slate-600 uppercase tracking-[0.3em] whitespace-nowrap animate-marquee">
-                        YOUR PRIVACY IS PROTECTED UNDER THE PHILIPPINE DATA PRIVACY ACT (RA 10173) • AUTHORIZED RESIDENTS ONLY • PULSO CITIZEN PLATFORM • CITY OF CALOOCAN
-                    </div>
+            <div className="absolute bottom-0 left-0 w-full bg-white/60 dark:bg-[#020617]/70 backdrop-blur-md border-t border-slate-200 dark:border-white/5 py-4 px-8 flex flex-col md:flex-row justify-between items-center gap-4 z-50">
+                <div className="flex items-center gap-6">
+                    <span className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em]">Notice:</span>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">RESIDENTS ONLY • CITY OF CALOOCAN</div>
                 </div>
-                <div className="flex items-center gap-6 text-[10px] font-black text-slate-400 dark:text-slate-500 tracking-[0.2em]">
-                    <span>CALOOCAN NORTH DISTRICT • PHILIPPINES</span>
-                    <div className="h-3 w-[1px] bg-slate-200 dark:bg-white/10" />
-                    <span className="text-orange-600/50 dark:text-orange-500/50">v4.2.1</span>
-                </div>
+                <div className="text-[10px] font-black text-slate-400 tracking-[0.2em]">v4.2.1</div>
             </div>
         </div>
     );

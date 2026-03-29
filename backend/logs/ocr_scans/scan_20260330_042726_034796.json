@@ -1,0 +1,18 @@
+{
+    "timestamp": "2026-03-30T04:27:26.034796",
+    "raw_text": "\u2190\nPULSO\n+\nlocalhost:5173/dashboard\nOverview\nPULSO\nRESIDENT PORTAL\nOverview\nMy Reports\nGood morning, Gener!\nYour vigilance keeps 'Bagong Silang (176)' safe. Here is a summary of your\ncommunity's active infrastructure status.\nProfile\nA ACTIVE\n3\nSettings\n\u2461Help & Support\nRecent Activity\n\u2192 Sign Out\nRESOLVED\nTRUST SCORE\n12\n98\nTop 5% of Reporters\nRPT-8291\nIN TRANSIT\n20 mins ago\nLATEST UPDATE\nQ Search...\nG\nG\nQuick Report\nSnap a priority infrastructure hazard\nTap to open Camera\nGPS Standby\nRequires photo capture\nView All\nBrief details about the hazard...\nWater Pipe Burst\nLarge pipe leaking onto the main road causing a slip hazard.\nZone 15, Near Covered Court\nTeam Beta dispatched to location.\n08:30 AM\nRPT-8285\nUNDER REVIEW\n2 hours ago\nFallen Tree Branches\nLATEST UPDATE\n\u2022 Report received and queued for\n\u2606\n0\nX\n@\nGener\nBAGONG SILANG\nSubmit Priority Report\n44\n",
+    "parsed_data": {
+        "id_type": "unknown",
+        "id_type_label": "Unknown Document",
+        "first_name": "Gener",
+        "last_name": "",
+        "middle_name": "",
+        "dob": "",
+        "sex": "",
+        "address": "\u2190 PULSO + localhost:5173/dashboard Overview PULSO RESIDENT PORTAL Overview My Reports Good morning, Gener! Your vigilance keeps 'Bagong Silang (176)' safe. Here is a summary of your community's active",
+        "barangay": "176",
+        "postal_code": "1428",
+        "is_north_caloocan": false,
+        "verification_message": "Verification Failed: Address does not appear to be in Caloocan City."
+    }
+}
