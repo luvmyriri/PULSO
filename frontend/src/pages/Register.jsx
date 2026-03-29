@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database } from 'lucide-react';
+import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown } from 'lucide-react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import Spline from '@splinetool/react-spline';
@@ -98,6 +98,27 @@ function parseOcrAddress(raw, data) {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function getPostalCodeForBarangay(brgy) {
+    if (!brgy) return '';
+    const numMatch = brgy.match(/\d+/);
+    if (!numMatch) return '';
+    const num = parseInt(numMatch[0], 10);
+    
+    if ([165, 166, 168, 169, 170].includes(num)) return '1420';
+    if (num === 167) return '1423';
+    if ([171, 172, 173].includes(num)) return '1421';
+    if ([174, 175, 177, 178].includes(num)) return '1424';
+    if (num === 176) return '1428';
+    if (num === 179) return '1425';
+    if ([180, 181, 182].includes(num)) return '1422';
+    if ([183, 184].includes(num)) return '1426';
+    if ([185, 186, 187, 188].includes(num)) return '1427';
+    return '';
+}
+
+// ---------------------------------------------------------------------------
 // Smart OCR → Form Field Mapper
 // ---------------------------------------------------------------------------
 function mapOcrToForm(data) {
@@ -169,9 +190,9 @@ function mapOcrToForm(data) {
     mapped.street = data.street || addr.street || (data.address || '').split('\n')[0].trim();
 
     mapped.barangay = data.barangay ? (data.barangay.startsWith('Barangay') ? data.barangay : `Barangay ${data.barangay}`) : (addr.barangayId ? `Barangay ${addr.barangayId}` : '');
-    mapped.municipality = data.city || 'Caloocan City';
-    mapped.province = data.province || 'Metro Manila';
-    mapped.postalCode = data.postal_code || '1421'; // Default to 1421 for North Caloocan if detection fails
+    mapped.municipality = 'Caloocan City - North';
+    mapped.province = 'Metro Manila';
+    mapped.postalCode = data.postal_code || getPostalCodeForBarangay(mapped.barangay) || '1421'; // Default to 1421 for North Caloocan if detection fails
     return mapped;
 }
 
@@ -204,6 +225,59 @@ const SectionHeading = ({ children }) => (
         <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700/60" />
     </div>
 );
+
+const CustomSelect = ({ label, name, value, onChange, options, required }) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+    
+    const dropdownRef = React.useRef(null);
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 pl-0.5">{label} {required && <span className="text-red-400">*</span>}</label>
+            <button
+                type="button"
+                className={`w-full flex items-center justify-between border text-sm rounded-xl px-3 py-2.5 outline-none transition-all focus:ring-2 focus:ring-orange-500 focus:border-transparent cursor-pointer ${
+                    isOpen ? 'bg-white dark:bg-slate-800 border-orange-500' : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-orange-500/50'
+                } text-slate-900 dark:text-white`}
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <span className={value ? "truncate pr-2" : "text-slate-400"}>{value || "Select"}</span>
+                <ChevronDown size={15} className={`transition-transform text-slate-500 dark:text-slate-400 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.15 }}
+                        className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden drop-shadow-2xl max-h-60 overflow-y-auto custom-scrollbar"
+                    >
+                        {options.map((opt) => (
+                            <button
+                                key={opt}
+                                type="button"
+                                className={`w-full text-left px-3 py-2.5 hover:bg-orange-500 hover:text-white transition-colors text-sm font-medium ${value === opt ? 'bg-orange-50 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400' : 'text-slate-900 dark:text-white'}`}
+                                onClick={() => {
+                                    onChange({ target: { name, value: opt, type: 'select-one' } });
+                                    setIsOpen(false);
+                                }}
+                            >
+                                {opt}
+                            </button>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 // ---------------------------------------------------------------------------
 // Main Register Component
@@ -249,6 +323,7 @@ export default function Register() {
         firstName: '',
         middleName: '',
         lastName: '',
+        suffix: '',
         dobDate: null,   // Date object for display
         dob: '',         // ISO string YYYY-MM-DD for payload
         age: '',
@@ -258,8 +333,8 @@ export default function Register() {
         subdivision: '',
         street: '',
         barangay: '',
-        municipality: '',
-        province: '',
+        municipality: 'Caloocan City - North',
+        province: 'Metro Manila',
         district: '',
         postalCode: '',
         idType: '',
@@ -323,6 +398,13 @@ export default function Register() {
                 if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
                 next.age = age >= 0 ? String(age) : '';
                 next.dobDate = bd;
+            }
+            // Auto-fill postal code when barangay changes
+            if (name === 'barangay' && value) {
+                const postal = getPostalCodeForBarangay(value);
+                if (postal) {
+                    next.postalCode = postal;
+                }
             }
             return next;
         });
@@ -393,7 +475,7 @@ export default function Register() {
         try {
             const addressParts = [formData.houseNo, formData.blockLot, formData.subdivision, formData.street].filter(Boolean);
             const payload = {
-                full_name: [formData.firstName, formData.middleName, formData.lastName].filter(Boolean).join(' '),
+                full_name: [formData.firstName, formData.middleName, formData.lastName, formData.suffix].filter(Boolean).join(' '),
                 email: formData.email,
                 phone_number: formData.mobile,
                 password: formData.password,
@@ -488,7 +570,7 @@ export default function Register() {
                     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }}>
                         <div className="relative group">
                             <div className="absolute -inset-1 bg-gradient-to-r from-orange-600/20 to-blue-600/20 rounded-[2rem] blur-xl opacity-30 dark:opacity-40 group-hover:opacity-60 transition duration-1000" />
-                            <div className="relative bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 lg:p-10 shadow-2xl overflow-hidden min-h-[400px] flex flex-col justify-center">
+                            <div className="relative bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 lg:p-10 shadow-2xl min-h-[400px] flex flex-col justify-center">
                     {/* Stepper */}
                     <div className="flex items-center mb-6 relative px-1">
                         <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 dark:bg-slate-700 -translate-y-1/2 z-0 rounded-full" />
@@ -682,10 +764,11 @@ export default function Register() {
 
                                 {/* Full Name */}
                                 <SectionHeading>Full Name</SectionHeading>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                     <InputField label="First Name" name="firstName" value={formData.firstName} onChange={handleChange} required />
                                     <InputField label="Middle Name" name="middleName" value={formData.middleName} onChange={handleChange} placeholder="Optional" />
                                     <InputField label="Last Name" name="lastName" value={formData.lastName} onChange={handleChange} required />
+                                    <InputField label="Suffix" name="suffix" value={formData.suffix} onChange={handleChange} placeholder="e.g. Jr." />
                                 </div>
 
                                 {/* Demographics */}
@@ -704,15 +787,7 @@ export default function Register() {
                                         />
                                     </div>
                                     <InputField label="Age" name="age" value={formData.age} onChange={handleChange} readOnly placeholder="Auto-filled" />
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 pl-0.5">Sex <span className="text-red-400">*</span></label>
-                                        <select name="sex" value={formData.sex} onChange={handleChange} required
-                                            className="w-full bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-orange-500 outline-none appearance-none cursor-pointer">
-                                            <option value="" disabled>Select</option>
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                        </select>
-                                    </div>
+                                    <CustomSelect label="Sex" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required />
                                 </div>
 
                                 {/* Address */}
@@ -722,10 +797,29 @@ export default function Register() {
                                     <InputField label="Block & Lot" name="blockLot" value={formData.blockLot} onChange={handleChange} />
                                     <InputField label="Subdivision" name="subdivision" value={formData.subdivision} onChange={handleChange} className="col-span-2 md:col-span-1" />
                                     <InputField label="Street" name="street" value={formData.street} onChange={handleChange} required className="col-span-2" />
-                                    <InputField label="Barangay" name="barangay" value={formData.barangay} onChange={handleChange} required />
-                                    <InputField label="City" name="municipality" value={formData.municipality} onChange={handleChange} />
-                                    <InputField label="Province" name="province" value={formData.province} onChange={handleChange} />
-                                    <InputField label="Postal Code" name="postalCode" value={formData.postalCode} onChange={handleChange} />
+                                    <CustomSelect label="Barangay" name="barangay" value={formData.barangay} onChange={handleChange} options={Array.from({ length: 24 }, (_, i) => `Barangay ${165 + i}`)} required />
+                                    <InputField label="City" name="municipality" value={formData.municipality} onChange={handleChange} readOnly />
+                                    <InputField label="Province" name="province" value={formData.province} onChange={handleChange} readOnly />
+                                    <div className="relative">
+                                        <div className="flex items-center gap-1 mb-1.5 pl-0.5">
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400">Postal Code</label>
+                                            <div className="relative flex items-center justify-center">
+                                                <Info size={13} className="peer text-slate-400 cursor-help hover:text-orange-500 transition-colors" />
+                                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-slate-700 text-white text-[11px] font-medium rounded-lg py-1.5 px-3 opacity-0 peer-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                                                    {formData.barangay ? `Postal code for ${formData.barangay}` : 'Select a barangay to auto-fill'}
+                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-slate-800 dark:border-t-slate-700"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            name="postalCode"
+                                            value={formData.postalCode}
+                                            readOnly
+                                            placeholder="Auto-filled"
+                                            className="w-full border text-sm rounded-xl px-3 py-2.5 outline-none transition-all bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed font-medium"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="flex gap-3 mt-5">

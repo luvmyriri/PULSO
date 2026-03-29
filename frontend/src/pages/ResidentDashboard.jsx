@@ -18,6 +18,7 @@ import {
     LogOut,
     CheckCircle2,
     ChevronRight,
+    ChevronDown,
     MessageSquare,
     X,
     Camera,
@@ -430,6 +431,46 @@ const SettingsView = ({ handleLogout, containerVariants }) => (
     </motion.div>
 );
 
+const ReportCategoryDropdown = ({ value, onChange, options }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                className="w-full flex items-center justify-between bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white p-3 rounded-xl focus:ring-2 focus:ring-orange-500/50 outline-none"
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <span className="font-medium text-[15px]">{value || "Select Category"}</span>
+                <ChevronDown size={18} className={`transition-transform text-slate-500 dark:text-slate-400 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        className="absolute z-10 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden drop-shadow-2xl"
+                    >
+                        {options.map((option) => (
+                            <button
+                                key={option}
+                                type="button"
+                                className={`w-full text-left px-4 py-3 hover:bg-orange-500 hover:text-white transition-colors text-[15px] font-medium ${value === option ? 'bg-orange-500/10 text-orange-500' : 'text-slate-900 dark:text-white'}`}
+                                onClick={() => {
+                                    onChange(option);
+                                    setIsOpen(false);
+                                }}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
+
 const ResidentModals = ({ 
     activeModal, setActiveModal, selectedPost, setSelectedPost, isLoaded, map, setMap, panorama, setPanorama, reportLocation, setReportLocation, 
     locationAddress, geocodingAddress, reportCategory, setReportCategory, reportNotes, setReportNotes, selectedImage, setSelectedImage, 
@@ -440,18 +481,18 @@ const ResidentModals = ({
     <AnimatePresence>
         {activeModal && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setActiveModal(null)}>
-                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`w-full flex flex-col my-8 pointer-events-auto ${activeModal === 'map' ? 'max-w-7xl h-[90vh]' : 'max-w-lg bg-white dark:bg-slate-900 rounded-3xl overflow-hidden'}`} onClick={e => e.stopPropagation()}>
+                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`w-full flex flex-col my-8 pointer-events-auto ${activeModal === 'map' ? 'max-w-7xl h-[90vh]' : 'max-w-lg bg-white dark:bg-slate-900 rounded-3xl'}`} onClick={e => e.stopPropagation()}>
                     {activeModal === 'file-report' && (
                         <div className="p-6 space-y-5">
-                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">New AI Report</h3><button onClick={() => setActiveModal(null)} className="p-1.5 hover:bg-slate-100 rounded-full"><X size={20}/></button></div>
+                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-slate-900 dark:text-white">New AI Report</h3><button onClick={() => setActiveModal(null)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full transition-colors"><X size={20}/></button></div>
                             {selectedImage ? <img src={selectedImage} className="w-full rounded-2xl aspect-video object-cover" /> : <button onClick={() => setIsIDCameraOpen(true)} className="w-full bg-slate-900 rounded-2xl aspect-video flex flex-col items-center justify-center text-white"><Camera size={40} className="text-orange-500 mb-2"/><span>Open Camera</span></button>}
                             <IDCameraModal isOpen={isIDCameraOpen} onClose={() => setIsIDCameraOpen(false)} onCapture={file => setSelectedImage(URL.createObjectURL(file))} title="Issue Photo" side="ISSUE" />
                             <div className="space-y-3">
-                                <select className="w-full border p-3 rounded-xl" value={reportCategory} onChange={e => setReportCategory(e.target.value)}>{REPORT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                                <textarea className="w-full border p-3 rounded-xl" rows="2" placeholder="Additional notes..." value={reportNotes} onChange={e => setReportNotes(e.target.value)} />
+                                <ReportCategoryDropdown value={reportCategory} onChange={setReportCategory} options={REPORT_CATEGORIES} />
+                                <textarea className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white p-3 rounded-xl focus:ring-2 focus:ring-orange-500/50 outline-none placeholder:text-slate-500 dark:placeholder:text-slate-400" rows="2" placeholder="Additional notes..." value={reportNotes} onChange={e => setReportNotes(e.target.value)} />
                             </div>
                             <div className="flex gap-3 pt-2">
-                                <button className="flex-1 py-3 bg-slate-100 font-bold rounded-xl" onClick={() => setActiveModal(null)}>Cancel</button>
+                                <button className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors hover:bg-slate-200 dark:hover:bg-slate-700" onClick={() => setActiveModal(null)}>Cancel</button>
                                 <button className="flex-1 py-3 bg-orange-500 text-white font-bold rounded-xl" onClick={handleFileReport} disabled={submittingReport}>{submittingReport ? '...' : 'Submit Report'}</button>
                             </div>
                         </div>
