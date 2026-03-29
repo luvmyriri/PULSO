@@ -712,3 +712,239 @@ def deactivate_user(
     )
     db.commit()
     return {"message": f"User {user.full_name} has been deactivated."}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Design Requests (Design & Planning Division)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/design-requests", response_model=List[dict])
+def list_design_requests(
+    skip: int = 0,
+    limit: int = 50,
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """List design requests linked to LGU infrastructure projects."""
+    _assert_role(current_user, *GOV_ROLES)
+    q = db.query(gov_models.ProjectRequest)
+    if status:
+        q = q.filter(gov_models.ProjectRequest.status == status)
+    items = q.filter(
+        gov_models.ProjectRequest.status.in_([
+            "design_in_progress", "request_received", "survey_in_progress",
+            "approved_by_city_engineer"
+        ])
+    ).order_by(gov_models.ProjectRequest.created_at.desc()).offset(skip).limit(limit).all()
+    return [
+        {
+            "id": p.id,
+            "project_number": p.project_number,
+            "title": p.title,
+            "status": p.status,
+            "barangay": p.barangay,
+            "location": p.location_description,
+            "current_phase": p.current_phase,
+            "created_at": str(p.created_at),
+        }
+        for p in items
+    ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Structure Analysis (Design Division)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/analysis", response_model=List[dict])
+def list_structure_analysis(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Returns projects that are in the design or analysis phase."""
+    _assert_role(current_user, *GOV_ROLES)
+    items = (
+        db.query(gov_models.ProjectRequest)
+        .filter(gov_models.ProjectRequest.status.in_([
+            "design_in_progress", "approved_by_city_engineer", "survey_in_progress"
+        ]))
+        .order_by(gov_models.ProjectRequest.created_at.desc())
+        .offset(skip).limit(limit).all()
+    )
+    return [
+        {
+            "id": p.id,
+            "project_number": p.project_number,
+            "title": p.title,
+            "status": p.status,
+            "barangay": p.barangay,
+            "location": p.location_description,
+            "scope_of_work": p.scope_of_work,
+            "current_phase": p.current_phase,
+            "created_at": str(p.created_at),
+        }
+        for p in items
+    ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Field Surveys (Survey & Estimation Division)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/surveys", response_model=List[dict])
+def list_field_surveys(
+    skip: int = 0,
+    limit: int = 50,
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Field survey assignments derived from work orders and project requests."""
+    _assert_role(current_user, *GOV_ROLES)
+    # Surveys = work orders in field/survey phase + project requests in survey_in_progress
+    wo_items = (
+        db.query(gov_models.WorkOrder)
+        .filter(gov_models.WorkOrder.status.in_(["assigned", "in_progress"]))
+        .order_by(gov_models.WorkOrder.created_at.desc())
+        .offset(skip).limit(limit // 2 + 1).all()
+    )
+    proj_items = (
+        db.query(gov_models.ProjectRequest)
+        .filter(gov_models.ProjectRequest.status == "survey_in_progress")
+        .order_by(gov_models.ProjectRequest.created_at.desc())
+        .limit(limit // 2 + 1).all()
+    )
+    results = []
+    for w in wo_items:
+        results.append({
+            "id": w.id,
+            "wo_number": w.wo_number,
+            "title": w.title,
+            "status": w.status,
+            "barangay": w.barangay,
+            "location": w.location_description,
+            "created_at": str(w.created_at),
+        })
+    for p in proj_items:
+        results.append({
+            "id": p.id,
+            "project_number": p.project_number,
+            "title": p.title,
+            "status": p.status,
+            "barangay": p.barangay,
+            "location": p.location_description,
+            "created_at": str(p.created_at),
+        })
+    return results[:limit]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bill of Quantities (Survey & Estimation)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/boq", response_model=List[dict])
+def list_boq(
+    skip: int = 0,
+    limit: int = 100,
+    pr_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """List all Bill of Quantities items across procurement requests."""
+    _assert_role(current_user, *GOV_ROLES)
+    q = db.query(gov_models.BoQItem)
+    if pr_id:
+        q = q.filter(gov_models.BoQItem.procurement_request_id == pr_id)
+    items = q.offset(skip).limit(limit).all()
+    result = []
+    for item in items:
+        pr = db.query(gov_models.ProcurementRequest).filter(
+            gov_models.ProcurementRequest.id == item.procurement_request_id
+        ).first()
+        result.append({
+            "id": item.id,
+            "pr_number": pr.pr_number if pr else "—",
+            "title": item.description,
+            "description": f"Qty: {item.quantity} {item.unit} @ ₱{item.unit_cost:,.2f} = ₱{item.total_cost:,.2f}",
+            "status": pr.status if pr else "unknown",
+            "barangay": pr.title if pr else "—",
+            "created_at": str(item.created_at) if hasattr(item, "created_at") else "—",
+        })
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cost Estimation (Survey & Estimation Division)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/estimation", response_model=List[dict])
+def list_cost_estimations(
+    skip: int = 0,
+    limit: int = 50,
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Cost estimation view aggregating procurement requests with BoQ totals."""
+    _assert_role(current_user, *GOV_ROLES)
+    q = db.query(gov_models.ProcurementRequest)
+    if status:
+        q = q.filter(gov_models.ProcurementRequest.status == status)
+    items = q.order_by(gov_models.ProcurementRequest.created_at.desc()).offset(skip).limit(limit).all()
+    result = []
+    for pr in items:
+        boq_items = db.query(gov_models.BoQItem).filter(
+            gov_models.BoQItem.procurement_request_id == pr.id
+        ).all()
+        total = sum(getattr(i, "total_cost", 0) or 0 for i in boq_items)
+        result.append({
+            "id": pr.id,
+            "pr_number": pr.pr_number,
+            "title": pr.title,
+            "description": f"Total Estimate: ₱{total:,.2f} | {len(boq_items)} line items",
+            "status": pr.status,
+            "barangay": pr.barangay if hasattr(pr, "barangay") else "—",
+            "created_at": str(pr.created_at),
+        })
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reports Archive (Administrative Division)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/reports-archive", response_model=List[dict])
+def list_reports_archive(
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Archived and resolved citizen infrastructure reports. Senior LGU staff only."""
+    _assert_role(current_user, *SENIOR_ROLES)
+    q = db.query(models.Report)
+    if status:
+        q = q.filter(models.Report.status == status)
+    else:
+        q = q.filter(models.Report.status.in_(["resolved", "rejected", "closed"]))
+    if category:
+        q = q.filter(models.Report.category == category)
+    items = q.order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
+    return [
+        {
+            "id": r.id,
+            "ticket_id": getattr(r, "ticket_id", f"RPT-{r.id:05d}"),
+            "title": r.category or "Infrastructure Report",
+            "description": r.description or "",
+            "status": r.status,
+            "barangay": getattr(r, "barangay", "—"),
+            "location": getattr(r, "location_string", "—"),
+            "created_at": str(r.created_at),
+        }
+        for r in items
+    ]
+

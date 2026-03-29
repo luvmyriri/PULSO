@@ -197,10 +197,50 @@ const ManagementDashboard = () => {
 
     // KPI Data - use real stats when available, fallback display otherwise
     const kpis = [
-        { label: 'Total Reports (All Time)', value: reportStats ? reportStats.total.toLocaleString() : '—', trend: '+12%', color: 'blue', icon: <Activity size={20}/> },
-        { label: 'Resolved Tickets', value: reportStats ? reportStats.resolved.toLocaleString() : '—', trend: '+18%', color: 'green', icon: <CheckCircle2 size={20}/> },
-        { label: 'Pending Approval', value: reportStats ? reportStats.pending_approval.toLocaleString() : '—', trend: '', color: 'orange', icon: <Clock size={20}/>, goodTrend: false },
-        { label: 'Active (Dispatched)', value: reportStats ? reportStats.dispatched.toLocaleString() : '—', trend: 'Live', color: 'indigo', icon: <Users size={20}/> },
+        {
+            label: 'Total Reports (All Time)',
+            value: reportStats ? reportStats.total.toLocaleString() : '—',
+            trend: '+12%', trendLabel: 'vs last month',
+            goodTrend: true,
+            Icon: Activity,
+            iconBg: 'bg-blue-100 dark:bg-blue-900/30',
+            iconColor: 'text-blue-500',
+            accent: 'hover:border-blue-500/40',
+            glow: 'from-blue-500/5 to-transparent',
+        },
+        {
+            label: 'Resolved Tickets',
+            value: reportStats ? reportStats.resolved.toLocaleString() : '—',
+            trend: '+18%', trendLabel: 'vs last month',
+            goodTrend: true,
+            Icon: CheckCircle2,
+            iconBg: 'bg-green-100 dark:bg-green-900/30',
+            iconColor: 'text-green-500',
+            accent: 'hover:border-green-500/40',
+            glow: 'from-green-500/5 to-transparent',
+        },
+        {
+            label: 'Pending Approval',
+            value: reportStats ? reportStats.pending_approval.toLocaleString() : '—',
+            trend: '', trendLabel: 'vs last month',
+            goodTrend: false,
+            Icon: Clock,
+            iconBg: 'bg-orange-100 dark:bg-orange-900/30',
+            iconColor: 'text-orange-500',
+            accent: 'hover:border-orange-500/40',
+            glow: 'from-orange-500/5 to-transparent',
+        },
+        {
+            label: 'Active (Dispatched)',
+            value: reportStats ? reportStats.dispatched.toLocaleString() : '—',
+            trend: 'Live', trendLabel: 'vs last month',
+            goodTrend: true,
+            Icon: Users,
+            iconBg: 'bg-indigo-100 dark:bg-indigo-900/30',
+            iconColor: 'text-indigo-500',
+            accent: 'hover:border-indigo-500/40',
+            glow: 'from-indigo-500/5 to-transparent',
+        },
     ];
 
     // Permit Tracking Data
@@ -277,23 +317,32 @@ const ManagementDashboard = () => {
                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                                 {/* KPI Ribbon */}
                                 <div className="grid grid-cols-4 gap-6">
-                                    {kpis.map((kpi, idx) => (
-                                        <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-indigo-500/50 transition-colors cursor-pointer">
-                                            <div className={`absolute top-0 right-0 p-4 text-${kpi.color}-500/20 group-hover:text-${kpi.color}-500/40 transition-colors scale-150 -translate-y-4 translate-x-4`}>
-                                                {kpi.icon}
+                                    {kpis.map((kpi, idx) => {
+                                        const { Icon } = kpi;
+                                        return (
+                                            <div key={idx} className={`bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group transition-all duration-200 cursor-pointer ${kpi.accent}`}>
+                                                {/* Subtle gradient wash */}
+                                                <div className={`absolute inset-0 bg-gradient-to-br ${kpi.glow} opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none`} />
+
+                                                {/* Icon badge — top right */}
+                                                <div className={`absolute top-4 right-4 w-10 h-10 rounded-xl flex items-center justify-center ${kpi.iconBg} ${kpi.iconColor} shrink-0`}>
+                                                    <Icon size={20} />
+                                                </div>
+
+                                                <h3 className="text-xs font-bold text-slate-500 mb-2 relative z-10 pr-12">{kpi.label}</h3>
+                                                <div className="text-3xl font-display font-black text-slate-900 dark:text-white mb-3 relative z-10">{kpi.value}</div>
+                                                <div className="flex items-center gap-1 text-xs font-bold relative z-10">
+                                                    <TrendingUp size={12} className={kpi.goodTrend ? 'text-green-500' : 'text-orange-500'}/>
+                                                    <span className={kpi.goodTrend ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}>
+                                                        {kpi.trend || '—'}
+                                                    </span>
+                                                    <span className="text-slate-400 font-normal">{kpi.trendLabel}</span>
+                                                </div>
                                             </div>
-                                            <h3 className="text-sm font-bold text-slate-500 mb-1 relative z-10">{kpi.label}</h3>
-                                            <div className="text-3xl font-display font-black text-slate-900 dark:text-white mb-2 relative z-10">{kpi.value}</div>
-                                            <div className="flex items-center gap-1 text-xs font-bold relative z-10">
-                                                <TrendingUp size={12} className={kpi.goodTrend !== false ? 'text-green-500' : 'text-orange-500'}/>
-                                                <span className={kpi.goodTrend !== false ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}>
-                                                    {kpi.trend}
-                                                </span>
-                                                <span className="text-slate-400 font-normal">vs last month</span>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
+
 
                                 {/* Charts Area */}
                                 <div className="grid grid-cols-2 gap-6">
