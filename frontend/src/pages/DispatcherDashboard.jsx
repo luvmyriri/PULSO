@@ -27,11 +27,16 @@ import {
     MapPin,
     Truck
 } from 'lucide-react';
-<<<<<<< HEAD
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
-=======
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF } from '@react-google-maps/api';
->>>>>>> 9056a898c9b2270d413c2765c439026f6f7a0522
+
+const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7566, lng: 121.0450 };
+const CALOOCAN_CENTER = { lat: 14.7566, lng: 121.0450 };
+const NORTH_CALOOCAN_BOUNDARY = [
+    { lat: 14.780, lng: 121.030 },
+    { lat: 14.780, lng: 121.080 },
+    { lat: 14.730, lng: 121.080 },
+    { lat: 14.730, lng: 121.030 }
+];
 import { Link, useNavigate } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 
@@ -70,8 +75,7 @@ const DispatcherDashboard = () => {
 
     // New State for Work Order Generation Modal
     const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
-<<<<<<< HEAD
-=======
+    const [panorama, setPanorama] = useState(null);
     const [isStreetViewConfirmOpen, setIsStreetViewConfirmOpen] = useState(false);
     const [pendingStreetViewLoc, setPendingStreetViewLoc] = useState(null);
     const [isStreetActive, setIsStreetActive] = useState(false);
@@ -348,7 +352,6 @@ const DispatcherDashboard = () => {
             setPanorama(sv);
         }
     }, [map, panorama]);
->>>>>>> 9056a898c9b2270d413c2765c439026f6f7a0522
     const [dispatchForm, setDispatchForm] = useState({
         assigned_to_id: 2, // Dummy ID for field engineer
         priority: 'normal',
@@ -756,17 +759,6 @@ const DispatcherDashboard = () => {
                                         zIndex: 1000 
                                     }}
                                 >
-<<<<<<< HEAD
-                                    <div className="p-2 text-slate-900 min-w-[150px]">
-                                        <div className="font-bold text-xs mb-1">RPT-[{selectedMarker.id}]</div>
-                                        <div className="text-[10px] mb-1 capitalize">{selectedMarker.category || 'Uncategorized'}</div>
-                                        <div className={`text-[10px] font-bold ${selectedMarker.status === 'resolved' ? 'text-green-600' : 'text-orange-600'}`}>
-                                            {selectedMarker.status.replace('_', ' ').toUpperCase()}
-                                        </div>
-                                    </div>
-                                </InfoWindowF>
-                            )}
-=======
                                     {/* All inline styles — Tailwind dark: classes are unreliable inside Google Maps DOM */}
                                     <div 
                                         onMouseDown={(e) => e.stopPropagation()}
@@ -1064,7 +1056,6 @@ const DispatcherDashboard = () => {
                                     />
                                 </>
                             )}
->>>>>>> 9056a898c9b2270d413c2765c439026f6f7a0522
                         </GoogleMap>
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-950">
@@ -1072,13 +1063,8 @@ const DispatcherDashboard = () => {
                         </div>
                     )}
 
-<<<<<<< HEAD
-                    {/* Map UI Floating Controls */}
-                    <div className="absolute bottom-6 left-6 flex flex-col gap-2 pointer-events-none">
-=======
                     {/* Map UI Floating Controls - Stacked Above the MiniMap */}
                     <div className="absolute bottom-[205px] left-[30px] flex flex-col gap-2 pointer-events-none mb-1">
->>>>>>> 9056a898c9b2270d413c2765c439026f6f7a0522
                         <div className="bg-slate-900/90 backdrop-blur border border-slate-800 rounded-xl p-3 flex flex-col gap-3 shadow-xl pointer-events-auto">
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Live Map Feed</h4>
                             <div className="flex items-center gap-3">
