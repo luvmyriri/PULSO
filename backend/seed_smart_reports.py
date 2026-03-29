@@ -2,8 +2,9 @@ import sys
 import os
 import random
 import datetime
+import json
 
-# Add the current directory to sys.path so we can import from backend modules
+# Add the current directory to sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from database import SessionLocal
@@ -13,80 +14,138 @@ import gov_models
 def seed_smart_reports():
     db = SessionLocal()
 
-    # Find a test citizen user
-    citizen = db.query(models.User).filter(models.User.role == "resident").first()
-    if not citizen:
-        citizen = db.query(models.User).first()
-    
-    citizen_id = citizen.id if citizen else 1
+    print("\n" + "="*60)
+    print("  PULSO — Seeding High-Quality AI Training & Test Data")
+    print("="*60)
 
-    # Find the dispatcher / system_admin for actor_id logging
+    # 1. ACQUIRE ACTORS
+    resident = db.query(models.User).filter(models.User.role == "resident").first()
+    if not resident:
+        # Fallback to ANY user if no resident
+        resident = db.query(models.User).first()
+        if not resident:
+            print("  [ERR] No users found in database.")
+            return
+
     admin = db.query(models.User).filter(models.User.role == "system_admin").first()
-    admin_id = admin.id if admin else 2
+    admin_id = admin.id if admin else 1
+    
+    field_worker = db.query(models.User).filter(models.User.role == "field_worker").first()
+    field_worker_id = field_worker.id if field_worker else admin_id
 
-    # Provide realistic coordinates in Caloocan North bounds
-    # Center: 14.7566, 121.0450
+    # 2. DEFINITIONS
     base_lat = 14.7566
     base_lng = 121.0450
 
     issues = [
-        {"cat": "Road Issue", "ai_cat": "Infrastructure", "desc": "Massive pothole on the main road", "urgency": "High", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Pothole.jpg/800px-Pothole.jpg"},
-        {"cat": "Flooding", "ai_cat": "Water Issue", "desc": "Street is completely flooded after the storm", "urgency": "Critical", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Flooded_street.jpg/800px-Flooded_street.jpg"},
-        {"cat": "Electrical", "ai_cat": "Power Outage", "desc": "Live wire hanging from the electricity pole", "urgency": "Critical", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Downed_power_lines.jpg/800px-Downed_power_lines.jpg"},
-        {"cat": "Waste", "ai_cat": "Sanitation", "desc": "Uncollected garbage piling up on the sidewalk", "urgency": "Medium", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Garbage_on_the_street.jpg/800px-Garbage_on_the_street.jpg"},
-        {"cat": "Water Leak", "ai_cat": "Water Issue", "desc": "Burst pipe leaking water everywhere", "urgency": "High", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Water_leak.jpg/800px-Water_leak.jpg"}
+        {
+            "cat": "Road Issue", 
+            "ai_cat": "Infrastructure", 
+            "desc": "Severe asphalt degradation and deep potholes causing traffic hazards.", 
+            "urgency": "High", 
+            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Pothole.jpg/800px-Pothole.jpg",
+            "score": 8.5
+        },
+        {
+            "cat": "Flooding", 
+            "ai_cat": "Water/Drainage", 
+            "desc": "Massive gutter overflow and street flooding reaching curb height.", 
+            "urgency": "Critical", 
+            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Flooded_street.jpg/800px-Flooded_street.jpg",
+            "score": 9.2
+        },
+        {
+            "cat": "Electrical", 
+            "ai_cat": "Public Safety", 
+            "desc": "Exposed high-voltage wiring and sagging utility lines near a school zone.", 
+            "urgency": "Critical", 
+            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Downed_power_lines.jpg/800px-Downed_power_lines.jpg",
+            "score": 10.0
+        },
+        {
+            "cat": "Waste Mgmt", 
+            "ai_cat": "Sanitation", 
+            "desc": "Illegal dumping site causing foul odors and blocking pedestrian pathways.", 
+            "urgency": "Medium", 
+            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Garbage_on_the_street.jpg/800px-Garbage_on_the_street.jpg",
+            "score": 5.5
+        },
+        {
+            "cat": "Water Leak", 
+            "ai_cat": "Water Issue", 
+            "desc": "Major main pipe rupture resulting in significant water loss and low pressure.", 
+            "urgency": "High", 
+            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Water_leak.jpg/800px-Water_leak.jpg",
+            "score": 7.8
+        }
     ]
 
-    # Let's seed 15 reports across different statuses
-    statuses = [
-        "unverified", "unverified", "pending", "pending", 
-        "approved_internal", "approved_internal", "approved_internal", 
-        "dispatched", "dispatched", 
-        "resolved", "resolved"
-    ]
+    statuses = ["unverified", "pending", "approved_internal", "dispatched", "resolved"]
 
-    print("Generating Smart Seed Reports for Command Center...")
+    print(f"  [START] Generating 25 complex scenarios for Resident: {resident.email}")
 
-    for i in range(15):
+    for i in range(25):
         issue = random.choice(issues)
         status = random.choice(statuses)
-
-        lat = base_lat + random.uniform(-0.03, 0.03)
-        lng = base_lng + random.uniform(-0.03, 0.03)
+        
+        lat = base_lat + random.uniform(-0.04, 0.04)
+        lng = base_lng + random.uniform(-0.04, 0.04)
+        
+        # Create Report
+        meta = {
+            "vision_confidence": round(random.uniform(0.85, 0.98), 2),
+            "structural_impact": "high",
+            "environment_check": "passed",
+            "calification_id": f"AI-{random.randint(100,999)}"
+        }
 
         report = models.Report(
-            user_id=citizen_id,
+            user_id=resident.id,
             category=issue["cat"],
-            description=f"Automated Issue: {issue['desc']}",
+            description=issue["desc"],
             location_lat=lat,
             location_lng=lng,
-            location_string=f"Simulated Address {i}, Caloocan North",
+            location_string=f"Phase {random.randint(1,9)}, Brgy {random.randint(170,188)}, Caloocan North",
             image_url=issue["url"],
             status=status,
-            ai_summary=f"AI scanned image and detected {issue['urgency']} severity {issue['cat'].lower()} hazard.",
+            ai_summary=f"PULSO AI verified: {issue['urgency']} severity {issue['cat'].lower()} detected via vision analysis.",
             ai_category=issue["ai_cat"],
             ai_urgency=issue["urgency"],
-            created_at=datetime.datetime.utcnow() - datetime.timedelta(hours=random.randint(1, 72))
+            severity_score=issue["score"],
+            ai_metadata=json.dumps(meta)
         )
+        
         db.add(report)
-        db.flush() # flush to get the report.id immediately
+        db.flush()
 
-        # If it's dispatched or resolved, let's automatically create a WorkOrder to make the "Fleet/Dispatch" tab pop
+        # Create linked WorkOrder for actionable statuses
         if status in ["dispatched", "resolved"]:
             wo = gov_models.WorkOrder(
-                title=f"Fix {issue['cat']}",
-                description=f"Action required for ticket {report.id}",
-                wo_type="standard",
-                priority=issue["urgency"].lower() if issue["urgency"].lower() in ["low", "normal", "high", "critical"] else "normal",
+                report_id=report.id,
+                title=f"Repair: {issue['cat']} Alert",
+                description=f"Field assignment triggered by AI Triage for ticket #{report.id}. {issue['desc']}",
+                wo_type="standard" if random.random() > 0.3 else "preemptive",
                 status="in_progress" if status == "dispatched" else "completed",
-                assigned_to_id=3, # Mock field engineer
+                priority=issue["urgency"].lower(),
                 assigned_by_id=admin_id,
-                report_id=report.id
+                assigned_to_id=field_worker_id,
+                scheduled_date=datetime.datetime.now() - datetime.timedelta(days=random.randint(0, 2))
             )
             db.add(wo)
+            
+        if (i+1) % 5 == 0:
+            print(f"  [PROGRESS] {i+1}/25 data points generated...")
 
-    db.commit()
-    print("Database seeded with fresh dynamic reports and work orders successfully!")
+    try:
+        db.commit()
+        print("="*60)
+        print(f"  SUCCESS: 25 High-Fidelity AI Datasets Seeded Successfully.")
+        print("="*60 + "\n")
+    except Exception as e:
+        db.rollback()
+        print(f"  [ERR] Commit failed: {e}")
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     seed_smart_reports()
