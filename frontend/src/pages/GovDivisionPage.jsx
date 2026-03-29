@@ -3,7 +3,7 @@
  * Generic division-level page template for all City Engineering Office sub-divisions.
  * Used for routes like /gov/work-orders, /gov/projects, /gov/obo, /gov/procurement, etc.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -11,11 +11,81 @@ import {
     ClipboardList, Ruler, Eye, HardHat, Wrench, FileBarChart2,
     Clock, CheckCircle2, AlertTriangle, Users, Plus, Filter,
     Search, ChevronRight, Activity, FileCheck, ArrowRight,
-    BookOpen, UserCog, Settings
+    BookOpen, UserCog, Settings, FlaskConical, Bell, Globe,
+    Shield, Database, RefreshCw, Monitor, Lock, Server, User,
+    ChevronDown, Check
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
 
 const API_BASE = 'http://localhost:8000';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OrangeSelect — custom styled dropdown replacing native <select>
+// ─────────────────────────────────────────────────────────────────────────────
+const OrangeSelect = ({ value, onChange, options, placeholder = 'Select…', minWidth = '160px' }) => {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const selected = options.find(o => o.value === value);
+
+    return (
+        <div ref={ref} className="relative" style={{ minWidth }}>
+            {/* Trigger button */}
+            <button
+                type="button"
+                onClick={() => setOpen(p => !p)}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all duration-150 ${
+                    open
+                        ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-500 text-orange-700 dark:text-orange-300 shadow-sm shadow-orange-500/10'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-orange-400 hover:text-orange-600 dark:hover:text-orange-400'
+                }`}
+            >
+                <span className="truncate">{selected ? selected.label : placeholder}</span>
+                <ChevronDown
+                    size={14}
+                    className={`shrink-0 transition-transform duration-200 ${
+                        open ? 'rotate-180 text-orange-500' : 'text-slate-400'
+                    }`}
+                />
+            </button>
+
+            {/* Dropdown panel */}
+            {open && (
+                <div className="absolute top-full left-0 mt-1.5 w-full z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl shadow-black/10 dark:shadow-black/40 overflow-hidden">
+                    {/* Orange top accent line */}
+                    <div className="h-0.5 bg-gradient-to-r from-orange-400 to-orange-600" />
+                    <div className="py-1.5 max-h-64 overflow-y-auto custom-scrollbar">
+                        {options.map(opt => {
+                            const isSelected = opt.value === value;
+                            return (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => { onChange(opt.value); setOpen(false); }}
+                                    className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors ${
+                                        isSelected
+                                            ? 'bg-orange-50 dark:bg-orange-900/25 text-orange-700 dark:text-orange-300 font-bold'
+                                            : 'text-slate-700 dark:text-slate-300 hover:bg-orange-50/60 dark:hover:bg-orange-900/10 hover:text-orange-600 dark:hover:text-orange-400 font-medium'
+                                    }`}
+                                >
+                                    <span>{opt.label}</span>
+                                    {isSelected && <Check size={13} className="text-orange-500 shrink-0" />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page config map: route → UI metadata + content
@@ -92,6 +162,54 @@ const PAGE_CONFIG = {
         color: 'amber',
         apiPath: null,
         statuses: [],
+    },
+    '/gov/design-requests': {
+        title: 'Design Requests',
+        subtitle: 'Active design and planning requests across infrastructure project phases.',
+        icon: Ruler,
+        color: 'indigo',
+        apiPath: '/api/gov/design-requests',
+        statuses: ['request_received','survey_in_progress','design_in_progress','approved_by_city_engineer'],
+    },
+    '/gov/analysis': {
+        title: 'Structure Analysis',
+        subtitle: 'Structural and civil engineering analysis queue from active project phases.',
+        icon: FlaskConical,
+        color: 'blue',
+        apiPath: '/api/gov/analysis',
+        statuses: ['survey_in_progress','design_in_progress','approved_by_city_engineer'],
+    },
+    '/gov/surveys': {
+        title: 'Field Surveys',
+        subtitle: 'Geodetic and civil engineering field survey assignments and results.',
+        icon: Eye,
+        color: 'green',
+        apiPath: '/api/gov/surveys',
+        statuses: ['assigned','in_progress','survey_in_progress'],
+    },
+    '/gov/boq': {
+        title: 'Bill of Quantities',
+        subtitle: 'Material and labor cost estimates across all active procurement requests.',
+        icon: ClipboardList,
+        color: 'amber',
+        apiPath: '/api/gov/boq',
+        statuses: [],
+    },
+    '/gov/estimation': {
+        title: 'Cost Estimation',
+        subtitle: 'Aggregated BoQ cost estimates per procurement request. RA 9184 compliant.',
+        icon: PackageCheck,
+        color: 'violet',
+        apiPath: '/api/gov/estimation',
+        statuses: ['draft','submitted','validated','sent_to_procurement'],
+    },
+    '/gov/reports-archive': {
+        title: 'Reports Archive',
+        subtitle: 'Closed, resolved, and rejected citizen infrastructure reports for administrative records.',
+        icon: FileBarChart2,
+        color: 'purple',
+        apiPath: '/api/gov/reports-archive',
+        statuses: ['resolved','rejected','closed'],
     },
     '/gov/users': {
         title: 'Role Management',
@@ -320,6 +438,10 @@ const GovDivisionPage = () => {
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+    const [roleFilter, setRoleFilter] = useState('');
+    const [trustFilter, setTrustFilter] = useState('');
+    const [editingUser, setEditingUser] = useState(null); // { id, role }
+    const [savingRole, setSavingRole] = useState(false);
 
     const config = PAGE_CONFIG[location.pathname] || {
         title: 'Division Page',
@@ -348,9 +470,8 @@ const GovDivisionPage = () => {
     }, [location.pathname, statusFilter, token]);
 
     const filtered = items.filter(item => {
-        if (!search) return true;
         const s = search.toLowerCase();
-        return (
+        const matchesSearch = !search || (
             (item.title || '').toLowerCase().includes(s) ||
             (item.description || '').toLowerCase().includes(s) ||
             (item.wo_number || '').toLowerCase().includes(s) ||
@@ -362,14 +483,62 @@ const GovDivisionPage = () => {
             (item.record_id || '').toLowerCase().includes(s) ||
             (item.record_type || '').toLowerCase().includes(s) ||
             (item.title_or_applicant || '').toLowerCase().includes(s) ||
-            (item.issued_by_name || '').toLowerCase().includes(s)
+            (item.issued_by_name || '').toLowerCase().includes(s) ||
+            (item.full_name || '').toLowerCase().includes(s) ||
+            (item.email || '').toLowerCase().includes(s) ||
+            (item.barangay || '').toLowerCase().includes(s) ||
+            (item.role || '').toLowerCase().includes(s)
         );
+        const matchesRole = !roleFilter || item.role === roleFilter;
+        const matchesTrust = !trustFilter || (
+            trustFilter === '100' ? (item.trust_score ?? 100) === 100 :
+            trustFilter === '90' ? (item.trust_score ?? 100) >= 90 && (item.trust_score ?? 100) < 100 :
+            trustFilter === '70' ? (item.trust_score ?? 100) >= 70 && (item.trust_score ?? 100) < 90 :
+            trustFilter === 'low' ? (item.trust_score ?? 100) < 70 : true
+        );
+        return matchesSearch && matchesRole && matchesTrust;
     });
 
     const isAuditLog = location.pathname === '/gov/audit-logs';
     const isTimeline = location.pathname === '/gov/timeline';
     const isRecords = location.pathname === '/gov/records';
     const isStatic = !config.apiPath;
+    const isSettings = location.pathname === '/gov/settings';
+    const isUsers = location.pathname === '/gov/users';
+
+    const GOV_ROLE_OPTIONS = [
+        'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
+        'records_officer','division_chief','design_engineer','estimator',
+        'cad_operator','project_engineer','construction_foreman','field_worker',
+        'building_inspector','electrical_inspector','mechanical_inspector',
+        'dispatcher','manager','system_admin','resident',
+    ];
+
+    // Title-case helper: "city_engineer" → "City Engineer"
+    const toTitleCase = str => str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+    const activeFilterCount = [roleFilter, trustFilter].filter(Boolean).length;
+
+    // Role-change handler for /gov/users
+    const handleRoleChange = async (userId, newRole) => {
+        setSavingRole(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/gov/users/${userId}/role`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ role: newRole }),
+            });
+            if (res.ok) {
+                setItems(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+                setEditingUser(null);
+            }
+        } finally { setSavingRole(false); }
+    };
+
+    // Settings panels state
+    const [notifSettings, setNotifSettings] = React.useState({ email: true, sms: false, inApp: true, digest: true });
+    const [settingsSaved, setSettingsSaved] = React.useState(false);
+    const saveSettings = () => { setSettingsSaved(true); setTimeout(() => setSettingsSaved(false), 2500); };
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-300 font-sans flex text-sm">
@@ -398,8 +567,123 @@ const GovDivisionPage = () => {
                 <main className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full mx-auto space-y-4">
 
-                        {/* Static / placeholder pages */}
-                        {isStatic && (
+                        {/* Settings Page — Full UI */}
+                        {isSettings && (
+                            <div className="space-y-6">
+                                {/* System Info Card */}
+                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+                                    <div className="flex items-center gap-3 mb-5">
+                                        <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                            <Server size={18} className="text-slate-500" />
+                                        </div>
+                                        <div>
+                                            <h2 className="font-black text-slate-900 dark:text-white text-base">System Information</h2>
+                                            <p className="text-xs text-slate-500">Read-only platform environment details</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {[
+                                            { label: 'Platform', value: 'PULSO — City Engineering Office', icon: Globe },
+                                            { label: 'Version', value: 'v2.4.1 (Production)', icon: Monitor },
+                                            { label: 'Environment', value: 'Caloocan City, Metro Manila', icon: Shield },
+                                            { label: 'Database', value: 'PostgreSQL 15 (Active)', icon: Database },
+                                            { label: 'API Status', value: 'All systems operational', icon: Server },
+                                            { label: 'Last Sync', value: new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }), icon: RefreshCw },
+                                        ].map(({ label, value, icon: InfoIcon }) => (
+                                            <div key={label} className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                                                <InfoIcon size={15} className="text-slate-400 mt-0.5 shrink-0" />
+                                                <div>
+                                                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">{label}</div>
+                                                    <div className="text-sm font-bold text-slate-800 dark:text-slate-200">{value}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Notification Preferences */}
+                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+                                    <div className="flex items-center gap-3 mb-5">
+                                        <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                                            <Bell size={18} className="text-indigo-500" />
+                                        </div>
+                                        <div>
+                                            <h2 className="font-black text-slate-900 dark:text-white text-base">Notification Preferences</h2>
+                                            <p className="text-xs text-slate-500">Choose how you receive system alerts</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {[
+                                            { key: 'email', label: 'Email Notifications', desc: 'Receive alerts at your registered email address' },
+                                            { key: 'sms', label: 'SMS Alerts', desc: 'Get urgent notifications via SMS (requires phone number)' },
+                                            { key: 'inApp', label: 'In-App Notifications', desc: 'Show notification badge and bell alerts in PULSO' },
+                                            { key: 'digest', label: 'Daily Digest', desc: 'Morning summary of all pending actions and updates' },
+                                        ].map(({ key, label, desc }) => (
+                                            <div key={key} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                <div>
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white">{label}</div>
+                                                    <div className="text-xs text-slate-500 mt-0.5">{desc}</div>
+                                                </div>
+                                                <button
+                                                    onClick={() => setNotifSettings(p => ({ ...p, [key]: !p[key] }))}
+                                                    className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
+                                                        notifSettings[key] ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-700'
+                                                    }`}
+                                                >
+                                                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${
+                                                        notifSettings[key] ? 'left-[22px]' : 'left-0.5'
+                                                    }`} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={saveSettings}
+                                        className={`mt-4 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                                            settingsSaved
+                                                ? 'bg-green-500 text-white'
+                                                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                        }`}
+                                    >
+                                        {settingsSaved ? '✓ Saved' : 'Save Preferences'}
+                                    </button>
+                                </div>
+
+                                {/* Security Settings */}
+                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+                                    <div className="flex items-center gap-3 mb-5">
+                                        <div className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/30 flex items-center justify-center">
+                                            <Lock size={18} className="text-red-500" />
+                                        </div>
+                                        <div>
+                                            <h2 className="font-black text-slate-900 dark:text-white text-base">Security &amp; Access</h2>
+                                            <p className="text-xs text-slate-500">Account security options for your government profile</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                                            <div>
+                                                <div className="font-bold text-sm text-slate-900 dark:text-white">Signed-in as</div>
+                                                <div className="text-xs text-slate-500 font-mono mt-0.5">{currentUser?.email || '—'}</div>
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-full">
+                                                {currentUser?.role?.replace(/_/g, ' ') || 'Staff'}
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={() => { localStorage.clear(); navigate('/gov'); }}
+                                            className="w-full flex items-center gap-3 p-4 rounded-xl border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-bold"
+                                        >
+                                            <Lock size={15} />
+                                            Sign out of PULSO (all sessions)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Static placeholder for other non-API pages (should be none after this update) */}
+                        {isStatic && !isSettings && (
                             <div className={`rounded-2xl border p-10 text-center ${colors.bg} ${colors.border}`}>
                                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${colors.icon}`}>
                                     <Icon size={32} />
@@ -407,7 +691,7 @@ const GovDivisionPage = () => {
                                 <h2 className={`text-2xl font-black mb-2 ${colors.text}`}>{config.title}</h2>
                                 <p className="text-slate-500 max-w-md mx-auto text-sm leading-relaxed">{config.subtitle}</p>
                                 <p className="mt-4 text-xs text-slate-400 bg-white/60 dark:bg-slate-900/60 inline-block px-3 py-1 rounded-full">
-                                    This module is under active development. Backend APIs are ready — frontend integration coming soon.
+                                    This module is under active development.
                                 </p>
                             </div>
                         )}
@@ -416,33 +700,96 @@ const GovDivisionPage = () => {
                         {config.apiPath && (
                             <>
                                 {/* Filters */}
+
                                 <div className="flex items-center gap-3 flex-wrap">
+
+                                    {/* Search */}
+
                                     <div className="relative flex-1 min-w-48">
+
                                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+
                                         <input
+
                                             type="text"
-                                            placeholder={`Search ${config.title.toLowerCase()}...`}
+
+                                            placeholder={isUsers ? 'Search by name, email, role, barangay…' : `Search ${config.title.toLowerCase()}...`}
+
                                             value={search}
+
                                             onChange={e => setSearch(e.target.value)}
-                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-orange-500 transition-colors"
+
                                         />
+
                                     </div>
-                                    {config.statuses.length > 0 && (
-                                        <select
-                                            value={statusFilter}
-                                            onChange={e => setStatusFilter(e.target.value)}
-                                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                                        >
-                                            <option value="">All Statuses</option>
-                                            {config.statuses.map(s => (
-                                                <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-                                            ))}
-                                        </select>
-                                    )}
-                                    <div className="text-xs text-slate-400 font-bold whitespace-nowrap">
-                                        {loading ? 'Loading...' : `${filtered.length} record${filtered.length !== 1 ? 's' : ''}`}
+
+
+
+                                     {/* Status filter — for non-user pages */}
+                                     {config.statuses.length > 0 && !isUsers && (
+                                         <OrangeSelect
+                                             value={statusFilter}
+                                             onChange={v => setStatusFilter(v)}
+                                             placeholder="All Statuses"
+                                             minWidth="180px"
+                                             options={[
+                                                 { value: '', label: 'All Statuses' },
+                                                 ...config.statuses.map(s => ({ value: s, label: s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }))
+                                             ]}
+                                         />
+                                     )}
+
+                                     {/* Users-specific filters */}
+                                     {isUsers && (
+                                         <>
+                                             <OrangeSelect
+                                                 value={roleFilter}
+                                                 onChange={v => setRoleFilter(v)}
+                                                 placeholder="All Roles"
+                                                 minWidth="190px"
+                                                 options={[
+                                                     { value: '', label: 'All Roles' },
+                                                     ...GOV_ROLE_OPTIONS.map(r => ({ value: r, label: toTitleCase(r) }))
+                                                 ]}
+                                             />
+
+                                             <OrangeSelect
+                                                 value={trustFilter}
+                                                 onChange={v => setTrustFilter(v)}
+                                                 placeholder="All Trust Scores"
+                                                 minWidth="175px"
+                                                 options={[
+                                                     { value: '', label: 'All Trust Scores' },
+                                                     { value: '100', label: 'Perfect (100)' },
+                                                     { value: '90',  label: 'High (90–99)' },
+                                                     { value: '70',  label: 'Medium (70–89)' },
+                                                     { value: 'low', label: 'Low (<70)' },
+                                                 ]}
+                                             />
+
+                                             {activeFilterCount > 0 && (
+                                                 <button
+                                                     onClick={() => { setRoleFilter(''); setTrustFilter(''); setSearch(''); }}
+                                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-xs font-bold border border-orange-200 dark:border-orange-800 hover:bg-orange-100 transition-colors whitespace-nowrap"
+                                                 >
+                                                     <Filter size={11} />
+                                                     {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active · clear
+                                                 </button>
+                                             )}
+                                         </>
+                                     )}
+
+                                    <div className="text-xs text-slate-400 font-bold whitespace-nowrap ml-auto">
+
+                                        {loading ? 'Loading…' : `${filtered.length} record${filtered.length !== 1 ? 's' : ''}`}
+
                                     </div>
+
                                 </div>
+
+
 
                                 {/* Table */}
                                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
@@ -483,6 +830,16 @@ const GovDivisionPage = () => {
                                                                 <th className="p-4">Finalized By</th>
                                                                 <th className="p-4 text-right">Action</th>
                                                             </>
+                                                        ) : isUsers ? (
+                                                            <>
+                                                                <th className="p-4">ID</th>
+                                                                <th className="p-4">Full Name</th>
+                                                                <th className="p-4">Role</th>
+                                                                <th className="p-4">Barangay</th>
+                                                                <th className="p-4">Trust Score</th>
+                                                                <th className="p-4">Joined</th>
+                                                                <th className="p-4 text-right">Actions</th>
+                                                            </>
                                                         ) : (
                                                             <>
                                                                 <th className="p-4">Tracking No.</th>
@@ -498,6 +855,96 @@ const GovDivisionPage = () => {
                                                     {filtered.map(item =>
                                                         isAuditLog ? <AuditRow key={item.id || item.record_id} entry={item} /> :
                                                         isRecords ? <RecordRow key={item.record_id} entry={item} /> :
+                                                        isUsers ? (
+                                                            <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors text-sm group">
+                                                                <td className="p-4 font-mono text-slate-400 text-xs">{item.id}</td>
+                                                                <td className="p-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        {/* Avatar with orange gradient */}
+                                                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center font-black text-white text-sm shrink-0 shadow-sm">
+                                                                            {(item.full_name || '?').charAt(0).toUpperCase()}
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="font-bold text-slate-900 dark:text-white">{item.full_name}</div>
+                                                                            <div className="text-xs text-slate-400">{item.email}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    {editingUser?.id === item.id ? (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <select
+                                                                                defaultValue={item.role}
+                                                                                onChange={e => setEditingUser(prev => ({ ...prev, role: e.target.value }))}
+                                                                                className="bg-white dark:bg-slate-800 border border-orange-400 rounded-lg px-2 py-1 text-xs font-bold focus:outline-none"
+                                                                            >
+                                                                                {GOV_ROLE_OPTIONS.map(r => (
+                                                                                    <option key={r} value={r}>{toTitleCase(r)}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                            <button
+                                                                                onClick={() => handleRoleChange(item.id, editingUser.role || item.role)}
+                                                                                disabled={savingRole}
+                                                                                className="px-2 py-1 rounded-lg bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 transition-colors disabled:opacity-50"
+                                                                            >
+                                                                                {savingRole ? '…' : 'Save'}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => setEditingUser(null)}
+                                                                                className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 transition-colors"
+                                                                            >
+                                                                                Cancel
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400">
+                                                                            {toTitleCase(item.role || '')}
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-4 text-xs text-slate-500">{item.barangay || '—'}</td>
+                                                                <td className="p-4">
+                                                                    {/* Trust score redesigned */}
+                                                                    <div className="flex flex-col gap-1 min-w-[80px]">
+                                                                        <div className="flex items-center justify-between mb-0.5">
+                                                                            <span className={`text-xs font-black ${
+                                                                                (item.trust_score ?? 100) >= 90 ? 'text-green-600 dark:text-green-400' :
+                                                                                (item.trust_score ?? 100) >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500'
+                                                                            }`}>{item.trust_score ?? 100}</span>
+                                                                            <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
+                                                                                (item.trust_score ?? 100) >= 90 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                                                                                (item.trust_score ?? 100) >= 70 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
+                                                                                'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                                                            }`}>
+                                                                                {(item.trust_score ?? 100) >= 90 ? 'High' : (item.trust_score ?? 100) >= 70 ? 'Med' : 'Low'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                                                            <div
+                                                                                className={`h-full rounded-full transition-all ${
+                                                                                    (item.trust_score ?? 100) >= 90 ? 'bg-green-500' :
+                                                                                    (item.trust_score ?? 100) >= 70 ? 'bg-yellow-400' : 'bg-red-400'
+                                                                                }`}
+                                                                                style={{ width: `${item.trust_score ?? 100}%` }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-4 text-xs text-slate-500">
+                                                                    {item.created_at ? new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric'}) : '—'}
+                                                                </td>
+                                                                <td className="p-4 text-right">
+                                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <button
+                                                                            onClick={() => setEditingUser({ id: item.id, role: item.role })}
+                                                                            className="px-3 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-xs font-bold hover:bg-orange-100 transition-colors border border-orange-200 dark:border-orange-800"
+                                                                        >
+                                                                            Edit Role
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ) :
                                                         <ItemRow key={item.id} item={item} path={location.pathname} />
                                                     )}
                                                 </tbody>
