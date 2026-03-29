@@ -57,7 +57,9 @@ import {
     Menu,
     X as XIcon,
     Radio,
-    Loader2
+    Loader2,
+    Maximize2,
+    Minimize2
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Branding from '../components/Branding';
@@ -1296,7 +1298,45 @@ export default function ResidentDashboard() {
         }
     };
 
-    // Client-side effect for offline tracking
+    // ── Resident AI Assistant State ───────────────────────────────────────────
+    const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+    const [isAIMaximized, setIsAIMaximized] = useState(false);
+    const [isAILoading, setIsAILoading] = useState(false);
+    const [aiQuery, setAiQuery] = useState('');
+    const [aiMessages, setAiMessages] = useState([
+        { role: 'assistant', text: `Hi ${currentUser?.full_name?.split(' ')[0] || 'there'}! I am PULSO Assistant, your 24/7 community helper. Ask me about filing reports, nearby hazards, city services, or anything about Caloocan City!` }
+    ]);
+    const aiChatEndRef = React.useRef(null);
+
+    const handleResidentAIChat = async (e) => {
+        e.preventDefault();
+        if (!aiQuery.trim() || isAILoading) return;
+
+        const userMsg = { role: 'user', text: aiQuery };
+        setAiMessages(prev => [...prev, userMsg]);
+        const captured = aiQuery;
+        setAiQuery('');
+        setIsAILoading(true);
+
+        try {
+            const resp = await fetch('http://localhost:8000/api/ai/assistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    query: captured,
+                    context: `Resident Portal. User: ${user.name}, Barangay: ${user.barangay}. Active tab: ${activeTab}. The user is a citizen, NOT a staff member. Help them navigate PULSO, understand how to report issues, check their report status, learn about city services, evacuation routes, and local government procedures in Caloocan City North.`
+                })
+            });
+            const data = await resp.json();
+            setAiMessages(prev => [...prev, { role: 'assistant', text: data.response }]);
+        } catch {
+            setAiMessages(prev => [...prev, { role: 'assistant', text: 'Sorry, I am temporarily unavailable. Please try again shortly.' }]);
+        } finally {
+            setIsAILoading(false);
+            setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        }
+    };
+
     useEffect(() => {
         const handleOffline = () => setIsOffline(true);
         const handleOnline = () => setIsOffline(false);
@@ -1529,6 +1569,158 @@ export default function ResidentDashboard() {
                     )}
                 </div>
             </main>
+
+            {/* ── PULSO Resident AI Assistant FAB ────────────────────────────── */}
+            <div className="fixed bottom-24 right-6 z-[100] flex flex-col items-end gap-4">
+                <AnimatePresence>
+                    {isAIChatOpen && (
+                        <>
+                            {/* Backdrop for maximized mode */}
+                            {isAIMaximized && (
+                                <motion.div
+                                    key="resident-ai-backdrop"
+                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99]"
+                                    onClick={() => setIsAIMaximized(false)}
+                                />
+                            )}
+
+                            <motion.div
+                                key="resident-ai-chat"
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                                className={`bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col transition-all duration-300 ${
+                                    isAIMaximized
+                                        ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[100] rounded-3xl'
+                                        : 'w-[360px] h-[500px] rounded-2xl relative z-[100]'
+                                }`}
+                            >
+                                {/* Header */}
+                                <div className="p-4 bg-gradient-to-r from-blue-900 to-blue-800 flex justify-between items-center shrink-0">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                                            <Brain size={18} className="text-white" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-white text-sm">PULSO Assistant</h4>
+                                            <p className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">Community Helper · 24/7</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => setIsAIMaximized(prev => !prev)}
+                                            title={isAIMaximized ? 'Minimize' : 'Maximize'}
+                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors"
+                                        >
+                                            {isAIMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
+                                            title="Close"
+                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors"
+                                        >
+                                            <X size={15} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Suggested quick-actions (shown only when 1 message = greeting) */}
+                                {aiMessages.length === 1 && (
+                                    <div className="px-3 py-2 bg-orange-50 dark:bg-slate-800 border-b border-orange-100 dark:border-slate-700 flex gap-2 flex-wrap shrink-0">
+                                        {['How to file a report?', 'My report status', 'City hotlines', 'Evacuation routes'].map(q => (
+                                            <button
+                                                key={q}
+                                                onClick={() => { setAiQuery(q); }}
+                                                className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-white dark:bg-slate-700 border border-blue-200 dark:border-slate-600 px-2.5 py-1 rounded-full hover:bg-blue-800 hover:text-white hover:border-blue-800 transition-colors"
+                                            >
+                                                {q}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Messages */}
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+                                    {aiMessages.map((msg, i) => (
+                                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            {msg.role === 'assistant' && (
+                                                <div className="w-6 h-6 rounded-full bg-blue-800 flex items-center justify-center mr-2 mt-0.5 shrink-0">
+                                                    <Brain size={12} className="text-white" />
+                                                </div>
+                                            )}
+                                            <div className={`${
+                                                isAIMaximized ? 'max-w-[65%]' : 'max-w-[82%]'
+                                            } p-3 rounded-2xl text-[13px] font-medium leading-relaxed ${
+                                                msg.role === 'user'
+                                                    ? 'bg-blue-700 text-white rounded-br-md'
+                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-md'
+                                            }`}>
+                                                {msg.text}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isAILoading && (
+                                        <div className="flex justify-start">
+                                            <div className="w-6 h-6 rounded-full bg-blue-800 flex items-center justify-center mr-2 mt-0.5 shrink-0">
+                                                <Brain size={12} className="text-white" />
+                                            </div>
+                                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-md flex gap-1">
+                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={aiChatEndRef} />
+                                </div>
+
+                                {/* Input */}
+                                <form onSubmit={handleResidentAIChat} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shrink-0">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={aiQuery}
+                                            onChange={e => setAiQuery(e.target.value)}
+                                            placeholder="Ask PULSO Assistant..."
+                                            className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 py-2.5 text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-700 outline-none placeholder:text-slate-400"
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={isAILoading}
+                                            className="w-10 h-10 rounded-xl bg-blue-800 hover:bg-blue-700 flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0"
+                                        >
+                                            <Search size={16} />
+                                        </button>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        </>
+                    )}
+                </AnimatePresence>
+
+                {/* Pulsing FAB button */}
+                <motion.button
+                    onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="relative w-14 h-14 rounded-full bg-blue-900 shadow-xl shadow-blue-900/50 flex items-center justify-center text-white"
+                    title="PULSO Assistant"
+                >
+                    <AnimatePresence>
+                        {!isAIChatOpen && (
+                            <motion.span
+                                key="pulse"
+                                className="absolute inset-0 rounded-full bg-blue-700 opacity-60"
+                                animate={{ scale: [1, 1.5], opacity: [0.7, 0] }}
+                                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
+                            />
+                        )}
+                    </AnimatePresence>
+                    {isAIChatOpen ? <X size={22} /> : <Brain size={24} />}
+                </motion.button>
+            </div>
         </div>
     );
 }

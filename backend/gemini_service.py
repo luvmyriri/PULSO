@@ -17,7 +17,7 @@ load_dotenv()
 
 GEMINI_API_KEY     = os.getenv("GOOGLE_GEMINI_API_KEY")
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google-credentials.json")
-GEMINI_MODEL       = "gemini-2.5-flash"
+GEMINI_MODEL       = "models/gemini-2.5-flash"
 
 # ── SDK Init ──────────────────────────────────────────────────────────────────
 
@@ -84,7 +84,27 @@ def _generate_multimodal(prompt: str, image_bytes: bytes, mime: str = "image/jpe
         return None
 
 
-# ── Public AI Functions ───────────────────────────────────────────────────────
+# ── Response Cleaner ─────────────────────────────────────────────────────────
+
+def _clean_response(text: str) -> str:
+    """
+    Strip markdown formatting symbols from AI responses so they display
+    cleanly in the PULSO chat UI without raw asterisks or hashes.
+    """
+    import re
+    # Remove bold (**text** or __text__)
+    text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', text)
+    text = re.sub(r'_{1,2}(.*?)_{1,2}', r'\1', text)
+    # Remove heading markers
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+    # Replace bullet points (* item or - item) with a clean dash
+    text = re.sub(r'^[\*\-]\s+', '• ', text, flags=re.MULTILINE)
+    # Remove leftover lone asterisks
+    text = text.replace('**', '').replace('*', '')
+    # Collapse 3+ blank lines into 2
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
 
 def analyze_report(description: str, image_data: Optional[bytes] = None) -> Dict:
     """
@@ -253,16 +273,17 @@ Communication Style:
 - Technical and precise for engineers/dispatchers
 - Friendly and bilingual (English/Tagalog) for citizens
 - Always helpful, clear, and professional
+- IMPORTANT: Do NOT use markdown formatting. No asterisks, no bold (**), no bullet symbols (*), no headers (#). Use plain text only. For lists, use numbered items (1. 2. 3.) or write in full sentences.
 
 System Context: {context or "General system inquiry"}
 User Query: {query}
 
-Provide a helpful, accurate response:"""
+Provide a helpful, accurate, plain-text response:"""
 
     try:
         raw = _generate(prompt, json_mode=False)
         if raw:
-            return {"response": raw}
+            return {"response": _clean_response(raw)}
     except Exception as e:
         print(f"[AI] Assistant error: {e}")
 
