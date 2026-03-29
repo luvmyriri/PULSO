@@ -127,7 +127,6 @@ const DispatcherDashboard = () => {
     const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
     const [selectedCategory, setSelectedCategory] = useState('All Categories');
     const [showHeatmap, setShowHeatmap] = useState(false);
-    const miniMapRef = useRef(null);
 
     // AI Omni-Assistant State
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -199,40 +198,47 @@ const DispatcherDashboard = () => {
         }
     };
 
-    // Sync Street View with State
+    // Sync Street View with State — single consolidated effect
     useEffect(() => {
-        if (!panorama || !miniMapRef.current) return;
-
-        // Secure widget into Street View controls (Bottom Left)
-        const controlPosition = window.google.maps.ControlPosition.LEFT_BOTTOM;
-        const controlDiv = miniMapRef.current;
-        
-        panorama.controls[controlPosition].clear();
-        panorama.controls[controlPosition].push(controlDiv);
+        if (!panorama || !window.google?.maps) return;
 
         const posListener = panorama.addListener('position_changed', () => {
-            const pos = panorama.getPosition().toJSON();
-            setSvLocation(pos);
+            const pos = panorama.getPosition();
+            if (!pos) return;
+            const loc = { lat: pos.lat(), lng: pos.lng() };
+            // Validate position inside North Caloocan jurisdication on every navigation change
+            if (!checkJurisdiction(loc)) {
+                panorama.setVisible(false);
+                return;
+            }
+            setSvLocation(loc);
         });
 
         const povListener = panorama.addListener('pov_changed', () => {
-             const pov = panorama.getPov();
-             setSvHeading(pov.heading);
+            const pov = panorama.getPov();
+            setSvHeading(pov.heading);
         });
 
         const visListener = panorama.addListener('visible_changed', () => {
-            setIsStreetActive(panorama.getVisible());
+            const nowVisible = panorama.getVisible();
+            setIsStreetActive(nowVisible);
+            setIsStreetViewVisible(nowVisible);
+            // When closing street view, pan the main map back to the last SV position
+            if (!nowVisible && panorama.getPosition() && map) {
+                const pos = panorama.getPosition();
+                map.panTo({ lat: pos.lat(), lng: pos.lng() });
+            }
         });
 
         return () => {
-            window.google.maps.event.removeListener(posListener);
-            window.google.maps.event.removeListener(povListener);
-            window.google.maps.event.removeListener(visListener);
-            if (panorama && panorama.controls) {
-                panorama.controls[window.google.maps.ControlPosition.LEFT_BOTTOM].clear();
+            if (window.google?.maps) {
+                window.google.maps.event.removeListener(posListener);
+                window.google.maps.event.removeListener(povListener);
+                window.google.maps.event.removeListener(visListener);
             }
         };
-    }, [panorama]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [panorama, map]);
     
     // Routing state
     const [directionsResponse, setDirectionsResponse] = useState(null);
@@ -333,39 +339,7 @@ const DispatcherDashboard = () => {
         return () => clearInterval(interval);
     }, []);
 
-    useEffect(() => {
-        if (panorama) {
-            const posListener = panorama.addListener('position_changed', () => {
-                const pos = panorama.getPosition();
-                if (pos) {
-                    const loc = { lat: pos.lat(), lng: pos.lng() };
-                    
-                    // Validate position on every change (drag or nav)
-                    if (!checkJurisdiction(loc)) {
-                        panorama.setVisible(false);
-                        return;
-                    }
-                    
-                    setSvLocation(loc);
-                }
-            });
-            const visListener = panorama.addListener('visible_changed', () => {
-                const nowVisible = panorama.getVisible();
-                setIsStreetViewVisible(nowVisible);
-                
-                if (!nowVisible && panorama.getPosition() && map) {
-                    const pos = panorama.getPosition();
-                    map.panTo({ lat: pos.lat(), lng: pos.lng() });
-                }
-            });
-            return () => {
-                if (window.google && window.google.maps) {
-                    window.google.maps.event.removeListener(posListener);
-                    window.google.maps.event.removeListener(visListener);
-                }
-            };
-        }
-    }, [panorama]);
+    // (Duplicate panorama effect removed — consolidated into the one above)
 
     const checkJurisdiction = (location) => {
         if (!window.google || !window.google.maps || !window.google.maps.geometry) return true;
@@ -412,10 +386,8 @@ const DispatcherDashboard = () => {
         ],
         disableDefaultUI: true,
         zoomControl: true,
-        streetViewControl: true,
-        streetViewControlOptions: {
-            position: window.google?.maps?.ControlPosition?.RIGHT_BOTTOM
-        }
+        // streetViewControl is intentionally disabled — we use our own custom toggle button
+        streetViewControl: false,
     }), []);
 
     const { isLoaded } = useJsApiLoader({
@@ -597,8 +569,8 @@ const DispatcherDashboard = () => {
 
     // Weighted Urban Glow Heatmap Logic (Reactive to Barangay Density)
     const heatmapData = React.useMemo(() => {
-        // Return empty array EARLY if toggle is off OR there are no reports to show
-        if (!showHeatmap || filteredReports.length === 0) {
+        // Return empty array EARLY if toggle is off, no data, or Maps API not ready
+        if (!showHeatmap || filteredReports.length === 0 || !window.google?.maps) {
             return [];
         }
         
@@ -610,23 +582,25 @@ const DispatcherDashboard = () => {
         }, {});
 
         // Build weighted heatmap points
-        return filteredReports.map(report => {
-            const groupKey = `${report.barangay || 'unknown'}-${report.ai_category || report.category || 'misc'}`;
-            const groupDensity = densityMap[groupKey] || 1;
-            
-            // Urgency Base (1-10 scale)
-            const urgencyWeight = report.ai_urgency?.toLowerCase() === 'critical' ? 10 : 
-                                  report.ai_urgency?.toLowerCase() === 'high' ? 6 : 
-                                  report.ai_urgency?.toLowerCase() === 'medium' ? 3 : 1;
-            
-            // Final intensity is a product of Urgency + Group Density (Pressure)
-            const finalWeight = urgencyWeight * (1 + (groupDensity / 5));
+        return filteredReports
+            .filter(r => r.location_lat && r.location_lng)
+            .map(report => {
+                const groupKey = `${report.barangay || 'unknown'}-${report.ai_category || report.category || 'misc'}`;
+                const groupDensity = densityMap[groupKey] || 1;
+                
+                // Urgency Base (1-10 scale)
+                const urgencyWeight = report.ai_urgency?.toLowerCase() === 'critical' ? 10 : 
+                                      report.ai_urgency?.toLowerCase() === 'high' ? 6 : 
+                                      report.ai_urgency?.toLowerCase() === 'medium' ? 3 : 1;
+                
+                // Final intensity is a product of Urgency + Group Density (Pressure)
+                const finalWeight = urgencyWeight * (1 + (groupDensity / 5));
 
-            return {
-                location: new window.google.maps.LatLng(report.location_lat, report.location_lng),
-                weight: finalWeight
-            };
-        });
+                return {
+                    location: new window.google.maps.LatLng(report.location_lat, report.location_lng),
+                    weight: finalWeight
+                };
+            });
     }, [filteredReports, showHeatmap, selectedBarangay, selectedCategory]);
 
     // Memoize heatmap options to prevent unnecessary layer updates
@@ -1007,10 +981,10 @@ const DispatcherDashboard = () => {
                                     <MarkerF
                                         key={report.id}
                                         position={{ lat: report.location_lat, lng: report.location_lng }}
-                                        panorama={panorama}
                                         onClick={() => {
                                             setSelectedReport(report);
                                             setSelectedMarker(report);
+                                            if (map) map.panTo({ lat: report.location_lat, lng: report.location_lng });
                                         }}
                                         onDblClick={() => {
                                             handleStreetViewClick({ lat: report.location_lat, lng: report.location_lng });
@@ -1221,74 +1195,14 @@ const DispatcherDashboard = () => {
                                 </>
                             )}
                             
-                            {/* Mini-Map Navigation Widget (Active in Street View) */}
-                            <div 
-                                ref={miniMapRef}
-                                style={{ 
-                                    display: isStreetActive && svLocation ? 'block' : 'none',
-                                    paddingLeft: '12px',
-                                    paddingBottom: '24px',
-                                    zIndex: 1000
-                                }}
-                            >
-                                <div style={{ 
-                                    width: '200px', 
-                                    height: '150px', 
-                                    borderRadius: '16px', 
-                                    border: '4px solid white', 
-                                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)', 
-                                    overflow: 'hidden', 
-                                    pointerEvents: 'auto' 
-                                }}>
-                                    <GoogleMap
-                                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                                        center={svLocation}
-                                        zoom={17}
-                                        options={{
-                                            disableDefaultUI: true,
-                                            gestureHandling: 'none',
-                                            styles: [
-                                                { elementType: 'labels', stylers: [{ visibility: 'on' }] },
-                                                { featureType: 'poi', stylers: [{ visibility: 'off' }] }
-                                            ]
-                                        }}
-                                    >
-                                        {/* "You are here" Pulse / Heading Indicator */}
-                                        <MarkerF
-                                            position={svLocation}
-                                            icon={window.google && window.google.maps ? {
-                                                path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                                                scale: 5,
-                                                fillColor: '#3b82f6',
-                                                fillOpacity: 1,
-                                                strokeWeight: 2,
-                                                strokeColor: 'white',
-                                                rotation: svHeading
-                                            } : undefined}
-                                        />
-                                        {/* Reference Path for orientation */}
-                                        {directionsResponse && directionsResponse.routes && (
-                                            <PolylineF
-                                                path={directionsResponse.routes[0].overview_path}
-                                                options={{
-                                                    strokeColor: '#f97316',
-                                                    strokeOpacity: 0.8,
-                                                    strokeWeight: 3,
-                                                    clickable: false
-                                                }}
-                                            />
-                                        )}
-                                    </GoogleMap>
-                                </div>
-                            </div>
 
-                            {/* Street View Camera Position Marker (on Map & Street View) - Pulsing Signal Waves */}
+
+                            {/* Street View Camera Position Marker — no `panorama` prop, shown on the regular map */}
                             {svLocation && (
                                 <>
-                                    {/* Stable Core Marker */}
+                                    {/* Stable Core Dot */}
                                     <MarkerF
                                         position={svLocation}
-                                        panorama={panorama}
                                         zIndex={160}
                                         icon={window.google && window.google.maps ? {
                                             path: window.google.maps.SymbolPath.CIRCLE,
@@ -1300,11 +1214,9 @@ const DispatcherDashboard = () => {
                                         } : undefined}
                                         title={isStreetViewVisible ? "Live Street View Camera" : "Last Viewed Location"}
                                     />
-                                    
-                                    {/* Animated Signal Waves using Markers (Persistent on Map) */}
+                                    {/* Outer pulse ring 1 */}
                                     <MarkerF
                                         position={svLocation}
-                                        panorama={panorama}
                                         zIndex={155}
                                         icon={window.google && window.google.maps ? {
                                             path: window.google.maps.SymbolPath.CIRCLE,
@@ -1317,9 +1229,9 @@ const DispatcherDashboard = () => {
                                         } : undefined}
                                         options={{ clickable: false }}
                                     />
+                                    {/* Outer pulse ring 2 (offset phase) */}
                                     <MarkerF
                                         position={svLocation}
-                                        panorama={panorama}
                                         zIndex={154}
                                         icon={window.google && window.google.maps ? {
                                             path: window.google.maps.SymbolPath.CIRCLE,
@@ -1336,8 +1248,66 @@ const DispatcherDashboard = () => {
                             )}
                         </GoogleMap>
 
-                    {/* Map UI Floating Controls - Stacked Above the MiniMap */}
-                    <div className="absolute bottom-[205px] left-[30px] flex flex-col gap-2 pointer-events-none mb-1">
+                    {/* Mini-Map Navigation Widget (Absolute overlay, visible only in Street View) */}
+                    {isStreetActive && svLocation && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                bottom: '24px',
+                                right: '16px',
+                                zIndex: 20,
+                                borderRadius: '16px',
+                                border: '3px solid white',
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                                overflow: 'hidden',
+                                width: '200px',
+                                height: '150px',
+                                pointerEvents: 'auto'
+                            }}
+                        >
+                            <GoogleMap
+                                mapContainerStyle={{ width: '100%', height: '100%' }}
+                                center={svLocation}
+                                zoom={17}
+                                options={{
+                                    disableDefaultUI: true,
+                                    gestureHandling: 'none',
+                                    styles: [
+                                        { elementType: 'labels', stylers: [{ visibility: 'on' }] },
+                                        { featureType: 'poi', stylers: [{ visibility: 'off' }] }
+                                    ]
+                                }}
+                            >
+                                <MarkerF
+                                    position={svLocation}
+                                    icon={window.google && window.google.maps ? {
+                                        path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                                        scale: 5,
+                                        fillColor: '#3b82f6',
+                                        fillOpacity: 1,
+                                        strokeWeight: 2,
+                                        strokeColor: 'white',
+                                        rotation: svHeading
+                                    } : undefined}
+                                />
+                                {directionsResponse && directionsResponse.routes && (
+                                    <PolylineF
+                                        path={directionsResponse.routes[0].overview_path}
+                                        options={{
+                                            strokeColor: '#f97316',
+                                            strokeOpacity: 0.8,
+                                            strokeWeight: 3,
+                                            clickable: false
+                                        }}
+                                    />
+                                )}
+                            </GoogleMap>
+                        </div>
+                    )}
+
+                    {/* Map UI Floating Controls */}
+                    <div className="absolute bottom-6 left-4 flex flex-col gap-2 pointer-events-none">
+                        {/* Legend */}
                         <div className="bg-slate-900/90 backdrop-blur border border-slate-800 rounded-xl p-3 flex flex-col gap-3 shadow-xl pointer-events-auto">
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Live Map Feed</h4>
                             <div className="flex items-center gap-3">
@@ -1354,29 +1324,52 @@ const DispatcherDashboard = () => {
                         </div>
 
                         {/* Center on HQ Button */}
-                        <button 
+                        <button
                             onClick={centerOnHQ}
                             className="bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 p-3 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center pointer-events-auto transition-colors group"
                             title="Center on Dispatch HQ"
-                            style={{ position: 'relative', zIndex: 10 }}
                         >
                             <ShieldAlert size={20} className="group-hover:text-blue-500" />
                         </button>
 
-                        {/* Custom Street View Toggle */}
-                        <button 
+                        {/* Street View Toggle */}
+                        <button
                             onClick={() => {
                                 if (panorama) {
-                                    panorama.setVisible(!panorama.getVisible());
+                                    if (panorama.getVisible()) {
+                                        panorama.setVisible(false);
+                                    } else if (svLocation) {
+                                        panorama.setPosition(svLocation);
+                                        panorama.setVisible(true);
+                                    } else if (selectedMarker) {
+                                        handleStreetViewClick({ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng });
+                                    } else {
+                                        panorama.setPosition(CALOOCAN_CENTER);
+                                        panorama.setVisible(true);
+                                    }
                                 }
                             }}
-                            className="bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 p-3 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center pointer-events-auto transition-colors group"
-                            title="Toggle Street View"
-                            style={{ position: 'relative', zIndex: 10 }}
+                            className={`shadow-xl border p-3 rounded-full flex items-center justify-center pointer-events-auto transition-colors group ${
+                                isStreetActive
+                                    ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                            title={isStreetActive ? 'Exit Street View' : 'Open Street View'}
                         >
-                            <Navigation size={20} className="group-hover:text-blue-500" />
+                            <Navigation size={20} className={isStreetActive ? '' : 'group-hover:text-blue-500'} />
                         </button>
-                        </div>
+
+                        {/* Clear Route Button (shown only when a route is active) */}
+                        {directionsResponse && (
+                            <button
+                                onClick={() => { setDirectionsResponse(null); setDistance(''); setDuration(''); }}
+                                className="bg-white dark:bg-slate-900 shadow-xl border border-orange-400 p-3 rounded-full text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 flex items-center justify-center pointer-events-auto transition-colors"
+                                title="Clear Route"
+                            >
+                                <X size={20} />
+                            </button>
+                        )}
+                    </div>
                         </>
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-950">
@@ -1756,17 +1749,22 @@ const DispatcherDashboard = () => {
                                     </button>
                                     <button 
                                         onClick={() => {
-                                            if (map) {
+                                            if (panorama && pendingStreetViewLoc) {
+                                                panorama.setPosition(pendingStreetViewLoc);
+                                                panorama.setVisible(true);
+                                                setSvLocation(pendingStreetViewLoc);
+                                            } else if (map && pendingStreetViewLoc) {
                                                 const sv = map.getStreetView();
                                                 sv.setPosition(pendingStreetViewLoc);
                                                 sv.setVisible(true);
+                                                setPanorama(sv);
                                             }
                                             setIsStreetViewConfirmOpen(false);
                                             setPendingStreetViewLoc(null);
                                         }}
                                         className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg transition-colors flex items-center justify-center gap-2"
                                     >
-                                        Confirm
+                                        <Eye size={14} /> Confirm
                                     </button>
                                 </div>
                             </motion.div>

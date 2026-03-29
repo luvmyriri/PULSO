@@ -10,6 +10,7 @@ import ResidentDashboard from './pages/ResidentDashboard';
 import DispatcherDashboard from './pages/DispatcherDashboard';
 import ManagementDashboard from './pages/ManagementDashboard';
 import GovDivisionPage   from './pages/GovDivisionPage';
+import GovAnalyticsPage  from './pages/GovAnalyticsPage';
 import PositionDashboard from './pages/PositionDashboard';
 import ResetPassword     from './pages/ResetPassword';
 import LanguageSwitcher  from './components/LanguageSwitcher';
@@ -163,6 +164,11 @@ function App() {
                         {/* System Settings — admin + exec only */}
                         <Route path="/gov/settings" element={
                             <AdminOnly><GovDivisionPage /></AdminOnly>
+                        } />
+
+                        {/* Analytics Intelligence Engine — admin + exec only */}
+                        <Route path="/gov/analytics" element={
+                            <AdminOnly><GovAnalyticsPage /></AdminOnly>
                         } />
 
                         {/* ── 404 FALLBACK ────────────────────────────────────── */}

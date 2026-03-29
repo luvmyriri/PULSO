@@ -82,37 +82,67 @@ def seed_smart_reports():
 
     statuses = ["unverified", "pending", "approved_internal", "dispatched", "resolved"]
 
-    print(f"  [START] Generating 25 complex scenarios for Resident: {resident.email}")
+    print(f"  [START] Generating 150 clustered scenarios for Resident: {resident.email}")
 
-    for i in range(25):
-        issue = random.choice(issues)
+    # Create 3 "hotspots" to trick DBSCAN into finding dense critical zones at 200m radius
+    hotspots = [
+        {"center_lat": 14.7520, "center_lng": 121.0400, "barangay": 176, "cat": "Road Issue", "desc_prefix": "Deep cratering over a 50m stretch.", "urgency": "High", "score": 8.5},
+        {"center_lat": 14.7610, "center_lng": 121.0510, "barangay": 178, "cat": "Flooding", "desc_prefix": "Severe drainage blockage causing thigh-deep floods.", "urgency": "Critical", "score": 9.5},
+        {"center_lat": 14.7485, "center_lng": 121.0350, "barangay": 171, "cat": "Electrical", "desc_prefix": "Multiple blown transformers and downed lines.", "urgency": "Critical", "score": 9.8}
+    ]
+
+    for i in range(150):
+        # 70% of points hit a hotspot, 30% are random noise
+        is_hotspot = random.random() < 0.70
+        
+        if is_hotspot:
+            spot = random.choice(hotspots)
+            issue_cat = spot["cat"]
+            issue = next(item for item in issues if item["cat"] == issue_cat)
+            
+            # Very tight grouping: ~50-100 meters offset
+            lat = spot["center_lat"] + random.uniform(-0.0005, 0.0005)
+            lng = spot["center_lng"] + random.uniform(-0.0005, 0.0005)
+            brgy_str = f"Phase {random.randint(1,4)}, Brgy {spot['barangay']}, Caloocan North"
+            base_desc = spot["desc_prefix"] + " " + issue["desc"]
+        else:
+            issue = random.choice(issues)
+            # Wide random spread
+            lat = base_lat + random.uniform(-0.04, 0.04)
+            lng = base_lng + random.uniform(-0.04, 0.04)
+            brgy_str = f"Phase {random.randint(1,9)}, Brgy {random.randint(170,188)}, Caloocan North"
+            base_desc = issue["desc"]
+            
         status = random.choice(statuses)
-        
-        lat = base_lat + random.uniform(-0.04, 0.04)
-        lng = base_lng + random.uniform(-0.04, 0.04)
-        
+
         # Create Report
         meta = {
             "vision_confidence": round(random.uniform(0.85, 0.98), 2),
-            "structural_impact": "high",
+            "structural_impact": "high" if issue["urgency"] in ["High", "Critical"] else "moderate",
             "environment_check": "passed",
             "calification_id": f"AI-{random.randint(100,999)}"
         }
 
+        # Backdate reports logically over the last 60 days to trigger Weekly Forecast trends
+        days_back = random.randint(1, 60)
+        simulated_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days_back)
+
         report = models.Report(
             user_id=resident.id,
             category=issue["cat"],
-            description=issue["desc"],
+            description=base_desc,
             location_lat=lat,
             location_lng=lng,
-            location_string=f"Phase {random.randint(1,9)}, Brgy {random.randint(170,188)}, Caloocan North",
+            location_string=brgy_str,
             image_url=issue["url"],
             status=status,
             ai_summary=f"PULSO AI verified: {issue['urgency']} severity {issue['cat'].lower()} detected via vision analysis.",
             ai_category=issue["ai_cat"],
             ai_urgency=issue["urgency"],
             severity_score=issue["score"],
-            ai_metadata=json.dumps(meta)
+            ai_metadata=json.dumps(meta),
+            created_at=simulated_date,
+            updated_at=simulated_date + datetime.timedelta(hours=random.randint(1, 48))
         )
         
         db.add(report)
@@ -123,23 +153,25 @@ def seed_smart_reports():
             wo = gov_models.WorkOrder(
                 report_id=report.id,
                 title=f"Repair: {issue['cat']} Alert",
-                description=f"Field assignment triggered by AI Triage for ticket #{report.id}. {issue['desc']}",
+                description=f"Field assignment triggered by AI Triage for ticket #{report.id}. {base_desc}",
                 wo_type="standard" if random.random() > 0.3 else "preemptive",
                 status="in_progress" if status == "dispatched" else "completed",
                 priority=issue["urgency"].lower(),
                 assigned_by_id=admin_id,
                 assigned_to_id=field_worker_id,
-                scheduled_date=datetime.datetime.now() - datetime.timedelta(days=random.randint(0, 2))
+                scheduled_date=simulated_date + datetime.timedelta(days=1),
+                created_at=simulated_date,
+                updated_at=simulated_date + datetime.timedelta(days=3)
             )
             db.add(wo)
             
-        if (i+1) % 5 == 0:
-            print(f"  [PROGRESS] {i+1}/25 data points generated...")
+        if (i+1) % 25 == 0:
+            print(f"  [PROGRESS] {i+1}/150 data points generated...")
 
     try:
         db.commit()
         print("="*60)
-        print(f"  SUCCESS: 25 High-Fidelity AI Datasets Seeded Successfully.")
+        print(f"  SUCCESS: 150 High-Fidelity Clustered AI Datasets Seeded Successfully.")
         print("="*60 + "\n")
     except Exception as e:
         db.rollback()

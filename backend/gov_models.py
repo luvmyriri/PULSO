@@ -27,16 +27,16 @@ import uuid
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _gen_wo_id():
-    return f"WO-{str(uuid.uuid4().int)[:6]}"
+    return f"WO-{str(uuid.uuid4().int)[:8]}"
 
 def _gen_pr_id():
-    return f"PRQ-{str(uuid.uuid4().int)[:6]}"
+    return f"PRQ-{str(uuid.uuid4().int)[:8]}"
 
 def _gen_proj_id():
-    return f"PROJ-{str(uuid.uuid4().int)[:6]}"
+    return f"PROJ-{str(uuid.uuid4().int)[:8]}"
 
 def _gen_obo_id():
-    return f"OBO-{str(uuid.uuid4().int)[:6]}"
+    return f"OBO-{str(uuid.uuid4().int)[:8]}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
