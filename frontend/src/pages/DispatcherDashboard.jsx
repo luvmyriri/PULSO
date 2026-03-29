@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { 
@@ -10,6 +10,8 @@ import {
     Map as MapIcon, 
     Filter, 
     MoreHorizontal,
+    Maximize2,
+    Minimize2,
     Navigation,
     ShieldAlert,
     TrendingUp,
@@ -25,7 +27,11 @@ import {
     MapPin,
     Truck
 } from 'lucide-react';
+<<<<<<< HEAD
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
+=======
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF } from '@react-google-maps/api';
+>>>>>>> 9056a898c9b2270d413c2765c439026f6f7a0522
 import { Link, useNavigate } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 
@@ -64,6 +70,285 @@ const DispatcherDashboard = () => {
 
     // New State for Work Order Generation Modal
     const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
+<<<<<<< HEAD
+=======
+    const [isStreetViewConfirmOpen, setIsStreetViewConfirmOpen] = useState(false);
+    const [pendingStreetViewLoc, setPendingStreetViewLoc] = useState(null);
+    const [isStreetActive, setIsStreetActive] = useState(false);
+    const [svLocation, setSvLocation] = useState(null);
+    const [isStreetViewVisible, setIsStreetViewVisible] = useState(false);
+    const [pulseRadius, setPulseRadius] = useState(0);
+    const [isJurisdictionModalOpen, setIsJurisdictionModalOpen] = useState(false);
+    const [jurisdictionErrorMsg, setJurisdictionErrorMsg] = useState("");
+    const [svHeading, setSvHeading] = useState(0);
+    const miniMapRef = useRef(null);
+
+    // AI Omni-Assistant State
+    const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+    const [aiQuery, setAiQuery] = useState('');
+    const [aiMessages, setAiMessages] = useState([
+        { role: 'assistant', text: `Greetings, Dispatcher ${currentUser?.full_name || ''}. I am your Engineering Co-pilot. How can I assist with triage today?` }
+    ]);
+    const [isAILoading, setIsAILoading] = useState(false);
+    const [isAIMaximized, setIsAIMaximized] = useState(false);
+
+    const aiChatEndRef = useRef(null);
+
+    // Location-intent keyword detection
+    const LOCATION_KEYWORDS = /location|where|report|map|address|barangay|coordinates|lat|lng|pin|incident|hazard|site|area|place/i;
+
+    const handleAIChat = async (e) => {
+        e.preventDefault();
+        if (!aiQuery.trim() || isAILoading) return;
+
+        const userMsg = { role: 'user', text: aiQuery };
+        setAiMessages(prev => [...prev, userMsg]);
+        const capturedQuery = aiQuery;
+        setAiQuery('');
+        setIsAILoading(true);
+
+        try {
+            // If query is location-related, fetch live report data
+            let reportContext = '';
+            let reportsForMap = [];
+            const isLocationQuery = LOCATION_KEYWORDS.test(capturedQuery);
+
+            if (isLocationQuery) {
+                try {
+                    const rResp = await fetch('http://localhost:8000/api/reports?limit=30', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (rResp.ok) {
+                        reportsForMap = await rResp.json();
+                        reportContext = `\n\nLive Report Data (${reportsForMap.length} active reports):\n` +
+                            reportsForMap.map((r, i) =>
+                                `${i + 1}. [RPT-${r.id}] ${r.ai_category || r.category || 'Uncategorized'} — ${r.location_string || `Lat:${r.location_lat?.toFixed(4)}, Lng:${r.location_lng?.toFixed(4)}`} — Status: ${r.status}`
+                            ).join('\n');
+                    }
+                } catch { /* silently skip if reports unavailable */ }
+            }
+
+            const resp = await fetch('http://localhost:8000/api/ai/assistant', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    query: capturedQuery,
+                    context: `Dispatcher View. Mode: ${dashboardMode}. Selection: ${selectedReport?.category || 'None'}.${reportContext}`
+                })
+            });
+            const data = await resp.json();
+            setAiMessages(prev => [...prev, {
+                role: 'assistant',
+                text: data.response,
+                mapData: reportsForMap.length > 0 ? reportsForMap : undefined
+            }]);
+        } catch (err) {
+            setAiMessages(prev => [...prev, { role: 'assistant', text: 'Error connecting to PULSO Brain.' }]);
+        } finally {
+            setIsAILoading(false);
+            setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        }
+    };
+
+    // Sync Street View with State
+    useEffect(() => {
+        if (!panorama || !miniMapRef.current) return;
+
+        // Secure widget into Street View controls (Bottom Left)
+        const controlPosition = window.google.maps.ControlPosition.LEFT_BOTTOM;
+        const controlDiv = miniMapRef.current;
+        
+        panorama.controls[controlPosition].clear();
+        panorama.controls[controlPosition].push(controlDiv);
+
+        const posListener = panorama.addListener('position_changed', () => {
+            const pos = panorama.getPosition().toJSON();
+            setSvLocation(pos);
+        });
+
+        const povListener = panorama.addListener('pov_changed', () => {
+             const pov = panorama.getPov();
+             setSvHeading(pov.heading);
+        });
+
+        const visListener = panorama.addListener('visible_changed', () => {
+            setIsStreetActive(panorama.getVisible());
+        });
+
+        return () => {
+            window.google.maps.event.removeListener(posListener);
+            window.google.maps.event.removeListener(povListener);
+            window.google.maps.event.removeListener(visListener);
+            if (panorama && panorama.controls) {
+                panorama.controls[window.google.maps.ControlPosition.LEFT_BOTTOM].clear();
+            }
+        };
+    }, [panorama]);
+    
+    // Routing state
+    const [directionsResponse, setDirectionsResponse] = useState(null);
+    const [distance, setDistance] = useState('');
+    const [duration, setDuration] = useState('');
+    
+    // Reset route when selected report changes
+    useEffect(() => {
+        setDirectionsResponse(null);
+        setDistance('');
+        setDuration('');
+    }, [selectedReport]);
+
+    const [directionsLoading, setDirectionsLoading] = useState(false);
+
+    const handleGetDirections = async (targetReport = null, originOverride = null) => {
+        const target = targetReport || selectedReport || selectedMarker;
+        const originObj = originOverride || CALOOCAN_CITY_HALL_NORTH_LOC;
+        const originStr = `${originObj.lat},${originObj.lng}`;
+        const destStr = target ? `${target.location_lat},${target.location_lng}` : '';
+        
+        console.log("handleGetDirections (Proxy) triggered for:", target?.id);
+
+        if (target && destStr) {
+            setDirectionsLoading(true);
+            try {
+                // Using the secure backend proxy we created earlier
+                const response = await fetch(`http://localhost:8000/api/maps/directions?origin=${encodeURIComponent(originStr)}&destination=${encodeURIComponent(destStr)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.polyline) {
+                        console.log("Directions Proxy OK:", data.distance);
+                        
+                                // Decode the polyline points for the map
+                        if (window.google && window.google.maps && window.google.maps.geometry) {
+                            const decodedPath = window.google.maps.geometry.encoding.decodePath(data.polyline);
+                            
+                            // Find Midpoint for the label
+                            const midpointIndex = Math.floor(decodedPath.length / 2);
+                            const midpoint = { 
+                                lat: decodedPath[midpointIndex].lat(), 
+                                lng: decodedPath[midpointIndex].lng() 
+                            };
+
+                            setDirectionsResponse({
+                                routes: [{
+                                    legs: [{
+                                        distance: { text: data.distance },
+                                        duration: { text: data.duration },
+                                        steps: [],
+                                    }],
+                                    overview_path: decodedPath,
+                                    overview_polyline: data.polyline, 
+                                    bounds: data.bounds,
+                                    midpoint: midpoint
+                                }]
+                            });
+                        }
+                        
+                        setDistance(data.distance);
+                        setDuration(data.duration);
+                        
+                        if (!selectedMarker || selectedMarker.id !== target.id) {
+                            setSelectedMarker(target);
+                        }
+                    } else {
+                        throw new Error("Invalid route data received");
+                    }
+                } else {
+                    const err = await response.json();
+                    throw new Error(err.detail || "API Request Denied (Check GCP Console)");
+                }
+            } catch (err) {
+                console.error('Directions Proxy failed:', err);
+                alert(`Routing Error: ${err.message}. Please ensure 'Directions API' is enabled in your Google Cloud Console.`);
+                setDirectionsResponse(null);
+                setDistance('');
+                setDuration('');
+            } finally {
+                setDirectionsLoading(false);
+            }
+        }
+    };
+
+    const handleExternalDirections = (target) => {
+        if (!target || !target.location_lat) return;
+        const url = `https://www.google.com/maps/dir/?api=1&origin=${CALOOCAN_CITY_HALL_NORTH_LOC.lat},${CALOOCAN_CITY_HALL_NORTH_LOC.lng}&destination=${target.location_lat},${target.location_lng}&travelmode=driving`;
+        window.open(url, '_blank');
+    };
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setPulseRadius(prev => (prev + 1) % 40); // Pulse scale from 0 to 40
+        }, 40);
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        if (panorama) {
+            const posListener = panorama.addListener('position_changed', () => {
+                const pos = panorama.getPosition();
+                if (pos) {
+                    const loc = { lat: pos.lat(), lng: pos.lng() };
+                    
+                    // Validate position on every change (drag or nav)
+                    if (!checkJurisdiction(loc)) {
+                        panorama.setVisible(false);
+                        return;
+                    }
+                    
+                    setSvLocation(loc);
+                }
+            });
+            const visListener = panorama.addListener('visible_changed', () => {
+                const nowVisible = panorama.getVisible();
+                setIsStreetViewVisible(nowVisible);
+                
+                if (!nowVisible && panorama.getPosition() && map) {
+                    const pos = panorama.getPosition();
+                    map.panTo({ lat: pos.lat(), lng: pos.lng() });
+                }
+            });
+            return () => {
+                if (window.google && window.google.maps) {
+                    window.google.maps.event.removeListener(posListener);
+                    window.google.maps.event.removeListener(visListener);
+                }
+            };
+        }
+    }, [panorama]);
+
+    const checkJurisdiction = (location) => {
+        if (!window.google || !window.google.maps || !window.google.maps.geometry) return true;
+        
+        const polygon = new window.google.maps.Polygon({ paths: NORTH_CALOOCAN_BOUNDARY });
+        const latLng = new window.google.maps.LatLng(location.lat, location.lng);
+        const isIn = window.google.maps.geometry.poly.containsLocation(latLng, polygon);
+        
+        if (!isIn && !isJurisdictionModalOpen) {
+            setJurisdictionErrorMsg(t('This location is outside North Caloocan City jurisdiction. Visual verification tools and Street View are restricted to authorized areas.'));
+            setIsJurisdictionModalOpen(true);
+        }
+        return isIn;
+    };
+
+    const handleStreetViewClick = (location) => {
+        if (checkJurisdiction(location)) {
+            setPendingStreetViewLoc(location);
+            setIsStreetViewConfirmOpen(true);
+        }
+    };
+
+    useEffect(() => {
+        if (map && !panorama) {
+            const sv = map.getStreetView();
+            setPanorama(sv);
+        }
+    }, [map, panorama]);
+>>>>>>> 9056a898c9b2270d413c2765c439026f6f7a0522
     const [dispatchForm, setDispatchForm] = useState({
         assigned_to_id: 2, // Dummy ID for field engineer
         priority: 'normal',
@@ -251,11 +536,11 @@ const DispatcherDashboard = () => {
         return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
     };
 
-    // Mock Fleet Data
+    // Mock Fleet Data with GPS Coordinates
     const fleetStatus = [
-        { id: 'FL-01', name: 'Team Alpha', status: 'Available', type: 'Electrical', location: 'Zone 12' },
-        { id: 'FL-02', name: 'Team Beta', status: 'En Route', type: 'General/Roads', location: 'Main Avenue' },
-        { id: 'FL-03', name: 'Team Gamma', status: 'On Site', type: 'Plumbing/Water', location: 'Block 4' },
+        { id: 'FL-01', name: 'Team Alpha', status: 'Available', type: 'Electrical', location: 'Zone 12', lat: 14.758, lng: 121.035 },
+        { id: 'FL-02', name: 'Team Beta', status: 'En Route', type: 'General/Roads', location: 'Main Avenue', lat: 14.745, lng: 121.065 },
+        { id: 'FL-03', name: 'Team Gamma', status: 'On Site', type: 'Plumbing/Water', location: 'Block 4', lat: 14.762, lng: 121.042 },
     ];
 
     return (
@@ -351,7 +636,12 @@ const DispatcherDashboard = () => {
                                         return (
                                         <button 
                                             key={report.id}
-                                            onClick={() => setSelectedReport({...report, aiConfidence, color, icon})}
+                                            onClick={() => {
+                                                const reportWithContext = {...report, aiConfidence, color, icon};
+                                                setSelectedReport(reportWithContext);
+                                                setSelectedMarker(report);
+                                                if (map) map.panTo({ lat: report.location_lat, lng: report.location_lng });
+                                            }}
                                             className={`w-full text-left p-3 rounded-xl border transition-all ${selectedReport?.id === report.id ? `bg-${color}-50 dark:bg-${color}-900/20 border-${color}-200 dark:border-${color}-500/50` : 'bg-white dark:bg-slate-950/50 border-slate-200 dark:border-slate-800/50 hover:border-slate-300 dark:hover:border-slate-700 shadow-sm'}`}
                                         >
                                             <div className="flex justify-between items-start mb-2">
@@ -461,7 +751,12 @@ const DispatcherDashboard = () => {
                                 <InfoWindowF
                                     position={{ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng }}
                                     onCloseClick={() => setSelectedMarker(null)}
+                                    options={{ 
+                                        pixelOffset: new window.google.maps.Size(0, -35),
+                                        zIndex: 1000 
+                                    }}
                                 >
+<<<<<<< HEAD
                                     <div className="p-2 text-slate-900 min-w-[150px]">
                                         <div className="font-bold text-xs mb-1">RPT-[{selectedMarker.id}]</div>
                                         <div className="text-[10px] mb-1 capitalize">{selectedMarker.category || 'Uncategorized'}</div>
@@ -471,6 +766,305 @@ const DispatcherDashboard = () => {
                                     </div>
                                 </InfoWindowF>
                             )}
+=======
+                                    {/* All inline styles — Tailwind dark: classes are unreliable inside Google Maps DOM */}
+                                    <div 
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ background:'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)', borderRadius:'16px', padding:'16px', minWidth:'220px', border:'1px solid rgba(255,255,255,0.07)', margin:'-10px', boxShadow:'0 25px 50px rgba(0,0,0,0.7)', fontFamily:'Inter,sans-serif', display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', position:'relative' }}
+                                    >
+                                        {/* Close */}
+                                        <button onClick={() => setSelectedMarker(null)} style={{ position:'absolute', top:'10px', right:'10px', background:'rgba(255,255,255,0.07)', border:'none', borderRadius:'50%', width:'26px', height:'26px', cursor:'pointer', color:'#94a3b8', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                                        {/* Icon */}
+                                        <div style={{ width:'42px', height:'42px', borderRadius:'50%', background:'rgba(249,115,22,0.12)', border:'1px solid rgba(249,115,22,0.25)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'10px', color:'#f97316' }}><AlertTriangle size={18} /></div>
+                                        {/* Ticket ID */}
+                                        <div style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.1em', color:'#94a3b8', marginBottom:'4px', fontFamily:'monospace' }}>RPT-{selectedMarker.id}</div>
+                                        {/* Category */}
+                                        <h4 style={{ fontWeight:700, fontSize:'14px', color:'#f1f5f9', lineHeight:1.3, margin:'0 0 6px', padding:'0 16px' }}>{selectedMarker.ai_category || selectedMarker.category || 'Uncategorized'}</h4>
+                                        {/* Distance & Duration from HQ or Get Route Button */}
+                                        {!directionsResponse ? (
+                                            <button
+                                                disabled={directionsLoading}
+                                                onPointerDown={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
+                                                onClick={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
+                                                style={{ width:'100%', padding:'10px 0', background: directionsLoading ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'12px', color:'#f1f5f9', fontSize:'12px', fontWeight:600, cursor: directionsLoading ? 'wait' : 'pointer', marginBottom:'14px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'all 0.2s', position:'relative', zIndex:1001 }}
+                                                onMouseOver={(e) => { if(!directionsLoading) e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                                                onMouseOut={(e) => { if(!directionsLoading) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                                            >
+                                                {directionsLoading ? (
+                                                    <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                                                ) : (
+                                                    <><Navigation size={14} color="#f97316" /> Get Directions</>
+                                                )}
+                                            </button>
+                                        ) : (
+                                            <div style={{ display:'flex', flexDirection:'column', gap:'8px', width:'100%', marginBottom:'14px' }}>
+                                                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', borderRadius:'12px', padding:'8px 14px' }}>
+                                                    <Truck size={12} style={{ color:'#f97316' }} />
+                                                    <span style={{ fontSize:'10px', fontWeight:800, color:'#f1f5f9' }}>{distance} • {duration}</span>
+                                                </div>
+                                                <button 
+                                                    onClick={() => handleExternalDirections(selectedMarker)}
+                                                    style={{ width:'100%', background:'transparent', border:'none', color:'#94a3b8', fontSize:'9px', fontWeight:700, textTransform:'uppercase', cursor:'pointer', textDecoration:'underline' }}
+                                                >
+                                                    Open in Maps App
+                                                </button>
+                                            </div>
+                                        )}
+                                        {/* Status pill */}
+                                        <div style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.12em', color: selectedMarker.status==='resolved'?'#4ade80': selectedMarker.status==='rejected'?'#f87171':'#fb923c', background: selectedMarker.status==='resolved'?'rgba(74,222,128,0.12)': selectedMarker.status==='rejected'?'rgba(248,113,113,0.12)':'rgba(251,146,60,0.12)', padding:'3px 12px', borderRadius:'999px', marginBottom:'14px', textTransform:'uppercase' }}>{(selectedMarker.status || '').replace(/_/g,' ')}</div>
+                                        {/* Street View button */}
+                                        <button
+                                            onClick={() => handleStreetViewClick({ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng })}
+                                            style={{ width:'100%', padding:'10px 0', background:'linear-gradient(135deg,#ea580c,#f97316)', border:'none', borderRadius:'12px', color:'white', fontSize:'12px', fontWeight:700, cursor:'pointer', boxShadow:'0 4px 20px rgba(249,115,22,0.35)', letterSpacing:'0.02em', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}
+                                        >
+                                            <Eye size={14} /> Open Street View
+                                        </button>
+                                    </div>
+                                </InfoWindowF>
+                            )}
+
+                            {/* User Position Marker */}
+                            {/* North Caloocan Jurisdiction Boundary Display */}
+                             <PolygonF
+                                paths={NORTH_CALOOCAN_BOUNDARY}
+                                options={{
+                                    fillColor: "#6366f1",
+                                    fillOpacity: 0.08,
+                                    strokeColor: "#6366f1",
+                                    strokeOpacity: 0.6,
+                                    strokeWeight: 3,
+                                    clickable: false,
+                                }}
+                            />
+
+                            {/* Caloocan City Hall North Pin */}
+                            <MarkerF 
+                                position={CALOOCAN_CITY_HALL_NORTH_LOC}
+                                zIndex={200}
+                                icon={window.google && window.google.maps ? {
+                                    path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+                                    fillColor: '#f97316',
+                                    fillOpacity: 1,
+                                    scale: 6,
+                                    strokeColor: 'white',
+                                    strokeWeight: 2,
+                                } : undefined}
+                                title="Caloocan City Hall North (HQ)"
+                            />
+
+                            {/* Fleet unit markers */}
+                            {fleetStatus.map(team => (
+                                <MarkerF
+                                    key={team.id}
+                                    position={{ lat: team.lat, lng: team.lng }}
+                                    icon={window.google && window.google.maps ? {
+                                        path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                                        scale: 5,
+                                        fillColor: team.status === 'Available' ? '#22c55e' : (team.status === 'En Route' ? '#f97316' : '#f97316'),
+                                        fillOpacity: 1,
+                                        strokeWeight: 2,
+                                        strokeColor: 'white',
+                                        rotation: 0
+                                    } : undefined}
+                                    title={`${team.name} (${team.status})`}
+                                />
+                            ))}
+
+                            {/* Route to Selected Hazard - NAVIGATION VISUALS (On Main Map) */}
+                            {directionsResponse && directionsResponse.routes && directionsResponse.routes[0] && (
+                                <>
+                                    {/* Path Casing (Border) */}
+                                    <PolylineF
+                                        path={directionsResponse.routes[0].overview_path}
+                                        options={{
+                                            strokeColor: '#ffffff',
+                                            strokeOpacity: 1,
+                                            strokeWeight: 10,
+                                            zIndex: 499,
+                                            clickable: false
+                                        }}
+                                    />
+                                    {/* Main Path (Safety Orange) */}
+                                    <PolylineF
+                                        path={directionsResponse.routes[0].overview_path}
+                                        options={{
+                                            strokeColor: '#f97316', 
+                                            strokeOpacity: 1,
+                                            strokeWeight: 6,
+                                            zIndex: 500,
+                                            clickable: false
+                                        }}
+                                    />
+                                    {/* Floating Duration Label at Midpoint */}
+                                    {directionsResponse.routes[0].midpoint && (
+                                        <InfoWindowF
+                                            position={directionsResponse.routes[0].midpoint}
+                                            options={{ 
+                                                disableAutoPan: true,
+                                                closeBoxURL: "", 
+                                                enableEventPropagation: true,
+                                                pixelOffset: new window.google.maps.Size(0, 0)
+                                            }}
+                                        >
+                                            <div style={{ 
+                                                background: '#883900ff', 
+                                                color: 'white', 
+                                                padding: '2px 8px', 
+                                                borderRadius: '6px', 
+                                                fontSize: '11px', 
+                                                fontWeight: 'bold',
+                                                border: '2px solid white',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {duration}
+                                            </div>
+                                        </InfoWindowF>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Tactical Overlays (VISIBLE ONLY IN STREET VIEW) */}
+                            {isStreetActive && directionsResponse && directionsResponse.routes && (
+                                <>
+                                    <PolylineF
+                                        path={directionsResponse.routes[0].overview_path}
+                                        panorama={panorama}
+                                        options={{
+                                            strokeColor: '#ffffff',
+                                            strokeOpacity: 0.8,
+                                            strokeWeight: 8,
+                                            zIndex: 499
+                                        }}
+                                    />
+                                    <PolylineF
+                                        path={directionsResponse.routes[0].overview_path}
+                                        panorama={panorama}
+                                        options={{
+                                            strokeColor: '#f97316',
+                                            strokeOpacity: 0.9,
+                                            strokeWeight: 5,
+                                            zIndex: 500
+                                        }}
+                                    />
+                                </>
+                            )}
+                            
+                            {/* Mini-Map Navigation Widget (Active in Street View) */}
+                            <div 
+                                ref={miniMapRef}
+                                style={{ 
+                                    display: isStreetActive && svLocation ? 'block' : 'none',
+                                    paddingLeft: '12px',
+                                    paddingBottom: '24px',
+                                    zIndex: 1000
+                                }}
+                            >
+                                <div style={{ 
+                                    width: '200px', 
+                                    height: '150px', 
+                                    borderRadius: '16px', 
+                                    border: '4px solid white', 
+                                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)', 
+                                    overflow: 'hidden', 
+                                    pointerEvents: 'auto' 
+                                }}>
+                                    <GoogleMap
+                                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                                        center={svLocation}
+                                        zoom={17}
+                                        options={{
+                                            disableDefaultUI: true,
+                                            gestureHandling: 'none',
+                                            styles: [
+                                                { elementType: 'labels', stylers: [{ visibility: 'on' }] },
+                                                { featureType: 'poi', stylers: [{ visibility: 'off' }] }
+                                            ]
+                                        }}
+                                    >
+                                        {/* "You are here" Pulse / Heading Indicator */}
+                                        <MarkerF
+                                            position={svLocation}
+                                            icon={window.google && window.google.maps ? {
+                                                path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                                                scale: 5,
+                                                fillColor: '#3b82f6',
+                                                fillOpacity: 1,
+                                                strokeWeight: 2,
+                                                strokeColor: 'white',
+                                                rotation: svHeading
+                                            } : undefined}
+                                        />
+                                        {/* Reference Path for orientation */}
+                                        {directionsResponse && directionsResponse.routes && (
+                                            <PolylineF
+                                                path={directionsResponse.routes[0].overview_path}
+                                                options={{
+                                                    strokeColor: '#f97316',
+                                                    strokeOpacity: 0.8,
+                                                    strokeWeight: 3,
+                                                    clickable: false
+                                                }}
+                                            />
+                                        )}
+                                    </GoogleMap>
+                                </div>
+                            </div>
+
+                            {/* Street View Camera Position Marker (on Map & Street View) - Pulsing Signal Waves */}
+                            {svLocation && (
+                                <>
+                                    {/* Stable Core Marker */}
+                                    <MarkerF
+                                        position={svLocation}
+                                        panorama={panorama}
+                                        zIndex={160}
+                                        icon={window.google && window.google.maps ? {
+                                            path: window.google.maps.SymbolPath.CIRCLE,
+                                            fillColor: '#ef4444',
+                                            fillOpacity: 1,
+                                            scale: 7,
+                                            strokeColor: 'white',
+                                            strokeWeight: 2,
+                                        } : undefined}
+                                        title={isStreetViewVisible ? "Live Street View Camera" : "Last Viewed Location"}
+                                    />
+                                    
+                                    {/* Animated Signal Waves using Markers (Persistent on Map) */}
+                                    <MarkerF
+                                        position={svLocation}
+                                        panorama={panorama}
+                                        zIndex={155}
+                                        icon={window.google && window.google.maps ? {
+                                            path: window.google.maps.SymbolPath.CIRCLE,
+                                            fillColor: '#ef4444',
+                                            fillOpacity: 0.3 * (1 - pulseRadius / 40) * (isStreetViewVisible ? 1 : 0.6),
+                                            scale: pulseRadius,
+                                            strokeColor: '#ef4444',
+                                            strokeOpacity: 0.6 * (1 - pulseRadius / 40) * (isStreetViewVisible ? 1 : 0.6),
+                                            strokeWeight: 1,
+                                        } : undefined}
+                                        options={{ clickable: false }}
+                                    />
+                                    <MarkerF
+                                        position={svLocation}
+                                        panorama={panorama}
+                                        zIndex={154}
+                                        icon={window.google && window.google.maps ? {
+                                            path: window.google.maps.SymbolPath.CIRCLE,
+                                            fillColor: '#ef4444',
+                                            fillOpacity: 0.2 * (1 - ((pulseRadius + 20) % 40) / 40) * (isStreetViewVisible ? 1 : 0.6),
+                                            scale: (pulseRadius + 20) % 40,
+                                            strokeColor: '#ef4444',
+                                            strokeOpacity: 0.4 * (1 - ((pulseRadius + 20) % 40) / 40) * (isStreetViewVisible ? 1 : 0.6),
+                                            strokeWeight: 1,
+                                        } : undefined}
+                                        options={{ clickable: false }}
+                                    />
+                                </>
+                            )}
+>>>>>>> 9056a898c9b2270d413c2765c439026f6f7a0522
                         </GoogleMap>
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-950">
@@ -478,8 +1072,13 @@ const DispatcherDashboard = () => {
                         </div>
                     )}
 
+<<<<<<< HEAD
                     {/* Map UI Floating Controls */}
                     <div className="absolute bottom-6 left-6 flex flex-col gap-2 pointer-events-none">
+=======
+                    {/* Map UI Floating Controls - Stacked Above the MiniMap */}
+                    <div className="absolute bottom-[205px] left-[30px] flex flex-col gap-2 pointer-events-none mb-1">
+>>>>>>> 9056a898c9b2270d413c2765c439026f6f7a0522
                         <div className="bg-slate-900/90 backdrop-blur border border-slate-800 rounded-xl p-3 flex flex-col gap-3 shadow-xl pointer-events-auto">
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Live Map Feed</h4>
                             <div className="flex items-center gap-3">
@@ -557,6 +1156,34 @@ const DispatcherDashboard = () => {
                                                     </div>
                                                 )}
 
+                                                {/* Route Info in Sidebar */}
+                                                {directionsResponse && (
+                                                    <div className="mb-4 p-3 rounded-xl bg-orange-500/5 border border-orange-500/20 flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">Route to Incident</div>
+                                                            <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                                <Truck size={14} className="text-orange-500"/> {distance} • {duration}
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => handleExternalDirections(selectedReport)}
+                                                            className="p-2 rounded-lg bg-white dark:bg-slate-800 text-slate-500 hover:text-blue-500 transition-colors shadow-sm"
+                                                        >
+                                                            <Navigation size={16} />
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {!directionsResponse && (
+                                                    <button 
+                                                        onClick={() => handleGetDirections(selectedReport)}
+                                                        className="w-full mb-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-800"
+                                                    >
+                                                        <Navigation size={14} className="text-orange-500"/>
+                                                        Calculate Logistics & Route
+                                                    </button>
+                                                )}
+
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <button 
                                                         onClick={() => handleRejectReport(selectedReport.id)}
@@ -620,9 +1247,26 @@ const DispatcherDashboard = () => {
                                         <div className="text-xs text-slate-400 mb-1">Type: <span className="text-slate-300">{team.type}</span></div>
                                         <div className="text-xs text-slate-400 flex justify-between items-center">
                                             <span>Loc: <span className="text-slate-300">{team.location}</span></span>
-                                            {team.status === 'Available' && (
-                                                <button className="text-blue-400 hover:text-blue-300 font-bold">Assign Work</button>
-                                            )}
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    onClick={() => map?.panTo({ lat: team.lat, lng: team.lng })}
+                                                    className="text-slate-400 hover:text-white"
+                                                    title="Locate Team"
+                                                >
+                                                    <MapPin size={14}/>
+                                                </button>
+                                                {selectedReport && (
+                                                    <button 
+                                                        onClick={() => handleGetDirections(selectedReport, { lat: team.lat, lng: team.lng })}
+                                                        className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1"
+                                                    >
+                                                        <Navigation size={12}/> Route
+                                                    </button>
+                                                )}
+                                                {team.status === 'Available' && (
+                                                    <button className="text-blue-400 hover:text-blue-300 font-bold">Assign</button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -743,6 +1387,198 @@ const DispatcherDashboard = () => {
                 </AnimatePresence>
 
                 </main>
+
+                {/* PULSO Omni-Assistant FAB */}
+                <div className="fixed bottom-24 right-6 z-[100] flex flex-col items-end gap-4">
+                    <AnimatePresence>
+                        {isAIChatOpen && (
+                            <>
+                                {/* Backdrop (maximized only) */}
+                                {isAIMaximized && (
+                                    <motion.div
+                                        key="backdrop"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[99]"
+                                        onClick={() => setIsAIMaximized(false)}
+                                    />
+                                )}
+
+                                <motion.div
+                                    key="chat"
+                                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                    transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                                    className={`bg-slate-900 shadow-2xl border border-slate-700 overflow-hidden flex flex-col transition-all duration-300 ${
+                                        isAIMaximized
+                                            ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[100] rounded-3xl'
+                                            : 'w-[380px] h-[500px] rounded-2xl relative z-[100]'
+                                    }`}
+                                >
+                                    {/* Header */}
+                                    <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shrink-0">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-blue-800 flex items-center justify-center animate-pulse">
+                                                <Brain size={18} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-white text-sm">PULSO Omni-Assistant</h4>
+                                                <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Engineering Co-pilot</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {/* Maximize / Minimize toggle */}
+                                            <button
+                                                onClick={() => setIsAIMaximized(prev => !prev)}
+                                                title={isAIMaximized ? 'Minimize' : 'Maximize'}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                                            >
+                                                {isAIMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                                            </button>
+                                            {/* Close */}
+                                            <button
+                                                onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
+                                                title="Close"
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
+                                            >
+                                                <MoreHorizontal size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Messages */}
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
+                                        {aiMessages.map((msg, i) => (
+                                            <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                                {/* Text bubble */}
+                                                <div className={`${
+                                                    isAIMaximized ? 'max-w-[70%]' : 'max-w-[90%]'
+                                                } p-3 rounded-2xl text-xs font-medium leading-relaxed ${
+                                                    msg.role === 'user' ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
+                                                }`}>
+                                                    {msg.text}
+                                                </div>
+
+                                                {/* Map Result Card — shown only for assistant messages with location data */}
+                                                {msg.role === 'assistant' && msg.mapData && msg.mapData.length > 0 && isLoaded && (
+                                                    <div className={`w-full ${isAIMaximized ? 'max-w-[85%]' : 'max-w-full'} rounded-2xl border border-slate-700 overflow-hidden bg-slate-800/80`}>
+                                                        {/* Map label */}
+                                                        <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/60 border-b border-slate-700">
+                                                            <MapIcon size={13} className="text-orange-400" />
+                                                            <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest">Live Report Locations</span>
+                                                            <span className="ml-auto text-[10px] text-slate-400 font-semibold">{msg.mapData.length} pins</span>
+                                                        </div>
+
+                                                        {/* Embedded mini Google Map */}
+                                                        <div className="w-full h-44 relative">
+                                                            <GoogleMap
+                                                                mapContainerStyle={{ width: '100%', height: '100%' }}
+                                                                center={CALOOCAN_CENTER}
+                                                                zoom={13}
+                                                                options={{
+                                                                    disableDefaultUI: true,
+                                                                    styles: [
+                                                                        { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+                                                                        { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+                                                                        { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+                                                                        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+                                                                        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0c1626' }] },
+                                                                    ]
+                                                                }}
+                                                            >
+                                                                {msg.mapData.map(r => r.location_lat && r.location_lng && (
+                                                                    <MarkerF
+                                                                        key={r.id}
+                                                                        position={{ lat: r.location_lat, lng: r.location_lng }}
+                                                                        title={`RPT-${r.id}: ${r.ai_category || r.category}`}
+                                                                        icon={window.google?.maps ? {
+                                                                            path: window.google.maps.SymbolPath.CIRCLE,
+                                                                            fillColor: r.status === 'resolved' ? '#22c55e' : r.ai_urgency === 'Critical' ? '#ef4444' : '#f97316',
+                                                                            fillOpacity: 1,
+                                                                            scale: 7,
+                                                                            strokeColor: 'white',
+                                                                            strokeWeight: 2,
+                                                                        } : undefined}
+                                                                    />
+                                                                ))}
+                                                            </GoogleMap>
+                                                        </div>
+
+                                                        {/* Report list — scrollable */}
+                                                        <div className="max-h-48 overflow-y-auto divide-y divide-slate-700/50 scrollbar-thin scrollbar-thumb-slate-700">
+                                                            {msg.mapData.map((r, idx) => (
+                                                                <button
+                                                                    key={r.id}
+                                                                    onClick={() => map?.panTo({ lat: r.location_lat, lng: r.location_lng })}
+                                                                    className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-slate-700/50 transition-colors text-left group"
+                                                                >
+                                                                    {/* Index badge */}
+                                                                    <span className="shrink-0 w-5 h-5 rounded-full bg-slate-700 text-[10px] font-bold text-slate-300 flex items-center justify-center mt-0.5">{idx + 1}</span>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                                            <span className="text-[11px] font-bold text-white truncate">{r.ai_category || r.category || 'Uncategorized'}</span>
+                                                                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                                                                                r.status === 'resolved' ? 'bg-green-500/15 text-green-400' :
+                                                                                r.ai_urgency === 'Critical' ? 'bg-red-500/15 text-red-400' :
+                                                                                'bg-orange-500/15 text-orange-400'
+                                                                            }`}>{r.status}</span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1 mt-0.5">
+                                                                            <MapPin size={9} className="text-slate-500 shrink-0" />
+                                                                            <span className="text-[10px] text-slate-400 truncate">
+                                                                                {r.location_string || `${r.location_lat?.toFixed(4)}°N, ${r.location_lng?.toFixed(4)}°E`}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="text-[9px] font-mono text-slate-600 group-hover:text-orange-400 transition-colors shrink-0">RPT-{r.id}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {isAILoading && (
+                                            <div className="flex justify-start">
+                                                <div className="bg-slate-800 p-3 rounded-2xl flex gap-1">
+                                                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                                                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div ref={aiChatEndRef} />
+                                    </div>
+
+                                    {/* Input */}
+                                    <form onSubmit={handleAIChat} className="p-4 bg-slate-800 border-t border-slate-700 shrink-0">
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={aiQuery}
+                                                onChange={(e) => setAiQuery(e.target.value)}
+                                                placeholder="Ask PULSO Brain..."
+                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-blue-600 outline-none"
+                                            />
+                                            <button type="submit" disabled={isAILoading} className="absolute right-2 top-[7px] text-blue-400 hover:text-blue-300 disabled:opacity-40">
+                                                <Search size={16} />
+                                            </button>
+                                        </div>
+                                    </form>
+                                </motion.div>
+                            </>
+                        )}
+                    </AnimatePresence>
+
+                    <button
+                        onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                        className="w-16 h-16 rounded-full bg-blue-900 shadow-2xl shadow-blue-900/50 flex items-center justify-center text-white hover:bg-blue-800 transition-all hover:scale-105 active:scale-95 group"
+                    >
+                        <Brain size={32} className="group-hover:animate-pulse" />
+                    </button>
+                </div>
             </div>
         </div>
     );

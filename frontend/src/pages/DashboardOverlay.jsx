@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Camera, MapPin, WifiOff, CheckCircle2, AlertTriangle,
-    Send, Clock, Truck, HardHat, Bell, LogOut, Loader2
+    Send, Clock, Truck, HardHat, Bell, LogOut, Loader2, Brain, Search, X
 } from 'lucide-react';
 import Branding from '../components/Branding';
 
@@ -11,13 +11,22 @@ export default function DashboardOverlay({ onNavigate }) {
     const [reports, setReports] = useState([]);
     const [drafts, setDrafts] = useState([]);
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     // Form State
     const [photo, setPhoto] = useState(null);
     const [photoPreview, setPhotoPreview] = useState(null);
     const [location, setLocation] = useState(null);
     const [gettingLocation, setGettingLocation] = useState(false);
     const [description, setDescription] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // AI Omni-Assistant State
+    const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+    const [aiQuery, setAiQuery] = useState('');
+    const [aiMessages, setAiMessages] = useState([
+        { role: 'assistant', text: "Hello! I'm your PULSO Assistant. How can I help you with Caloocan city services today?" }
+    ]);
+    const [isAILoading, setIsAILoading] = useState(false);
 
     const fileInputRef = useRef(null);
 
@@ -117,6 +126,37 @@ export default function DashboardOverlay({ onNavigate }) {
             }
             setPhoto(null); setPhotoPreview(null); setLocation(null); setDescription(''); setIsSubmitting(false);
         }, 800);
+    };
+
+    const handleAIChat = async (e) => {
+        e.preventDefault();
+        if (!aiQuery.trim() || isAILoading) return;
+        
+        const userMsg = { role: 'user', text: aiQuery };
+        setAiMessages(prev => [...prev, userMsg]);
+        setAiQuery('');
+        setIsAILoading(true);
+
+        try {
+            const token = localStorage.getItem('pulso_token');
+            const resp = await fetch('http://localhost:8000/api/ai/assistant', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ 
+                    query: aiQuery,
+                    context: "Resident Dashboard. Main reporting screen."
+                })
+            });
+            const data = await resp.json();
+            setAiMessages(prev => [...prev, { role: 'assistant', text: data.response }]);
+        } catch (err) {
+            setAiMessages(prev => [...prev, { role: 'assistant', text: "Service temporarily unavailable." }]);
+        } finally {
+            setIsAILoading(false);
+        }
     };
 
     return (
@@ -279,6 +319,64 @@ export default function DashboardOverlay({ onNavigate }) {
                     </div>
                 </section>
 
+            </div>
+            {/* AI Assistant Floating Interface */}
+            <div className="fixed bottom-24 right-6 z-[60] flex flex-col items-end gap-3 sm:bottom-24 sm:right-8">
+                <AnimatePresence>
+                    {isAIChatOpen && (
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="w-[calc(100vw-32px)] sm:w-[350px] h-[450px] bg-white shadow-2xl rounded-3xl border border-slate-100 overflow-hidden flex flex-col mb-4"
+                        >
+                            <div className="p-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <Brain size={20} />
+                                    <span className="font-bold text-sm">PULSO Assistant</span>
+                                </div>
+                                <button onClick={() => setIsAIChatOpen(false)}><X size={18} /></button>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {aiMessages.map((msg, i) => (
+                                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] p-3 rounded-2xl text-[11px] font-semibold leading-relaxed ${
+                                            msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-700'
+                                        }`}>
+                                            {msg.text}
+                                        </div>
+                                    </div>
+                                ))}
+                                {isAILoading && (
+                                    <div className="flex justify-center p-2">
+                                        <Loader2 className="animate-spin text-orange-500" size={16} />
+                                    </div>
+                                )}
+                            </div>
+
+                            <form onSubmit={handleAIChat} className="p-3 border-t border-slate-100 flex gap-2 bg-slate-50">
+                                <input 
+                                    type="text" 
+                                    value={aiQuery}
+                                    onChange={(e) => setAiQuery(e.target.value)}
+                                    placeholder="Ask about Caloocan services..."
+                                    className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-medium outline-none focus:ring-1 focus:ring-orange-500"
+                                />
+                                <button type="submit" className="p-2 bg-orange-500 text-white rounded-xl shadow-sm hover:bg-orange-600 transition-colors">
+                                    <Search size={16} />
+                                </button>
+                            </form>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                <button 
+                    onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-orange-500 shadow-xl flex items-center justify-center text-white hover:bg-orange-600 transition-all hover:scale-110 active:scale-95 group"
+                >
+                    <Brain size={28} className="group-hover:animate-pulse" />
+                </button>
             </div>
         </motion.div>
     );

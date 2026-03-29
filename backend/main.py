@@ -110,6 +110,23 @@ async def root():
 async def health_check():
     return {"status": "healthy", "service": "PULSO Core Engine"}
 
+class AIChatRequest(BaseModel):
+    query: str
+    context: Optional[str] = None
+
+@app.post("/api/ai/assistant")
+async def ai_omni_assistant(
+    req: AIChatRequest,
+    current_user: schemas.UserResponse = Depends(get_current_user)
+):
+    """
+    PULSO Omni-Assistant: AI integration for all screens and inputs.
+    Contextual assistance for citizens and LGU engineers.
+    """
+    # Auto-inject user identity into context
+    user_ctx = f"User: {current_user.full_name} ({current_user.role}). Context: {req.context or 'General Dashboard'}"
+    return gemini_service.get_ai_assistant_response(req.query, context=user_ctx)
+
 # ---------------------------------------------------------------------------
 # OCR / ID Verification
 # ---------------------------------------------------------------------------
@@ -454,24 +471,76 @@ def read_report(
 
 @app.post("/api/reports", response_model=schemas.ReportResponse)
 async def create_new_report(
-    report: schemas.ReportCreate,
+    category: str = Form(...),
+    description: str = Form(...),
+    lat: Optional[float] = Form(None),
+    lng: Optional[float] = Form(None),
+    location_string: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: schemas.UserResponse = Depends(get_current_user)
 ):
-    # 1. AI Triage
-    ai_analysis = gemini_service.analyze_report(report.description)
+    """
+    Creates a new report with multi-modal AI Scanning.
+    If an image is uploaded, Gemini 1.5 Flash analyzes it for hazard verification.
+    """
+    # Create DTO for logic consistency
+    report_dto = schemas.ReportCreate(
+        category=category,
+        description=description,
+        location_lat=lat,
+        location_lng=lng,
+        location_string=location_string
+    )
 
-    # 2. Auto-reverse-geocode: replace raw 'Lat: X, Lng: Y' with a real address
-    if report.location_lat and report.location_lng:
-        if not report.location_string or report.location_string.startswith("Lat:"):
-            report.location_string = await maps_service.reverse_geocode(
-                report.location_lat, report.location_lng
+    image_bytes = None
+    image_url = None
+    if image:
+        image_bytes = await image.read()
+        # In a real app, save to S3/Cloud Storage here. 
+        # For now, we mock the URL but pre-read bytes for the AI.
+        image_url = f"https://mock-storage.pulso.gov.ph/reports/{image.filename}"
+
+    # 1. ADVANCED AI TRIAGE (Multi-modal)
+    # The AI now "sees" the hazard if an image was provided and checks for appropriateness.
+    ai_analysis = gemini_service.analyze_report(description, image_data=image_bytes)
+    
+    # IMMEDIATE MODERATION: Reject if AI flags as inappropriate
+    if ai_analysis and ai_analysis.get("is_inappropriate"):
+        reason = ai_analysis.get("rejection_reason", "Inappropriate content detected.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Report rejected by AI Safety Filter: {reason}"
+        )
+
+    # Enrich analysis with image detecting metadata
+    if ai_analysis and image:
+        ai_analysis["has_image_verification"] = True
+    
+    # 2. Auto-reverse-geocode
+    if report_dto.location_lat and report_dto.location_lng:
+        if not report_dto.location_string or report_dto.location_string.startswith("Lat:"):
+            report_dto.location_string = await maps_service.reverse_geocode(
+                report_dto.location_lat, report_dto.location_lng
             )
 
     # 3. Database Creation
-    db_report = crud.create_report(db=db, report=report, user_id=current_user.id, ai_analysis=ai_analysis)
+    # If AI detects high severity or verified image, status defaults are handled in crud
+    db_report = crud.create_report(
+        db=db, 
+        report=report_dto, 
+        user_id=current_user.id, 
+        ai_analysis=ai_analysis
+    )
+    
+    if image_url:
+        db_report.image_url = image_url
+        # If image provided, set to 'unverified' until AI processing is confirmed
+        # (Though we did it sync here, we flag it for system audit)
+        db_report.status = "unverified"
+        db.commit()
 
-    # 4. Geospatial Deduplication
+    # 4. Geospatial Deduplication (Same as before)
     recent_reports = db.query(models.Report).filter(
         models.Report.status != "resolved",
         models.Report.location_lat != None,
@@ -528,6 +597,29 @@ async def geocode_search(
     """
     results = await maps_service.forward_geocode(q)
     return {"results": results}
+
+
+@app.get("/api/maps/directions")
+async def get_directions_proxy(
+    origin: str = Query(..., description="Origin coords or address"),
+    destination: str = Query(..., description="Destination coords or address"),
+    mode: str = Query("driving", description="driving, walking, bicycling, or transit"),
+    current_user: schemas.UserResponse = Depends(get_current_user)
+):
+    """
+    Get routing directions between two locations.
+    Useful for dispatch navigation and travel time estimation.
+    """
+    route = await maps_service.get_directions(origin, destination, mode)
+    if not route:
+        raise HTTPException(status_code=400, detail="Could not calculate route due to server error")
+    
+    # Check if we got an error response from Google (status != OK)
+    if route.get("status") and route.get("status") != "OK":
+        error_msg = route.get("error_detail") or f"Google Maps Error: {route.get('status')}"
+        raise HTTPException(status_code=400, detail=error_msg)
+        
+    return route
 
 @app.patch("/api/reports/{report_id}/status", response_model=schemas.ReportResponse)
 def update_report_status(
@@ -628,6 +720,40 @@ def delete_advisory(
     if not success:
         raise HTTPException(status_code=404, detail="Advisory not found")
     return {"message": f"Advisory {advisory_id} deleted successfully"}
+
+@app.post("/api/advisories/generate/{report_id}")
+async def generate_ai_advisory(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
+):
+    """
+    Dispatcher-only: Triggers AI to draft a public advisory based on a validated report.
+    Returns a JSON draft (title, body, priority).
+    """
+    db_report = crud.get_report(db, report_id=report_id)
+    if not db_report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    import json
+    ai_meta = {}
+    if db_report.ai_metadata:
+        try:
+            ai_meta = json.loads(db_report.ai_metadata)
+        except: pass
+        
+    report_data = {
+        "category": db_report.category,
+        "ai_summary": ai_meta.get("smart_summary", db_report.description),
+        "location_string": db_report.location_string,
+        "severity_score": db_report.severity_score
+    }
+    
+    draft = gemini_service.generate_advisory_content(report_data)
+    if not draft:
+        raise HTTPException(status_code=500, detail="AI generation failed.")
+        
+    return draft
 
 # ---------------------------------------------------------------------------
 # Notifications

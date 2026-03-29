@@ -28,6 +28,7 @@ from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 from dotenv import load_dotenv
 from id_parsers import get_parser
+import gemini_service
 
 load_dotenv()
 
@@ -632,6 +633,19 @@ def extract_id_details(text: str) -> Dict[str, Any]:
     parser = get_parser(id_type)
     parsed = parser.extract(text, lines)
     print(f"[OCR] Parser ({id_type}) returned: {parsed}")
+
+    # 3. ADVANCED: LLM-Assisted Refinement (Vertex AI)
+    # The LLM cleans up noisy OCR and handles "label bleed" better than rules.
+    llm_extracted = gemini_service.extract_id_data(text, id_type=id_type)
+    if llm_extracted:
+        print(f"[OCR] Vertex AI Refinement: {llm_extracted}")
+        # Only overwrite if LLM found something useful, else keep parser's result
+        for key in ('first_name', 'last_name', 'middle_name', 'dob', 'sex', 'address', 'barangay', 'pcn', 'postal_code'):
+            if llm_extracted.get(key) and not parsed.get(key):
+                parsed[key] = llm_extracted.get(key)
+            elif llm_extracted.get(key) and len(str(llm_extracted.get(key))) > len(str(parsed.get(key, ''))):
+                # Trust LLM for better cleaning of structured strings
+                parsed[key] = llm_extracted.get(key)
 
     first_name  = parsed.get('first_name', '')
     last_name   = parsed.get('last_name', '')

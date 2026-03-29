@@ -35,6 +35,7 @@ class ReportBase(BaseModel):
     location_lng: Optional[float] = None
     location_string: Optional[str] = None
     image_url: Optional[str] = None
+    ai_metadata: Optional[str] = None
 
 class ReportCreate(ReportBase):
     pass
@@ -49,6 +50,7 @@ class ReportResponse(ReportBase):
     ai_summary: Optional[str] = None
     ai_reasoning: Optional[str] = None
     severity_score: Optional[float] = 0.0
+    ai_metadata: Optional[str] = None
     cluster_id: Optional[int] = None
     reporter_name: Optional[str] = None  # Convenience field for dispatcher/management views
     created_at: datetime
