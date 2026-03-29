@@ -98,7 +98,10 @@ export default function Login() {
                 navigate(GOV_ROLES.includes(data.user.role) ? '/gov/my-dashboard' : '/dashboard');
             } else {
                 const errData = await response.json();
-                setError(errData.detail || 'Authentication failed');
+                const msg = typeof errData.detail === 'object' 
+                    ? (Array.isArray(errData.detail) ? errData.detail[0].msg : JSON.stringify(errData.detail))
+                    : errData.detail;
+                setError(msg || 'Authentication failed');
             }
         } catch {
             setError('Network error. Is the backend running?');
@@ -122,7 +125,10 @@ export default function Login() {
                 setRecoveryRefId(data.reference_id);
                 setRecoveryStep(2);
             } else {
-                setError(data.detail || 'Recovery request failed.');
+                const msg = typeof data.detail === 'object' 
+                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                    : data.detail;
+                setError(msg || 'Recovery request failed.');
             }
         } catch {
             setError('Network error. Please try again.');
@@ -148,7 +154,10 @@ export default function Login() {
             if (response.ok) {
                 setRecoveryStep(3);
             } else {
-                setError(data.detail || 'Identity synchronization failed: Invalid code.');
+                const msg = typeof data.detail === 'object' 
+                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                    : data.detail;
+                setError(msg || 'Identity synchronization failed: Invalid code.');
             }
         } catch {
             setError('System synchronization error.');
@@ -180,7 +189,10 @@ export default function Login() {
             if (response.ok) {
                 setRecoverySent(true);
             } else {
-                setError(data.detail || 'Identity synchronization failed.');
+                const msg = typeof data.detail === 'object' 
+                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                    : data.detail;
+                setError(msg || 'Identity synchronization failed.');
             }
         } catch (err) {
             setError('System synchronization error.');

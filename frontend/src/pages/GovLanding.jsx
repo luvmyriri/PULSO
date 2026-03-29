@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReCAPTCHA from "react-google-recaptcha";
 import Spline from '@splinetool/react-spline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +19,8 @@ export default function GovLanding() {
     const [view, setView] = useState('login'); // 'login' or 'forgot'
     const [recoverySent, setRecoverySent] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');
+    const [captchaToken, setCaptchaToken] = useState(null);
+    const recaptchaRef = useRef(null);
     
     // Portal Information Modals
     const [activeModal, setActiveModal] = useState(null); // 'directives' | 'resources' | null
@@ -59,6 +62,7 @@ export default function GovLanding() {
             const formData = new URLSearchParams();
             formData.append('username', email);
             formData.append('password', password);
+            formData.append('captcha_token', captchaToken || '');
 
             const response = await fetch('http://localhost:8000/api/auth/login', {
                 method: 'POST',
@@ -87,7 +91,12 @@ export default function GovLanding() {
                 }
             } else {
                 const errData = await response.json();
-                setError(errData.detail || 'Authentication failed');
+                const msg = typeof errData.detail === 'object' 
+                    ? (Array.isArray(errData.detail) ? errData.detail[0].msg : JSON.stringify(errData.detail))
+                    : errData.detail;
+                setError(msg || 'Authentication failed');
+                if (recaptchaRef.current) recaptchaRef.current.reset();
+                setCaptchaToken(null);
             }
         } catch (err) {
             setError('System Connectivity Error');
@@ -114,7 +123,10 @@ export default function GovLanding() {
                 setRecoverySent(true);
             } else {
                 const data = await response.json();
-                setError(data.detail || 'Recovery failed. Internal protocol error.');
+                const msg = typeof data.detail === 'object' 
+                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                    : data.detail;
+                setError(msg || 'Recovery failed. Internal protocol error.');
             }
         } catch (err) {
             setError('System Connectivity Error');
@@ -331,6 +343,15 @@ export default function GovLanding() {
                                                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                                         </button>
                                                     </div>
+                                                </div>
+                                                
+                                                <div className="flex justify-center py-4">
+                                                    <ReCAPTCHA
+                                                        ref={recaptchaRef}
+                                                        sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                        onChange={(token) => setCaptchaToken(token)}
+                                                        theme={theme === 'dark' ? 'dark' : 'light'}
+                                                    />
                                                 </div>
 
                                                 <button
