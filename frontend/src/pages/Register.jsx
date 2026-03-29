@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown } from 'lucide-react';
 import axios from 'axios';
@@ -354,6 +354,13 @@ export default function Register() {
     const [showPassword, setShowPassword] = React.useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
     const [hasScanned, setHasScanned] = React.useState(false); // prevent infinite re-scan
+    
+    // Verification State
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
+    const [verifying, setVerifying] = useState(false);
+    const [verifyError, setVerifyError] = useState('');
+    const [resending, setResending] = useState(false);
+    const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
     const handleFileUpload = (e, side) => {
         const file = e.target.files[0];
@@ -463,6 +470,75 @@ export default function Register() {
     const nextStep  = () => setStep(s => Math.min(s + 1, 3));
     const prevStep  = () => setStep(s => Math.max(s - 1, 1));
 
+    const handleOtpChange = (index, value) => {
+        if (!/^\d*$/.test(value)) return; // Only digits
+        const newOtp = [...otp];
+        newOtp[index] = value.slice(-1);
+        setOtp(newOtp);
+        
+        // Auto focus next
+        if (value && index < 5) {
+            otpRefs[index + 1].current.focus();
+        }
+    };
+
+    const handleKeyDown = (index, e) => {
+        if (e.key === 'Backspace' && !otp[index] && index > 0) {
+            otpRefs[index - 1].current.focus();
+        }
+    };
+
+    const handlePaste = (e) => {
+        e.preventDefault();
+        const data = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+        if (!data) return;
+        
+        const newOtp = [...otp];
+        data.split('').forEach((char, i) => {
+            if (i < 6) newOtp[i] = char;
+        });
+        setOtp(newOtp);
+        
+        // Focus the last filled box or the next empty one
+        const nextIndex = Math.min(data.length, 5);
+        otpRefs[nextIndex].current.focus();
+    };
+
+    const handleVerifyCode = async () => {
+        const code = otp.join('');
+        if (code.length < 6) return;
+        
+        setVerifying(true);
+        setVerifyError('');
+        try {
+            await axios.post('http://localhost:8000/api/auth/verify-registration', {
+                email: formData.email,
+                code: code
+            });
+            setStep(5);
+        } catch (err) {
+            setVerifyError(err.response?.data?.detail || 'Invalid verification code. Please try again.');
+        } finally {
+            setVerifying(false);
+        }
+    };
+
+    const handleResendCode = async () => {
+        setResending(true);
+        setVerifyError('');
+        try {
+            await axios.post('http://localhost:8000/api/auth/resend-code', {
+                email: formData.email,
+                code: '000000' // Placeholder for validation
+            });
+            alert("A new verification code has been sent to your email.");
+        } catch (err) {
+            setVerifyError("Failed to resend code.");
+        } finally {
+            setResending(false);
+        }
+    };
+
     // Registration submit
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -490,7 +566,7 @@ export default function Register() {
                 setStep(4);
             }
         } catch (err) {
-            setRegistrationError(err.response?.data?.detail || 'Registration failed. Email might already be in use.');
+            setRegistrationError(err.response?.data?.detail || 'Registration failed. Please try again or check your account details.');
         } finally {
             setRegistering(false);
         }
@@ -574,8 +650,8 @@ export default function Register() {
                     {/* Stepper */}
                     <div className="flex items-center mb-6 relative px-1">
                         <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 dark:bg-slate-700 -translate-y-1/2 z-0 rounded-full" />
-                        <div className={`absolute top-1/2 left-0 h-0.5 bg-orange-500 -translate-y-1/2 z-0 rounded-full transition-all duration-500 ${step === 1 ? 'w-0' : step === 2 ? 'w-1/2' : 'w-full'}`} />
-                        {[1, 2, 3].map(s => (
+                        <div className={`absolute top-1/2 left-0 h-0.5 bg-orange-500 -translate-y-1/2 z-0 rounded-full transition-all duration-500 ${step === 1 ? 'w-0' : step === 2 ? 'w-1/3' : step === 3 ? 'w-2/3' : 'w-full'}`} />
+                        {[1, 2, 3, 4].map(s => (
                             <div key={s} className={`relative z-10 flex items-center justify-center w-9 h-9 rounded-full font-bold text-sm border-2 transition-all duration-300 mr-auto last:mr-0
                                 ${step > s ? 'bg-orange-500 border-orange-500 text-white shadow-md' :
                                   step === s ? 'bg-orange-500 border-orange-500 text-white shadow-lg ring-4 ring-orange-200 dark:ring-orange-900' :
@@ -591,12 +667,14 @@ export default function Register() {
                             {step === 1 && 'Identity Verification'}
                             {step === 2 && 'Personal Information'}
                             {step === 3 && 'Account Credentials'}
-                            {step === 4 && 'Registration Complete!'}
+                            {step === 4 && 'Account Verification'}
+                            {step === 5 && 'Registration Complete!'}
                         </h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                             {step === 1 && 'Upload a valid Philippine government-issued ID to auto-fill your details.'}
                             {step === 2 && 'Review and complete your personal information.'}
                             {step === 3 && 'Set up your login credentials.'}
+                            {step === 4 && 'Enter the 6-digit code sent to your email.'}
                         </p>
                     </div>
 
@@ -909,16 +987,73 @@ export default function Register() {
                             </motion.div>
                         )}
 
-                        {/* ── STEP 4: Success ── */}
+                        {/* ── STEP 4: Account Verification ── */}
                         {step === 4 && (
-                            <motion.div key="s4" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }}
+                            <motion.div key="s4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}
+                                className="flex flex-col items-center text-center py-4">
+                                <div className="mb-6">
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                                        Please enter the code we sent to<br/>
+                                        <span className="font-bold text-slate-900 dark:text-white break-all">{formData.email}</span>
+                                    </p>
+                                    
+                                    <div className="flex justify-center gap-2 mb-8">
+                                        {otp.map((digit, index) => (
+                                            <input
+                                                key={index}
+                                                ref={otpRefs[index]}
+                                                type="text"
+                                                maxLength="1"
+                                                value={digit}
+                                                onChange={(e) => handleOtpChange(index, e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(index, e)}
+                                                onPaste={handlePaste}
+                                                className="w-12 h-14 text-center text-2xl font-black bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all text-slate-900 dark:text-white"
+                                            />
+                                        ))}
+                                    </div>
+                                    
+                                    {verifyError && (
+                                        <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 text-sm text-red-600 dark:text-red-400 flex items-center justify-center gap-2">
+                                            <AlertCircle size={15} />
+                                            {verifyError}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={handleVerifyCode}
+                                        disabled={otp.some(d => !d) || verifying}
+                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-6"
+                                    >
+                                        {verifying ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> : 'Confirm Account'}
+                                    </button>
+
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                                        I didn't receive a code!{' '}
+                                        <button 
+                                            type="button" 
+                                            onClick={handleResendCode}
+                                            disabled={resending}
+                                            className="text-orange-600 dark:text-orange-500 font-bold hover:underline disabled:opacity-50"
+                                        >
+                                            {resending ? 'Sending...' : 'Please Resend'}
+                                        </button>
+                                    </p>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ── STEP 5: Success ── */}
+                        {step === 5 && (
+                            <motion.div key="s5" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }}
                                 className="flex flex-col items-center text-center py-6 gap-4">
                                 <div className="w-20 h-20 bg-green-100 dark:bg-green-500/20 text-green-500 rounded-full flex items-center justify-center">
                                     <CheckCircle size={40} />
                                 </div>
                                 <div>
-                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Account Created!</h3>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">Your PULSO account has been successfully created. Welcome to the community!</p>
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Account Verified!</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">Your PULSO account has been successfully verified. Welcome to the community!</p>
                                 </div>
                                 <Link to="/login" className="mt-2 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white px-8 py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md flex items-center gap-2">
                                     Proceed to Login
@@ -928,7 +1063,7 @@ export default function Register() {
                     </AnimatePresence>
 
                     {/* Footer link */}
-                    {step !== 4 && (
+                    {step < 5 && (
                         <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800/50 text-center relative z-20">
                             <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
                                 Already have an account?{' '}

@@ -1,0 +1,18 @@
+{
+    "timestamp": "2026-03-30T04:26:38.928371",
+    "raw_text": "Carreer Objective\nTo obtain challenging position at a growth-oriented firm,\nwhich will allow me to both further utilize my educational\nbackground and professional experiences and\nsimultaneously acquire excellent opportunities for career\ndevelopment and personal growth.\nSeminar and training attended\nTABIOS, GENE G.\nCOLLEGE STUDENT\nContact\nName: Gene G. Tabios\nAge: 18\nBirthday: June 13, 2005\nBlk 9 Lot 30 Ruby St.\nCelina Homes 3 Bagumbong\nCaloocan City Brgy. 171\n09202467150\ngene.tabios13@gmail.com\nSkills\nProgramming\nEditing\nInstalling\nElectron College\nNCII Passer\nTraining and Assessment for NCII\nEducation\nCollege\nUniversity of Caloocan City\n2023-Present\nBachelor of Science in Information System\nSenior High School\nCaloocan City Business High School\n2021-2023\nInformation Communication System - CSS\n\u2022 Grade 12- With Honors\nGrade 11- With Honors\nNCII Passer\nJunior High School\nCaloocan City Business High School\n2017-2021\n. Grade 9- Conduct Award\nRepairing\nLanguage\nEnglish\nFilipino\nElementary\nCongress Elementary School\n2011-2017\n\u2022 Grade 5- With Honors\n",
+    "parsed_data": {
+        "id_type": "unknown",
+        "id_type_label": "Unknown Document",
+        "first_name": "Gene",
+        "last_name": "Tabios",
+        "middle_name": "G.",
+        "dob": "2005-06-13",
+        "sex": "",
+        "address": "Blk 9 Lot 30 Ruby St. Celina Homes 3 Bagumbong Caloocan City Brgy. 171 09202467150",
+        "barangay": "171",
+        "postal_code": "1421",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171)."
+    }
+}

@@ -22,6 +22,8 @@ class User(Base):
     barangay = Column(String)
     phone_number = Column(String, nullable=True)
     trust_score = Column(Integer, default=100)
+    verification_code = Column(String, nullable=True)
+    is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     reports = relationship("Report", back_populates="reporter")

@@ -23,6 +23,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     trust_score: int
+    is_verified: bool
     created_at: datetime
 
     class Config:

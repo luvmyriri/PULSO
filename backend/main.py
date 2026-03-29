@@ -1,17 +1,25 @@
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status, Query
+from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 import shutil
+import httpx
 from typing import Optional, List
 from sqlalchemy.orm import Session
 import auth
 import secrets
 from dotenv import load_dotenv
 import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import random
 load_dotenv()
+
+RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe") # Default to test key
 
 # Import the OCR, Gemini, and Maps services
 import ocr_service
@@ -29,7 +37,7 @@ models.Base.metadata.create_all(bind=engine)
 gov_models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="PULSO Backend API",
+    title="pulso-backend",
     description="City services platform for North Caloocan citizens.",
     version="2.0.0"
 )
@@ -97,6 +105,101 @@ def require_role(*roles):
             raise HTTPException(status_code=403, detail=f"Unauthorized. Requires active role clearance.")
         return current_user
     return _check
+
+# ---------------------------------------------------------------------------
+# Email / Verification Utilities
+# ---------------------------------------------------------------------------
+
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASS = os.getenv("SMTP_PASS")
+
+def send_verification_email(email: str, code: str):
+    """Sends a 6-digit verification code using the official Gmail SMTP settings."""
+    if not SMTP_USER or not SMTP_PASS:
+        print("[EMAIL] SMTP credentials missing. Skipping email send.")
+        return False
+        
+    try:
+        # User requested formatting for the 6-digit code: "552 108"
+        formatted_code = f"{code[:3]} {code[3:]}"
+        
+        subject = "Welcome to PULSO - Verify Your Official Account"
+        body = f"""PULSO: Public Utility & Infrastructure Locator System
+
+Welcome to the official portal for Caloocan City Engineering. To finalize your registration and activate your dashboard access, please enter the code below:
+
+{formatted_code}
+
+By verifying your email, you gain access to incident reporting, project timelines, and official city advisories.
+
+Safety Tip: Never share this code with anyone, including city staff. 
+"""
+        
+        msg = MIMEMultipart()
+        msg['From'] = f"PULSO Public Service <{SMTP_USER}>"
+        msg['To'] = email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+        
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(SMTP_USER, SMTP_PASS)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"[EMAIL] Error sending verification: {e}")
+        return False
+
+def send_password_reset_email(email: str, code: str, reference_id: str):
+    """Sends a 6-digit reset code using the 'Identity Verification Protocol' template."""
+    if not SMTP_USER or not SMTP_PASS:
+        print("[EMAIL] SMTP credentials missing. Skipping email send.")
+        return False
+        
+    try:
+        formatted_code = f"{code[:3]} {code[3:]}"
+        subject = "[PULSO] Password Reset Security Code"
+        body = f"""Identity Verification Protocol
+
+We received a request to reset the password for your PULSO account. To proceed with the security update, enter this 6-digit code:
+
+{formatted_code}
+Reference ID: {reference_id}
+Location: Caloocan City, PH
+
+If you did not request a password reset, your account is still secure. No further action is required. 
+"""
+        msg = MIMEMultipart()
+        msg['From'] = f"PULSO Security <{SMTP_USER}>"
+        msg['To'] = email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+        
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(SMTP_USER, SMTP_PASS)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"[EMAIL] Error sending reset: {e}")
+        return False
+
+async def verify_recaptcha(token: str):
+    """Verifies reCAPTCHA token with Google."""
+    if not token:
+        return False
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                "https://www.google.com/recaptcha/api/siteverify",
+                data={
+                    "secret": RECAPTCHA_SECRET_KEY,
+                    "response": token
+                }
+            )
+            data = response.json()
+            return data.get("success", False)
+        except Exception as e:
+            print(f"reCAPTCHA verification error: {e}")
+            return False
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Register Government-Side Router
@@ -166,17 +269,196 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    user.password = auth.get_password_hash(user.password)
-    return crud.create_user(db=db, user=user)
+    
+    # Generate 6-digit code
+    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    
+    user_data = user.model_dump()
+    user_data["password"] = auth.get_password_hash(user_data["password"])
+    
+    # Create user as unverified
+    new_user = models.User(
+        **{k: v for k, v in user_data.items() if k != "password"},
+        password_hash=user_data["password"],
+        verification_code=code,
+        is_verified=False
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # Send email
+    send_verification_email(new_user.email, code)
+    
+    return new_user
+
+class VerificationRequest(BaseModel):
+    email: str
+    code: str
+
+@app.post("/api/auth/verify-registration")
+def verify_registration(req: VerificationRequest, db: Session = Depends(get_db)):
+    user = crud.get_user_by_email(db, email=req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Clean the code (remove spaces if user copied "552 108")
+    cleaned_code = req.code.replace(" ", "")
+    
+    if user.verification_code != cleaned_code:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+        
+    user.is_verified = True
+    user.verification_code = None  # Clear the code after use
+    db.commit()
+    return {"status": "success", "message": "Account verified"}
+
+@app.post("/api/auth/resend-code")
+def resend_code(req: VerificationRequest, db: Session = Depends(get_db)):
+    user = crud.get_user_by_email(db, email=req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    user.verification_code = code
+    db.commit()
+    
+    send_verification_email(user.email, code)
+    return {"status": "success", "message": "New code sent"}
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+@app.post("/api/auth/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Generates a 6-digit reset code and sends the official security email."""
+    user = crud.get_user_by_email(db, email=req.email)
+    if not user:
+        # For security, don't reveal if the email is registered
+        return {"message": "If this email is registered, a security code will be sent."}
+    
+    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    ref_id = f"PC-{random.randint(10000, 99999)}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    
+    # Store or update the token record
+    reset_token = db.query(models.PasswordResetToken).filter(models.PasswordResetToken.email == req.email).first()
+    if reset_token:
+        reset_token.token = code
+        reset_token.expires_at = expires_at
+        reset_token.used = False
+    else:
+        reset_token = models.PasswordResetToken(
+            email=req.email,
+            token=code,
+            expires_at=expires_at
+        )
+        db.add(reset_token)
+    
+    db.commit()
+    send_password_reset_email(req.email, code, ref_id)
+    
+    return {
+        "message": "Reset code sent successfully.",
+        "reference_id": ref_id
+    }
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    code: str
+    new_password: str
+
+class VerifyResetCodeRequest(BaseModel):
+    email: str
+    code: str
+
+@app.post("/api/auth/verify-reset-code")
+async def verify_reset_code(req: VerifyResetCodeRequest, db: Session = Depends(get_db)):
+    """Verifies that the provided 6-digit sync code is valid and active."""
+    cleaned_code = req.code.replace(" ", "")
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.email == req.email,
+        models.PasswordResetToken.token == cleaned_code,
+        models.PasswordResetToken.used == False
+    ).first()
+    
+    if not reset_token:
+        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
+
+    # Explicitly compare aware UTC datetimes to ensure registry synchronization
+    current_time = datetime.now(timezone.utc)
+    db_expires_at = reset_token.expires_at
+    if db_expires_at.tzinfo is None:
+        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
+
+    if db_expires_at < current_time:
+        raise HTTPException(status_code=400, detail="Security token expired.")
+        
+    return {"message": "Identity synchronized. Identity verified."}
+
+@app.post("/api/auth/reset-password")
+async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Verifies the 6-digit code and updates the user's password."""
+    # Clean the code (remove spaces if user copied "319 472")
+    cleaned_code = req.code.replace(" ", "")
+
+    # Find the token
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.email == req.email,
+        models.PasswordResetToken.token == cleaned_code,
+        models.PasswordResetToken.used == False
+    ).first()
+    
+    if not reset_token:
+        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
+
+    # Explicitly compare aware UTC datetimes for credential update validation
+    current_time = datetime.now(timezone.utc)
+    db_expires_at = reset_token.expires_at
+    if db_expires_at.tzinfo is None:
+        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
+
+    if db_expires_at < current_time:
+        raise HTTPException(status_code=400, detail="Security token expired.")
+    
+    # Update user password
+    user = crud.get_user_by_email(db, email=req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="Subject not found in registry.")
+    
+    user.password_hash = auth.get_password_hash(req.new_password)
+    user.is_verified = True # Resetting password via email token is proof of ownership
+    reset_token.used = True # Mark as used
+    
+    db.commit()
+    return {"message": "Credentials updated successfully. System synchronized."}
 
 @app.post("/api/auth/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    captcha_token: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    # Verify reCAPTCHA
+    if not await verify_recaptcha(captcha_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reCAPTCHA. Please try again."
+        )
+
     user = crud.get_user_by_email(db, email=form_data.username)
     if not user or not auth.verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check verification status
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account not verified. Please check your email for the verification code.",
         )
     from datetime import timedelta
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)

@@ -133,7 +133,7 @@ const LGU_SERVICES_LIST = [
 const KNOWLEDGE_BASE_ARTICLES = [
     { id: 1, title: 'How AI Reporting Works', category: 'Tech Guide', excerpt: 'Learn how Gemini AI verifies your incident reports in real-time.' },
     { id: 2, title: 'Flood Evacuation Routes', category: 'Emergency', excerpt: 'Safe zones and routes for residents in Low-lying North Caloocan areas.' },
-    { id: 3, title: 'Waste Management 101', category: 'Environment', excerpt: 'Official garbage collection schedule and segregration rules.' },
+    { id: 3, title: 'Engineering Permit Guide', category: 'Public Works', excerpt: 'Step-by-step guide on applying for building and excavation permits in Caloocan North.' },
     { id: 4, title: 'Noise Ordinance Info', category: 'Community', excerpt: 'Understanding the city wide peace and order regulations.' },
 ];
 
