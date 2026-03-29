@@ -10,6 +10,8 @@ import {
     Map as MapIcon, 
     Filter, 
     MoreHorizontal,
+    Maximize2,
+    Minimize2,
     Navigation,
     ShieldAlert,
     TrendingUp,
@@ -108,34 +110,66 @@ const DispatcherDashboard = () => {
         { role: 'assistant', text: `Greetings, Dispatcher ${currentUser?.full_name || ''}. I am your Engineering Co-pilot. How can I assist with triage today?` }
     ]);
     const [isAILoading, setIsAILoading] = useState(false);
+    const [isAIMaximized, setIsAIMaximized] = useState(false);
+
+    const aiChatEndRef = useRef(null);
+
+    // Location-intent keyword detection
+    const LOCATION_KEYWORDS = /location|where|report|map|address|barangay|coordinates|lat|lng|pin|incident|hazard|site|area|place/i;
 
     const handleAIChat = async (e) => {
         e.preventDefault();
         if (!aiQuery.trim() || isAILoading) return;
-        
+
         const userMsg = { role: 'user', text: aiQuery };
         setAiMessages(prev => [...prev, userMsg]);
+        const capturedQuery = aiQuery;
         setAiQuery('');
         setIsAILoading(true);
 
         try {
+            // If query is location-related, fetch live report data
+            let reportContext = '';
+            let reportsForMap = [];
+            const isLocationQuery = LOCATION_KEYWORDS.test(capturedQuery);
+
+            if (isLocationQuery) {
+                try {
+                    const rResp = await fetch('http://localhost:8000/api/reports?limit=30', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (rResp.ok) {
+                        reportsForMap = await rResp.json();
+                        reportContext = `\n\nLive Report Data (${reportsForMap.length} active reports):\n` +
+                            reportsForMap.map((r, i) =>
+                                `${i + 1}. [RPT-${r.id}] ${r.ai_category || r.category || 'Uncategorized'} — ${r.location_string || `Lat:${r.location_lat?.toFixed(4)}, Lng:${r.location_lng?.toFixed(4)}`} — Status: ${r.status}`
+                            ).join('\n');
+                    }
+                } catch { /* silently skip if reports unavailable */ }
+            }
+
             const resp = await fetch('http://localhost:8000/api/ai/assistant', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ 
-                    query: aiQuery,
-                    context: `Dispatcher View. Active Mode: ${dashboardMode}. Current Selection: ${selectedReport?.category || 'None'}`
+                body: JSON.stringify({
+                    query: capturedQuery,
+                    context: `Dispatcher View. Mode: ${dashboardMode}. Selection: ${selectedReport?.category || 'None'}.${reportContext}`
                 })
             });
             const data = await resp.json();
-            setAiMessages(prev => [...prev, { role: 'assistant', text: data.response }]);
+            setAiMessages(prev => [...prev, {
+                role: 'assistant',
+                text: data.response,
+                mapData: reportsForMap.length > 0 ? reportsForMap : undefined
+            }]);
         } catch (err) {
-            setAiMessages(prev => [...prev, { role: 'assistant', text: "Error connecting to PULSO Brain." }]);
+            setAiMessages(prev => [...prev, { role: 'assistant', text: 'Error connecting to PULSO Brain.' }]);
         } finally {
             setIsAILoading(false);
+            setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         }
     };
 
@@ -1489,72 +1523,192 @@ const DispatcherDashboard = () => {
                 </main>
 
                 {/* PULSO Omni-Assistant FAB */}
-                <div className="fixed bottom-8 right-8 z-[100] flex flex-col items-end gap-4">
+                <div className="fixed bottom-24 right-6 z-[100] flex flex-col items-end gap-4">
                     <AnimatePresence>
                         {isAIChatOpen && (
-                            <motion.div 
-                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                                className="w-[380px] h-[500px] bg-slate-900 shadow-2xl rounded-2xl border border-slate-700 overflow-hidden flex flex-col"
-                            >
-                                <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center animate-pulse">
-                                            <Brain size={18} className="text-white" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-white text-sm">PULSO Omni-Assistant</h4>
-                                            <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Engineering Co-pilot</p>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => setIsAIChatOpen(false)} className="text-slate-400 hover:text-white transition-colors">
-                                        <MoreHorizontal size={20} />
-                                    </button>
-                                </div>
-                                
-                                <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
-                                    {aiMessages.map((msg, i) => (
-                                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium leading-relaxed ${
-                                                msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
-                                            }`}>
-                                                {msg.text}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {isAILoading && (
-                                        <div className="flex justify-start">
-                                            <div className="bg-slate-800 p-3 rounded-2xl flex gap-1">
-                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
-                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                            <>
+                                {/* Backdrop (maximized only) */}
+                                {isAIMaximized && (
+                                    <motion.div
+                                        key="backdrop"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[99]"
+                                        onClick={() => setIsAIMaximized(false)}
+                                    />
+                                )}
 
-                                <form onSubmit={handleAIChat} className="p-4 bg-slate-800 border-t border-slate-700">
-                                    <div className="relative">
-                                        <input 
-                                            type="text" 
-                                            value={aiQuery}
-                                            onChange={(e) => setAiQuery(e.target.value)}
-                                            placeholder="Ask PULSO Brain..."
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                        />
-                                        <button type="submit" disabled={isAILoading} className="absolute right-2 top-1.5 text-blue-500 hover:text-blue-400">
-                                            <Search size={16} />
-                                        </button>
+                                <motion.div
+                                    key="chat"
+                                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                    transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                                    className={`bg-slate-900 shadow-2xl border border-slate-700 overflow-hidden flex flex-col transition-all duration-300 ${
+                                        isAIMaximized
+                                            ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[100] rounded-3xl'
+                                            : 'w-[380px] h-[500px] rounded-2xl relative z-[100]'
+                                    }`}
+                                >
+                                    {/* Header */}
+                                    <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shrink-0">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-blue-800 flex items-center justify-center animate-pulse">
+                                                <Brain size={18} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-white text-sm">PULSO Omni-Assistant</h4>
+                                                <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Engineering Co-pilot</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {/* Maximize / Minimize toggle */}
+                                            <button
+                                                onClick={() => setIsAIMaximized(prev => !prev)}
+                                                title={isAIMaximized ? 'Minimize' : 'Maximize'}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                                            >
+                                                {isAIMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                                            </button>
+                                            {/* Close */}
+                                            <button
+                                                onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
+                                                title="Close"
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
+                                            >
+                                                <MoreHorizontal size={18} />
+                                            </button>
+                                        </div>
                                     </div>
-                                </form>
-                            </motion.div>
+
+                                    {/* Messages */}
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
+                                        {aiMessages.map((msg, i) => (
+                                            <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                                {/* Text bubble */}
+                                                <div className={`${
+                                                    isAIMaximized ? 'max-w-[70%]' : 'max-w-[90%]'
+                                                } p-3 rounded-2xl text-xs font-medium leading-relaxed ${
+                                                    msg.role === 'user' ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
+                                                }`}>
+                                                    {msg.text}
+                                                </div>
+
+                                                {/* Map Result Card — shown only for assistant messages with location data */}
+                                                {msg.role === 'assistant' && msg.mapData && msg.mapData.length > 0 && isLoaded && (
+                                                    <div className={`w-full ${isAIMaximized ? 'max-w-[85%]' : 'max-w-full'} rounded-2xl border border-slate-700 overflow-hidden bg-slate-800/80`}>
+                                                        {/* Map label */}
+                                                        <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/60 border-b border-slate-700">
+                                                            <MapIcon size={13} className="text-orange-400" />
+                                                            <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest">Live Report Locations</span>
+                                                            <span className="ml-auto text-[10px] text-slate-400 font-semibold">{msg.mapData.length} pins</span>
+                                                        </div>
+
+                                                        {/* Embedded mini Google Map */}
+                                                        <div className="w-full h-44 relative">
+                                                            <GoogleMap
+                                                                mapContainerStyle={{ width: '100%', height: '100%' }}
+                                                                center={CALOOCAN_CENTER}
+                                                                zoom={13}
+                                                                options={{
+                                                                    disableDefaultUI: true,
+                                                                    styles: [
+                                                                        { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+                                                                        { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+                                                                        { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+                                                                        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+                                                                        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0c1626' }] },
+                                                                    ]
+                                                                }}
+                                                            >
+                                                                {msg.mapData.map(r => r.location_lat && r.location_lng && (
+                                                                    <MarkerF
+                                                                        key={r.id}
+                                                                        position={{ lat: r.location_lat, lng: r.location_lng }}
+                                                                        title={`RPT-${r.id}: ${r.ai_category || r.category}`}
+                                                                        icon={window.google?.maps ? {
+                                                                            path: window.google.maps.SymbolPath.CIRCLE,
+                                                                            fillColor: r.status === 'resolved' ? '#22c55e' : r.ai_urgency === 'Critical' ? '#ef4444' : '#f97316',
+                                                                            fillOpacity: 1,
+                                                                            scale: 7,
+                                                                            strokeColor: 'white',
+                                                                            strokeWeight: 2,
+                                                                        } : undefined}
+                                                                    />
+                                                                ))}
+                                                            </GoogleMap>
+                                                        </div>
+
+                                                        {/* Report list — scrollable */}
+                                                        <div className="max-h-48 overflow-y-auto divide-y divide-slate-700/50 scrollbar-thin scrollbar-thumb-slate-700">
+                                                            {msg.mapData.map((r, idx) => (
+                                                                <button
+                                                                    key={r.id}
+                                                                    onClick={() => map?.panTo({ lat: r.location_lat, lng: r.location_lng })}
+                                                                    className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-slate-700/50 transition-colors text-left group"
+                                                                >
+                                                                    {/* Index badge */}
+                                                                    <span className="shrink-0 w-5 h-5 rounded-full bg-slate-700 text-[10px] font-bold text-slate-300 flex items-center justify-center mt-0.5">{idx + 1}</span>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                                            <span className="text-[11px] font-bold text-white truncate">{r.ai_category || r.category || 'Uncategorized'}</span>
+                                                                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                                                                                r.status === 'resolved' ? 'bg-green-500/15 text-green-400' :
+                                                                                r.ai_urgency === 'Critical' ? 'bg-red-500/15 text-red-400' :
+                                                                                'bg-orange-500/15 text-orange-400'
+                                                                            }`}>{r.status}</span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1 mt-0.5">
+                                                                            <MapPin size={9} className="text-slate-500 shrink-0" />
+                                                                            <span className="text-[10px] text-slate-400 truncate">
+                                                                                {r.location_string || `${r.location_lat?.toFixed(4)}°N, ${r.location_lng?.toFixed(4)}°E`}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="text-[9px] font-mono text-slate-600 group-hover:text-orange-400 transition-colors shrink-0">RPT-{r.id}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {isAILoading && (
+                                            <div className="flex justify-start">
+                                                <div className="bg-slate-800 p-3 rounded-2xl flex gap-1">
+                                                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                                                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div ref={aiChatEndRef} />
+                                    </div>
+
+                                    {/* Input */}
+                                    <form onSubmit={handleAIChat} className="p-4 bg-slate-800 border-t border-slate-700 shrink-0">
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={aiQuery}
+                                                onChange={(e) => setAiQuery(e.target.value)}
+                                                placeholder="Ask PULSO Brain..."
+                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-blue-600 outline-none"
+                                            />
+                                            <button type="submit" disabled={isAILoading} className="absolute right-2 top-[7px] text-blue-400 hover:text-blue-300 disabled:opacity-40">
+                                                <Search size={16} />
+                                            </button>
+                                        </div>
+                                    </form>
+                                </motion.div>
+                            </>
                         )}
                     </AnimatePresence>
 
-                    <button 
+                    <button
                         onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-                        className="w-16 h-16 rounded-full bg-blue-600 shadow-2xl flex items-center justify-center text-white hover:bg-blue-500 transition-all hover:scale-105 active:scale-95 group"
+                        className="w-16 h-16 rounded-full bg-blue-900 shadow-2xl shadow-blue-900/50 flex items-center justify-center text-white hover:bg-blue-800 transition-all hover:scale-105 active:scale-95 group"
                     >
                         <Brain size={32} className="group-hover:animate-pulse" />
                     </button>

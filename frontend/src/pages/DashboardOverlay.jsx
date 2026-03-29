@@ -321,7 +321,7 @@ export default function DashboardOverlay({ onNavigate }) {
 
             </div>
             {/* AI Assistant Floating Interface */}
-            <div className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-3 sm:bottom-8 sm:right-8">
+            <div className="fixed bottom-24 right-6 z-[60] flex flex-col items-end gap-3 sm:bottom-24 sm:right-8">
                 <AnimatePresence>
                     {isAIChatOpen && (
                         <motion.div 
