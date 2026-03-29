@@ -9,11 +9,21 @@ from typing import Dict, Any, Optional
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv('GOOGLE_GEMINI_API_KEY')
+GOOGLE_CREDENTIALS = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
 GEMINI_MODEL = "gemini-1.5-flash"
 
 # Configure the SDK
-if GEMINI_API_KEY:
+# Priority 1: Official Service Account (ADC) automatically handled by SDK via env
+# Priority 2: Explicit API Key
+if GEMINI_API_KEY and not GOOGLE_CREDENTIALS:
     genai.configure(api_key=GEMINI_API_KEY)
+elif GOOGLE_CREDENTIALS:
+    # Explicitly check if path exists to avoid silent failures
+    if os.path.exists(GOOGLE_CREDENTIALS):
+        print(f"[AI] Initializing Vertex AI via Service Account: {GOOGLE_CREDENTIALS}")
+    else:
+        print(f"[AI] WARNING: Credentials path {GOOGLE_CREDENTIALS} not found. Falling back to API Key.")
+        if GEMINI_API_KEY: genai.configure(api_key=GEMINI_API_KEY)
 
 def analyze_report(description: str, image_data: Optional[bytes] = None):
     """
