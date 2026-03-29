@@ -529,6 +529,29 @@ async def geocode_search(
     results = await maps_service.forward_geocode(q)
     return {"results": results}
 
+
+@app.get("/api/maps/directions")
+async def get_directions_proxy(
+    origin: str = Query(..., description="Origin coords or address"),
+    destination: str = Query(..., description="Destination coords or address"),
+    mode: str = Query("driving", description="driving, walking, bicycling, or transit"),
+    current_user: schemas.UserResponse = Depends(get_current_user)
+):
+    """
+    Get routing directions between two locations.
+    Useful for dispatch navigation and travel time estimation.
+    """
+    route = await maps_service.get_directions(origin, destination, mode)
+    if not route:
+        raise HTTPException(status_code=400, detail="Could not calculate route due to server error")
+    
+    # Check if we got an error response from Google (status != OK)
+    if route.get("status") and route.get("status") != "OK":
+        error_msg = route.get("error_detail") or f"Google Maps Error: {route.get('status')}"
+        raise HTTPException(status_code=400, detail=error_msg)
+        
+    return route
+
 @app.patch("/api/reports/{report_id}/status", response_model=schemas.ReportResponse)
 def update_report_status(
     report_id: int,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { 
@@ -25,7 +25,7 @@ import {
     MapPin,
     Truck
 } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF } from '@react-google-maps/api';
 import { Link, useNavigate } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 
@@ -98,45 +98,134 @@ const DispatcherDashboard = () => {
     const [pulseRadius, setPulseRadius] = useState(0);
     const [isJurisdictionModalOpen, setIsJurisdictionModalOpen] = useState(false);
     const [jurisdictionErrorMsg, setJurisdictionErrorMsg] = useState("");
+    const [svHeading, setSvHeading] = useState(0);
+    const miniMapRef = useRef(null);
+
+    // Sync Street View with State
+    useEffect(() => {
+        if (!panorama || !miniMapRef.current) return;
+
+        // Secure widget into Street View controls (Bottom Left)
+        const controlPosition = window.google.maps.ControlPosition.LEFT_BOTTOM;
+        const controlDiv = miniMapRef.current;
+        
+        panorama.controls[controlPosition].clear();
+        panorama.controls[controlPosition].push(controlDiv);
+
+        const posListener = panorama.addListener('position_changed', () => {
+            const pos = panorama.getPosition().toJSON();
+            setSvLocation(pos);
+        });
+
+        const povListener = panorama.addListener('pov_changed', () => {
+             const pov = panorama.getPov();
+             setSvHeading(pov.heading);
+        });
+
+        const visListener = panorama.addListener('visible_changed', () => {
+            setIsStreetActive(panorama.getVisible());
+        });
+
+        return () => {
+            window.google.maps.event.removeListener(posListener);
+            window.google.maps.event.removeListener(povListener);
+            window.google.maps.event.removeListener(visListener);
+            if (panorama && panorama.controls) {
+                panorama.controls[window.google.maps.ControlPosition.LEFT_BOTTOM].clear();
+            }
+        };
+    }, [panorama]);
     
     // Routing state
     const [directionsResponse, setDirectionsResponse] = useState(null);
     const [distance, setDistance] = useState('');
     const [duration, setDuration] = useState('');
     
-    // Reset route when selected marker changes
+    // Reset route when selected report changes
     useEffect(() => {
         setDirectionsResponse(null);
         setDistance('');
         setDuration('');
-    }, [selectedMarker]);
+    }, [selectedReport]);
 
-    const handleGetDirections = () => {
-        if (selectedMarker && selectedMarker.location_lat && selectedMarker.location_lng && window.google) {
-            const directionsService = new window.google.maps.DirectionsService();
-            directionsService.route(
-                {
-                    origin: CALOOCAN_CITY_HALL_NORTH_LOC,
-                    destination: { 
-                        lat: parseFloat(selectedMarker.location_lat), 
-                        lng: parseFloat(selectedMarker.location_lng) 
-                    },
-                    travelMode: window.google.maps.TravelMode.DRIVING,
-                },
-                (result, status) => {
-                    if (status === window.google.maps.DirectionsStatus.OK) {
-                        setDirectionsResponse(result);
-                        setDistance(result.routes[0].legs[0].distance.text);
-                        setDuration(result.routes[0].legs[0].duration.text);
+    const [directionsLoading, setDirectionsLoading] = useState(false);
+
+    const handleGetDirections = async (targetReport = null, originOverride = null) => {
+        const target = targetReport || selectedReport || selectedMarker;
+        const originObj = originOverride || CALOOCAN_CITY_HALL_NORTH_LOC;
+        const originStr = `${originObj.lat},${originObj.lng}`;
+        const destStr = target ? `${target.location_lat},${target.location_lng}` : '';
+        
+        console.log("handleGetDirections (Proxy) triggered for:", target?.id);
+
+        if (target && destStr) {
+            setDirectionsLoading(true);
+            try {
+                // Using the secure backend proxy we created earlier
+                const response = await fetch(`http://localhost:8000/api/maps/directions?origin=${encodeURIComponent(originStr)}&destination=${encodeURIComponent(destStr)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.polyline) {
+                        console.log("Directions Proxy OK:", data.distance);
+                        
+                                // Decode the polyline points for the map
+                        if (window.google && window.google.maps && window.google.maps.geometry) {
+                            const decodedPath = window.google.maps.geometry.encoding.decodePath(data.polyline);
+                            
+                            // Find Midpoint for the label
+                            const midpointIndex = Math.floor(decodedPath.length / 2);
+                            const midpoint = { 
+                                lat: decodedPath[midpointIndex].lat(), 
+                                lng: decodedPath[midpointIndex].lng() 
+                            };
+
+                            setDirectionsResponse({
+                                routes: [{
+                                    legs: [{
+                                        distance: { text: data.distance },
+                                        duration: { text: data.duration },
+                                        steps: [],
+                                    }],
+                                    overview_path: decodedPath,
+                                    overview_polyline: data.polyline, 
+                                    bounds: data.bounds,
+                                    midpoint: midpoint
+                                }]
+                            });
+                        }
+                        
+                        setDistance(data.distance);
+                        setDuration(data.duration);
+                        
+                        if (!selectedMarker || selectedMarker.id !== target.id) {
+                            setSelectedMarker(target);
+                        }
                     } else {
-                        console.error('Directions request failed due to ' + status);
-                        setDirectionsResponse(null);
-                        setDistance('');
-                        setDuration('');
+                        throw new Error("Invalid route data received");
                     }
+                } else {
+                    const err = await response.json();
+                    throw new Error(err.detail || "API Request Denied (Check GCP Console)");
                 }
-            );
+            } catch (err) {
+                console.error('Directions Proxy failed:', err);
+                alert(`Routing Error: ${err.message}. Please ensure 'Directions API' is enabled in your Google Cloud Console.`);
+                setDirectionsResponse(null);
+                setDistance('');
+                setDuration('');
+            } finally {
+                setDirectionsLoading(false);
+            }
         }
+    };
+
+    const handleExternalDirections = (target) => {
+        if (!target || !target.location_lat) return;
+        const url = `https://www.google.com/maps/dir/?api=1&origin=${CALOOCAN_CITY_HALL_NORTH_LOC.lat},${CALOOCAN_CITY_HALL_NORTH_LOC.lng}&destination=${target.location_lat},${target.location_lng}&travelmode=driving`;
+        window.open(url, '_blank');
     };
 
     useEffect(() => {
@@ -408,11 +497,11 @@ const DispatcherDashboard = () => {
         return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
     };
 
-    // Mock Fleet Data
+    // Mock Fleet Data with GPS Coordinates
     const fleetStatus = [
-        { id: 'FL-01', name: 'Team Alpha', status: 'Available', type: 'Electrical', location: 'Zone 12' },
-        { id: 'FL-02', name: 'Team Beta', status: 'En Route', type: 'General/Roads', location: 'Main Avenue' },
-        { id: 'FL-03', name: 'Team Gamma', status: 'On Site', type: 'Plumbing/Water', location: 'Block 4' },
+        { id: 'FL-01', name: 'Team Alpha', status: 'Available', type: 'Electrical', location: 'Zone 12', lat: 14.758, lng: 121.035 },
+        { id: 'FL-02', name: 'Team Beta', status: 'En Route', type: 'General/Roads', location: 'Main Avenue', lat: 14.745, lng: 121.065 },
+        { id: 'FL-03', name: 'Team Gamma', status: 'On Site', type: 'Plumbing/Water', location: 'Block 4', lat: 14.762, lng: 121.042 },
     ];
 
     return (
@@ -507,7 +596,12 @@ const DispatcherDashboard = () => {
                                         return (
                                         <button 
                                             key={report.id}
-                                            onClick={() => setSelectedReport({...report, aiConfidence, color, icon})}
+                                            onClick={() => {
+                                                const reportWithContext = {...report, aiConfidence, color, icon};
+                                                setSelectedReport(reportWithContext);
+                                                setSelectedMarker(report);
+                                                if (map) map.panTo({ lat: report.location_lat, lng: report.location_lng });
+                                            }}
                                             className={`w-full text-left p-3 rounded-xl border transition-all ${selectedReport?.id === report.id ? `bg-${color}-50 dark:bg-${color}-900/20 border-${color}-200 dark:border-${color}-500/50` : 'bg-white dark:bg-slate-950/50 border-slate-200 dark:border-slate-800/50 hover:border-slate-300 dark:hover:border-slate-700 shadow-sm'}`}
                                         >
                                             <div className="flex justify-between items-start mb-2">
@@ -628,9 +722,17 @@ const DispatcherDashboard = () => {
                                 <InfoWindowF
                                     position={{ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng }}
                                     onCloseClick={() => setSelectedMarker(null)}
+                                    options={{ 
+                                        pixelOffset: new window.google.maps.Size(0, -35),
+                                        zIndex: 1000 
+                                    }}
                                 >
                                     {/* All inline styles — Tailwind dark: classes are unreliable inside Google Maps DOM */}
-                                    <div style={{ background:'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)', borderRadius:'16px', padding:'16px', minWidth:'220px', border:'1px solid rgba(255,255,255,0.07)', margin:'-10px', boxShadow:'0 25px 50px rgba(0,0,0,0.7)', fontFamily:'Inter,sans-serif', display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', position:'relative' }}>
+                                    <div 
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ background:'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)', borderRadius:'16px', padding:'16px', minWidth:'220px', border:'1px solid rgba(255,255,255,0.07)', margin:'-10px', boxShadow:'0 25px 50px rgba(0,0,0,0.7)', fontFamily:'Inter,sans-serif', display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', position:'relative' }}
+                                    >
                                         {/* Close */}
                                         <button onClick={() => setSelectedMarker(null)} style={{ position:'absolute', top:'10px', right:'10px', background:'rgba(255,255,255,0.07)', border:'none', borderRadius:'50%', width:'26px', height:'26px', cursor:'pointer', color:'#94a3b8', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
                                         {/* Icon */}
@@ -642,17 +744,31 @@ const DispatcherDashboard = () => {
                                         {/* Distance & Duration from HQ or Get Route Button */}
                                         {!directionsResponse ? (
                                             <button
-                                                onClick={handleGetDirections}
-                                                style={{ width:'100%', padding:'10px 0', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'12px', color:'#f1f5f9', fontSize:'12px', fontWeight:600, cursor:'pointer', marginBottom:'14px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'all 0.2s' }}
-                                                onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
-                                                onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                                                disabled={directionsLoading}
+                                                onPointerDown={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
+                                                onClick={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
+                                                style={{ width:'100%', padding:'10px 0', background: directionsLoading ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'12px', color:'#f1f5f9', fontSize:'12px', fontWeight:600, cursor: directionsLoading ? 'wait' : 'pointer', marginBottom:'14px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'all 0.2s', position:'relative', zIndex:1001 }}
+                                                onMouseOver={(e) => { if(!directionsLoading) e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                                                onMouseOut={(e) => { if(!directionsLoading) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
                                             >
-                                                <Navigation size={14} color="#f97316" /> Get Directions
+                                                {directionsLoading ? (
+                                                    <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                                                ) : (
+                                                    <><Navigation size={14} color="#f97316" /> Get Directions</>
+                                                )}
                                             </button>
                                         ) : (
-                                            <div style={{ display:'flex', alignItems:'center', gap:'6px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'999px', padding:'4px 14px', marginBottom:'14px' }}>
-                                                <span style={{ color:'#f97316', display:'flex' }}><Truck size={12} /></span>
-                                                <span style={{ fontSize:'10px', fontWeight:700, color:'#cbd5e1' }}>HQ → {distance} ({duration})</span>
+                                            <div style={{ display:'flex', flexDirection:'column', gap:'8px', width:'100%', marginBottom:'14px' }}>
+                                                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', borderRadius:'12px', padding:'8px 14px' }}>
+                                                    <Truck size={12} style={{ color:'#f97316' }} />
+                                                    <span style={{ fontSize:'10px', fontWeight:800, color:'#f1f5f9' }}>{distance} • {duration}</span>
+                                                </div>
+                                                <button 
+                                                    onClick={() => handleExternalDirections(selectedMarker)}
+                                                    style={{ width:'100%', background:'transparent', border:'none', color:'#94a3b8', fontSize:'9px', fontWeight:700, textTransform:'uppercase', cursor:'pointer', textDecoration:'underline' }}
+                                                >
+                                                    Open in Maps App
+                                                </button>
                                             </div>
                                         )}
                                         {/* Status pill */}
@@ -688,7 +804,7 @@ const DispatcherDashboard = () => {
                                 zIndex={200}
                                 icon={window.google && window.google.maps ? {
                                     path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-                                    fillColor: '#3b82f6',
+                                    fillColor: '#f97316',
                                     fillOpacity: 1,
                                     scale: 6,
                                     strokeColor: 'white',
@@ -697,20 +813,164 @@ const DispatcherDashboard = () => {
                                 title="Caloocan City Hall North (HQ)"
                             />
 
-                            {/* Route to Selected Hazard */}
-                            {directionsResponse && (
-                                <DirectionsRenderer
-                                    directions={directionsResponse}
-                                    options={{
-                                        suppressMarkers: true,
-                                        polylineOptions: {
-                                            strokeColor: '#f97316',
-                                            strokeOpacity: 0.8,
-                                            strokeWeight: 5
-                                        }
-                                    }}
+                            {/* Fleet unit markers */}
+                            {fleetStatus.map(team => (
+                                <MarkerF
+                                    key={team.id}
+                                    position={{ lat: team.lat, lng: team.lng }}
+                                    icon={window.google && window.google.maps ? {
+                                        path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                                        scale: 5,
+                                        fillColor: team.status === 'Available' ? '#22c55e' : (team.status === 'En Route' ? '#f97316' : '#f97316'),
+                                        fillOpacity: 1,
+                                        strokeWeight: 2,
+                                        strokeColor: 'white',
+                                        rotation: 0
+                                    } : undefined}
+                                    title={`${team.name} (${team.status})`}
                                 />
+                            ))}
+
+                            {/* Route to Selected Hazard - NAVIGATION VISUALS (On Main Map) */}
+                            {directionsResponse && directionsResponse.routes && directionsResponse.routes[0] && (
+                                <>
+                                    {/* Path Casing (Border) */}
+                                    <PolylineF
+                                        path={directionsResponse.routes[0].overview_path}
+                                        options={{
+                                            strokeColor: '#ffffff',
+                                            strokeOpacity: 1,
+                                            strokeWeight: 10,
+                                            zIndex: 499,
+                                            clickable: false
+                                        }}
+                                    />
+                                    {/* Main Path (Safety Orange) */}
+                                    <PolylineF
+                                        path={directionsResponse.routes[0].overview_path}
+                                        options={{
+                                            strokeColor: '#f97316', 
+                                            strokeOpacity: 1,
+                                            strokeWeight: 6,
+                                            zIndex: 500,
+                                            clickable: false
+                                        }}
+                                    />
+                                    {/* Floating Duration Label at Midpoint */}
+                                    {directionsResponse.routes[0].midpoint && (
+                                        <InfoWindowF
+                                            position={directionsResponse.routes[0].midpoint}
+                                            options={{ 
+                                                disableAutoPan: true,
+                                                closeBoxURL: "", 
+                                                enableEventPropagation: true,
+                                                pixelOffset: new window.google.maps.Size(0, 0)
+                                            }}
+                                        >
+                                            <div style={{ 
+                                                background: '#883900ff', 
+                                                color: 'white', 
+                                                padding: '2px 8px', 
+                                                borderRadius: '6px', 
+                                                fontSize: '11px', 
+                                                fontWeight: 'bold',
+                                                border: '2px solid white',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {duration}
+                                            </div>
+                                        </InfoWindowF>
+                                    )}
+                                </>
                             )}
+
+                            {/* Tactical Overlays (VISIBLE ONLY IN STREET VIEW) */}
+                            {isStreetActive && directionsResponse && directionsResponse.routes && (
+                                <>
+                                    <PolylineF
+                                        path={directionsResponse.routes[0].overview_path}
+                                        panorama={panorama}
+                                        options={{
+                                            strokeColor: '#ffffff',
+                                            strokeOpacity: 0.8,
+                                            strokeWeight: 8,
+                                            zIndex: 499
+                                        }}
+                                    />
+                                    <PolylineF
+                                        path={directionsResponse.routes[0].overview_path}
+                                        panorama={panorama}
+                                        options={{
+                                            strokeColor: '#f97316',
+                                            strokeOpacity: 0.9,
+                                            strokeWeight: 5,
+                                            zIndex: 500
+                                        }}
+                                    />
+                                </>
+                            )}
+                            
+                            {/* Mini-Map Navigation Widget (Active in Street View) */}
+                            <div 
+                                ref={miniMapRef}
+                                style={{ 
+                                    display: isStreetActive && svLocation ? 'block' : 'none',
+                                    paddingLeft: '12px',
+                                    paddingBottom: '24px',
+                                    zIndex: 1000
+                                }}
+                            >
+                                <div style={{ 
+                                    width: '200px', 
+                                    height: '150px', 
+                                    borderRadius: '16px', 
+                                    border: '4px solid white', 
+                                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)', 
+                                    overflow: 'hidden', 
+                                    pointerEvents: 'auto' 
+                                }}>
+                                    <GoogleMap
+                                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                                        center={svLocation}
+                                        zoom={17}
+                                        options={{
+                                            disableDefaultUI: true,
+                                            gestureHandling: 'none',
+                                            styles: [
+                                                { elementType: 'labels', stylers: [{ visibility: 'on' }] },
+                                                { featureType: 'poi', stylers: [{ visibility: 'off' }] }
+                                            ]
+                                        }}
+                                    >
+                                        {/* "You are here" Pulse / Heading Indicator */}
+                                        <MarkerF
+                                            position={svLocation}
+                                            icon={window.google && window.google.maps ? {
+                                                path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                                                scale: 5,
+                                                fillColor: '#3b82f6',
+                                                fillOpacity: 1,
+                                                strokeWeight: 2,
+                                                strokeColor: 'white',
+                                                rotation: svHeading
+                                            } : undefined}
+                                        />
+                                        {/* Reference Path for orientation */}
+                                        {directionsResponse && directionsResponse.routes && (
+                                            <PolylineF
+                                                path={directionsResponse.routes[0].overview_path}
+                                                options={{
+                                                    strokeColor: '#f97316',
+                                                    strokeOpacity: 0.8,
+                                                    strokeWeight: 3,
+                                                    clickable: false
+                                                }}
+                                            />
+                                        )}
+                                    </GoogleMap>
+                                </div>
+                            </div>
 
                             {/* Street View Camera Position Marker (on Map & Street View) - Pulsing Signal Waves */}
                             {svLocation && (
@@ -771,8 +1031,8 @@ const DispatcherDashboard = () => {
                         </div>
                     )}
 
-                    {/* Map UI Floating Controls */}
-                    <div className="absolute bottom-32 left-6 flex flex-col gap-2 pointer-events-none">
+                    {/* Map UI Floating Controls - Stacked Above the MiniMap */}
+                    <div className="absolute bottom-[205px] left-[30px] flex flex-col gap-2 pointer-events-none mb-1">
                         <div className="bg-slate-900/90 backdrop-blur border border-slate-800 rounded-xl p-3 flex flex-col gap-3 shadow-xl pointer-events-auto">
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Live Map Feed</h4>
                             <div className="flex items-center gap-3">
@@ -885,6 +1145,34 @@ const DispatcherDashboard = () => {
                                                     </div>
                                                 )}
 
+                                                {/* Route Info in Sidebar */}
+                                                {directionsResponse && (
+                                                    <div className="mb-4 p-3 rounded-xl bg-orange-500/5 border border-orange-500/20 flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">Route to Incident</div>
+                                                            <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                                <Truck size={14} className="text-orange-500"/> {distance} • {duration}
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => handleExternalDirections(selectedReport)}
+                                                            className="p-2 rounded-lg bg-white dark:bg-slate-800 text-slate-500 hover:text-blue-500 transition-colors shadow-sm"
+                                                        >
+                                                            <Navigation size={16} />
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {!directionsResponse && (
+                                                    <button 
+                                                        onClick={() => handleGetDirections(selectedReport)}
+                                                        className="w-full mb-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-800"
+                                                    >
+                                                        <Navigation size={14} className="text-orange-500"/>
+                                                        Calculate Logistics & Route
+                                                    </button>
+                                                )}
+
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <button 
                                                         onClick={() => handleRejectReport(selectedReport.id)}
@@ -948,9 +1236,26 @@ const DispatcherDashboard = () => {
                                         <div className="text-xs text-slate-400 mb-1">Type: <span className="text-slate-300">{team.type}</span></div>
                                         <div className="text-xs text-slate-400 flex justify-between items-center">
                                             <span>Loc: <span className="text-slate-300">{team.location}</span></span>
-                                            {team.status === 'Available' && (
-                                                <button className="text-blue-400 hover:text-blue-300 font-bold">Assign Work</button>
-                                            )}
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    onClick={() => map?.panTo({ lat: team.lat, lng: team.lng })}
+                                                    className="text-slate-400 hover:text-white"
+                                                    title="Locate Team"
+                                                >
+                                                    <MapPin size={14}/>
+                                                </button>
+                                                {selectedReport && (
+                                                    <button 
+                                                        onClick={() => handleGetDirections(selectedReport, { lat: team.lat, lng: team.lng })}
+                                                        className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1"
+                                                    >
+                                                        <Navigation size={12}/> Route
+                                                    </button>
+                                                )}
+                                                {team.status === 'Available' && (
+                                                    <button className="text-blue-400 hover:text-blue-300 font-bold">Assign</button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

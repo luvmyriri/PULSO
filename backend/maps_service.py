@@ -15,6 +15,7 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
 GEOCODING_URL   = "https://maps.googleapis.com/maps/api/geocode/json"
 PLACES_TEXT_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+DIRECTIONS_URL  = "https://maps.googleapis.com/maps/api/directions/json"
 
 
 async def reverse_geocode(lat: float, lng: float) -> str:
@@ -86,6 +87,53 @@ async def forward_geocode(query: str, region: str = "PH") -> list:
 
     except Exception:
         return []
+
+
+async def get_directions(origin: str, destination: str, mode: str = "driving") -> Optional[dict]:
+    """
+    Get directions between two points (coords or address).
+    Returns basic route data including encoded polyline, distance, and duration.
+    """
+    if not GOOGLE_MAPS_API_KEY:
+        return None
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                DIRECTIONS_URL,
+                params={
+                    "origin": origin,
+                    "destination": destination,
+                    "mode": mode,
+                    "key": GOOGLE_MAPS_API_KEY,
+                    "region": "ph"
+                }
+            )
+            data = resp.json()
+
+        if data.get("status") == "OK" and data.get("routes"):
+            route = data["routes"][0]
+            leg = route["legs"][0]
+            
+            return {
+                "polyline": route["overview_polyline"]["points"],
+                "distance": leg["distance"]["text"],
+                "duration": leg["duration"]["text"],
+                "start_address": leg["start_address"],
+                "end_address": leg["end_address"],
+                "bounds": route["bounds"],
+                "status": "OK"
+            }
+        
+        print(f"[GOOGLE MAPS ERROR] Status: {data.get('status')} - Error Message: {data.get('error_message')}")
+        return {
+            "status": data.get("status"),
+            "error_detail": data.get("error_message")
+        }
+
+    except Exception as e:
+        print(f"[GOOGLE MAPS EXCEPTION] {str(e)}")
+        return None
 
 
 def _shorten_address(full_address: str) -> str:
