@@ -202,17 +202,16 @@ def get_infrastructure_clusters(
             cat_counts[c.lower()] += 1
         dominant_category = max(cat_counts, key=cat_counts.get)
 
-        # Recurrence score — reports at previously-resolved locations
+        # Recurrence score — resolved reports of same category near the centroid
         resolved_ids = {
-            r.id for r in db.query(models.Report).filter(
+            res.id for res in db.query(models.Report).filter(
                 models.Report.status == "resolved",
                 models.Report.location_lat.isnot(None),
+                models.Report.category == dominant_category
             ).all()
-            if any(
-                _haversine_meters(r.location_lat, r.location_lng, centroid_lat, centroid_lng) <= cluster_radius
-                for r in group[:1]  # cheap proximity check anchor
-            )
+            if _haversine_meters(res.location_lat, res.location_lng, centroid_lat, centroid_lng) <= cluster_radius
         }
+
         # Recurrence score capped at 100% based on active group size
         recurrence_score = min(1.0, len(resolved_ids) / max(len(group), 1))
 
