@@ -17,7 +17,7 @@ load_dotenv()
 
 GEMINI_API_KEY     = os.getenv("GOOGLE_GEMINI_API_KEY")
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google-credentials.json")
-GEMINI_MODEL       = "models/gemini-2.5-flash"
+GEMINI_MODEL       = "models/gemini-1.5-flash"   # Production-ready Flash model
 
 # ── SDK Init ──────────────────────────────────────────────────────────────────
 

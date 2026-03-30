@@ -483,112 +483,8 @@ def resend_code(req: VerificationRequest, db: Session = Depends(get_db)):
     send_verification_email(user.email, code)
     return {"status": "success", "message": "New code sent"}
 
-class ForgotPasswordRequest(BaseModel):
-    email: str
 
-@app.post("/api/auth/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    """Generates a 6-digit reset code and sends the official security email."""
-    user = crud.get_user_by_email(db, email=req.email)
-    if not user:
-        # For security, don't reveal if the email is registered
-        return {"message": "If this email is registered, a security code will be sent."}
-    
-    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-    ref_id = f"PC-{random.randint(10000, 99999)}"
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
-    
-    # Store or update the token record
-    reset_token = db.query(models.PasswordResetToken).filter(models.PasswordResetToken.email == req.email).first()
-    if reset_token:
-        reset_token.token = code
-        reset_token.expires_at = expires_at
-        reset_token.used = False
-    else:
-        reset_token = models.PasswordResetToken(
-            email=req.email,
-            token=code,
-            expires_at=expires_at
-        )
-        db.add(reset_token)
-    
-    db.commit()
-    send_password_reset_email(req.email, code, ref_id)
-    
-    return {
-        "message": "Reset code sent successfully.",
-        "reference_id": ref_id
-    }
 
-class ResetPasswordRequest(BaseModel):
-    email: str
-    code: str
-    new_password: str
-
-class VerifyResetCodeRequest(BaseModel):
-    email: str
-    code: str
-
-@app.post("/api/auth/verify-reset-code")
-async def verify_reset_code(req: VerifyResetCodeRequest, db: Session = Depends(get_db)):
-    """Verifies that the provided 6-digit sync code is valid and active."""
-    cleaned_code = req.code.replace(" ", "")
-    reset_token = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.email == req.email,
-        models.PasswordResetToken.token == cleaned_code,
-        models.PasswordResetToken.used == False
-    ).first()
-    
-    if not reset_token:
-        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
-
-    # Explicitly compare aware UTC datetimes to ensure registry synchronization
-    current_time = datetime.now(timezone.utc)
-    db_expires_at = reset_token.expires_at
-    if db_expires_at.tzinfo is None:
-        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
-
-    if db_expires_at < current_time:
-        raise HTTPException(status_code=400, detail="Security token expired.")
-        
-    return {"message": "Identity synchronized. Identity verified."}
-
-@app.post("/api/auth/reset-password")
-async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
-    """Verifies the 6-digit code and updates the user's password."""
-    # Clean the code (remove spaces if user copied "319 472")
-    cleaned_code = req.code.replace(" ", "")
-
-    # Find the token
-    reset_token = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.email == req.email,
-        models.PasswordResetToken.token == cleaned_code,
-        models.PasswordResetToken.used == False
-    ).first()
-    
-    if not reset_token:
-        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
-
-    # Explicitly compare aware UTC datetimes for credential update validation
-    current_time = datetime.now(timezone.utc)
-    db_expires_at = reset_token.expires_at
-    if db_expires_at.tzinfo is None:
-        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
-
-    if db_expires_at < current_time:
-        raise HTTPException(status_code=400, detail="Security token expired.")
-    
-    # Update user password
-    user = crud.get_user_by_email(db, email=req.email)
-    if not user:
-        raise HTTPException(status_code=404, detail="Subject not found in registry.")
-    
-    user.password_hash = auth.get_password_hash(req.new_password)
-    user.is_verified = True # Resetting password via email token is proof of ownership
-    reset_token.used = True # Mark as used
-    
-    db.commit()
-    return {"message": "Credentials updated successfully. System synchronized."}
 
 @app.post("/api/auth/login")
 async def login(
@@ -662,7 +558,8 @@ async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_
     import secrets
     from datetime import datetime, timedelta
     token = secrets.token_urlsafe(32)
-    expires = datetime.utcnow() + timedelta(hours=1)
+    expires = datetime.now(timezone.utc) + timedelta(hours=1)
+
     
     # Save to DB
     reset_token = models.PasswordResetToken(
@@ -805,7 +702,8 @@ async def verify_token(token: str, db: Session = Depends(get_db)):
     reset_token = db.query(models.PasswordResetToken).filter(
         models.PasswordResetToken.token == token,
         models.PasswordResetToken.used == False,
-        models.PasswordResetToken.expires_at > datetime.datetime.utcnow()
+        models.PasswordResetToken.expires_at > datetime.now(timezone.utc)
+
     ).first()
     
     if not reset_token:
@@ -820,7 +718,8 @@ async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db
     reset_token = db.query(models.PasswordResetToken).filter(
         models.PasswordResetToken.token == req.token,
         models.PasswordResetToken.used == False,
-        models.PasswordResetToken.expires_at > datetime.datetime.utcnow()
+        models.PasswordResetToken.expires_at > datetime.now(timezone.utc)
+
     ).first()
     
     if not reset_token:
