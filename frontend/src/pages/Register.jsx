@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown } from 'lucide-react';
+import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown, Calendar, ChevronRight, UserCheck } from 'lucide-react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import Spline from '@splinetool/react-spline';
@@ -15,86 +15,88 @@ import IDCameraModal from '../components/IDCameraModal';
 // ---------------------------------------------------------------------------
 function parseOcrAddress(raw, data) {
     if (!raw) return {};
-    let remaining = raw.replace(/\n|\|/g, ', ').trim(); // Normalize newlines/pipes to commas
-    
-    // Aggressive frontend noise-scrubbing (metadata that leaked from OCR block)
-    remaining = remaining.replace(/\b(KASARIAN|KASAR1AN|SEX|SEK|MALE|FEMALE|HALE|NALE|FEHALE|PEMALE|PHILIPPINES?|OF\s?PHI.*?|ADDRESS|A0DRESS|ADDRES5|RESIDENCE|LICENSE|L1CENSE|RESTRICTION|AGENCY|CODE|SERIAL|PLACE|ISSUANCE|BLOOD|EYE|WEIGHT|HEIGHT|TIN)\b/ig, '');
-    let zipMatch = remaining.match(/\b([I1lO0]{1}\d{3}|\d{4}|14[O0]{2})\b/i); // Caloocan Zip Codes
-    if(zipMatch) {
-         remaining = remaining.replace(zipMatch[0], '').trim();
-    }
-    
-    // 1. Extract House Number / Block & Lot (leading parts)
-    let houseNo = '';
-    let blockLot = '';
 
-    // Match leading BLK/LOT patterns first
-    const leadingBlkMatch = remaining.match(/^((?:BLK|BLOCK|LOT)\s*\d+[\s\S]*?)(?:,\s*|\s+(?!LOT))/i);
-    if (leadingBlkMatch) {
-         blockLot = leadingBlkMatch[1].trim();
-         remaining = remaining.replace(leadingBlkMatch[1], '').trim();
-    } else {
-        // Fallback to house number (digits)
-        const houseMatch = remaining.match(/^(\d+[-–a-zA-Z]*)\s/);
-        if (houseMatch) {
-            houseNo = houseMatch[1];
-            remaining = remaining.replace(houseMatch[0], '').trim();
-        }
-    }
+    // ─── 1. Normalize ───────────────────────────────────────────────────────
+    let s = raw
+        .replace(/\n|\|/g, ' ')             // newlines → spaces
+        .replace(/\s{2,}/g, ' ')            // collapse multiple spaces
+        .trim();
 
-    // 2. Extract Block & Lot (contained anywhere else)
-    if (!blockLot) {
-        const blkMatch = remaining.match(/\b((?:BLK|BLOCK|8LK|B1K)\.?\s*[\dO]+\s*(?:[\w\s]*?)(?:LOT|L0T|L07)\.?\s*[\dO]+[\w\s]*?)\b/i) || 
-                         remaining.match(/\b((?:LOT|L0T|L07)\.?\s*[\dO]+[A-Z]?)\b/i); 
-        if (blkMatch) {
-            // normalize
-            blockLot = blkMatch[1].toUpperCase().replace(/8LK|B1K/g, 'BLK').replace(/L0T|L07/g, 'LOT').trim();
-            remaining = remaining.replace(blkMatch[0], '').trim();
-        }
-    }
+    // Strip OCR metadata noise
+    const NOISE = /\b(KASARIAN|KASAR1AN|SEX|SEK|MALE|FEMALE|HALE|NALE|FEHALE|PEMALE|PHILIPPINES?|REPUBLIKA\s+NG|NG\s+PILIPINAS|ADDRESS|A0DRESS|ADDRES5|RESIDENCE|LICENSE|L1CENSE|RESTRICTION|AGENCY|CODE|SERIAL|PLACE OF BIRTH|ISSUANCE|BLOOD\s+TYPE|EYE\s+COLOR|WEIGHT|HEIGHT|TIN|EXPIRY|VALIDITY|VALID\s+UNTIL)\b/gi;
+    s = s.replace(NOISE, '').replace(/\s{2,}/g, ' ').trim();
 
-    // 3. Extract Subdivision / Village / Estate (Including "Northville" explicitly from National IDs)
+    // Strip postal codes (4-digit)
+    s = s.replace(/\b1[34]\d{2}\b/g, '').trim();
+
+    let houseNo     = '';
+    let blockLot    = '';
+    let street      = '';
     let subdivision = '';
-    const subdivMatch = remaining.match(/\b([\w\s.#\-]+?(?:HOMES(?:\s+\d+)?|VILLAGE|VILL\.|HEIGHTS|SUBD\.?|SUBDIVISION|VILLE|ESTATE|PARK|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+)?))\b/i);
-    if (subdivMatch) {
-        subdivision = subdivMatch[1].trim();
-        remaining = remaining.replace(subdivMatch[0], '').trim();
 
-        // Split out street if it leaked into subdivision (e.g. "Ruby St Colina Homes")
-        const stInSubdivMatch = subdivision.match(/\b(.*?)\b(?:ST\.?|STREET|AVE\.?|AVENUE|RD\.?|ROAD|BLVD\.?|BOULEVARD)\b\s+(.*)/i);
-        if (stInSubdivMatch) {
-             // If we found a street keyword in the middle of subdivision string
-             const fullMatch = subdivision.match(/\b(.*?)\b(?:ST\.?|STREET|AVE\.?|AVENUE|RD\.?|ROAD|BLVD\.?|BOULEVARD)\b/i);
-             if (fullMatch) {
-                 const streetLeaked = fullMatch[0].trim();
-                 subdivision = subdivision.replace(streetLeaked, '').trim();
-                 remaining = (streetLeaked + ' ' + remaining).trim();
-             }
+    // ─── 2. Extract Block & Lot (highest priority) ───────────────────────────
+    // Pattern: BLK 9 LOT 30, BLOCK 9 LOT 30, LOT 30 BLK 9, LOT 30
+    const blkLotRe = /\b((?:BLK|BLOCK|B\.?LK|8LK)\.?\s*\d+[A-Z]?\s*(?:LOT|L0T)\.?\s*\d+[A-Z]?|(?:LOT|L0T)\.?\s*\d+[A-Z]?\s*(?:BLK|BLOCK|B\.?LK)\.?\s*\d+[A-Z]?|(?:BLK|BLOCK|B\.?LK)\.?\s*\d+[A-Z]?|(?:LOT|L0T)\.?\s*\d+[A-Z]?)\b/i;
+    const blkLotMatch = s.match(blkLotRe);
+    if (blkLotMatch) {
+        blockLot = blkLotMatch[1]
+            .replace(/8LK|B\.?LK/gi, 'BLK')
+            .replace(/L0T/gi, 'LOT')
+            .replace(/\s+/g, ' ')
+            .toUpperCase()
+            .trim();
+        s = s.replace(blkLotMatch[0], '').trim();
+    }
+
+    // ─── 3. Extract leading House Number (if no Block/Lot found) ────────────
+    if (!blockLot) {
+        const houseRe = /^(#?\d+[-–\/]?[A-Za-z]?)\s/;
+        const houseMatch = s.match(houseRe);
+        if (houseMatch) {
+            houseNo = houseMatch[1].replace(/^#/, '');
+            s = s.replace(houseMatch[0], '').trim();
         }
     }
 
-    // 4. Strip out known Barangay/City parts that might have leaked from OCR grouping
-    remaining = remaining.replace(/\b(?:BARANGAY|BRGY\.?|BGY\.?)\s*\d+[A-Z]?\b/i, '');
-    
-    // Dynamically remove the specific barangay text found by the backend (e.g., '171', 'Bagumbong', 'Talipapa')
-    if (data && data.barangay) {
-         try {
-             const brgyRegex = new RegExp(`\\b${data.barangay}\\b`, 'ig');
-             remaining = remaining.replace(brgyRegex, '');
-         } catch(e) {}
+    // ─── 4. Extract Street (before or after subdivision) ────────────────────
+    // Street has suffix: St., Ave., Rd., Blvd., Dr., Lane, Highway, Ext.
+    const streetRe = /\b((?:[A-Za-z0-9#.\-]+\s+)*(?:[A-Za-z0-9#.\-]+)\s+(?:STREET|ST\.?|AVENUE|AVE\.?|ROAD|RD\.?|BOULEVARD|BLVD\.?|DRIVE|DR\.?|LANE|LN\.?|HIGHWAY|HWY\.?|EXTENSION|EXT\.?|LOOP|WALK|WAY|CIRCLE|CIR\.?))\b/i;
+    const streetMatch = s.match(streetRe);
+    if (streetMatch) {
+        street = streetMatch[1].replace(/\s+/g, ' ').trim();
+        // Title case
+        street = street.replace(/\b\w/g, c => c.toUpperCase());
+        s = s.replace(streetMatch[0], '').trim();
     }
 
-    remaining = remaining.replace(/\b(?:CALOOCAN|KALOOKAN|CITY|NCR|METRO MANILA|DISTRICT|ZONE|THIRD\s*(?:DIS\s*)?TRICT|EXPIRATION|DATE)\b/ig, '');
-    
-    // Clean up leftover commas, slashes, and spaces (and triple/double commas)
-    remaining = remaining.replace(/,\s*,/g, ',').replace(/(^[,.\s\/]+)|([,.\s\/]+$)/g, '').trim();
+    // ─── 5. Extract Subdivision / Village / Estate ───────────────────────────
+    const subdivRe = /\b((?:[A-Za-z0-9#.\-]+\s+)*(?:[A-Za-z0-9#.\-]+\s+)?(?:HOMES?(?:\s+\d+[A-Z]?)?|VILLAGE|VILL(?:AGE)?\.?|HEIGHTS?|SUBD(?:\.?|IVISION)?|SUBDIVISION|VILLE|ESTATE|PARK(?:\s+\d+)?|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+)?|FAIRVIEW|TOWNVILLE|RESIDENCES?|COMPOUND|ROYALE|VERDE|PALMS?|GARDENS?|GROVE|OAKS?|PINES|HILLS?|VISTAS?))\b/i;
+    const subdivMatch = s.match(subdivRe);
+    if (subdivMatch) {
+        subdivision = subdivMatch[1].replace(/\s+/g, ' ').trim();
+        subdivision = subdivision.replace(/\b\w/g, c => c.toUpperCase());
+        s = s.replace(subdivMatch[0], '').trim();
+    }
 
-    return {
-        houseNo,
-        blockLot,
-        subdivision: subdivision.replace(/(^[,.\s\/]+)|([,.\s\/]+$)/g, '').trim(),
-        street: remaining
-    };
+    // ─── 6. Strip barangay / city noise from remainder ────────────────────────
+    s = s.replace(/\b(?:BARANGAY|BRGY\.?|BGY\.?)\s*\d+[A-Z]?\b/gi, '');
+    if (data && data.barangay) {
+        try {
+            // Remove exact barangay name 
+            const bn = data.barangay.replace(/^Barangay\s*/i, '').trim();
+            if (bn) s = s.replace(new RegExp(`\\b${bn.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`, 'gi'), '');
+        } catch(_) {}
+    }
+    s = s.replace(/\b(?:CALOOCAN|KALOOKAN|CITY|NCR|METRO\s+MANILA|MANILA|DISTRICT|ZONE|THIRD\s*DISTRICT)\b/gi, '');
+    s = s.replace(/[,\/\s]+$/, '').replace(/^[,\/\s]+/, '').replace(/\s{2,}/g, ' ').trim();
+
+    // ─── 7. If street still empty, use cleaned remainder ────────────────────
+    if (!street && s) {
+        street = s.replace(/\b\w/g, c => c.toUpperCase()).trim();
+        s = '';
+    }
+
+    return { houseNo, blockLot, subdivision, street };
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +155,9 @@ function mapOcrToForm(data) {
         mapped.lastName = rawLast;
         mapped.middleName = (data.middle_name || '').trim();
     }
+    
+    // --- Suffix ---
+    mapped.suffix = (data.suffix || '').trim().replace(/[.,]$/, ''); // Jr. -> Jr
 
     // --- ID Type ---
     mapped.idType = data.id_type_label || 'Unknown Document';
@@ -184,12 +189,26 @@ function mapOcrToForm(data) {
 
     // --- Address ---
     const addr = parseOcrAddress(data.address || '', data);
-    mapped.houseNo = data.house_no || addr.houseNo || '';
-    mapped.blockLot = data.block_lot || addr.blockLot || '';
-    mapped.subdivision = data.subdivision || addr.subdivision || '';
-    mapped.street = data.street || addr.street || (data.address || '').split('\n')[0].trim();
+    mapped.houseNo = data.house_no !== undefined ? data.house_no : (addr.houseNo || '');
+    mapped.blockLot = data.block_lot !== undefined ? data.block_lot : (addr.blockLot || '');
+    mapped.subdivision = data.subdivision !== undefined ? data.subdivision : (addr.subdivision || '');
+    mapped.street = data.street !== undefined ? data.street : (addr.street || (data.address || '').split('\n')[0].trim());
 
-    mapped.barangay = data.barangay ? (data.barangay.startsWith('Barangay') ? data.barangay : `Barangay ${data.barangay}`) : (addr.barangayId ? `Barangay ${addr.barangayId}` : '');
+    let bn = (data.barangay || addr.barangayId || '').trim();
+    if (bn) {
+        // Strictly hunt for the 3-digit barangay number (e.g. 171)
+        const numMatch = bn.match(/\b(1[6-8][0-9])\b/); 
+        if (numMatch) {
+            mapped.barangay = `Barangay ${numMatch[1]}`;
+        } else {
+            // Fallback: cleanup the string if no strict number is detected
+            bn = bn.replace(/Barangay/ig, '').replace(/,/g, '').trim();
+            mapped.barangay = `Barangay ${bn}`;
+        }
+    } else {
+        mapped.barangay = '';
+    }
+
     mapped.municipality = 'Caloocan City - North';
     mapped.province = 'Metro Manila';
     mapped.postalCode = data.postal_code || getPostalCodeForBarangay(mapped.barangay) || '1421'; // Default to 1421 for North Caloocan if detection fails
@@ -279,6 +298,224 @@ const CustomSelect = ({ label, name, value, onChange, options, required }) => {
     );
 };
 
+const CustomDatePicker = ({ label, name, value, onChange, required }) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [viewDate, setViewDate] = React.useState(value ? new Date(value + 'T00:00:00') : new Date());
+    const [isYearSelectorOpen, setIsYearSelectorOpen] = React.useState(false);
+    const [isMonthSelectorOpen, setIsMonthSelectorOpen] = React.useState(false);
+    const dropdownRef = React.useRef(null);
+    const yearScrollRef = React.useRef(null);
+
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+    const currentMonth = viewDate.getMonth();
+    const currentYear = viewDate.getFullYear();
+
+    const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
+    const getFirstDayOfMonth = (month, year) => new Date(year, month, 1).getDay();
+
+    const handleMonthChange = (offset) => {
+        const nextDate = new Date(viewDate);
+        nextDate.setMonth(viewDate.getMonth() + offset);
+        setViewDate(nextDate);
+    };
+
+    const handleYearChange = (year) => {
+        const nextDate = new Date(viewDate);
+        nextDate.setFullYear(parseInt(year));
+        setViewDate(nextDate);
+        setIsYearSelectorOpen(false);
+    };
+
+    const handleMonthSelect = (month) => {
+        const nextDate = new Date(viewDate);
+        nextDate.setMonth(month);
+        setViewDate(nextDate);
+        setIsMonthSelectorOpen(false);
+    };
+
+    const handleDateSelect = (day) => {
+        const selected = new Date(currentYear, currentMonth, day);
+        const offset = selected.getTimezoneOffset() * 60000;
+        const localDate = new Date(selected.getTime() - offset);
+        const dateStr = localDate.toISOString().split('T')[0];
+        onChange({ target: { name, value: dateStr, type: 'date' } });
+        setIsOpen(false);
+    };
+
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsOpen(false);
+                setIsYearSelectorOpen(false);
+                setIsMonthSelectorOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Snap scroll to current year when opened
+    React.useEffect(() => {
+        if (isYearSelectorOpen && yearScrollRef.current) {
+            const el = yearScrollRef.current.querySelector(`[data-year="${currentYear}"]`);
+            if (el) el.scrollIntoView({ block: 'center' });
+        }
+    }, [isYearSelectorOpen, currentYear]);
+
+    const daysInMonth = getDaysInMonth(currentMonth, currentYear);
+    const firstDay = getFirstDayOfMonth(currentMonth, currentYear);
+    const prevMonthDays = getDaysInMonth(currentMonth - 1, currentYear);
+    
+    const calendarDays = [];
+    for (let i = firstDay - 1; i >= 0; i--) calendarDays.push({ day: prevMonthDays - i, current: false });
+    for (let i = 1; i <= daysInMonth; i++) calendarDays.push({ day: i, current: true });
+    const remaining = 42 - calendarDays.length;
+    for (let i = 1; i <= remaining; i++) calendarDays.push({ day: i, current: false });
+
+    const yearOptions = [];
+    const thisYear = new Date().getFullYear();
+    for (let y = thisYear; y >= 1920; y--) yearOptions.push(y);
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return "Select Date";
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    };
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 pl-0.5">{label} {required && <span className="text-red-400">*</span>}</label>
+            <button
+                type="button"
+                className={`w-full flex items-center justify-between border text-sm rounded-xl px-3 py-2.5 outline-none transition-all focus:ring-2 focus:ring-orange-500 focus:border-transparent cursor-pointer ${
+                    isOpen ? 'bg-white dark:bg-slate-800 border-orange-500 shadow-lg' : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-orange-500/50'
+                } text-slate-900 dark:text-white`}
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <div className="flex items-center gap-2 overflow-hidden">
+                    <Calendar size={15} className="text-slate-400 shrink-0" />
+                    <span className={value ? "truncate" : "text-slate-400"}>{formatDate(value)}</span>
+                </div>
+                <ChevronDown size={14} className={`transition-transform text-slate-500 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 15, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                        className="absolute z-[100] mt-2 left-0 sm:left-auto sm:right-0 w-[280px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden backdrop-blur-2xl p-4"
+                    >
+                        {/* Custom Header */}
+                        <div className="flex items-center justify-between mb-4 px-1">
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-black uppercase text-orange-500 tracking-[0.1em]">Identity Birth Date</span>
+                                <div className="flex items-center gap-1.5 min-h-[24px]">
+                                    <button 
+                                        type="button"
+                                        onClick={() => { setIsMonthSelectorOpen(!isMonthSelectorOpen); setIsYearSelectorOpen(false); }}
+                                        className={`text-sm font-black transition-colors flex items-center gap-1 ${isMonthSelectorOpen ? 'text-orange-500' : 'text-slate-900 dark:text-white hover:text-orange-500'}`}
+                                    >
+                                        {monthNames[currentMonth]}
+                                        <ChevronDown size={12} className={`transition-transform ${isMonthSelectorOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => { setIsYearSelectorOpen(!isYearSelectorOpen); setIsMonthSelectorOpen(false); }}
+                                        className={`text-sm font-black transition-colors flex items-center gap-1 ${isYearSelectorOpen ? 'text-orange-500' : 'text-slate-900 dark:text-white hover:text-orange-500'}`}
+                                    >
+                                        {currentYear}
+                                        <ChevronDown size={12} className={`transition-transform ${isYearSelectorOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex gap-1.5">
+                                <button type="button" onClick={() => handleMonthChange(-1)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-slate-500 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-white/10">
+                                    <ChevronRight size={16} className="rotate-180" />
+                                </button>
+                                <button type="button" onClick={() => handleMonthChange(1)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-slate-500 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-white/10">
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Popover Content Layer */}
+                        <div className="relative min-h-[200px]">
+                            {/* Main Calendar Grid */}
+                            <motion.div
+                                animate={{ opacity: (isMonthSelectorOpen || isYearSelectorOpen) ? 0 : 1, scale: (isMonthSelectorOpen || isYearSelectorOpen) ? 0.95 : 1, filter: (isMonthSelectorOpen || isYearSelectorOpen) ? 'blur(4px)' : 'blur(0px)' }}
+                                className="grid grid-cols-7 gap-1"
+                            >
+                                {days.map(d => <div key={d} className="text-[10px] font-black text-slate-400 text-center uppercase py-1">{d}</div>)}
+                                {calendarDays.map((d, i) => {
+                                    const isSelected = value && new Date(value + 'T00:00:00').getDate() === d.day && new Date(value + 'T00:00:00').getMonth() === currentMonth && new Date(value + 'T00:00:00').getFullYear() === currentYear && d.current;
+                                    const isToday = new Date().getDate() === d.day && new Date().getMonth() === currentMonth && new Date().getFullYear() === currentYear && d.current;
+                                    return (
+                                        <button key={i} type="button" disabled={!d.current} onClick={() => handleDateSelect(d.day)}
+                                            className={`h-8 w-8 flex items-center justify-center text-xs font-bold rounded-lg transition-all ${!d.current ? 'text-slate-300 dark:text-slate-700 cursor-default p-0' : isSelected ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30 scale-110 active:scale-95' : isToday ? 'border border-orange-500/50 text-orange-500 bg-orange-500/5' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-orange-500 active:scale-95'}`}>
+                                            {d.day}
+                                        </button>
+                                    );
+                                })}
+                            </motion.div>
+
+                            {/* Month Selector Overlay */}
+                            <AnimatePresence>
+                                {isMonthSelectorOpen && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}
+                                        className="absolute inset-0 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-xl grid grid-cols-3 gap-2 p-1"
+                                    >
+                                        {monthShort.map((m, idx) => (
+                                            <button key={m} type="button" onClick={() => handleMonthSelect(idx)}
+                                                className={`flex items-center justify-center rounded-xl text-xs font-black uppercase transition-all ${currentMonth === idx ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-600 dark:text-slate-400 hover:bg-orange-500/10 hover:text-orange-500'}`}>
+                                                {m}
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {/* Year Selector Overlay */}
+                            <AnimatePresence>
+                                {isYearSelectorOpen && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}
+                                        className="absolute inset-0 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-xl p-1"
+                                    >
+                                        <div ref={yearScrollRef} className="h-full overflow-y-auto custom-scrollbar-thin grid grid-cols-2 gap-2 pr-1">
+                                            {yearOptions.map(y => (
+                                                <button key={y} data-year={y} type="button" onClick={() => handleYearChange(y)}
+                                                    className={`py-2 px-3 rounded-xl text-xs font-black transition-all ${currentYear === y ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-600 dark:text-slate-400 hover:bg-orange-500/10 hover:text-orange-500'}`}>
+                                                    {y}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                        
+                        {/* Footer Actions */}
+                        <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 dark:border-white/10">
+                            <button type="button" onClick={() => { 
+                                const today = new Date();
+                                handleYearChange(today.getFullYear());
+                                setViewDate(today);
+                                setIsMonthSelectorOpen(false);
+                                setIsYearSelectorOpen(false);
+                            }} className="text-[10px] font-black text-orange-500 uppercase tracking-widest hover:text-orange-400 transition-colors">Go to Today</button>
+                            {value && <button type="button" onClick={() => { onChange({ target: { name, value: '', type: 'date' } }); setIsOpen(false); }} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors">Clear</button>}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
+
 // ---------------------------------------------------------------------------
 // Main Register Component
 export default function Register() {
@@ -312,6 +549,7 @@ export default function Register() {
     const [step, setStep] = React.useState(1);
     const [isScanning, setIsScanning] = React.useState(false);
     const [scanError, setScanError] = React.useState('');
+    const [scanStatus, setScanStatus] = React.useState('Scanning...');
     
     // Camera state
     const [cameraOpen, setCameraOpen] = React.useState(false);
@@ -351,16 +589,35 @@ export default function Register() {
     const [verifiedBadge, setVerifiedBadge] = React.useState('');
     const [registering, setRegistering] = React.useState(false);
     const [registrationError, setRegistrationError] = React.useState('');
+    const [ageError, setAgeError] = React.useState('');
     const [showPassword, setShowPassword] = React.useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-    const [hasScanned, setHasScanned] = React.useState(false); // prevent infinite re-scan
+    const [hasScanned, setHasScanned] = React.useState(false);
+    const [isFaceVerified, setIsFaceVerified] = React.useState(false);
+    const [faceMatchConfidence, setFaceMatchConfidence] = React.useState(''); // 'high', 'medium', 'na'
     
     // Verification State
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [verifying, setVerifying] = useState(false);
     const [verifyError, setVerifyError] = useState('');
+    const [verifySuccess, setVerifySuccess] = useState('');
     const [resending, setResending] = useState(false);
+    const [resendTimer, setResendTimer] = useState(0);
+    const [canResend, setCanResend] = useState(true);
     const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
+
+    React.useEffect(() => {
+        let interval = null;
+        if (resendTimer > 0) {
+            interval = setInterval(() => {
+                setResendTimer((prev) => prev - 1);
+            }, 1000);
+        } else if (resendTimer === 0) {
+            setCanResend(true);
+            clearInterval(interval);
+        }
+        return () => clearInterval(interval);
+    }, [resendTimer]);
 
     const handleFileUpload = (e, side) => {
         const file = e.target.files[0];
@@ -393,7 +650,14 @@ export default function Register() {
 
     // Generic change handler
     const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        let { name, value, type, checked } = e.target;
+        
+        // Strict Philippine Mobile Number Validation (Numbers Only, Max 11)
+        if (name === 'mobile') {
+            value = value.replace(/\D/g, ''); // Instantly strip all non-digits
+            if (value.length > 11) value = value.slice(0, 11);
+        }
+
         setFormData(prev => {
             const next = { ...prev, [name]: type === 'checkbox' ? checked : value };
             // Auto-calculate age when DOB input changes directly
@@ -405,6 +669,15 @@ export default function Register() {
                 if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
                 next.age = age >= 0 ? String(age) : '';
                 next.dobDate = bd;
+                
+                // Age range validation (18-100)
+                if (age < 18) {
+                    setAgeError("Residents must be at least 18 years old to register.");
+                } else if (age > 100) {
+                    setAgeError("Maximum allowed registration age is 100 years.");
+                } else {
+                    setAgeError("");
+                }
             }
             // Auto-fill postal code when barangay changes
             if (name === 'barangay' && value) {
@@ -419,11 +692,31 @@ export default function Register() {
 
     // Scan ID handler
     const handleScanID = async (autoNext = true) => {
-        if (!formData.idFront) { setScanError('Please upload the front of your ID first.'); return; }
+        if (!formData.idFront || !formData.idBack) { 
+            setScanError('Please upload both the FRONT and BACK of your ID to continue.'); 
+            return; 
+        }
         setIsScanning(true);
         setScanError('');
+        setScanStatus('Initializing Multimodal Audit...');
+        let statusInt;
 
         try {
+            // Progressive status updates for the visual audit
+            statusInt = setInterval(() => {
+                const statuses = [
+                    "Analyzing Document Layout...",
+                    "Performing Visual Identity Audit...",
+                    "Comparing Portrait Photos...",
+                    "Verifying Hologram & Security Markers...",
+                    "Cross-referencing Person Metadata..."
+                ];
+                setScanStatus(prev => {
+                   const idx = statuses.indexOf(prev);
+                   return idx < statuses.length - 1 ? statuses[idx + 1] : prev;
+                });
+            }, 2500);
+
             const fd = new FormData();
             fd.append('idFront', formData.idFront);
             if (formData.idBack) fd.append('idBack', formData.idBack);
@@ -433,6 +726,7 @@ export default function Register() {
             });
 
             const result = res.data;
+            if (statusInt) clearInterval(statusInt);
 
             if (!result.success) {
                 setScanError(result.error || 'OCR failed. Please try again with a clearer image.');
@@ -440,6 +734,30 @@ export default function Register() {
             }
 
             const data = result.extracted_data;
+
+            // ─── VISUAL FACE MATCH VALIDATION ───────────────────────────────
+            const faceMatch      = data.is_visual_face_match;
+            const faceConfidence = data.face_match_confidence || 'na';
+
+            if (faceMatch === false) {
+                // AI confirmed faces are DIFFERENT people — hard block
+                setScanError(
+                    '🚫 Face Mismatch Detected: The portrait on the front ID does not match the person on the back. ' +
+                    'Please ensure both images are from the same physical ID card.'
+                );
+                setIsFaceVerified(false);
+                setFaceMatchConfidence('low');
+                if (statusInt) clearInterval(statusInt);
+                return;
+            }
+
+            setIsFaceVerified(faceMatch !== false); // true or undefined (no back face)
+            setFaceMatchConfidence(faceConfidence);
+
+            if (data.is_document_mismatch) {
+                setScanError(data.mismatch_reason || 'ID Mismatch: Front and Back images appear to be from different documents.');
+                return;
+            }
 
             if (!data.is_north_caloocan) {
                 setScanError(data.verification_message || 'Verification Failed: You must be a resident of North Caloocan (Barangay 165–188) to register.');
@@ -460,14 +778,26 @@ export default function Register() {
 
         } catch (err) {
             console.error('[Register] Scan error:', err);
+            if (statusInt) clearInterval(statusInt);
             setScanError(err.response?.data?.detail || 'Could not connect to the verification server. Please check your connection.');
         } finally {
             setIsScanning(false);
+            if (statusInt) clearInterval(statusInt);
         }
     };
 
-    const handleSkip = () => { setScanError(''); setStep(2); };
-    const nextStep  = () => setStep(s => Math.min(s + 1, 3));
+    const handleSkip = () => { 
+        // Obsolete: Skipping is no longer allowed for PULSO registration.
+        setScanError('Identity verification is required to continue.'); 
+    };
+    const nextStep = () => {
+        if (step === 2 && ageError) {
+            setRegistrationError(ageError);
+            return;
+        }
+        setRegistrationError('');
+        setStep(s => Math.min(s + 1, 3));
+    };
     const prevStep  = () => setStep(s => Math.max(s - 1, 1));
 
     const handleOtpChange = (index, value) => {
@@ -524,14 +854,19 @@ export default function Register() {
     };
 
     const handleResendCode = async () => {
+        if (!canResend) return;
         setResending(true);
         setVerifyError('');
+        setVerifySuccess('');
         try {
             await axios.post('http://localhost:8000/api/auth/resend-code', {
                 email: formData.email,
                 code: '000000' // Placeholder for validation
             });
-            alert("A new verification code has been sent to your email.");
+            setVerifySuccess("A new 6-digit verification code has been securely dispatched to your email address.");
+            setResendTimer(60);
+            setCanResend(false);
+            setTimeout(() => setVerifySuccess(''), 5000);
         } catch (err) {
             setVerifyError("Failed to resend code.");
         } finally {
@@ -563,6 +898,8 @@ export default function Register() {
             if (res.status === 200 || res.status === 201) {
                 localStorage.removeItem('pulso_token');
                 localStorage.removeItem('pulso_user');
+                setResendTimer(60);
+                setCanResend(false);
                 setStep(4);
             }
         } catch (err) {
@@ -572,8 +909,8 @@ export default function Register() {
         }
     };
 
-    // Step 2 "Next" is enabled when core fields are filled
-    const step2Valid = formData.firstName && formData.lastName && formData.dob && formData.street && formData.barangay;
+    // Step 2 "Next" is enabled when core fields are filled and age is valid (street is optional)
+    const step2Valid = formData.firstName && formData.lastName && formData.dob && formData.barangay && !ageError;
 
     return (
         <div className="relative min-h-screen w-full bg-slate-50 dark:bg-[#020617] overflow-hidden font-sans text-slate-800 dark:text-slate-200 transition-colors duration-700">
@@ -776,9 +1113,9 @@ export default function Register() {
                                             ) : (
                                                 <>
                                                     <UploadCloud size={26} className="text-slate-400 group-hover:text-orange-500 mb-2 transition-colors" />
-                                                    <span className="text-sm font-bold text-slate-500 group-hover:text-orange-600 transition-colors">ID Back</span>
+                                                    <div className="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-500 font-bold uppercase">Back ID Reqd.</div>
                                                     <div className="flex gap-2 mt-2">
-                                                        <span className="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-500 font-bold uppercase">Upload</span>
+                                                        <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase transition-colors">Upload</span>
                                                         <button 
                                                             onClick={(e) => openCamera(e, 'back')}
                                                             className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase hover:bg-orange-200 transition-colors flex items-center gap-1"
@@ -805,18 +1142,16 @@ export default function Register() {
                                     </div>
                                 )}
 
-                                <div className="flex gap-3">
-                                    <button type="button" onClick={handleSkip} className="w-1/3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-3 rounded-2xl font-bold text-sm transition-all">
-                                        Skip
-                                    </button>
+                                <div className="flex flex-col gap-3">
                                     <button
                                         type="button"
                                         onClick={handleScanID}
-                                        disabled={!formData.idFront || isScanning}
-                                        className="w-2/3 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        disabled={!formData.idFront || !formData.idBack || isScanning}
+                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
-                                        {isScanning ? <><Loader2 size={18} className="animate-spin" /> Scanning...</> : <><ShieldCheck size={18} /> Scan ID & Continue</>}
+                                        {isScanning ? <><Loader2 size={18} className="animate-spin" /> Identifying ID Side & Type...</> : <><ShieldCheck size={18} /> Scan Documents & Continue</>}
                                     </button>
+                                    <p className="text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest">Both Front and Back required for maximum AI accuracy</p>
                                 </div>
                             </motion.div>
                         )}
@@ -825,20 +1160,29 @@ export default function Register() {
                         {step === 2 && (
                             <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
                                 {/* Verification badge */}
-                                {verifiedBadge ? (
-                                    <div className="mb-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3 flex gap-2 items-center text-sm">
-                                        <CheckCircle size={16} className="text-green-500 shrink-0" />
-                                        <div>
-                                            <p className="font-bold text-green-700 dark:text-green-400 text-xs">{verifiedBadge}</p>
-                                            <p className="text-xs text-green-600/80 dark:text-green-500/80">Review and fill in any missing information below.</p>
+                                {verifiedBadge && (
+                                    <div className="mb-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3 flex gap-3 items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 bg-green-500/10 text-green-600 rounded-full flex items-center justify-center shrink-0">
+                                                <ShieldCheck size={18} />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-green-700 dark:text-green-400 text-xs">Identity Verified via AI</p>
+                                                <p className="text-[11px] text-green-600/80 dark:text-green-500/70">Intelligence Parse Complete. Please review your details below.</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 flex gap-2 items-center text-xs text-amber-700 dark:text-amber-400">
-                                        <Info size={15} className="shrink-0" />
-                                        <span>ID scan skipped. Please fill in your details manually. Only North Caloocan (Barangay 165–188) residents may register.</span>
+                                        {formData.idType && formData.idType !== 'Unknown Document' && (
+                                            <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg">
+                                                <span className="text-[10px] font-black uppercase tracking-widest">{formData.idType}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
+
+                                {/* Required Fields Legend */}
+                                <div className="flex items-center gap-1.5 mb-2 px-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                    <span className="text-red-500 font-black text-sm">*</span> Indicates a required field
+                                </div>
 
                                 {/* Full Name */}
                                 <SectionHeading>Full Name</SectionHeading>
@@ -852,29 +1196,38 @@ export default function Register() {
                                 {/* Demographics */}
                                 <SectionHeading>Demographics</SectionHeading>
                                 <div className="grid grid-cols-3 gap-2">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 pl-0.5">Date of Birth <span className="text-red-400">*</span></label>
-                                        <input
-                                            type="date"
-                                            name="dob"
-                                            value={formData.dob}
-                                            onChange={handleChange}
-                                            max={new Date().toISOString().split('T')[0]}
-                                            required
-                                            className="w-full bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                                        />
-                                    </div>
+                                    <CustomDatePicker 
+                                        label="Date of Birth"
+                                        name="dob"
+                                        value={formData.dob} 
+                                        onChange={handleChange} 
+                                        required 
+                                    />
                                     <InputField label="Age" name="age" value={formData.age} onChange={handleChange} readOnly placeholder="Auto-filled" />
                                     <CustomSelect label="Sex" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required />
                                 </div>
 
+                                <AnimatePresence>
+                                    {ageError && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3"
+                                        >
+                                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                                            <p className="text-xs font-bold text-red-500">{ageError}</p>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
                                 {/* Address */}
                                 <SectionHeading>Complete Address</SectionHeading>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    <InputField label="House No." name="houseNo" value={formData.houseNo} onChange={handleChange} />
+                                    <InputField label="House Number / Floor / Unit" name="houseNo" value={formData.houseNo} onChange={handleChange} />
                                     <InputField label="Block & Lot" name="blockLot" value={formData.blockLot} onChange={handleChange} />
-                                    <InputField label="Subdivision" name="subdivision" value={formData.subdivision} onChange={handleChange} className="col-span-2 md:col-span-1" />
-                                    <InputField label="Street" name="street" value={formData.street} onChange={handleChange} required className="col-span-2" />
+                                    <InputField label="Building / Subdivision / Village" name="subdivision" value={formData.subdivision} onChange={handleChange} className="col-span-2 md:col-span-1" />
+                                    <InputField label="Street / Avenue / Corner / Road" name="street" value={formData.street} onChange={handleChange} className="col-span-2" />
                                     <CustomSelect label="Barangay" name="barangay" value={formData.barangay} onChange={handleChange} options={Array.from({ length: 24 }, (_, i) => `Barangay ${165 + i}`)} required />
                                     <InputField label="City" name="municipality" value={formData.municipality} onChange={handleChange} readOnly />
                                     <InputField label="Province" name="province" value={formData.province} onChange={handleChange} readOnly />
@@ -939,12 +1292,44 @@ export default function Register() {
                                             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 pl-0.5">Password <span className="text-red-400">*</span></label>
                                             <div className="relative">
                                                 <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                                                <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Min. 6 characters" required minLength={6}
+                                                <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Min. 8 characters" required minLength={8}
                                                     className="w-full bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-xl pl-9 pr-10 py-2.5 focus:ring-2 focus:ring-orange-500 outline-none transition-all" />
                                                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-500 transition-colors focus:outline-none" aria-label={showPassword ? "Hide password" : "Show password"}>
                                                     {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                                                 </button>
                                             </div>
+
+                                            {/* Password Strength Meter */}
+                                            {formData.password && (
+                                                <div className="mt-2 space-y-2 px-1">
+                                                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                                                        <span className="text-slate-400">Security Strength</span>
+                                                        <span className={
+                                                            formData.password.length < 8 || !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password) || !/[^A-Za-z0-9]/.test(formData.password)
+                                                                ? (formData.password.length < 8 ? "text-red-500" : "text-orange-500")
+                                                                : "text-green-500"
+                                                        }>
+                                                            {formData.password.length < 8 ? "Weak" : (
+                                                                !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password) || !/[^A-Za-z0-9]/.test(formData.password)
+                                                                    ? "Medium"
+                                                                    : "Strong"
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-1 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden flex gap-1">
+                                                        <div className={`h-full transition-all duration-500 rounded-full ${formData.password.length >= 8 ? 'bg-orange-500 w-1/4' : 'bg-red-500 w-1/4'}`} />
+                                                        <div className={`h-full transition-all duration-500 rounded-full ${/[A-Z]/.test(formData.password) ? 'bg-orange-500 w-1/4' : 'bg-slate-200 dark:bg-white/5 w-1/4'}`} />
+                                                        <div className={`h-full transition-all duration-500 rounded-full ${/[0-9]/.test(formData.password) ? 'bg-orange-500 w-1/4' : 'bg-slate-200 dark:bg-white/5 w-1/4'}`} />
+                                                        <div className={`h-full transition-all duration-500 rounded-full ${/[^A-Za-z0-9]/.test(formData.password) ? 'bg-green-500 w-1/4' : 'bg-slate-200 dark:bg-white/5 w-1/4'}`} />
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2 pt-1 uppercase">
+                                                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border transition-all ${formData.password.length >= 8 ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 opacity-50'}`}>8+ Chars</span>
+                                                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border transition-all ${/[A-Z]/.test(formData.password) ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 opacity-50'}`}>Capital</span>
+                                                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border transition-all ${/[0-9]/.test(formData.password) ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 opacity-50'}`}>Number</span>
+                                                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border transition-all ${/[^A-Za-z0-9]/.test(formData.password) ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 opacity-50'}`}>Special</span>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 pl-0.5">Confirm Password <span className="text-red-400">*</span></label>
@@ -1014,10 +1399,17 @@ export default function Register() {
                                     </div>
                                     
                                     {verifyError && (
-                                        <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 text-sm text-red-600 dark:text-red-400 flex items-center justify-center gap-2">
-                                            <AlertCircle size={15} />
-                                            {verifyError}
+                                        <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 text-sm text-red-600 dark:text-red-400 flex items-center justify-center gap-2 text-left">
+                                            <AlertCircle size={15} className="shrink-0" />
+                                            <span>{verifyError}</span>
                                         </div>
+                                    )}
+                                    {verifySuccess && (
+                                        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+                                            className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3 text-sm text-green-700 dark:text-green-400 flex items-center justify-center gap-2 text-left shadow-sm">
+                                            <CheckCircle size={15} className="shrink-0" />
+                                            <span>{verifySuccess}</span>
+                                        </motion.div>
                                     )}
 
                                     <button
@@ -1029,17 +1421,25 @@ export default function Register() {
                                         {verifying ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> : 'Confirm Account'}
                                     </button>
 
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                                        I didn't receive a code!{' '}
-                                        <button 
-                                            type="button" 
-                                            onClick={handleResendCode}
-                                            disabled={resending}
-                                            className="text-orange-600 dark:text-orange-500 font-bold hover:underline disabled:opacity-50"
-                                        >
-                                            {resending ? 'Sending...' : 'Please Resend'}
-                                        </button>
-                                    </p>
+                                    <div className="text-center mt-4">
+                                        {resendTimer > 0 ? (
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-100/50 dark:bg-white/5 py-2 px-4 rounded-full inline-block">
+                                                Resend code in <span className="text-orange-600">{resendTimer}s</span>
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                I didn't receive a code!{' '}
+                                                <button 
+                                                    type="button" 
+                                                    onClick={handleResendCode}
+                                                    disabled={resending || !canResend}
+                                                    className="text-orange-600 dark:text-orange-500 font-bold hover:underline disabled:opacity-50"
+                                                >
+                                                    {resending ? 'Sending...' : 'Please Resend'}
+                                                </button>
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </motion.div>
                         )}
@@ -1144,8 +1544,8 @@ export default function Register() {
                                 </button>
                             )}
                             {isScanning && (
-                                <button disabled className="flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm bg-orange-500/20 text-orange-400 cursor-not-allowed shadow-lg">
-                                    <Loader2 size={16} className="animate-spin" /> Scanning...
+                                <button disabled className="flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm bg-orange-500/20 text-orange-400 cursor-not-allowed shadow-xl border border-orange-500/20">
+                                    <Loader2 size={16} className="animate-spin" /> {scanStatus}
                                 </button>
                             )}
                             {hasScanned && !isScanning && (
@@ -1167,46 +1567,7 @@ export default function Register() {
                             </button>
                         </div>
 
-                        {/* Scanning Details Panel Overlay */}
-                        {(formData.firstName || formData.lastName) && !isScanning && (
-                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                                className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-3xl bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl text-white cursor-auto"
-                                onClick={e => e.stopPropagation()}
-                            >
-                                <div className="flex items-center justify-between mb-4 px-2 border-b border-white/10 pb-3">
-                                    <div className="flex items-center gap-2">
-                                        <Database size={18} className="text-orange-400" />
-                                        <span className="text-sm font-black uppercase tracking-widest text-slate-200">Extracted Information</span>
-                                    </div>
-                                    {formData.idType && (
-                                        <span className="text-[10px] font-black px-2 py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-md uppercase tracking-tighter">
-                                            {formData.idType}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-2">
-                                    <div>
-                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider mb-1">Full Name</p>
-                                        <p className="text-sm font-bold text-white truncate">{[formData.firstName, formData.middleName, formData.lastName].filter(Boolean).join(' ') || '—'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider mb-1">Date of Birth</p>
-                                        <p className="text-sm font-bold text-white">{formData.dob || '—'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider mb-1">Sex</p>
-                                        <p className="text-sm font-bold text-white">{formData.sex || '—'}</p>
-                                    </div>
-                                    <div className="lg:col-span-1">
-                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider mb-1">Address Match</p>
-                                        <div className="flex items-center gap-1.5">
-                                            {formData.street || formData.barangay ? <CheckCircle size={14} className="text-green-400" /> : <AlertCircle size={14} className="text-amber-400" />}
-                                            <p className="text-sm font-bold text-white truncate max-w-[120px]">{formData.barangay || 'Pending'}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
+
                     </motion.div>
                 )}
             </AnimatePresence>

@@ -1,0 +1,18 @@
+{
+    "timestamp": "2026-03-30T12:30:01.590764",
+    "raw_text": "OF CALOOCAN\nSTUDIES DEPARTMEN\nFORENI\nFLAVA GEEK GAR\nALOOCAN CITY\nS DEPARTMENT\n",
+    "parsed_data": {
+        "id_type": "unknown",
+        "id_type_label": "Unknown Document",
+        "first_name": "Flava",
+        "last_name": "Gar",
+        "middle_name": "Geek",
+        "dob": "",
+        "sex": "",
+        "address": "Of Caloocan Studies Departmen Foreni Flava Geek Gar",
+        "barangay": "",
+        "postal_code": "",
+        "is_north_caloocan": false,
+        "verification_message": "Verification Failed: Caloocan City detected but could not determine barangay number."
+    }
+}

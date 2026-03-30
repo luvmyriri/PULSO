@@ -1,0 +1,24 @@
+{
+    "timestamp": "2026-03-30T21:59:01.230614",
+    "raw_text": "REPUBLIKA NG PILIPINAS\nREPUBLIKA NG PILIPINAS\nRepublic of the Philippines\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine National ID\n5043-5793-0864-2584\nAPELVIDO/LAST NAME\nEVANGELISTA\nHOMGA PANGALAN GIVEN NAMES\nMARC ALEXIS\nGITNANG APELYIDO/MIDDLE NAME\nNATIVIDAD\nPETSA NG KAPANGANAKAN/DATE OF BIRTH\nJanuary 05, 2005\nTIRAHAN/ADDRESS\nBLK 40 LOT 3 NORTHVILLE 2B BAGUMBONG, BARANGAY 171, CITY OF\nCALOOCAN, NCR, THIRD DISTRICT, PHILIPPINES, 1421\nDIGITAL ID NUMBER\nKFF209\nPHL\nREPUBLIC OF THE PHILIPPINES\nDEPARTMENT OF TRANSPORTATION\nLAND TRANSPORTATION OFFICE\nNON-PROFESSIONAL DRIVER'S LICENSE\nLast Name. First Name, Middle Name\nTABIOS, EMILY GANGE\nNationality Sex Date of Birth\n1972/04/16\nPHL\nAddress\nF\nWeight (kg) Height(m)\n58\n1.55\nB-9 L-30 RUBY ST. CELINA HOMES 3\nBACUMBONG KALOOKAN CITY\nLicense No.\nBlood Type\n2018/0\n0+\nEyes Color\nBROWN\nRestrictions\nConditions\nNONE\nSignature of Licensee\nN25-14-016594 2022/04/16\nSummit\nEDGAR C GALVANTE\nAssistant Secretary\nExpiration Date\nAgency Code\nN06",
+    "parsed_data": {
+        "id_type": "philid",
+        "id_type_label": "Philippine National ID",
+        "first_name": "Marc Alexis",
+        "last_name": "Evangelista",
+        "middle_name": "Natividad",
+        "dob": "2005-01-05",
+        "sex": "",
+        "address": "Blk 40 Lot 3 Northville 2b Bagumbong, Barangay 171, City Of Caloocan, Ncr, Third District, Philippines, 1421",
+        "barangay": "171",
+        "postal_code": "1421",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "pcn": "5043-5793-0864-2584",
+        "block_lot": "Blk 40 Lot 3",
+        "subdivision": "Northville 2B Bagumbong",
+        "street": "Barangay 171",
+        "is_document_mismatch": true,
+        "mismatch_reason": "Document types do not match (National ID vs Driver's License) and personal details (names, birthdates) belong to different individuals."
+    }
+}

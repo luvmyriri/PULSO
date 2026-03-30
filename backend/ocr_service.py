@@ -149,6 +149,97 @@ def preprocess_image(image_bytes: bytes, for_vision_api: bool = False) -> bytes:
         return image_bytes
 
 # ---------------------------------------------------------------------------
+# Address Component Parser  
+# ---------------------------------------------------------------------------
+
+def parse_address_components(raw: str, barangay: str = '') -> dict:
+    """
+    Splits a raw OCR address string into structured sub-fields:
+    house_no, block_lot, subdivision, street.
+    """
+    import re as _re
+
+    if not raw:
+        return {'house_no': '', 'block_lot': '', 'subdivision': '', 'street': ''}
+
+    # 1. Normalize
+    s = raw.replace('\n', ' ').replace('|', ' ')
+    s = _re.sub(r'\s{2,}', ' ', s).strip()
+
+    # 2. CRITICAL: Philippine addresses often have trailing metadata after commas
+    #    e.g. "Blk 40 Lot 3 Northville 2b Bagumbong, Barangay 171, City Of Caloocan, NCR..."
+    #    Truncate at the first comma that is followed by city/barangay-level noise
+    TRAILING_MARKERS = r',\s*(?:Barangay|Brgy|City|Municipality|Province|NCR|Metro\s+Manila|Philippines?|Caloocan|Quezon|Third\s+District)'
+    m = _re.search(TRAILING_MARKERS, s, _re.I)
+    if m:
+        s = s[:m.start()].strip()
+
+    # 3. Strip remaining noise keywords
+    NOISE = r'\b(KASARIAN|SEX|MALE|FEMALE|PHILIPPINES?|REPUBLIKA\s+NG|ADDRESS|RESIDENCE|LICENSE|RESTRICTION|ISSUANCE|BLOOD\s+TYPE|EYE\s+COLOR|WEIGHT|HEIGHT|TIN|EXPIRY|NCR|THIRD\s+DISTRICT)\b'
+    s = _re.sub(NOISE, '', s, flags=_re.I)
+    # Strip 4-digit postal codes
+    s = _re.sub(r'\b1[34]\d{2}\b', '', s)
+    # Strip any remaining city/district words
+    s = _re.sub(r'\b(CALOOCAN|KALOOKAN|CITY|METRO\s+MANILA|MANILA|DISTRICT|ZONE)\b', '', s, flags=_re.I)
+    # Strip barangay text by name
+    if barangay:
+        bn = _re.sub(r'^Barangay\s*', '', barangay, flags=_re.I).strip()
+        if bn:
+            s = _re.sub(r'\b' + _re.escape(bn) + r'\b', '', s, flags=_re.I)
+    s = _re.sub(r'\b(BARANGAY|BRGY\.?|BGY\.?)\s*\d+[A-Z]?\b', '', s, flags=_re.I)
+    # Clean up punctuation artifacts
+    s = _re.sub(r'[,\/]+', ' ', s)
+    s = _re.sub(r'\s{2,}', ' ', s).strip()
+
+    house_no = ''
+    block_lot = ''
+    street = ''
+    subdivision = ''
+
+    # 4. Extract Block & Lot (highest priority)
+    blk_lot_re = r'\b((?:BLK|BLOCK|B\.?LK|8LK)\.?\s*\d+[A-Z]?\s*(?:LOT|L0T)\.?\s*\d+[A-Z]?|(?:LOT|L0T)\.?\s*\d+[A-Z]?\s*(?:BLK|BLOCK|B\.?LK)\.?\s*\d+[A-Z]?|(?:BLK|BLOCK|B\.?LK)\.?\s*\d+[A-Z]?|(?:LOT|L0T)\.?\s*\d+[A-Z]?)\b'
+    m = _re.search(blk_lot_re, s, _re.I)
+    if m:
+        block_lot = _re.sub(r'8LK|B\.?LK', 'BLK', m.group(1), flags=_re.I)
+        block_lot = _re.sub(r'L0T', 'LOT', block_lot, flags=_re.I)
+        block_lot = block_lot.upper().strip()
+        s = (s[:m.start()] + ' ' + s[m.end():]).strip()
+
+    # 5. Leading house number (only if no block/lot)
+    if not block_lot:
+        m = _re.match(r'^(#?\d+[-\u2013\/]?[A-Za-z]?)\s', s)
+        if m:
+            house_no = m.group(1).lstrip('#')
+            s = s[m.end():].strip()
+
+    # 6. Extract Street (by suffix keyword)
+    street_re = r'\b((?:[A-Za-z0-9#\.\-]+\s+)*(?:[A-Za-z0-9#\.\-]+)\s+(?:STREET|ST\.?|AVENUE|AVE\.?|ROAD|RD\.?|BOULEVARD|BLVD\.?|DRIVE|DR\.?|LANE|LN\.?|HIGHWAY|HWY\.?|EXTENSION|EXT\.?|LOOP|WALK|WAY|CIRCLE|CIR\.?))\b'
+    m = _re.search(street_re, s, _re.I)
+    if m:
+        street = m.group(1).strip().title()
+        s = (s[:m.start()] + ' ' + s[m.end():]).strip()
+
+    # 7. Extract Subdivision / Village (after street extraction)
+    subdiv_re = r'\b((?:[A-Za-z0-9#\.\-]+\s+)*(?:[A-Za-z0-9#\.\-]+\s+)?(?:HOMES?(?:\s+\d+[A-Z]?)?|VILLAGE|VILL(?:AGE)?\.?|HEIGHTS?|SUBD(?:\.?|IVISION)?|SUBDIVISION|VILLE|ESTATE|PARK(?:\s+\d+)?|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+[A-Z]?)?|FAIRVIEW|TOWNVILLE|RESIDENCES?|COMPOUND|ROYALE|PALMS?|GARDENS?|GROVE|HILLS?))\b'
+    m = _re.search(subdiv_re, s, _re.I)
+    if m:
+        subdivision = m.group(1).strip().title()
+        s = (s[:m.start()] + ' ' + s[m.end():]).strip()
+        s = _re.sub(r'\s{2,}', ' ', s)
+
+    # 8. Remainder -> street fallback if still empty
+    s = _re.sub(r'[,\/\s]+$', '', s).lstrip(', ').strip()
+    if not street and s:
+        street = s.title().strip()
+
+    return {
+        'house_no':    house_no,
+        'block_lot':   block_lot,
+        'subdivision': subdivision,
+        'street':      street,
+    }
+
+# ---------------------------------------------------------------------------
 # ID Type Detection
 # ---------------------------------------------------------------------------
 
@@ -163,7 +254,9 @@ def detect_id_type(text: str) -> str:
     if any(k in u for k in (
         'PHILSYS', 'PHILIPPINE IDENTIFICATION SYSTEM', 'PCN', 'PHILID',
         'PAMBANSANG PAGKAKAKILANLAN', 'PHILIPPINE NATIONAL ID',
-        'PAMBANSANG ID', 'APELYIDO/LAST NAME', 'MGA PANGALAN', 'GITNANG APELYIDO'
+        'PAMBANSANG ID', 'APELYIDO/LAST NAME', 'MGA PANGALAN', 'GITNANG APELYIDO',
+        'PHILIPPINE STATISTICS AUTHORITY', 'PSA',
+        'KASARIAN', 'URI NG DUGO', 'KALAGAYANG SIBIL', 'KAPANGANAKAN', 'MABINI'
     )):
         return 'philid'
     if any(k in u for k in ('UNIFIED MULTI-PURPOSE', 'UMID', 'SSS')):
@@ -178,7 +271,7 @@ def detect_id_type(text: str) -> str:
         return 'pagibig'
     if any(k in u for k in ('PHLPOST', 'PHLPost', 'POSTAL ID', 'PHILIPPINE POSTAL')):
         return 'postal'
-    if any(k in u for k in ('COMMISSION ON ELECTIONS', 'COMELEC', 'VOTERS IDENTIFICATION', "VOTER'S ID", 'VIN')):
+    if any(k in u for k in ('COMMISSION ON ELECTIONS', 'COMELEC', 'VOTERS IDENTIFICATION', "VOTER'S ID", 'VOTER IDENTIFICATION NUMBER')):
         return 'comelec'
     if 'PASSPORT' in u or re.search(r'^[A-Z]{2}\d{7}', u, re.MULTILINE):
         return 'passport'
@@ -653,38 +746,120 @@ def infer_postal_code(text: str) -> str:
             return code
     return ''
 
-def extract_id_details(text: str) -> Dict[str, Any]:
+def compare_names(name1: str, name2: str) -> bool:
     """
-    Dispatch OCR text to the appropriate per-ID-type parser module,
+    Heuristic to compare two name strings from different ID surfaces.
+    Returns True if they are likely the same person, False if they are clearly different.
+    """
+    if not name1 or not name2: return True # One side missing is not a mismatch
+    
+    n1 = name1.upper().replace('.', '').strip()
+    n2 = name2.upper().replace('.', '').strip()
+    
+    # If they are different but one is a substring of the other (e.g. "JUAN" vs "JUAN DELA CRUZ")
+    if n1 in n2 or n2 in n1: return True
+    
+    # Basic token check (Must share at least one significant name part)
+    tokens1 = set(n1.split())
+    tokens2 = set(n2.split())
+    
+    # Ignore common noises
+    stop_words = {'THE', 'OF', 'ID', 'MR', 'MS', 'MRS'}
+    t1 = tokens1 - stop_words
+    t2 = tokens2 - stop_words
+    
+    # If they share NO tokens, it's a mismatch
+    if not (t1 & t2): return False
+    
+    return True
+
+def extract_id_details(front_text: str, back_text: str = "", front_image: bytes = None, back_image: bytes = None) -> Dict[str, Any]:
+    """
+    Dispatch OCR text from both sides to the AI parser for multi-side intelligence,
     then enrich with residency verification.
-
-    Returns dict with:
-      id_type, first_name, last_name, middle_name, dob, sex,
-      address, barangay, is_north_caloocan, verification_message
     """
-    upper_text = text.upper()
-    lines = [line.strip() for line in text.split('\n') if len(line.strip()) > 1]
+    full_text = f"{front_text}\n{back_text}"
+    upper_text = full_text.upper()
+    lines = [line.strip() for line in full_text.split('\n') if len(line.strip()) > 1]
 
-    # 1. Detect which Philippine ID this is
-    id_type = detect_id_type(upper_text)
-    print(f"[OCR] Detected ID type: {id_type}")
+    # 1. Detect which Philippine ID this is (Cross-Validation)
+    id_type_front = detect_id_type(front_text)
+    id_type_back  = detect_id_type(back_text)
+    
+    # Heuristic Mismatch Check (Warning only, will be refined by AI Intelligence)
+    heuristic_mismatch = False
+    heuristic_reason = ""
+    
+    if id_type_front != 'unknown' and id_type_back != 'unknown' and id_type_front != id_type_back:
+        heuristic_mismatch = True
+        heuristic_reason = f"Heuristic Warning: Document type may mismatch (Front={id_type_front.upper()}, Back={id_type_back.upper()}). Refining with AI..."
+        print(f"[OCR] {heuristic_reason}")
+
+    # Starting heuristic, will be refined by AI below
+    id_type = id_type_front if id_type_front != 'unknown' else id_type_back
+    print(f"[OCR] Heuristic ID types: Front={id_type_front}, Back={id_type_back}")
 
     # 2. Route to the appropriate modular parser
     parser = get_parser(id_type)
-    parsed = parser.extract(text, lines)
-    print(f"[OCR] Parser ({id_type}) returned: {parsed}")
+    parsed = parser.extract(full_text, lines)
 
-    # 3. ADVANCED: LLM-Assisted Refinement (Vertex AI)
-    # The LLM cleans up noisy OCR and handles "label bleed" better than rules.
-    llm_extracted = gemini_service.extract_id_data(text, id_type=id_type)
+    mismatch_detected = False
+    mismatch_reason = ""
+
+    # 3. ADVANCED: LLM-Assisted Refinement (Side, Type & Visual/Integrity Audit)
+    # Pass both front and back text separately to the AI for cross-referencing
+    llm_extracted = gemini_service.extract_id_data(
+        front_text, 
+        back_text, 
+        id_type=id_type, 
+        front_image=front_image, 
+        back_image=back_image
+    )
+    
     if llm_extracted:
-        print(f"[OCR] Vertex AI Refinement: {llm_extracted}")
+        print(f"[OCR] AI Intelligent Scan Result: {llm_extracted}")
+        
+        # Override ID Type with AI Intelligence (more authoritative than heuristics)
+        ai_type = llm_extracted.get('front_id_type', 'unknown')
+        if ai_type != 'unknown':
+            id_type = ai_type.lower()
+            print(f"[OCR] AI Overrode Type to: {id_type}")
+
+        # START AUTHORITATIVE AI AUDIT (AI Intelligence has the final word)
+        # Reset heuristic mismatch if AI confirms the document is valid
+        ai_detected_mismatch = llm_extracted.get('is_document_mismatch', False)
+        ai_mismatch_reason   = llm_extracted.get('mismatch_reason', "")
+
+        # Only trust the heuristic if AI also finds an issue, otherwise trust the Visual Audit
+        if ai_detected_mismatch:
+            mismatch_detected = True
+            mismatch_reason = ai_mismatch_reason
+        else:
+            # AI says it's fine! Override the heuristic's false-positive flag
+            if heuristic_mismatch:
+                print(f"[OCR] AI Intelligence override: Document is VALID despite heuristic warning ({heuristic_reason})")
+            mismatch_detected = False
+            mismatch_reason = ""
+
+        # Secondary checks (Orientation/Side)
+        if not llm_extracted.get('is_front_correct', True):
+            mismatch_detected = True
+            mismatch_reason = "Front ID scan error: The image uploaded as 'Front' appears to be the back of the document."
+        elif not llm_extracted.get('is_back_correct', True):
+            mismatch_detected = True
+            mismatch_reason = "Back ID scan error: The image uploaded as 'Back' appears to be the front of the document."
+        
+        # Identity Portrait Check (Face Match)
+        if llm_extracted.get('is_visual_face_match') == False:
+            mismatch_detected = True
+            mismatch_reason = "Identity Mismatch: The portrait photo on the front does not match the individual on the back."
+
         # Only overwrite if LLM found something useful, else keep parser's result
-        for key in ('first_name', 'last_name', 'middle_name', 'dob', 'sex', 'address', 'barangay', 'pcn', 'postal_code'):
+        for key in ('first_name', 'last_name', 'middle_name', 'suffix', 'dob', 'sex', 'address', 'barangay', 'pcn', 'postal_code', 'license_no'):
             if llm_extracted.get(key) and not parsed.get(key):
                 parsed[key] = llm_extracted.get(key)
             elif llm_extracted.get(key) and len(str(llm_extracted.get(key))) > len(str(parsed.get(key, ''))):
-                # Trust LLM for better cleaning of structured strings
+                # Trust LLM for better cleaning
                 parsed[key] = llm_extracted.get(key)
 
     first_name  = parsed.get('first_name', '')
@@ -695,7 +870,7 @@ def extract_id_details(text: str) -> Dict[str, Any]:
     address     = parsed.get('address', '')
     barangay    = parsed.get('barangay', '')
 
-    # 3. Legacy fallbacks — use the old helpers if the modular parser was incomplete
+    # 4. Legacy fallbacks — use the old helpers if the modular parser was incomplete
     if not barangay:
         barangay = extract_barangay(upper_text)
     if not dob:
@@ -703,7 +878,7 @@ def extract_id_details(text: str) -> Dict[str, Any]:
     if not sex:
         sex = extract_sex(upper_text)
     if not address:
-        address = text[:200].replace('\n', ' ').strip()
+        address = full_text[:400].replace('\n', ' ').strip()
 
     # 4. Smart Postal Code inference if missing
     postal_code = parsed.get('postal_code', '')
@@ -712,6 +887,23 @@ def extract_id_details(text: str) -> Dict[str, Any]:
     
     # 5. Residency verification
     is_nc, msg = verify_north_caloocan_residency(upper_text, barangay)
+
+    # Priority: AI > Regex Fallback
+    # If the AI produces an output (even an empty string), we explicitly respect it.
+    if llm_extracted:
+        final_house_no  = llm_extracted.get('house_no', '')
+        final_block_lot = llm_extracted.get('block_lot', '')
+        final_subdiv    = llm_extracted.get('subdivision', '')
+        final_street    = llm_extracted.get('street', '')
+    else:
+        # Fallback to Regex modular parser only if AI crashed or fully yielded
+        addr_parts = parse_address_components(address, barangay)
+        final_house_no  = addr_parts['house_no']
+        final_block_lot = addr_parts['block_lot']
+        final_subdiv    = addr_parts['subdivision']
+        final_street    = addr_parts['street']
+
+    print(f"[OCR] Address Components: house_no='{final_house_no}' | block_lot='{final_block_lot}' | subdivision='{final_subdiv}' | street='{final_street}'")
 
     res = {
         'id_type':              id_type,
@@ -722,6 +914,10 @@ def extract_id_details(text: str) -> Dict[str, Any]:
         'dob':                  dob,
         'sex':                  sex,
         'address':              address,
+        'house_no':             final_house_no,
+        'block_lot':            final_block_lot,
+        'subdivision':          final_subdiv,
+        'street':               final_street,
         'barangay':             barangay,
         'postal_code':          postal_code,
         'is_north_caloocan':    is_nc,
@@ -733,8 +929,16 @@ def extract_id_details(text: str) -> Dict[str, Any]:
         if k not in res:
             res[k] = v
 
+    # 6. Set Mismatch Flags
+    res['is_document_mismatch'] = mismatch_detected
+    res['mismatch_reason']      = mismatch_reason
+
+    # Single-side verification check
+    if mismatch_detected:
+        res['verification_message'] = mismatch_reason
+
     # Log the attempt for future improvement
-    log_ocr_attempt(text, res)
+    log_ocr_attempt(full_text, res)
 
     return res
 
@@ -803,13 +1007,16 @@ async def perform_google_vision_ocr(image_bytes: bytes) -> str:
     full_text = resp_body.get('fullTextAnnotation', {}).get('text', '')
     if full_text:
         return full_text
+    
+    # Fallback to simple TEXT_DETECTION
+    texts = resp_body.get('textAnnotations', [])
+    if texts:
+        return texts[0].get('description', '')
 
-    # Fall back to TEXT_DETECTION
-    annotations = resp_body.get('textAnnotations', [])
-    return annotations[0].get('description', '') if annotations else ''
+    return ''
 
 # ---------------------------------------------------------------------------
-# OCR.space Fallback
+# OCR.space (Fallback Engine)
 # ---------------------------------------------------------------------------
 
 async def perform_ocrspace_ocr(image_bytes: bytes, filename: str = 'id.jpg') -> str:
@@ -852,100 +1059,46 @@ async def perform_ocrspace_ocr(image_bytes: bytes, filename: str = 'id.jpg') -> 
 # ---------------------------------------------------------------------------
 # Main Entry Point
 # ---------------------------------------------------------------------------
-async def perform_ocr(front_bytes: bytes, back_bytes: bytes = None) -> Dict[str, Any]:
+
+async def perform_ocr(front_bytes: bytes, back_bytes: bytes) -> Dict[str, Any]:
     """
-    Main OCR pipeline with concurrent engine execution for maximum speed.
+    Main Multi-Side OCR pipeline with concurrent execution.
+    Requires both front and back images for maximum AI accuracy.
     """
     start_total = time.time()
-    from dotenv import load_dotenv
-    import os as _os
-    load_dotenv(override=True)
-    # Explicitly remove stale simulation var from memory — handles the case
-    # where the var was set before .env was edited (no restart needed).
-    _os.environ.pop('SIMULATED_OCR_TEXT', None)
     
-    # open the .env file and check if it explicitly has SIMULATED_OCR_TEXT
-    _env_path = _os.path.join(_os.path.dirname(__file__), '.env')
-    sim_text = ''
-    try:
-        with open(_env_path) as _f:
-            for _line in _f:
-                _stripped = _line.strip()
-                if _stripped.startswith('SIMULATED_OCR_TEXT='):
-                    sim_text = _stripped.split('=', 1)[1].strip().strip('"')
-                    break
-    except Exception:
-        pass
+    # 1. Concurrent extraction of both sides
+    tasks = [
+        perform_google_vision_ocr(front_bytes),
+        perform_google_vision_ocr(back_bytes)
+    ]
     
-    if sim_text:
-        return {
-            "success": True,
-            "engine": "simulation",
-            "extracted_data": extract_id_details(sim_text),
-        }
-
-    # Parallelize engine calls
-    tasks = []
-    
-    if GOOGLE_VISION_API_KEY:
-        tasks.append(perform_google_vision_ocr(front_bytes))
-    
-    # Optional: Only run OCR.space if explicitly enabled OR if Google key is missing
-    # To keep speed high, we might want to NOT run both unless one fails, 
-    # but concurrent execution is faster than sequential fallback.
-    if OCR_API_KEY and OCR_API_KEY != 'helloworld':
-        tasks.append(perform_ocrspace_ocr(front_bytes))
-
+    # Run both sides in parallel
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
     front_text = ""
-    engine_used = "none"
+    back_text = ""
     
-    for i, res in enumerate(results):
-        if isinstance(res, str) and res.strip():
-            front_text = res
-            engine_used = "google_vision" if i == 0 and GOOGLE_VISION_API_KEY else "ocr_space"
-            break # Success with the first available engine
+    if len(results) > 0 and isinstance(results[0], str):
+        front_text = results[0]
     
-    if not front_text:
-        # Final fallback logic
-        allow_mock = os.getenv('ALLOW_MOCK_OCR', 'false').lower() == 'true'
-        if allow_mock:
-            print("[OCR] [DEV ONLY] Both engines failed. Returning mock data.")
-            mock_data = {
-                'id_type': 'lto',
-                'first_name': 'JUAN PEDRO',
-                'last_name': 'DELA CRUZ',
-                'middle_name': 'MALABANAN',
-                'dob': '1995-06-12',
-                'sex': 'Male',
-                'address': 'BLK 40 LOT 3 Ruby St Colina Homes 3',
-                'barangay': '171',
-                'is_north_caloocan': True,
-                'verification_message': 'Resident Verified (Optimized MOCK).',
-            }
-            return {"success": True, "engine": "mock", "extracted_data": mock_data}
+    if len(results) > 1 and isinstance(results[1], str):
+        back_text = results[1]
 
+    if not front_text and not back_text:
         return {
             "success": False,
-            "error": "OCR failed. Please retry with clearer focus.",
+            "error": "OCR failed for both sides. Please ensure images are clear and well-lit.",
             "extracted_data": None
         }
 
-    # Process back image if exists (sequential for now as back is secondary)
-    back_text = ""
-    if back_bytes:
-        try:
-            back_text = await perform_google_vision_ocr(back_bytes)
-        except: pass
-
-    # Combine and extract
-    extracted = extract_id_details(front_text + "\n" + back_text)
+    # 2. Multi-Side Logic Extraction (passed to AI Intelligence layer with original images)
+    extracted = extract_id_details(front_text, back_text, front_image=front_bytes, back_image=back_bytes)
     
-    print(f"[OCR] Total pipeline took {time.time() - start_total:.3f}s using {engine_used}")
+    print(f"[OCR] Multi-side pipeline took {time.time() - start_total:.3f}s")
     
     return {
         "success": True,
-        "engine": engine_used,
+        "engine": "google-vision-gemini-v2",
         "extracted_data": extracted,
     }
