@@ -38,6 +38,7 @@ export default function Login() {
     const [verificationOtp, setVerificationOtp] = useState(['', '', '', '', '', '']);
     const [verificationSuccess, setVerificationSuccess] = useState(false);
     const otpRefs = React.useRef([]);
+    const recaptchaRef = React.useRef(null);
 
     /* ── Same Spline scenes as GovLanding ──────────────────────────────── */
     const DARK_SCENE  = 'https://prod.spline.design/us1Y6xfaQLiI2cim/scene.splinecode';
@@ -84,9 +85,8 @@ export default function Login() {
         setLoading(true);
         setError('');
 
-        // Only block client-side if the captcha is already supposed to be visible
-        if (showCaptcha && !captchaValue) {
-            setError('System synchronization failed: Please solve the security puzzle to proceed.');
+        if (!captchaValue) {
+            setError('Please complete the security puzzle to proceed.');
             setLoading(false);
             return;
         }
@@ -95,9 +95,7 @@ export default function Login() {
             const formData = new URLSearchParams();
             formData.append('username', email);
             formData.append('password', password);
-            if (captchaValue) {
-                formData.append('captcha_token', captchaValue);
-            }
+            formData.append('captcha_token', captchaValue);
 
             const response = await fetch('http://localhost:8000/api/auth/login', {
                 method: 'POST',
@@ -108,24 +106,22 @@ export default function Login() {
             const data = await response.json();
 
             if (response.ok) {
-                // Handle two-stage verification
+                // If the backend still asks for captcha (edge case), we show error
                 if (data.require_captcha) {
-                    setShowCaptcha(true);
+                    setError('Security challenge required. Please try again.');
+                    setLoading(false);
+                    return;
+                }
+
+                if (data.user.role !== 'resident') {
+                    setError('This portal is for residents only. Authorized personnel please use the Government Gateway.');
                     setLoading(false);
                     return;
                 }
 
                 localStorage.setItem('pulso_token', data.access_token);
                 localStorage.setItem('pulso_user', JSON.stringify(data.user));
-
-                const GOV_ROLES = [
-                    'city_engineer', 'asst_city_engineer', 'admin_officer', 'admin_clerk',
-                    'records_officer', 'division_chief', 'design_engineer', 'estimator',
-                    'cad_operator', 'project_engineer', 'construction_foreman', 'field_worker',
-                    'building_inspector', 'electrical_inspector', 'mechanical_inspector',
-                    'dispatcher', 'manager', 'system_admin',
-                ];
-                navigate(GOV_ROLES.includes(data.user.role) ? '/gov/my-dashboard' : '/dashboard');
+                navigate('/dashboard');
             } else {
                 if (response.status === 403 && data.detail.includes("Account not verified")) {
                     setVerificationEmail(email);
@@ -493,29 +489,17 @@ export default function Login() {
                                                     </div>
                                                 </div>
 
-                                                {/* reCAPTCHA stage - Animate entry when credentials are verified */}
-                                                <AnimatePresence>
-                                                    {showCaptcha && (
-                                                        <motion.div 
-                                                            initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                                                            animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                                                            exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                                                            className="flex flex-col items-center gap-3 overflow-hidden mb-4"
-                                                        >
-                                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full">
-                                                                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
-                                                                <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">
-                                                                    Security verification required
-                                                                </span>
-                                                            </div>
-                                                            <ReCAPTCHA
-                                                                sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                                                                onChange={(val) => setCaptchaValue(val)}
-                                                                theme={theme === 'dark' ? 'dark' : 'light'}
-                                                            />
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
+                                                {/* ReCAPTCHA Checkbox stage */}
+                                                <div className="flex justify-center w-full mb-4">
+                                                    <div className="relative z-10 scale-95 origin-center">
+                                                        <ReCAPTCHA
+                                                            ref={recaptchaRef}
+                                                            sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                            onChange={(val) => setCaptchaValue(val)}
+                                                            theme={theme === 'dark' ? 'dark' : 'light'}
+                                                        />
+                                                    </div>
+                                                </div>
 
                                                 <button
                                                     type="submit"

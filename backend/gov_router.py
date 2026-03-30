@@ -740,11 +740,11 @@ def list_design_requests(
     return [
         {
             "id": p.id,
-            "project_number": p.project_number,
+            "project_number": p.proj_number,
             "title": p.title,
             "status": p.status,
             "barangay": p.barangay,
-            "location": p.location_description,
+            "location": p.location_string,
             "current_phase": p.current_phase,
             "created_at": str(p.created_at),
         }
@@ -776,12 +776,12 @@ def list_structure_analysis(
     return [
         {
             "id": p.id,
-            "project_number": p.project_number,
+            "project_number": p.proj_number,
             "title": p.title,
             "status": p.status,
             "barangay": p.barangay,
-            "location": p.location_description,
-            "scope_of_work": p.scope_of_work,
+            "location": p.location_string,
+            "scope_of_work": p.description,
             "current_phase": p.current_phase,
             "created_at": str(p.created_at),
         }
@@ -823,18 +823,18 @@ def list_field_surveys(
             "wo_number": w.wo_number,
             "title": w.title,
             "status": w.status,
-            "barangay": w.barangay,
-            "location": w.location_description,
+            "priority": w.priority,
+            "wo_type": w.wo_type,
             "created_at": str(w.created_at),
         })
     for p in proj_items:
         results.append({
             "id": p.id,
-            "project_number": p.project_number,
+            "project_number": p.proj_number,
             "title": p.title,
             "status": p.status,
             "barangay": p.barangay,
-            "location": p.location_description,
+            "location": p.location_string,
             "created_at": str(p.created_at),
         })
     return results[:limit]
@@ -866,7 +866,7 @@ def list_boq(
         result.append({
             "id": item.id,
             "pr_number": pr.pr_number if pr else "—",
-            "title": item.description,
+            "title": item.item_name,
             "description": f"Qty: {item.quantity} {item.unit} @ ₱{item.unit_cost:,.2f} = ₱{item.total_cost:,.2f}",
             "status": pr.status if pr else "unknown",
             "barangay": pr.title if pr else "—",

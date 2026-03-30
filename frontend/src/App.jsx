@@ -57,9 +57,9 @@ function App() {
                         <Route path="/reset-password" element={<ResetPassword />} />
 
                         {/* ── RESIDENT PORTAL ────────────────────────────────── */}
-                        {/*   Residents & gov staff can see the citizen dashboard  */}
+                        {/* Residents ONLY portal access */}
                         <Route path="/dashboard" element={
-                            <AnyAuth><ResidentDashboard /></AnyAuth>
+                            <ResidentOnly><ResidentDashboard /></ResidentOnly>
                         } />
 
                         {/* ── GOVERNMENT — UNIVERSAL LANDING ─────────────────── */}

@@ -90,6 +90,44 @@ def _append_audit(
 # Work Orders
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: int, actor_role: str):
+    """Update the citizen report status + notify the citizen. Called by gov CRUD functions."""
+    report = db.query(models.Report).filter(models.Report.id == report_id).first()
+    if not report:
+        return
+    previous = report.status
+    report.status = new_status
+
+    # Timeline entry (citizen-visible)
+    _append_timeline(
+        db, status=new_status, previous_status=previous,
+        actor_id=actor_id, actor_role=actor_role,
+        report_id=report_id, is_public=True,
+        note=f"Report status updated to {new_status}",
+    )
+    _append_audit(
+        db, trigger_type="status_change",
+        action=f"Report {report.ticket_id} status → {new_status}",
+        actor_id=actor_id, actor_role=actor_role,
+        report_id=report_id,
+    )
+
+    # Citizen notification
+    ticket = report.ticket_id or f"RPT-{report.id}"
+    notif_map = {
+        "pending_approval": ("Report Verified", f"Your report {ticket} has been verified and is pending engineering approval."),
+        "approved_internal": ("Report Approved", f"Good news! Your report {ticket} has been approved and is ready for dispatch."),
+        "dispatched": ("Team Dispatched", f"A field team has been dispatched for your report {ticket}. They are on the way."),
+        "in_progress": ("Work In Progress", f"Repair work is actively underway for your report {ticket}."),
+        "resolved": ("Report Resolved", f"Your report {ticket} has been resolved. Thank you for making North Caloocan better!"),
+        "rejected": ("Report Rejected", f"Your report {ticket} could not be verified. Please re-submit with clearer details if this was an error."),
+    }
+    if new_status in notif_map:
+        title, msg = notif_map[new_status]
+        notif = models.Notification(user_id=report.user_id, title=title, message=msg)
+        db.add(notif)
+
+
 def create_work_order(
     db: Session,
     data: gov_schemas.WorkOrderCreate,
@@ -123,6 +161,11 @@ def create_work_order(
         actor_id=actor_id, actor_role=actor_role,
         work_order_id=wo.id, report_id=data.report_id, project_id=data.project_id,
     )
+
+    # ── Lifecycle Link: auto-dispatch the linked citizen report ──
+    if data.report_id:
+        _sync_report_status(db, data.report_id, "dispatched", actor_id, actor_role)
+
     db.commit()
     db.refresh(wo)
     return wo
@@ -177,6 +220,17 @@ def update_work_order_status(
         actor_id=actor_id, actor_role=actor_role,
         work_order_id=wo_id,
     )
+
+    # ── Lifecycle Link: propagate WO status back to citizen report ──
+    if wo.report_id:
+        report_status_map = {
+            "in_progress": "dispatched",   # Crew is actively working
+            "completed":   "resolved",     # Work done → report resolved
+            "cancelled":   "approved_internal",  # Cancelled → revert to pre-dispatch
+        }
+        if new_status in report_status_map:
+            _sync_report_status(db, wo.report_id, report_status_map[new_status], actor_id, actor_role)
+
     db.commit()
     db.refresh(wo)
     return wo
@@ -206,6 +260,16 @@ def update_work_order(
             action=f"Work order {wo.wo_number} updated → status {update_data['status']}",
             actor_id=actor_id, actor_role=actor_role, work_order_id=wo_id,
         )
+        # ── Lifecycle Link: propagate WO status back to citizen report ──
+        if wo.report_id:
+            report_status_map = {
+                "in_progress": "dispatched",
+                "completed":   "resolved",
+                "cancelled":   "approved_internal",
+            }
+            new_st = update_data["status"]
+            if new_st in report_status_map:
+                _sync_report_status(db, wo.report_id, report_status_map[new_st], actor_id, actor_role)
     db.commit()
     db.refresh(wo)
     return wo
