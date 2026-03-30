@@ -25,7 +25,8 @@ import {
     X,
     Loader2,
     LogOut,
-    CheckCircle
+    CheckCircle,
+    Download
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
@@ -57,9 +58,85 @@ const ManagementDashboard = () => {
     });
     const [activeTab, setActiveTab] = useState('overview');
 
+    // Date range filter
+    const [dateRange, setDateRange] = useState('this_month');
+    const DATE_LABELS = {
+        this_week: 'This Week',
+        this_month: 'This Month',
+        last_month: 'Last Month',
+        last_90: 'Last 90 Days',
+        this_year: 'This Year',
+    };
+
     // Toast
     const [toast, setToast] = useState('');
     const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
+
+    // Client-side CSV export helper
+    const exportTableCSV = (headers, rows, filename) => {
+        const csvContent = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    };
+
+    const handleGenerateReport = () => {
+        if (activeTab === 'procurement' && procurementProjects.length > 0) {
+            exportTableCSV(
+                ['PR No.', 'Title', 'Total Estimate', 'Status'],
+                procurementProjects.map(p => [
+                    p.pr_number, p.title,
+                    p.total_estimated_cost != null ? `₱${Number(p.total_estimated_cost).toLocaleString('en-PH', { minimumFractionDigits: 2 })}` : '—',
+                    (p.status || 'draft').replace(/_/g, ' '),
+                ]),
+                'PULSO_Procurement.csv'
+            );
+            showToast('Procurement report exported!');
+        } else if (activeTab === 'permits' && permits.length > 0) {
+            exportTableCSV(
+                ['Tracking ID', 'Applicant', 'Type', 'Date', 'Status'],
+                permits.map(p => [
+                    p.obo_number || `OBO-${p.id}`, p.applicant_name || p.building_name || 'Applicant',
+                    (p.inspection_type || 'Building').replace(/_/g, ' '),
+                    p.created_at ? new Date(p.created_at).toLocaleDateString('en-PH') : '—',
+                    (p.status || 'pending').replace(/_/g, ' '),
+                ]),
+                'PULSO_OBO_Permits.csv'
+            );
+            showToast('OBO permits exported!');
+        } else if (activeTab === 'users' && usersList.length > 0) {
+            exportTableCSV(
+                ['Name', 'Email', 'Barangay', 'Role', 'Trust Score', 'Joined'],
+                usersList.map(u => [
+                    u.full_name, u.email, u.barangay || 'N/A', u.role,
+                    u.trust_score, new Date(u.created_at).toLocaleDateString(),
+                ]),
+                'PULSO_Users.csv'
+            );
+            showToast('User list exported!');
+        } else {
+            // Full analytics report via backend
+            fetch('http://localhost:8000/api/gov/analytics/export/full-report', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Export failed');
+                return res.blob();
+            })
+            .then(blob => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'PULSO_FullReport.csv';
+                a.click();
+                URL.revokeObjectURL(a.href);
+                showToast('Full analytics report exported!');
+            })
+            .catch(() => showToast('Export failed. Please try again.'));
+        }
+    };
 
     // Advisory form state
     const [advisoryForm, setAdvisoryForm] = useState({
@@ -304,11 +381,20 @@ const ManagementDashboard = () => {
                     </h1>
                     
                     <div className="flex items-center gap-4">
-                        <button className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm">
-                            <Calendar size={16}/> This Month <ChevronDown size={14}/>
-                        </button>
-                        <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-colors">
-                            Generate Report
+                        <select
+                            value={dateRange}
+                            onChange={e => setDateRange(e.target.value)}
+                            className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm appearance-none cursor-pointer"
+                        >
+                            {Object.entries(DATE_LABELS).map(([val, label]) => (
+                                <option key={val} value={val}>{label}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={handleGenerateReport}
+                            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                        >
+                            <Download size={15} /> Export Report
                         </button>
                         <button
                             onClick={() => { 

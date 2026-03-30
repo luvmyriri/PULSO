@@ -106,7 +106,7 @@ const ClusterCard = ({ cluster, onSelect, selected }) => {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function GovAnalyticsPage() {
     const navigate = useNavigate();
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const token = localStorage.getItem('pulso_token');
     const headers = { Authorization: `Bearer ${token}` };
 
     const [summary, setSummary] = useState(null);
@@ -119,6 +119,7 @@ export default function GovAnalyticsPage() {
     const [selectedCluster, setSelectedCluster] = useState(null);
     const [generatingNarrative, setGeneratingNarrative] = useState(false);
     const [narrative, setNarrative] = useState(null);
+    const [narrativeError, setNarrativeError] = useState(null);
     const [creatingPR, setCreatingPR] = useState(false);
     const [prSuccess, setPrSuccess] = useState(null);
     const [daysBack, setDaysBack] = useState(90);
@@ -127,6 +128,11 @@ export default function GovAnalyticsPage() {
     const [mapRef, setMapRef] = useState(null);
     const [darkMode] = useState(true);
     const [currentUser] = useState(() => JSON.parse(localStorage.getItem('pulso_user') || '{}'));
+    const [toast, setToast] = useState(null);
+    const [fetchError, setFetchError] = useState(null);
+    const [generatingBrief, setGeneratingBrief] = useState(false);
+    const [aiBrief, setAiBrief] = useState(null);
+    const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
 
     const { isLoaded: mapsLoaded } = useJsApiLoader({
         id: 'google-map-script',
@@ -137,6 +143,7 @@ export default function GovAnalyticsPage() {
     // ── Fetch All Data ──────────────────────────────────────────────────────
     const fetchData = useCallback(async () => {
         setLoading(true);
+        setFetchError(null);
         try {
             const [summaryRes, clustersRes, forecastRes, recurrenceRes, heatmapRes] = await Promise.all([
                 fetch(`${API}/api/gov/analytics/summary`, { headers }),
@@ -145,13 +152,15 @@ export default function GovAnalyticsPage() {
                 fetch(`${API}/api/gov/analytics/recurrence`, { headers }),
                 fetch(`${API}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers }),
             ]);
-            if (summaryRes.ok)   setSummary(await summaryRes.json());
-            if (clustersRes.ok)  setClusters((await clustersRes.json()).clusters || []);
-            if (forecastRes.ok)  setForecast(await forecastRes.json());
+            if (summaryRes.ok)    setSummary(await summaryRes.json());
+            else throw new Error(`Summary: ${summaryRes.status}`);
+            if (clustersRes.ok)   setClusters((await clustersRes.json()).clusters || []);
+            if (forecastRes.ok)   setForecast(await forecastRes.json());
             if (recurrenceRes.ok) setRecurrence((await recurrenceRes.json()).recurrence_events || []);
-            if (heatmapRes.ok)   setHeatmapData(await heatmapRes.json());
+            if (heatmapRes.ok)    setHeatmapData(await heatmapRes.json());
         } catch (e) {
             console.error('Analytics fetch error:', e);
+            setFetchError(e.message || 'Failed to connect to analytics engine');
         } finally {
             setLoading(false);
         }
@@ -159,10 +168,39 @@ export default function GovAnalyticsPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    // ── Export CSV ───────────────────────────────────────────────────────
+    const exportCSV = (type) => {
+        const endpoints = {
+            clusters: `/api/gov/analytics/export/clusters?days_back=${daysBack}`,
+            forecast: `/api/gov/analytics/export/forecast`,
+            recurrence: `/api/gov/analytics/export/recurrence?days_window=${daysBack}`,
+            full: `/api/gov/analytics/export/full-report?days_back=${daysBack}`,
+        };
+        const url = `${API}${endpoints[type] || endpoints.full}`;
+        fetch(url, { headers })
+            .then(res => {
+                if (!res.ok) throw new Error('Export failed');
+                return res.blob();
+            })
+            .then(blob => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                const disposition = type === 'full' ? 'PULSO_FullReport.csv'
+                    : type === 'clusters' ? 'PULSO_StressZones.csv'
+                    : type === 'forecast' ? 'PULSO_Forecast.csv'
+                    : 'PULSO_Recurrence.csv';
+                a.download = disposition;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            })
+            .catch(e => console.error('Export error:', e));
+    };
+
     // ── Generate AI Narrative ───────────────────────────────────────────────
     const generateNarrative = async (cluster) => {
         setGeneratingNarrative(true);
         setNarrative(null);
+        setNarrativeError(null);
         try {
             const res = await fetch(`${API}/api/gov/analytics/narrative`, {
                 method: 'POST',
@@ -172,11 +210,45 @@ export default function GovAnalyticsPage() {
             if (res.ok) {
                 const data = await res.json();
                 setNarrative(data);
+                showToast('AI Engineering Assessment generated successfully');
+            } else {
+                const err = await res.json().catch(() => ({}));
+                setNarrativeError(err.detail || `Generation failed (${res.status})`);
+                showToast(err.detail || 'AI assessment generation failed', 'error');
             }
         } catch (e) {
             console.error('Narrative generation failed:', e);
+            setNarrativeError('Network error — check backend connectivity');
+            showToast('Network error connecting to AI service', 'error');
         } finally {
             setGeneratingNarrative(false);
+        }
+    };
+
+    // ── Generate AI Intelligence Brief (overall summary) ──────────────────
+    const generateBrief = async () => {
+        if (clusters.length === 0) return;
+        setGeneratingBrief(true);
+        setAiBrief(null);
+        try {
+            const topCluster = clusters[0];
+            const res = await fetch(`${API}/api/ai/assistant`, {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: `Generate a concise executive intelligence brief (3-4 paragraphs) summarizing the current infrastructure status of North Caloocan based on ${summary?.total_reports || 0} citizen reports across ${clusters.length} stress zones. There are ${summary?.critical_zones || 0} CRITICAL zones, ${summary?.high_zones || 0} HIGH priority zones, and ${summary?.emerging_zones || 0} EMERGING zones. Total budget exposure is ${summary?.total_budget_exposure || 'N/A'}. Resolution rate is ${summary?.resolution_rate_pct || 0}%. The most severe cluster is in Barangay ${topCluster.barangay} with ${topCluster.report_count} reports of ${topCluster.dominant_category.replace(/_/g,' ')} at threat level ${topCluster.threat_level}. Chronic recurrence events: ${summary?.chronic_recurrence_events || 0}. Provide actionable recommendations for the City Engineer.`,
+                    context: 'Analytics Command Center — Executive Intelligence Brief'
+                }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAiBrief(data.response);
+                showToast('Intelligence brief generated');
+            }
+        } catch (e) {
+            showToast('Failed to generate brief', 'error');
+        } finally {
+            setGeneratingBrief(false);
         }
     };
 
@@ -263,6 +335,10 @@ export default function GovAnalyticsPage() {
                             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold text-sm px-4 py-2 rounded-xl transition-colors">
                             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
                         </button>
+                        <button onClick={() => exportCSV(activeTab === 'clusters' ? 'clusters' : activeTab === 'forecast' ? 'forecast' : activeTab === 'recurrence' ? 'recurrence' : 'full')}
+                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded-xl transition-colors">
+                            <Download size={15} /> Export CSV
+                        </button>
                     </div>
                 </div>
 
@@ -277,6 +353,44 @@ export default function GovAnalyticsPage() {
                             <KPICard label="Emerging Zones" value={summary.emerging_zones} sub="Growing trend detected" icon={TrendingUp} color="yellow" />
                             <KPICard label="Recurrences" value={summary.chronic_recurrence_events} sub="Chronic failures" icon={RotateCcw} color="rose" />
                             <KPICard label="Budget Exposure" value={summary.total_estimated_cost ? `₱${(summary.total_estimated_cost / 1_000_000).toFixed(1)}M` : '₱0'} sub="DPWH 2024 est." icon={DollarSign} color="emerald" />
+                        </div>
+                    )}
+
+                    {/* Fetch Error Banner */}
+                    {fetchError && (
+                        <div className="mx-8 mt-4 bg-red-950/30 border border-red-800/50 rounded-xl p-4 flex items-start gap-3">
+                            <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-bold text-red-400 text-sm">Analytics Engine Error</p>
+                                <p className="text-xs text-slate-400 mt-1">{fetchError}</p>
+                                <button onClick={fetchData} className="mt-2 text-xs font-bold text-red-400 hover:text-red-300 flex items-center gap-1">
+                                    <RefreshCw size={12} /> Retry Connection
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* AI Intelligence Brief */}
+                    {summary && !fetchError && (
+                        <div className="px-8 mt-4 shrink-0">
+                            {!aiBrief ? (
+                                <button onClick={generateBrief} disabled={generatingBrief || clusters.length === 0}
+                                    className="flex items-center gap-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-700/50 text-indigo-300 font-bold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-40">
+                                    {generatingBrief ? <><Loader2 size={15} className="animate-spin" /> Generating Intelligence Brief...</> : <><Brain size={15} /> Generate AI Intelligence Brief</>}
+                                </button>
+                            ) : (
+                                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                                    className="bg-indigo-950/30 border border-indigo-800/40 rounded-2xl p-5">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Brain size={16} className="text-indigo-400" />
+                                            <p className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Executive Intelligence Brief</p>
+                                        </div>
+                                        <button onClick={() => setAiBrief(null)} className="text-slate-500 hover:text-white"><X size={14} /></button>
+                                    </div>
+                                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{aiBrief}</p>
+                                </motion.div>
+                            )}
                         </div>
                     )}
 
@@ -487,6 +601,17 @@ export default function GovAnalyticsPage() {
                                                     </div>
                                                     <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{narrative.narrative}</p>
                                                     <p className="text-[10px] text-indigo-500 mt-3 font-bold">Generated by PULSO Intelligence Engine · {new Date(narrative.generated_at).toLocaleString('en-PH')}</p>
+                                                </div>
+                                            )}
+
+                                            {/* Narrative Error */}
+                                            {narrativeError && !narrative && (
+                                                <div className="bg-red-950/30 border border-red-800/40 rounded-xl p-4 flex items-start gap-3">
+                                                    <XCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <p className="font-bold text-red-400 text-xs">Assessment Failed</p>
+                                                        <p className="text-[11px] text-slate-400 mt-1">{narrativeError}</p>
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -719,6 +844,21 @@ export default function GovAnalyticsPage() {
                     )}
                 </div>
             </div>
+
+            {/* Toast Notification */}
+            <AnimatePresence>
+                {toast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
+                        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2 text-sm whitespace-nowrap ${
+                            toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-white text-slate-900'
+                        }`}
+                    >
+                        {toast.type === 'error' ? <XCircle size={16} /> : <CheckCircle size={16} className="text-green-500" />}
+                        {toast.msg}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

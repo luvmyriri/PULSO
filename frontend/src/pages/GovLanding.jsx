@@ -87,7 +87,12 @@ export default function GovLanding() {
                 if (GOV_ROLES.includes(data.user.role)) {
                     navigate('/gov/my-dashboard');
                 } else {
-                    navigate('/dashboard');
+                    setError('Authorized Government Personnel Only. Citizens please use the Citizen Portal.');
+                    localStorage.removeItem('pulso_token');
+                    localStorage.removeItem('pulso_user');
+                    setLoading(false);
+                    if (recaptchaRef.current) recaptchaRef.current.reset();
+                    setCaptchaToken(null);
                 }
             } else {
                 const errData = await response.json();
@@ -186,12 +191,7 @@ export default function GovLanding() {
 
                 <div className="flex items-center gap-6">
                     <div className="hidden md:flex items-center gap-6 text-sm font-medium pr-6 border-r border-slate-200 dark:border-white/10">
-                        <button
-                            onClick={() => navigate('/')}
-                            className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors font-semibold"
-                        >
-                            <Home size={15} /> Home
-                        </button>
+
                         <button 
                             onClick={() => setActiveModal('directives')}
                             className="text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors"

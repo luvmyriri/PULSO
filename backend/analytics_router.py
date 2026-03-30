@@ -17,10 +17,13 @@ Endpoints:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime
+import csv
+import io
 
 from database import get_db
 from auth import get_current_user
@@ -62,12 +65,12 @@ def _assert_role(user, *allowed):
 @router.get("/summary")
 def analytics_summary(
     db: Session = Depends(get_db),
-    # current_user=Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     """
     Aggregated analytics KPIs.
     """
-    # [DEBUG] Bypassing auth check for troubleshooting
+    _assert_role(current_user, *GOV_ROLES)
     return analytics_service.get_analytics_summary(db)
 
 
@@ -82,12 +85,14 @@ def list_clusters(
     min_reports: int = Query(3, ge=2, le=20, description="Minimum reports to form a cluster"),
     radius_m: float = Query(200.0, ge=50, le=1000, description="Clustering radius in meters"),
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     """
     Run DBSCAN spatial clustering on active reports.
     Returns infrastructure stress zones with threat classification,
     estimated costs, and barangay mapping.
     """
+    _assert_role(current_user, *GOV_ROLES)
     clusters = analytics_service.get_infrastructure_clusters(
         db,
         category_filter=category,
@@ -328,3 +333,169 @@ def create_procurement_from_cluster(
         "cluster_id": cluster["cluster_id"],
         "boq_summary": boq,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CSV Export Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _csv_response(rows: list, headers: list, filename: str) -> StreamingResponse:
+    """Helper to build a streaming CSV response."""
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(headers)
+    for row in rows:
+        writer.writerow(row)
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/export/clusters")
+def export_clusters_csv(
+    days_back: int = Query(90),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Export infrastructure stress zones as CSV."""
+    _assert_role(current_user, *GOV_ROLES)
+    clusters = analytics_service.get_infrastructure_clusters(db, days_back=days_back)
+    headers = [
+        "Cluster ID", "Barangay", "Category", "Threat Level",
+        "Reports", "Severity Score", "Recurrence %", "Radius (m)",
+        "Estimated Cost", "Lat", "Lng",
+    ]
+    rows = []
+    for c in clusters:
+        rows.append([
+            c["cluster_id"], c["barangay"], c["dominant_category"],
+            c["threat_level"], c["report_count"],
+            c["severity_score"], f'{c["recurrence_score"]*100:.1f}%',
+            f'{c["radius_meters"]:.0f}', c["estimated_cost_formatted"],
+            f'{c["centroid_lat"]:.6f}', f'{c["centroid_lng"]:.6f}',
+        ])
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M")
+    return _csv_response(rows, headers, f"PULSO_StressZones_{ts}.csv")
+
+
+@router.get("/export/forecast")
+def export_forecast_csv(
+    weeks_back: int = Query(12),
+    weeks_forward: int = Query(4),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Export forecast trends as CSV."""
+    _assert_role(current_user, *GOV_ROLES)
+    forecast = analytics_service.get_forecast(db, weeks_back=weeks_back, weeks_forward=weeks_forward)
+    headers = [
+        "Barangay", "Category", "Status", "Total Reports",
+        "Growth %", "Projected 4-Week Total",
+    ]
+    rows = []
+    for f in forecast:
+        rows.append([
+            f["barangay"], f["category"], f["status"],
+            f["total_reports"], f'{f["growth_pct"]:+.1f}%',
+            f'{f["projected_4wk_total"]:.1f}',
+        ])
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M")
+    return _csv_response(rows, headers, f"PULSO_Forecast_{ts}.csv")
+
+
+@router.get("/export/recurrence")
+def export_recurrence_csv(
+    days_window: int = Query(90),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Export chronic failure recurrence events as CSV."""
+    _assert_role(current_user, *SENIOR_ROLES)
+    events = analytics_service.get_recurrence_events(db, days_window=days_window)
+    headers = [
+        "Prior Report ID", "New Report ID", "Category", "Location",
+        "Distance (m)", "Days Since Repair", "Severity",
+    ]
+    rows = []
+    for r in events:
+        rows.append([
+            r["prior_report_id"], r["new_report_id"], r["category"],
+            r["location_string"] or "", r["distance_meters"],
+            r["days_since_resolved"] or "—", r["severity"],
+        ])
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M")
+    return _csv_response(rows, headers, f"PULSO_Recurrence_{ts}.csv")
+
+
+@router.get("/export/full-report")
+def export_full_report_csv(
+    days_back: int = Query(90),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Combined analytics export — summary KPIs + clusters + forecast + recurrence in one CSV."""
+    _assert_role(current_user, *SENIOR_ROLES)
+
+    summary = analytics_service.get_analytics_summary(db)
+    clusters = analytics_service.get_infrastructure_clusters(db, days_back=days_back)
+    forecast = analytics_service.get_forecast(db)
+    recurrence = analytics_service.get_recurrence_events(db, days_window=days_back)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+
+    # Section 1 — Summary KPIs
+    writer.writerow(["=== PULSO ANALYTICS REPORT ==="])
+    writer.writerow(["Generated", datetime.utcnow().isoformat()])
+    writer.writerow(["Window", f"Last {days_back} days"])
+    writer.writerow([])
+    writer.writerow(["--- SUMMARY KPIs ---"])
+    for key in ["total_reports", "total_clusters", "critical_zones", "high_zones",
+                 "emerging_zones", "resolution_rate_pct", "total_budget_exposure",
+                 "chronic_recurrence_events"]:
+        writer.writerow([key.replace("_", " ").title(), summary.get(key, "—")])
+    writer.writerow([])
+
+    # Section 2 — Stress Zones
+    writer.writerow(["--- INFRASTRUCTURE STRESS ZONES ---"])
+    writer.writerow(["ID", "Barangay", "Category", "Threat", "Reports",
+                     "Severity", "Recurrence %", "Radius (m)", "Est. Cost"])
+    for c in clusters:
+        writer.writerow([
+            c["cluster_id"], c["barangay"], c["dominant_category"],
+            c["threat_level"], c["report_count"], c["severity_score"],
+            f'{c["recurrence_score"]*100:.1f}%', f'{c["radius_meters"]:.0f}',
+            c["estimated_cost_formatted"],
+        ])
+    writer.writerow([])
+
+    # Section 3 — Forecast
+    writer.writerow(["--- FORECAST TRENDS ---"])
+    writer.writerow(["Barangay", "Category", "Status", "Total", "Growth %", "4-Week Projected"])
+    for f in forecast:
+        writer.writerow([
+            f["barangay"], f["category"], f["status"], f["total_reports"],
+            f'{f["growth_pct"]:+.1f}%', f'{f["projected_4wk_total"]:.1f}',
+        ])
+    writer.writerow([])
+
+    # Section 4 — Recurrence
+    writer.writerow(["--- CHRONIC RECURRENCE EVENTS ---"])
+    writer.writerow(["Prior ID", "New ID", "Category", "Location", "Distance (m)", "Days Since Repair", "Severity"])
+    for r in recurrence:
+        writer.writerow([
+            r["prior_report_id"], r["new_report_id"], r["category"],
+            r["location_string"] or "", r["distance_meters"],
+            r["days_since_resolved"] or "—", r["severity"],
+        ])
+
+    buf.seek(0)
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M")
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=PULSO_FullReport_{ts}.csv"},
+    )
