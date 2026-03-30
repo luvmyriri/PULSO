@@ -21,6 +21,7 @@ export default function Login() {
     const [error, setError]               = useState('');
     const [loading, setLoading]           = useState(false);
     const [captchaValue, setCaptchaValue] = useState(null);
+    const [showCaptcha, setShowCaptcha]   = useState(false);
     const [view, setView]                 = useState('login'); // 'login' | 'forgot'
     const [recoverySent, setRecoverySent] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -31,6 +32,11 @@ export default function Login() {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
     const [recoveryRefId, setRecoveryRefId] = useState('');
+    const [resendTimer, setResendTimer]     = useState(0);
+    const [canResend, setCanResend]         = useState(false);
+    const [verificationEmail, setVerificationEmail] = useState('');
+    const [verificationOtp, setVerificationOtp] = useState(['', '', '', '', '', '']);
+    const [verificationSuccess, setVerificationSuccess] = useState(false);
     const otpRefs = React.useRef([]);
 
     /* ── Same Spline scenes as GovLanding ──────────────────────────────── */
@@ -59,14 +65,28 @@ export default function Login() {
         }
     }, [theme]);
 
+    useEffect(() => {
+        let interval = null;
+        if (resendTimer > 0) {
+            interval = setInterval(() => {
+                setResendTimer((prev) => prev - 1);
+            }, 1000);
+        } else if (resendTimer === 0) {
+            setCanResend(true);
+            clearInterval(interval);
+        }
+        return () => clearInterval(interval);
+    }, [resendTimer]);
+
     /* ── Auth handlers ──────────────────────────────────────────────────── */
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
 
-        if (!captchaValue) {
-            setError('Please verify that you are not a robot.');
+        // Only block client-side if the captcha is already supposed to be visible
+        if (showCaptcha && !captchaValue) {
+            setError('System synchronization failed: Please solve the security puzzle to proceed.');
             setLoading(false);
             return;
         }
@@ -75,7 +95,9 @@ export default function Login() {
             const formData = new URLSearchParams();
             formData.append('username', email);
             formData.append('password', password);
-            formData.append('captcha_token', captchaValue);
+            if (captchaValue) {
+                formData.append('captcha_token', captchaValue);
+            }
 
             const response = await fetch('http://localhost:8000/api/auth/login', {
                 method: 'POST',
@@ -83,8 +105,16 @@ export default function Login() {
                 body: formData,
             });
 
+            const data = await response.json();
+
             if (response.ok) {
-                const data = await response.json();
+                // Handle two-stage verification
+                if (data.require_captcha) {
+                    setShowCaptcha(true);
+                    setLoading(false);
+                    return;
+                }
+
                 localStorage.setItem('pulso_token', data.access_token);
                 localStorage.setItem('pulso_user', JSON.stringify(data.user));
 
@@ -97,10 +127,17 @@ export default function Login() {
                 ];
                 navigate(GOV_ROLES.includes(data.user.role) ? '/gov/my-dashboard' : '/dashboard');
             } else {
-                const errData = await response.json();
-                const msg = typeof errData.detail === 'object' 
-                    ? (Array.isArray(errData.detail) ? errData.detail[0].msg : JSON.stringify(errData.detail))
-                    : errData.detail;
+                if (response.status === 403 && data.detail.includes("Account not verified")) {
+                    setVerificationEmail(email);
+                    setVerificationOtp(['', '', '', '', '', '']);
+                    setView('verify');
+                    setResendTimer(60);
+                    setCanResend(false);
+                    return;
+                }
+                const msg = typeof data.detail === 'object' 
+                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                    : data.detail;
                 setError(msg || 'Authentication failed');
             }
         } catch {
@@ -114,6 +151,7 @@ export default function Login() {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setRecoveryOtp(['', '', '', '', '', '']); // Clear previous inputs for security synchronization
         try {
             const response = await fetch('http://localhost:8000/api/auth/forgot-password', {
                 method: 'POST',
@@ -124,6 +162,8 @@ export default function Login() {
             if (response.ok) {
                 setRecoveryRefId(data.reference_id);
                 setRecoveryStep(2);
+                setResendTimer(60);
+                setCanResend(false);
             } else {
                 const msg = typeof data.detail === 'object' 
                     ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
@@ -157,10 +197,10 @@ export default function Login() {
                 const msg = typeof data.detail === 'object' 
                     ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
                     : data.detail;
-                setError(msg || 'Identity synchronization failed: Invalid code.');
+                setError(msg || 'Identity verification failed: Invalid code.');
             }
         } catch {
-            setError('System synchronization error.');
+            setError('System error. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -169,7 +209,7 @@ export default function Login() {
     const handleResetPassword = async (e) => {
         e.preventDefault();
         if (newPassword !== confirmNewPassword) {
-            setError('Synchronization Error: Access keys do not match.');
+            setError('Error: Passwords do not match.');
             return;
         }
 
@@ -192,34 +232,92 @@ export default function Login() {
                 const msg = typeof data.detail === 'object' 
                     ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
                     : data.detail;
-                setError(msg || 'Identity synchronization failed.');
+                setError(msg || 'Identity verification failed.');
             }
         } catch (err) {
-            setError('System synchronization error.');
+            setError('System error. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleOtpChange = (index, value) => {
+    const handleVerifyRegistration = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            const response = await fetch('http://localhost:8000/api/auth/verify-registration', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: verificationEmail,
+                    code: verificationOtp.join('')
+                }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setVerificationSuccess(true);
+                setError('');
+            } else {
+                const msg = typeof data.detail === 'object' 
+                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                    : data.detail;
+                setError(msg || 'Verification failed: Invalid code.');
+            }
+        } catch {
+            setError('System error. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResendRegistrationCode = async () => {
+        if (!canResend) return;
+        setLoading(true);
+        setError('');
+        try {
+            const response = await fetch('http://localhost:8000/api/auth/resend-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: verificationEmail, code: "" }), // code is optional/not-used here in resend
+            });
+            if (response.ok) {
+                setResendTimer(60);
+                setCanResend(false);
+            } else {
+                setError('Failed to resend code.');
+            }
+        } catch {
+            setError('Network error.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleOtpChange = (index, value, isVerification = false) => {
         if (!/^\d*$/.test(value)) return;
-        const newOtp = [...recoveryOtp];
+        const currentOtp = isVerification ? verificationOtp : recoveryOtp;
+        const setOtp = isVerification ? setVerificationOtp : setRecoveryOtp;
+        
+        const newOtp = [...currentOtp];
         newOtp[index] = value.slice(-1);
-        setRecoveryOtp(newOtp);
+        setOtp(newOtp);
         if (value && index < 5) otpRefs.current[index + 1].focus();
     };
 
-    const handleOtpKeyDown = (index, e) => {
-        if (e.key === 'Backspace' && !recoveryOtp[index] && index > 0) otpRefs.current[index - 1].focus();
+    const handleOtpKeyDown = (index, e, isVerification = false) => {
+        const currentOtp = isVerification ? verificationOtp : recoveryOtp;
+        if (e.key === 'Backspace' && !currentOtp[index] && index > 0) otpRefs.current[index - 1].focus();
     };
 
-    const handleOtpPaste = (e) => {
+    const handleOtpPaste = (e, isVerification = false) => {
         e.preventDefault();
+        const setOtp = isVerification ? setVerificationOtp : setRecoveryOtp;
         const data = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
         if (!data) return;
-        const newOtp = [...recoveryOtp];
+        const newOtp = ['', '', '', '', '', ''];
         data.split('').forEach((char, i) => { if (i < 6) newOtp[i] = char; });
-        setRecoveryOtp(newOtp);
+        setOtp(newOtp);
         const nextIndex = Math.min(data.length, 5);
         if (otpRefs.current[nextIndex]) otpRefs.current[nextIndex].focus();
     };
@@ -395,14 +493,29 @@ export default function Login() {
                                                     </div>
                                                 </div>
 
-                                                {/* reCAPTCHA */}
-                                                <div className="flex justify-center py-2">
-                                                    <ReCAPTCHA
-                                                        sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                                                        onChange={(val) => setCaptchaValue(val)}
-                                                        theme={theme === 'dark' ? 'dark' : 'light'}
-                                                    />
-                                                </div>
+                                                {/* reCAPTCHA stage - Animate entry when credentials are verified */}
+                                                <AnimatePresence>
+                                                    {showCaptcha && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                                                            exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                            className="flex flex-col items-center gap-3 overflow-hidden mb-4"
+                                                        >
+                                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full">
+                                                                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
+                                                                <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">
+                                                                    Security verification required
+                                                                </span>
+                                                            </div>
+                                                            <ReCAPTCHA
+                                                                sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                                onChange={(val) => setCaptchaValue(val)}
+                                                                theme={theme === 'dark' ? 'dark' : 'light'}
+                                                            />
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
 
                                                 <button
                                                     type="submit"
@@ -427,6 +540,121 @@ export default function Login() {
                                                     Sign Up
                                                 </a>
                                             </p>
+                                        </motion.div>
+                                    ) : view === 'verify' ? (
+                                        /* ── Account Verification Flow ──────────────── */
+                                        <motion.div
+                                            key="verify-form"
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            {verificationSuccess ? (
+                                                <div className="text-center py-6">
+                                                    <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-200 dark:border-emerald-500/20 shadow-lg">
+                                                        <CheckCircle className="text-emerald-500" size={40} />
+                                                    </div>
+                                                    <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+                                                        Account Verified
+                                                    </h2>
+                                                    <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-10 leading-relaxed">
+                                                        Congratulations! Your official registration has been activated. 
+                                                        You may now proceed to sign in to your dashboard.
+                                                    </p>
+                                                    <button
+                                                        onClick={() => { setView('login'); setVerificationSuccess(false); setVerificationOtp(['', '', '', '', '', '']); }}
+                                                        className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3 group"
+                                                    >
+                                                        Continue to Sign In
+                                                        <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="mb-10 text-center">
+                                                        <div className="w-20 h-20 bg-orange-100 dark:bg-white/5 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 border border-orange-200 dark:border-white/10 shadow-inner">
+                                                            <Shield className="text-orange-600 dark:text-orange-500" size={40} />
+                                                        </div>
+                                                        <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
+                                                            Verify Account
+                                                        </h2>
+                                                        <p className="text-slate-600 dark:text-slate-500 text-sm font-medium leading-relaxed">
+                                                            Enter the 6-digit verification code sent to<br/>
+                                                            <span className="text-orange-600 font-bold underline">{verificationEmail}</span>
+                                                        </p>
+                                                    </div>
+
+                                                    {error && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: -10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold flex items-center gap-3 shadow-lg"
+                                                        >
+                                                            <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shrink-0" />
+                                                            {error}
+                                                        </motion.div>
+                                                    )}
+
+                                                    <form onSubmit={handleVerifyRegistration} className="space-y-8">
+                                                        <div className="flex justify-center gap-3">
+                                                            {verificationOtp.map((digit, index) => (
+                                                                <input
+                                                                    key={index}
+                                                                    ref={(el) => (otpRefs.current[index] = el)}
+                                                                    type="text"
+                                                                    maxLength="1"
+                                                                    value={digit}
+                                                                    onChange={(e) => handleOtpChange(index, e.target.value, true)}
+                                                                    onKeyDown={(e) => handleOtpKeyDown(index, e, true)}
+                                                                    onPaste={(e) => handleOtpPaste(e, true)}
+                                                                    className="w-11 h-14 text-center text-2xl font-black bg-slate-100/50 dark:bg-white/[0.03] border-2 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-2xl focus:border-orange-500 focus:bg-white/5 outline-none transition-all shadow-inner"
+                                                                />
+                                                            ))}
+                                                        </div>
+
+                                                        <button
+                                                            type="submit"
+                                                            disabled={loading || verificationOtp.join('').length < 6}
+                                                            className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-orange-600/20 flex items-center justify-center gap-3 group disabled:opacity-50"
+                                                        >
+                                                            {loading ? (
+                                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                            ) : (
+                                                                <>
+                                                                    Verify & Activate
+                                                                    <CheckCircle size={18} className="group-hover:scale-110 transition-transform" />
+                                                                </>
+                                                            )}
+                                                        </button>
+
+                                                        <div className="text-center">
+                                                            {resendTimer > 0 ? (
+                                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-100/50 dark:bg-white/5 py-2 px-4 rounded-full inline-block">
+                                                                    Resend code in <span className="text-orange-600">{resendTimer}s</span>
+                                                                </p>
+                                                            ) : (
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={handleResendRegistrationCode}
+                                                                    disabled={loading || !canResend}
+                                                                    className="text-[10px] font-black text-orange-600 hover:text-orange-500 uppercase tracking-[0.2em] transition-colors flex items-center gap-2 mx-auto decoration-2 underline-offset-4 hover:underline"
+                                                                >
+                                                                    Resend Official Code
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </form>
+
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => { setView('login'); setError(''); }} 
+                                                        className="flex items-center gap-2 mx-auto text-slate-500 font-bold uppercase tracking-[0.2em] text-[10px] hover:text-slate-900 dark:hover:text-white transition-colors mt-10"
+                                                    >
+                                                        <ArrowLeft size={16} /> Cancel Verification
+                                                    </button>
+                                                </>
+                                            )}
                                         </motion.div>
                                     ) : (
                                         /* ── Forgot Password Flow ────────────────────── */
@@ -468,7 +696,7 @@ export default function Login() {
                                                                     Identity Retrieval
                                                                 </h2>
                                                                 <p className="text-slate-600 dark:text-slate-500 text-sm font-medium">
-                                                                    Enter your email for security synchronization
+                                                                    Enter your email for account verification
                                                                 </p>
                                                             </div>
 
@@ -483,19 +711,18 @@ export default function Login() {
                                                                 <div className="space-y-2">
                                                                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Official Email Address</label>
                                                                     <div className="relative group/input">
-                                                                        <Mail size={18} className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within/input:text-orange-500" />
-                                                                        <input type="email" value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white/5 block pl-12 p-4 transition-all" placeholder="your@email.com" required />
+                                                                        <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-focus-within/input:text-orange-500 transition-colors" />
+                                                                        <input type="email" value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white/5 block pl-12 p-4 transition-all shadow-inner" placeholder="your@email.com" required />
                                                                     </div>
                                                                 </div>
-                                                                <button type="submit" disabled={loading} className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3">
-                                                                    {loading ? <div className="w-5 h-5 border-2 border-slate-400 border-t-slate-800 rounded-full animate-spin" /> : <>Identify Subject <ChevronRight size={18} /></>}
+                                                                <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3 shadow-xl shadow-orange-600/20">
+                                                                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>Verify Email <ChevronRight size={18} /></>}
                                                                 </button>
                                                             </form>
                                                         </>
                                                     ) : recoveryStep === 2 ? (
                                                         <>
                                                             <div className="mb-8 text-center">
-                                                                {recoveryRefId && <div className="px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full text-[9px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest mb-4 inline-block">Ref: {recoveryRefId}</div>}
                                                                 <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Verify Identity</h2>
                                                                 <p className="text-slate-500 text-xs font-bold leading-relaxed">Enter the 6-digit sync code sent to<br/><span className="text-orange-600 underline">{recoveryEmail}</span></p>
                                                             </div>
@@ -515,15 +742,32 @@ export default function Login() {
                                                                 </div>
 
                                                                 <button type="submit" disabled={loading || recoveryOtp.join('').length < 6} className="w-full bg-orange-600 hover:bg-orange-500 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-orange-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">
-                                                                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Synchronize Identity'}
+                                                                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Verify Code'}
                                                                 </button>
+
+                                                                <div className="text-center mt-6">
+                                                                    {resendTimer > 0 ? (
+                                                                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                                                                            Resend code in <span className="text-orange-600">{resendTimer}s</span>
+                                                                        </p>
+                                                                    ) : (
+                                                                        <button 
+                                                                            type="button"
+                                                                            onClick={handleRecovery}
+                                                                            disabled={loading || !canResend}
+                                                                            className="text-[11px] font-black text-orange-600 hover:text-orange-500 uppercase tracking-widest transition-colors flex items-center gap-2 mx-auto"
+                                                                        >
+                                                                            Resend Verification Code
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </form>
                                                         </>
                                                     ) : (
                                                         <>
                                                             <div className="mb-8 text-center">
                                                                 <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Security Update</h2>
-                                                                <p className="text-slate-500 text-xs font-bold leading-relaxed">Identify verified. Please set your new<br/><span className="text-orange-600">secure access credentials</span></p>
+                                                                <p className="text-slate-500 text-xs font-bold leading-relaxed">Identity verified. Please set your<br/><span className="text-orange-600">secure password</span></p>
                                                             </div>
 
                                                             {error && (
@@ -534,16 +778,48 @@ export default function Login() {
 
                                                             <form onSubmit={handleResetPassword} className="space-y-6">
                                                                 <div className="space-y-2 relative">
-                                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">New Access Key</label>
+                                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">New Password</label>
                                                                     <div className="relative group/input">
                                                                         <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                                                         <input type={showNewPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-xs rounded-xl pl-10 pr-10 p-3.5 focus:outline-none focus:border-orange-500" placeholder="••••••••" required />
                                                                         <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"> {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />} </button>
                                                                     </div>
+
+                                                                    {/* Password Strength Meter */}
+                                                                    {newPassword && (
+                                                                        <div className="mt-2 space-y-2 px-1">
+                                                                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                                                                                <span className="text-slate-400">Security Strength</span>
+                                                                                <span className={
+                                                                                    newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)
+                                                                                        ? (newPassword.length < 8 ? "text-red-500" : "text-orange-500")
+                                                                                        : "text-green-500"
+                                                                                }>
+                                                                                    {newPassword.length < 8 ? "Weak" : (
+                                                                                        !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)
+                                                                                            ? "Medium"
+                                                                                            : "Strong"
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="h-1 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden flex gap-1">
+                                                                                <div className={`h-full transition-all duration-500 rounded-full ${newPassword.length >= 8 ? 'bg-orange-500 w-1/4' : 'bg-red-500 w-1/4'}`} />
+                                                                                <div className={`h-full transition-all duration-500 rounded-full ${/[A-Z]/.test(newPassword) ? 'bg-orange-500 w-1/4' : 'bg-slate-200 dark:bg-white/5 w-1/4'}`} />
+                                                                                <div className={`h-full transition-all duration-500 rounded-full ${/[0-9]/.test(newPassword) ? 'bg-orange-500 w-1/4' : 'bg-slate-200 dark:bg-white/5 w-1/4'}`} />
+                                                                                <div className={`h-full transition-all duration-500 rounded-full ${/[^A-Za-z0-9]/.test(newPassword) ? 'bg-green-500 w-1/4' : 'bg-slate-200 dark:bg-white/5 w-1/4'}`} />
+                                                                            </div>
+                                                                            <div className="flex flex-wrap gap-2 pt-1">
+                                                                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border transition-colors ${newPassword.length >= 8 ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400'}`}>8+ CHARS</span>
+                                                                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border transition-colors ${/[A-Z]/.test(newPassword) ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400'}`}>CAPITAL A-Z</span>
+                                                                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border transition-colors ${/[0-9]/.test(newPassword) ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400'}`}>NUMBER 0-9</span>
+                                                                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border transition-colors ${/[^A-Za-z0-9]/.test(newPassword) ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400'}`}>SPECIAL #$!</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                                 
                                                                 <div className="space-y-2">
-                                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Confirm Access Key</label>
+                                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Confirm New Password</label>
                                                                     <div className="relative group/input">
                                                                         <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                                                         <input type={showConfirmNewPassword ? "text" : "password"} value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-xs rounded-xl pl-10 pr-10 p-3.5 focus:outline-none focus:border-orange-500" placeholder="••••••••" required />

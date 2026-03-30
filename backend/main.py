@@ -115,72 +115,226 @@ SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASS")
 
 def send_verification_email(email: str, code: str):
-    """Sends a 6-digit verification code using the official Gmail SMTP settings."""
+    """Sends a 6-digit verification code using a professional PULSO HTML template."""
     if not SMTP_USER or not SMTP_PASS:
         print("[EMAIL] SMTP credentials missing. Skipping email send.")
         return False
         
     try:
-        # User requested formatting for the 6-digit code: "552 108"
+        # Formatted code: e.g., 552 108
         formatted_code = f"{code[:3]} {code[3:]}"
+        # Spaced code for the large display: e.g., 5  5  2   1  0  8
+        spaced_code = "  ".join(list(code[:3])) + " &nbsp; " + "  ".join(list(code[3:]))
         
-        subject = "Welcome to PULSO - Verify Your Official Account"
-        body = f"""PULSO: Public Utility & Infrastructure Locator System
-
-Welcome to the official portal for Caloocan City Engineering. To finalize your registration and activate your dashboard access, please enter the code below:
-
-{formatted_code}
-
-By verifying your email, you gain access to incident reporting, project timelines, and official city advisories.
-
-Safety Tip: Never share this code with anyone, including city staff. 
-"""
+        subject = "Official Account Verification Notice | City Government of Caloocan"
+        timestamp = datetime.now().strftime("%B %d, %Y, %I:%M %p")
         
-        msg = MIMEMultipart()
-        msg['From'] = f"PULSO Public Service <{SMTP_USER}>"
+        # Standardized Official Government Template (Consistent branding across all PULSO emails)
+        email_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: 'Inter', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background-color: #f1f5f9; color: #1e293b; }}
+                .wrapper {{ padding: 20px; }}
+                .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
+                .header {{ padding: 40px 20px; text-align: center; border-bottom: 1px solid #f1f5f9; }}
+                .seal {{ width: 80px; height: 80px; margin-bottom: 20px; object-fit: contain; }}
+                .letterhead {{ font-family: 'Times New Roman', Times, serif; color: #1e3a8a; line-height: 1.2; text-transform: uppercase; }}
+                .letterhead-jurisdiction {{ font-weight: 800; font-size: 14px; margin-bottom: 2px; }}
+                .letterhead-office {{ font-weight: 800; font-size: 14px; margin-bottom: 4px; }}
+                .letterhead-title {{ font-weight: 900; font-size: 18px; margin-top: 15px; border-bottom: 2px solid #1e3a8a; display: inline-block; padding-bottom: 4px; }}
+                .content {{ padding: 40px; text-align: center; }}
+                .notice-intro {{ font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 30px; }}
+                .code-container {{ background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 30px; margin-bottom: 30px; }}
+                .otp-code {{ font-size: 42px; font-weight: 900; color: #ea580c; font-family: 'Courier New', Courier, monospace; }}
+                .validity-period {{ font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 30px; }}
+                .advisory {{ background-color: #fff1f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; text-align: left; margin-top: 40px; }}
+                .advisory-title {{ color: #991b1b; font-weight: 900; font-size: 12px; margin-bottom: 6px; letter-spacing: 0.05em; }}
+                .advisory-text {{ font-size: 12px; color: #7f1d1d; line-height: 1.5; }}
+                .footer-metadata {{ background-color: #ea580c; padding: 20px; text-align: center; color: #ffffff; }}
+                .footer-title {{ font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; opacity: 0.9; }}
+                .footer-info {{ font-size: 10px; font-weight: 400; opacity: 0.9; }}
+                .disclaimer {{ padding: 20px; text-align: center; font-size: 10px; color: #94a3b8; font-style: italic; }}
+            </style>
+        </head>
+        <body>
+            <div class="wrapper">
+                <div class="container">
+                    <div class="header">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Caloocan_City.png" class="seal" alt="Caloocan Seal">
+                        <div class="letterhead">
+                            <div class="letterhead-jurisdiction">Republic of the Philippines</div>
+                            <div class="letterhead-jurisdiction">City Government of Caloocan</div>
+                            <div class="letterhead-office">Office of the City Engineer</div>
+                            <div class="letterhead-title">Official Verification Notice</div>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div class="notice-intro">
+                            This serves as an automated notification to secure your digital access.<br>
+                            To complete the <b>Identity Validation Process</b>, please utilize the One-Time Password (OTP) provided below.
+                        </div>
+                        <div class="code-container">
+                            <div class="otp-code">{spaced_code}</div>
+                        </div>
+                        <div class="validity-period">
+                            <b>VALIDITY PERIOD:</b> This authorization code is valid for exactly <b>thirty (30) minutes</b> from the time of issuance.<br>
+                            If the code expires, a new request must be generated.
+                        </div>
+                        <div class="advisory">
+                            <div class="advisory-title">SECURITY AND COMPLIANCE ADVISORY</div>
+                            <div class="advisory-text">
+                                If you did not personally initiate this request, <b>disregard this message immediately</b>. Your account remains protected under current encryption standards, and no further intervention is required.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="footer-metadata">
+                        <div class="footer-title">Official Security Details</div>
+                        <div class="footer-info">
+                            {timestamp} | OFFICE: Engineer Department | Caloocan City Hall
+                        </div>
+                        <div style="font-size: 10px; font-style: italic; margin-top: 15px; opacity: 0.8; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                            This is an automated message. Please do not reply to this email.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg = MIMEMultipart('alternative')
+        msg['From'] = f"City Government of Caloocan | PULSO <{SMTP_USER}>"
         msg['To'] = email
         msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
+        msg['X-Priority'] = '1 (Highest)'
+        msg['Importance'] = 'High'
+        
+        # Fallback text version
+        text_body = f"PULSO: Your official registration verification code is {formatted_code}. Issued by Office of the City Engineer."
+        msg.attach(MIMEText(text_body, 'plain'))
+        msg.attach(MIMEText(email_html, 'html'))
         
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(SMTP_USER, SMTP_PASS)
             server.send_message(msg)
         return True
     except Exception as e:
-        print(f"[EMAIL] Error sending verification: {e}")
+        print(f"[EMAIL] Error sending verification HTML email: {e}")
         return False
 
 def send_password_reset_email(email: str, code: str, reference_id: str):
-    """Sends a 6-digit reset code using the 'Identity Verification Protocol' template."""
+    """Sends a 6-digit reset code using an official government letterhead HTML template."""
     if not SMTP_USER or not SMTP_PASS:
         print("[EMAIL] SMTP credentials missing. Skipping email send.")
         return False
         
     try:
+        # Formatted code: e.g., 170 377
         formatted_code = f"{code[:3]} {code[3:]}"
-        subject = "[PULSO] Password Reset Security Code"
-        body = f"""Identity Verification Protocol
-
-We received a request to reset the password for your PULSO account. To proceed with the security update, enter this 6-digit code:
-
-{formatted_code}
-Reference ID: {reference_id}
-Location: Caloocan City, PH
-
-If you did not request a password reset, your account is still secure. No further action is required. 
-"""
-        msg = MIMEMultipart()
-        msg['From'] = f"PULSO Security <{SMTP_USER}>"
+        # Spaced code for the large display: e.g., 1 7 0   3 7 7
+        spaced_code = "  ".join(list(code[:3])) + " &nbsp; " + "  ".join(list(code[3:]))
+        
+        subject = "Official Identity Sync Notification | City Government of Caloocan"
+        # Format: March 30, 2026, 08:58 PM
+        timestamp = datetime.now().strftime("%B %d, %Y, %I:%M %p")
+        
+        # Official Government Letterhead HTML Template
+        email_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: 'Inter', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background-color: #f1f5f9; color: #1e293b; }}
+                .wrapper {{ padding: 20px; }}
+                .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
+                .header {{ padding: 40px 20px; text-align: center; border-bottom: 1px solid #f1f5f9; }}
+                .seal {{ width: 80px; height: 80px; margin-bottom: 20px; object-fit: contain; }}
+                .letterhead {{ font-family: 'Times New Roman', Times, serif; color: #1e3a8a; line-height: 1.2; text-transform: uppercase; }}
+                .letterhead-jurisdiction {{ font-weight: 800; font-size: 14px; margin-bottom: 2px; }}
+                .letterhead-office {{ font-weight: 800; font-size: 14px; margin-bottom: 4px; }}
+                .letterhead-title {{ font-weight: 900; font-size: 18px; margin-top: 15px; border-bottom: 2px solid #1e3a8a; display: inline-block; padding-bottom: 4px; }}
+                .content {{ padding: 40px; text-align: center; }}
+                .notice-intro {{ font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 30px; }}
+                .code-container {{ background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 30px; margin-bottom: 30px; }}
+                .otp-code {{ font-size: 42px; font-weight: 900; color: #ea580c; font-family: 'Courier New', Courier, monospace; }}
+                .validity-period {{ font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 30px; }}
+                .advisory {{ background-color: #fff1f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; text-align: left; margin-top: 40px; }}
+                .advisory-title {{ color: #991b1b; font-weight: 900; font-size: 12px; margin-bottom: 6px; letter-spacing: 0.05em; }}
+                .advisory-text {{ font-size: 12px; color: #7f1d1d; line-height: 1.5; }}
+                .footer-metadata {{ background-color: #ea580c; padding: 20px; text-align: center; color: #ffffff; }}
+                .footer-title {{ font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; opacity: 0.9; }}
+                .footer-info {{ font-size: 10px; font-weight: 400; opacity: 0.9; }}
+                .disclaimer {{ padding: 20px; text-align: center; font-size: 10px; color: #94a3b8; font-style: italic; }}
+            </style>
+        </head>
+        <body>
+            <div class="wrapper">
+                <div class="container">
+                    <div class="header">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Caloocan_City.png" class="seal" alt="Caloocan Seal">
+                        <div class="letterhead">
+                            <div class="letterhead-jurisdiction">Republic of the Philippines</div>
+                            <div class="letterhead-jurisdiction">City Government of Caloocan</div>
+                            <div class="letterhead-office">Office of the City Engineer</div>
+                            <div class="letterhead-title">Official Verification Notice</div>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div class="notice-intro">
+                            This serves as an automated notification to secure your digital access.<br>
+                            To complete the <b>Account Recovery & Sync Process</b>, please utilize the One-Time Password (OTP) provided below.
+                        </div>
+                        <div class="code-container">
+                            <div class="otp-code">{spaced_code}</div>
+                        </div>
+                        <div class="validity-period">
+                            <b>VALIDITY PERIOD:</b> This authorization code is valid for exactly <b>thirty (30) minutes</b> from the time of issuance.<br>
+                            If the code expires, a new request must be generated.
+                        </div>
+                        <div class="advisory">
+                            <div class="advisory-title">SECURITY AND COMPLIANCE ADVISORY</div>
+                            <div class="advisory-text">
+                                If you did not personally initiate this request, <b>disregard this message immediately</b>. Your account remains protected under current encryption standards, and no further intervention is required.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="footer-metadata">
+                        <div class="footer-title">Official Security Details</div>
+                        <div class="footer-info">
+                            {timestamp} | OFFICE: Engineer Department | Caloocan City Hall
+                        </div>
+                        <div style="font-size: 10px; font-style: italic; margin-top: 15px; opacity: 0.8; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                            This is an automated message. Please do not reply to this email.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg = MIMEMultipart('alternative')
+        msg['From'] = f"City Government of Caloocan | PULSO <{SMTP_USER}>"
         msg['To'] = email
         msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
+        msg['X-Priority'] = '1 (Highest)'
+        msg['Importance'] = 'High'
+        
+        # Fallback text version
+        text_body = f"PULSO: Your official identity verification code is {formatted_code}. Issued by Office of the City Engineer."
+        msg.attach(MIMEText(text_body, 'plain'))
+        msg.attach(MIMEText(email_html, 'html'))
         
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(SMTP_USER, SMTP_PASS)
             server.send_message(msg)
         return True
     except Exception as e:
-        print(f"[EMAIL] Error sending reset: {e}")
+        print(f"[EMAIL] Error sending reset html email: {e}")
         return False
 
 async def verify_recaptcha(token: str):
@@ -251,7 +405,7 @@ async def ai_omni_assistant(
 @app.post("/api/verify-residency")
 async def verify_residency(
     idFront: UploadFile = File(...),
-    idBack: Optional[UploadFile] = File(None)
+    idBack: UploadFile = File(...)
 ):
     """
     Receives front and back ID images, performs OCR,
@@ -439,16 +593,10 @@ async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db
 @app.post("/api/auth/login")
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(), 
-    captcha_token: str = Form(...),
+    captcha_token: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    # Verify reCAPTCHA
-    if not await verify_recaptcha(captcha_token):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid reCAPTCHA. Please try again."
-        )
-
+    # 1. Verify basic credentials first (to determine if we should challenge with reCAPTCHA)
     user = crud.get_user_by_email(db, email=form_data.username)
     if not user or not auth.verify_password(form_data.password, user.password_hash):
         raise HTTPException(
@@ -457,12 +605,26 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Check verification status (Mandatory for public residents)
+    # 2. Check for reCAPTCHA if credentials are valid
+    if not captcha_token:
+        return {
+            "require_captcha": True,
+            "message": "Security synchronization required. Please verify you are not a robot."
+        }
+
+    if not await verify_recaptcha(captcha_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reCAPTCHA. Please try again."
+        )
+    
+    # 3. Check verification status (Mandatory for public residents)
     if not user.is_verified and user.role == "resident":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account not verified. Please check your email for the verification code.",
         )
+        
     from datetime import timedelta
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
@@ -516,50 +678,75 @@ async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_
     # -------------------------------------------------------------------------
     # PROFESSIONAL HTML EMAIL TEMPLATE (PULSO THEME)
     # -------------------------------------------------------------------------
+    # Standardized Official Government Template (Consistent branding across all PULSO emails)
     email_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
         <style>
-            body {{ font-family: 'Inter', Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; color: #0f172a; }}
-            .container {{ max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 24px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }}
-            .header {{ background: linear-gradient(135deg, #ea580c 0%, #4338ca 100%); padding: 40px 20px; text-align: center; color: #ffffff; }}
-            .header h1 {{ margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -0.025em; text-transform: uppercase; }}
-            .header p {{ margin-top: 5px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; opacity: 0.8; }}
+            body {{ font-family: 'Inter', Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; color: #1e293b; }}
+            .wrapper {{ padding: 40px 20px; }}
+            .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }}
+            .header {{ padding: 40px 20px; text-align: center; border-bottom: 1px solid #f1f5f9; }}
+            .seal {{ width: 80px; height: 80px; margin-bottom: 20px; object-fit: contain; }}
+            .letterhead {{ font-family: 'Times New Roman', Times, serif; color: #1e3a8a; line-height: 1.2; text-transform: uppercase; }}
+            .letterhead-jurisdiction {{ font-weight: 800; font-size: 14px; margin-bottom: 2px; }}
+            .letterhead-office {{ font-weight: 800; font-size: 14px; margin-bottom: 4px; }}
+            .letterhead-title {{ font-weight: 900; font-size: 18px; margin-top: 15px; border-bottom: 2px solid #1e3a8a; display: inline-block; padding-bottom: 4px; }}
             .content {{ padding: 40px; text-align: center; }}
-            .content h2 {{ font-size: 24px; font-weight: 900; color: #0f172a; margin-bottom: 15px; letter-spacing: -0.025em; }}
-            .content p {{ font-size: 16px; line-height: 1.6; color: #64748b; margin-bottom: 30px; }}
-            .btn {{ display: inline-block; padding: 18px 36px; background-color: #4338ca; color: #ffffff !important; font-weight: 900; text-decoration: none; border-radius: 14px; text-transform: uppercase; font-size: 13px; letter-spacing: 0.1em; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); transition: all 0.2s ease; }}
-            .token-box {{ display: inline-block; margin-top: 30px; padding: 12px 20px; background-color: #f1f5f9; border-radius: 12px; font-family: monospace; font-size: 11px; color: #94a3b8; border: 1px solid #e2e8f0; word-break: break-all; width: 80%; }}
-            .footer {{ background-color: #f8fafc; padding: 25px; text-align: center; border-top: 1px solid #f1f5f9; }}
-            .footer p {{ font-size: 11px; color: #94a3b8; margin: 5px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }}
-            .security-notice {{ margin-top: 25px; padding: 15px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; color: #b91c1c; font-size: 12px; font-weight: 600; text-align: left; }}
+            .notice-intro {{ font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 30px; }}
+            .btn-container {{ margin: 30px 0; }}
+            .btn {{ display: inline-block; padding: 18px 40px; background-color: #ea580c; color: #ffffff !important; font-weight: 900; text-decoration: none; border-radius: 12px; text-transform: uppercase; font-size: 13px; letter-spacing: 0.1em; transition: all 0.2s ease; }}
+            .validity-period {{ font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 30px; }}
+            .advisory {{ background-color: #fff1f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; text-align: left; margin-top: 40px; }}
+            .advisory-title {{ color: #991b1b; font-weight: 900; font-size: 11px; margin-bottom: 6px; letter-spacing: 0.05em; }}
+            .advisory-text {{ font-size: 11px; color: #7f1d1d; line-height: 1.5; }}
+            .footer-metadata {{ background-color: #ea580c; padding: 30px 20px; text-align: center; color: #ffffff; }}
+            .footer-title {{ font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; opacity: 0.9; letter-spacing: 0.1em; }}
+            .footer-info {{ font-size: 10px; font-weight: 400; opacity: 0.9; }}
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
-                <h1>PULSO</h1>
-                <p>Unified Command Center | LGU Caloocan</p>
-            </div>
-            <div class="content">
-                <h2>Security Credential Update</h2>
-                <p>A password recovery protocol has been requested for your official personnel account.</p>
-                <a href="{reset_link}" class="btn">Authorize Reset</a>
-                <p style="margin-top: 35px; font-size: 13px;">This link will expire in <strong>1 hour</strong> as part of our automated security compliance.</p>
-                <div class="security-notice">
-                    <div style="font-weight: 900; margin-bottom: 5px;">⚠️ SECURITY ADVISORY</div>
-                    If you did not initiate this recovery protocol, please disregard this email. No access has been granted to your account.
+        <div class="wrapper">
+            <div class="container">
+                <div class="header">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Caloocan_City.png" class="seal" alt="Caloocan Seal">
+                    <div class="letterhead">
+                        <div class="letterhead-jurisdiction">Republic of the Philippines</div>
+                        <div class="letterhead-jurisdiction">City Government of Caloocan</div>
+                        <div class="letterhead-office">Office of the City Engineer</div>
+                        <div class="letterhead-title">Official Verification Notice</div>
+                    </div>
                 </div>
-                <div class="token-box">
-                    Protocol ID: {token}
+                <div class="content">
+                    <div class="notice-intro">
+                        A request has been received to authorize a <b>Credential Synchronisation</b> for your official PULSO account.<br>
+                        Please utilize the authorization link provided below to proceed.
+                    </div>
+                    <div class="btn-container">
+                        <a href="{reset_link}" class="btn">Authorize Identity Synchronization</a>
+                    </div>
+                    <div class="validity-period">
+                        <b>VALIDITY PERIOD:</b> This authorization request will expire in <b>exactly 1 hour</b>.<br>
+                        If no action is taken, the request will be automatically voided for your protection.
+                    </div>
+                    <div class="advisory">
+                        <div class="advisory-title">SECURITY AND COMPLIANCE ADVISORY</div>
+                        <div class="advisory-text">
+                            If you did not personally initiate this identity sync, <b>disregard this message immediately</b>. Your account remains protected under current secure encryption standards.
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="footer">
-                <p>CITY ENGINEERING OFFICE</p>
-                <p>REPUBLIC OF THE PHILIPPINES | CALOOCAN CITY HALL</p>
-                <p>&copy; 2025 PULSO INFRASTRUCTURE OPERATIONS</p>
+                <div class="footer-metadata">
+                    <div class="footer-title">Official Security Context</div>
+                    <div class="footer-info">
+                        Protocol ID: {token[:8]}... | OFFICE: Engineer Department | Caloocan City Hall
+                    </div>
+                    <div style="font-size: 9px; font-style: italic; margin-top: 15px; opacity: 0.8; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                        This is an automated system notification. Replies to this address are not monitored.
+                    </div>
+                </div>
             </div>
         </div>
     </body>

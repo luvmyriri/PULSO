@@ -1,0 +1,24 @@
+{
+    "timestamp": "2026-03-30T22:00:12.552559",
+    "raw_text": "REPUBLIKA NG PILIPINAS\nREPUBLIKA NG PILIPINAS\nRepublic of the Philippines\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine National ID\n5043-5793-0864-2584\nAPELVIDO/LAST NAME\nEVANGELISTA\nHOMGA PANGALAN GIVEN NAMES\nMARC ALEXIS\nGITNANG APELYIDO/MIDDLE NAME\nNATIVIDAD\nPETSA NG KAPANGANAKAN/DATE OF BIRTH\nJanuary 05, 2005\nTIRAHAN/ADDRESS\nBLK 40 LOT 3 NORTHVILLE 2B BAGUMBONG, BARANGAY 171, CITY OF\nCALOOCAN, NCR, THIRD DISTRICT, PHILIPPINES, 1421\nDIGITAL ID NUMBER\nKFF209\nPHL\nUREAU\nERNAL REVEN\nREPUBLIC OF THE PHILIPPINES REAU OF INTERNAL REVENU\nUREATERNAL REVENU DEPARTMENT OF FINANCE BUREAU OF INTERNAL REVENU\nUREAU ERNAL REV BUREAU OF INTERNAL REVENUEAU OF INTERNAL REVENU\nURE\nEURE Dela\nCUREA\nAU OF INTERNAL REVENUE BUREAU OF INTERNAL REVENU\nDela Cruz, Mia OF INTERNAL REVENUE BUREAU OF INTERNAL REVENU\nINTERNAL REVENUE BUREAU OF INTERNAL REVENU\nREVENU\nTIN: 123-456-789-000REVENU\nUREAU\nPURE 28 Payapa St. Bagong DiwaERNAL REVEND\nGUREA\nFURE\nUREA\nREVENU\nSto. Cristobal, Caloocan CityRNAL REVENU\nRNAL\nNUE BU\nRNAL REVEND\nNTERNAL REVENU\nUREAU OF INTERNAL REVENU\nUREAU OF INTERNAL REVENUE BUREAU\nEUREAU OF\nUREA\nURE\nDATE OF BIRTH: 09/04/1994 VENU\nVENU\nDATE OF ISSUE: 10/02/2017 REVENU\nUREAU OF INTERNAL REVENUE BU\nBUREAU OF INTERNAL REVE\nUREAU OF INTERNA\nCaleur\nSIGNATURE\nREVENU\nINTERNAL REVENUE SU\nENU\nENU\nENU\nENU\nENU\nENU\nENU\nENU\nENU\nENU\nENU\nENU\nOF INTERNAL REVENUE BUREAU OF INTERNAL REVENU\nINTERNAL REVENUE BUREAU OF INTERNAL REVENU\nTERNAL REVENUE BUREAU OF INTERNAL REVENU\nINTERNAL REVENUE BUREAU OF INTERNAL REVENU",
+    "parsed_data": {
+        "id_type": "philid",
+        "id_type_label": "Philippine National ID",
+        "first_name": "Marc Alexis",
+        "last_name": "Evangelista",
+        "middle_name": "Natividad",
+        "dob": "2005-01-05",
+        "sex": "",
+        "address": "Blk 40 Lot 3 Northville 2b Bagumbong, City Of Caloocan, Ncr, Third District, Philippines",
+        "barangay": "171",
+        "postal_code": "1421",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "pcn": "5043-5793-0864-2584",
+        "block_lot": "Blk 40 Lot 3",
+        "subdivision": "Northville 2B Bagumbong",
+        "street": "Barangay 171",
+        "is_document_mismatch": true,
+        "mismatch_reason": "Names and birthdates on front and back belong to different individuals."
+    }
+}
