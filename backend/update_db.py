@@ -1,22 +1,43 @@
-import sqlite3
 import psycopg2
 
 try:
     conn = psycopg2.connect("postgresql://postgres:0428@localhost/pulso_db")
     cur = conn.cursor()
-    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR;")
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS notifications (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        title VARCHAR,
-        message VARCHAR,
-        is_read BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
+    print("Connecting to pulso_db...")
+    
+    # Check current columns in 'users' table
+    cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'users';")
+    columns = [row[0] for row in cur.fetchall()]
+    print(f"Current columns in 'users': {columns}")
+    
+    # Add missing columns
+    if 'is_verified' not in columns:
+        print("Adding is_verified column...")
+        cur.execute("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;")
+    
+    if 'verification_code' not in columns:
+        print("Adding verification_code column...")
+        cur.execute("ALTER TABLE users ADD COLUMN verification_code VARCHAR;")
+        
+    if 'address' not in columns:
+        print("Adding address column...")
+        cur.execute("ALTER TABLE users ADD COLUMN address VARCHAR;")
+
+    if 'barangay' not in columns:
+        print("Adding barangay column...")
+        cur.execute("ALTER TABLE users ADD COLUMN barangay VARCHAR;")
+
+    if 'trust_score' not in columns:
+        print("Adding trust_score column...")
+        cur.execute("ALTER TABLE users ADD COLUMN trust_score INTEGER DEFAULT 100;")
+
+    # Ensure admin user is verified
+    print("Ensuring admin@pulso.system is verified...")
+    cur.execute("UPDATE users SET is_verified = TRUE WHERE email = 'admin@pulso.system';")
+    
     conn.commit()
-    print("Database updated successfully.")
+    print("Database schema synchronization complete.")
+    
 except Exception as e:
     print(f"Error updating database: {e}")
 finally:
