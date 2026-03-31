@@ -490,16 +490,25 @@ export default function Login() {
                                                 </div>
 
                                                 {/* ReCAPTCHA Checkbox stage */}
-                                                <div className="flex justify-center w-full mb-4">
-                                                    <div className="relative z-10 scale-95 origin-center">
-                                                        <ReCAPTCHA
-                                                            ref={recaptchaRef}
-                                                            sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                                                            onChange={(val) => setCaptchaValue(val)}
-                                                            theme={theme === 'dark' ? 'dark' : 'light'}
-                                                        />
-                                                    </div>
-                                                </div>
+                                                <AnimatePresence>
+                                                    {email && password && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="flex justify-center w-full mb-4 overflow-hidden"
+                                                        >
+                                                            <div className="relative z-10 scale-95 origin-center py-2">
+                                                                <ReCAPTCHA
+                                                                    ref={recaptchaRef}
+                                                                    sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                                    onChange={(val) => setCaptchaValue(val)}
+                                                                    theme={theme === 'dark' ? 'dark' : 'light'}
+                                                                />
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
 
                                                 <button
                                                     type="submit"

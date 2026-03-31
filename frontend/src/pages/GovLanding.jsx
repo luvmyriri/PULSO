@@ -55,8 +55,11 @@ export default function GovLanding() {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        setError('');
+        if (!captchaToken) {
+            setError('Please complete the security puzzle to proceed.');
+            setLoading(false);
+            return;
+        }
 
         try {
             const formData = new URLSearchParams();
@@ -191,7 +194,12 @@ export default function GovLanding() {
 
                 <div className="flex items-center gap-6">
                     <div className="hidden md:flex items-center gap-6 text-sm font-medium pr-6 border-r border-slate-200 dark:border-white/10">
-
+                        <button 
+                            onClick={() => navigate('/')} 
+                            className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-orange-600 transition-colors font-semibold"
+                        >
+                            <Home size={15} /> Home
+                        </button>
                         <button 
                             onClick={() => setActiveModal('directives')}
                             className="text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors"
@@ -345,14 +353,25 @@ export default function GovLanding() {
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="flex justify-center py-4">
-                                                    <ReCAPTCHA
-                                                        ref={recaptchaRef}
-                                                        sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                                                        onChange={(token) => setCaptchaToken(token)}
-                                                        theme={theme === 'dark' ? 'dark' : 'light'}
-                                                    />
-                                                </div>
+                                                <AnimatePresence>
+                                                    {email && password && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="flex justify-center w-full mb-4 overflow-hidden"
+                                                        >
+                                                            <div className="relative z-10 scale-95 origin-center py-2">
+                                                                <ReCAPTCHA
+                                                                    ref={recaptchaRef}
+                                                                    sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                                    onChange={(token) => setCaptchaToken(token)}
+                                                                    theme={theme === 'dark' ? 'dark' : 'light'}
+                                                                />
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
 
                                                 <button
                                                     type="submit"
