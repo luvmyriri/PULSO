@@ -968,7 +968,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextButton(
       onPressed: onPressed,
       child: Text(
-        "RESEND VERIFICATION CODE",
+        "I didn't receive a code. Resend",
         style: TextStyle(
           color: brandOrange,
           fontSize: 10,
