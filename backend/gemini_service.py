@@ -17,7 +17,7 @@ load_dotenv()
 
 GEMINI_API_KEY     = os.getenv("GOOGLE_GEMINI_API_KEY")
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google-credentials.json")
-GEMINI_MODEL       = "models/gemini-1.5-flash"   # Production-ready Flash model
+GEMINI_MODEL       = "gemini-2.5-flash"   # Latest stable 2026 High-Speed Flash model
 
 # ── SDK Init ──────────────────────────────────────────────────────────────────
 
@@ -52,7 +52,8 @@ def _generate(prompt: str, json_mode: bool = True) -> Optional[str]:
     try:
         from google.genai import types
         cfg = types.GenerateContentConfig(
-            response_mime_type="application/json" if json_mode else "text/plain"
+            response_mime_type="application/json" if json_mode else "text/plain",
+            temperature=0.0
         )
         resp = _client.models.generate_content(
             model=GEMINI_MODEL,
@@ -72,7 +73,10 @@ def _generate_multimodal(prompt: str, image_bytes: bytes, mime: str = "image/jpe
     try:
         from google.genai import types
         img_part = types.Part.from_bytes(data=image_bytes, mime_type=mime)
-        cfg = types.GenerateContentConfig(response_mime_type="application/json")
+        cfg = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.0,
+        )
         resp = _client.models.generate_content(
             model=GEMINI_MODEL,
             contents=[prompt, img_part],
@@ -92,7 +96,10 @@ def _generate_multimodal_dual(prompt: str, img1: bytes, img2: bytes, mime: str =
         from google.genai import types
         part1 = types.Part.from_bytes(data=img1, mime_type=mime)
         part2 = types.Part.from_bytes(data=img2, mime_type=mime)
-        cfg = types.GenerateContentConfig(response_mime_type="application/json")
+        cfg = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.0,
+        )
         resp = _client.models.generate_content(
             model=GEMINI_MODEL,
             contents=[prompt, "FRONT ID IMAGE:", part1, "BACK ID IMAGE:", part2],
@@ -217,15 +224,24 @@ Extract into a JSON object with these exact fields:
   "is_back_correct": true
 }}
 
-Intelligence Rules:
-1. Side Identification:
+Intelligence Rules (ZERO TOLERANCE FOR ERROR):
+1. VISUAL OCR OVERRIDE:
+   If the provided "FRONT SIDE OCR" or "BACK SIDE OCR" text is messy, incomplete, or contains obvious spelling errors (e.g., "B4gumBong" instead of "Bagumbong"), you MUST ignore the OCR text and perform a fresh, high-precision visual scan of the raw pixels in the images.
+
+2. DATA CONSISTENCY:
+   - Full Name: Combine First, Middle, and Last names into a consistent identity.
+   - Birthdate: Must be in YYYY-MM-DD. If formatted as "01-JAN-1990", convert to "1990-01-01".
+   - Sex: "Male" or "Female" only.
+   - "postal_code": 4-digit code.
+
+3. Side Identification:
    - Identify the exact type: "UMID", "PHILID" (National ID/Philsys), "LTO" (Driver's License), "POSTAL", "COMELEC", "UMID", "GSIS", "PRC", or "PASSPORT".
    - FRONT side has the primary portrait Photo, Full Name, and personal details.
    - BACK side has QR code, magnetic stripe, barcode, or secondary metadata.
    - PHILID Back: Has Kasarian/Sex, Uri ng Dugo, Kalagayang Sibil, Lugar ng Kapanganakan labels and a QR code. DO NOT classify this as COMELEC.
    - If the "FRONT SIDE" image looks like a back side, set "is_front_correct": false.
 
-2. VISUAL FACE MATCH — CRITICAL HIGH-SECURITY BIOMETRIC AUDIT:
+4. VISUAL FACE MATCH — CRITICAL HIGH-SECURITY BIOMETRIC AUDIT:
    This is the most important step. You must perform a detailed person-identity comparison.
 
    STEP A — Face Detection:
@@ -248,28 +264,21 @@ Intelligence Rules:
    - If the faces CLEARLY belong to DIFFERENT individuals (different gender, different bone structure, significantly different age): Set "is_visual_face_match": false, "is_document_mismatch": true, "face_match_confidence": "low", "mismatch_reason": "FACE MISMATCH: The portrait on the front ID does not match the person on the back. These appear to be two different individuals."
    - If ONLY the front has a face and back has no face (older ID formats): Set "is_visual_face_match": true, "face_match_confidence": "na" (not applicable, cannot verify visually).
 
-3. DOCUMENT INTEGRITY AUDIT:
-   - LTO DRIVER'S LICENSE: The front License Number (e.g., C33-24-003279) MUST align with any serial or barcode data prints on its back.
-   - PHILID vs COMELEC (CRITICAL): Do not mistake a National ID (Philsys/PHILID) back for a Voter's ID (COMELEC).
-     - PHILID Back attributes: QR Code, "Philippine Identification System", "Philippine Statistics Authority (PSA)", Tagalog field labels.
-     - COMELEC Back attributes: "COMMISSION ON ELECTIONS", Voter's information, Precinct number.
-   - Cross-check OCR data: Names and birthdates must align across both sides if they appear on both.
-4. PHILIPPINE ADDRESS INTELLIGENCE (DEEP DIVE):
-   Break down the 'address' block into detailed components using these strict definitions for Philippine structures:
-   - "house_no": Floor number, room number, or unit number only (e.g., #13A, 420, "Unit 4B", "3rd Floor", "Rm 12"). Do NOT put "Bldg", "Tower", or the building name here.
-   - "block_lot": Alphanumeric plot identifier, extremely common in PH (e.g., "Blk 1 Lot 9", "Block 4 Lot 20", "B1 L5", "Lot 3"). If this is present, "house_no" is usually blank.
-   - "street": The main artery, avenue, or corner intersection. Look for: "St.", "Street", "Ave.", "Avenue", "Road", "Rd.", "Alley", "Drive", "Blvd", "Corner", "Cor.". (e.g., "Ruby St.", "Taft Ave", "Magsaysay Road", "Cor. Recto Avenue").
-   - "subdivision": The specific estate, community, building, or tower name. Use advanced awareness of Philippine Subdivision/Village/Building types:
-      * Condominiums & Buildings: High-density vertical residences AND their exact building/tower letter/number identifiers (e.g., "Bldg. D Camarin Residences", "Avida Towers", "Tower 1 Burgundy Empire Tower", "Bldg A"). If the ID says "Bldg D", it MUST go here, not in house_no.
-      * Gated Communities / Executive Villages: Exclusively walled developments (e.g., "Forbes Park", "Ayala Alabang").
-      * Middle-Class to Affordable Subdivisions: Common developments equipped with clubhouses (e.g., "BF Homes", "Pueblo de Oro", "Northville 14", "Celina Homes 3").
-      * If a sub-locality or barangay name naturally follows the subdivision (e.g., "Northville 2B Bagumbong", "Celina Homes 3 Bagumbong"), KEEP it attached inside this field. Do not strip "Bagumbong" or "Camarin" out if it identifies the community.
-      * Look for keywords: "Subdivision", "Subd", "Village", "Homes", "Residences", "Compound", "Northville", "Ville", "Park", "Tower", "Building", "Bldg", "Condominium", "Condo".
-   - Clean out standalone City level items ("Caloocan") or formal Barangay prefixes ("Brgy. 171").
-5. Suffix Detection: Extract Jr., Sr., III, IV, etc. into the "suffix" field.
-6. Fix OCR Noise: Clean common errors (0 vs O, 1 vs I).
-7. Names: Title Case.
-8. dob: YYYY-MM-DD.
+5. PHILIPPINE ADDRESS INTELLIGENCE (DEEP DIVE):
+   - "house_no": Strictly numeric house, floor, or unit numbers (e.g. "123", "Unit 4B"). DO NOT put Phase (PH) or Package (PKG) numbers here.
+   - "block_lot": Identify BLK/LOT precisely (e.g., "B100 L11", "LOT 5 BLK 2").
+   - "subdivision": Include all named subdivisions, PH (Phase), PKG (Package), and NV (Northville) identifiers together here. 
+     *Example: "PH1 PKG2 Northville 1" or "Northville 15" or "PH8A PKG14".*
+   - "barangay": The specific Barangay. In Caloocan North, this is usually "Bagumbong", "Camarin", "Deparo", "Lumbac", etc. Ensure the Barangay name is accurately spelled.
+   - "postal_code": 4-digit code.
+
+6. Cross-Verification:
+   - Compare images vs OCR. If the visual ID says "JUAN" but OCR said "JOIN", the visual ID (Juan) is 100% correct.
+   - Set "is_document_mismatch": true if any critical field (Name, DOB, ID Type) differs drastically between eyes and OCR.
+   - Extract Jr., Sr., III, IV, etc. into the "suffix" field.
+   - Fix OCR Noise: Clean common errors (0 vs O, 1 vs I, 8 vs B). Be aggressive about fixing these based on context (e.g. 0 in a Name is probably O).
+   - Names: Title Case.
+   - INTELLIGENT DISPATCH: If the ID type is not one of the majors, use its visual and text clues to identify the most likely government issuer and return it in "front_id_type".
 """
     try:
         if front_image and back_image:

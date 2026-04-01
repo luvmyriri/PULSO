@@ -10,6 +10,7 @@ class GlassCard extends StatelessWidget {
   final double? width;
   final double? height;
   final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? margin;
 
   const GlassCard({
     Key? key,
@@ -21,13 +22,16 @@ class GlassCard extends StatelessWidget {
     this.width,
     this.height,
     this.padding = const EdgeInsets.all(24.0),
+    this.margin,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return ClipRRect(
+    return Container(
+      margin: margin,
+      child: ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
@@ -47,6 +51,7 @@ class GlassCard extends StatelessWidget {
           child: child,
         ),
       ),
-    );
+    ),
+   );
   }
 }

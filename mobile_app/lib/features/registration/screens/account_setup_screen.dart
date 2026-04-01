@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:mobile_app/core/theme/app_theme.dart';
-import 'package:mobile_app/features/registration/registration_provider.dart';
-import 'package:mobile_app/features/registration/screens/registration_success_screen.dart';
+import 'package:pulso_mobile/core/theme/app_theme.dart';
+import 'package:pulso_mobile/features/registration/registration_provider.dart';
+import 'package:pulso_mobile/features/registration/screens/registration_success_screen.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:ui';
 

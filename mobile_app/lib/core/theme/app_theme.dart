@@ -54,4 +54,13 @@ class AppTheme {
       iconTheme: IconThemeData(color: Colors.white),
     ),
   );
+
+  static ButtonStyle orangeButtonStyle = ElevatedButton.styleFrom(
+    backgroundColor: primaryOrange,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(vertical: 20),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    elevation: 8,
+    shadowColor: primaryOrange.withOpacity(0.3),
+  );
 }

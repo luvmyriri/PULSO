@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:mobile_app/core/api/api_endpoints.dart';
+import 'package:pulso_mobile/core/api/api_endpoints.dart';
 import 'package:flutter/foundation.dart';
 
 class ApiClient {
@@ -14,8 +14,8 @@ class ApiClient {
 
   ApiClient() {
     _dio.options.baseUrl = baseUrl;
-    _dio.options.connectTimeout = const Duration(seconds: 15);
-    _dio.options.receiveTimeout = const Duration(seconds: 15);
+    _dio.options.connectTimeout = const Duration(seconds: 30);
+    _dio.options.receiveTimeout = const Duration(seconds: 60);
 
     _dio.interceptors.add(LogInterceptor(
       request: true,

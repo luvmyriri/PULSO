@@ -211,6 +211,18 @@ async def verify_residency(
     back_bytes = await idBack.read() if idBack else None
     
     result = await ocr_service.perform_ocr(front_bytes, back_bytes)
+    
+    # STRICT VALIDATION: If the AI or heuristic detected a mismatch, block the scan
+    extracted = result.get("extracted_data", {})
+    if extracted.get("is_document_mismatch"):
+        reason = extracted.get("mismatch_reason", "ID verification failed: Document mismatch detected.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
+    
+    # RESIDENCY ENFORCEMENT: Fail if the ID is not from North Caloocan
+    if not extracted.get("is_north_caloocan"):
+        reason = extracted.get("verification_message", "Residency check failed: Address is outside North Caloocan (Barangays 165-188).")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
+
     return result
 
 # ---------------------------------------------------------------------------
@@ -462,7 +474,7 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
         <div class="wrapper">
             <div class="container">
                 <div class="header">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Caloocan_City.png/300px-Caloocan_City.png" class="seal" alt="Caloocan Seal">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Caloocan_City.png" class="seal" alt="Caloocan Seal">
                     <div class="gov-text">Republic of the Philippines</div>
                     <div class="gov-text">City Government of Caloocan</div>
                     <div class="gov-text">Office of the City Engineer</div>
