@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
 import 'package:pulso_mobile/widgets/glass_card.dart';
-
 import 'package:pulso_mobile/l10n/app_localizations.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -17,6 +18,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  bool _isLoading = false;
+
+  // Base URL for API - Use the same as login_screen.dart
+  static const String baseUrl = "http://192.168.0.199:8000";
+
+  Future<void> _handleRegister() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty || _nameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill in all fields"), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/api/auth/register"),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({
+          "email": _emailController.text.trim(),
+          "password": _passwordController.text,
+          "full_name": _nameController.text.trim(),
+          "role": "resident",
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Registration successful! Check your email for verification."),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Navigate to login and show verification screen
+        Navigator.pushReplacementNamed(
+          context, 
+          '/login',
+          arguments: {'email': _emailController.text.trim(), 'auto_verify': true},
+        );
+      } else {
+        final data = json.decode(response.body);
+        final detail = data['detail']?.toString() ?? "Registration failed";
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(detail), backgroundColor: Colors.redAccent),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Connection error. Is the server running?"), backgroundColor: Colors.redAccent),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +209,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: _isLoading ? null : _handleRegister,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: brandOrange,
                                 foregroundColor: Colors.white,
@@ -159,7 +218,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 elevation: 8,
                                 shadowColor: brandOrange.withOpacity(0.3),
                               ),
-                              child: Text(l10n.signUpButton, style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                    )
+                                  : Text(l10n.signUpButton, style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
                             ),
                           ),
                           const SizedBox(height: 24),

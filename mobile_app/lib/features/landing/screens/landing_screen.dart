@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:pulso_mobile/core/providers/settings_provider.dart';
+import 'package:pulso_mobile/widgets/glass_card.dart';
+import 'package:pulso_mobile/widgets/pulso_branding.dart';
 import 'package:pulso_mobile/l10n/app_localizations.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
+import 'package:pulso_mobile/core/providers/settings_provider.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -181,21 +183,49 @@ class _LandingScreenState extends State<LandingScreen> {
               children: [
                 Builder(builder: (context) {
                   return IconButton(
-                    icon: Icon(Icons.menu, color: isDark ? Colors.white : Colors.black87, size: 28),
+                    icon: Icon(Icons.menu, color: isDark ? Colors.white : brandOrange, size: 28),
                     onPressed: () => Scaffold.of(context).openDrawer(),
                   );
                 }),
-                const PulsoBranding(scale: 0.8),
-                ElevatedButton(
-                  onPressed: () => Navigator.pushNamed(context, '/login'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: brandOrange,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: const PulsoBranding(scale: 0.6),
                   ),
-                  child: Text(l10n.login, style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Theme Toggle
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          _buildThemeButton(context, ThemeMode.light, Icons.wb_sunny_outlined),
+                          _buildThemeButton(context, ThemeMode.system, Icons.settings_brightness_outlined),
+                          _buildThemeButton(context, ThemeMode.dark, Icons.nightlight_outlined),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pushNamed(context, '/login'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: brandOrange,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                      child: Text(l10n.login, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -214,6 +244,29 @@ class _LandingScreenState extends State<LandingScreen> {
             AboutLguSection(key: _aboutKey),
             const FooterSection(),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeButton(BuildContext context, ThemeMode mode, IconData icon) {
+    final settings = context.watch<SettingsProvider>();
+    final isSelected = settings.themeMode == mode;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brandOrange = AppTheme.primaryOrange;
+
+    return GestureDetector(
+      onTap: () => settings.setThemeMode(mode),
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: isSelected ? (isDark ? Colors.white10 : Colors.black12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Icon(
+          icon,
+          size: 14,
+          color: isSelected ? brandOrange : (isDark ? Colors.white38 : brandOrange.withOpacity(0.4)),
         ),
       ),
     );
@@ -892,7 +945,7 @@ class FooterSection extends StatelessWidget {
       padding: const EdgeInsets.all(50),
       child: Column(
         children: [
-          const PulsoBranding(scale: 0.95),
+          const PulsoBranding(scale: 0.8),
           const SizedBox(height: 40),
           Divider(color: isDark ? Colors.white10 : Colors.black12),
           const SizedBox(height: 40),
@@ -919,83 +972,6 @@ Future<void> _launchUrl(String url) async {
   }
 }
 
-class PulsoBranding extends StatelessWidget {
-  final double scale;
-  final Color? textColor;
-  const PulsoBranding({super.key, this.scale = 1.0, this.textColor});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final displayTextColor = textColor ?? (isDark ? Colors.white : const Color(0xFF0F172A));
-    
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 44 * scale,
-              height: 44 * scale,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: isDark ? Colors.white54 : Colors.black12, width: 2),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(isDark ? 0.5 : 0.1), blurRadius: 15, offset: const Offset(0, 5))
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(100),
-                child: Image.asset('assets/images/engineering-logo.jpg', fit: BoxFit.cover),
-              ),
-            ),
-            Positioned(
-              left: 28 * scale,
-              child: Container(
-                width: 44 * scale,
-                height: 44 * scale,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: isDark ? Colors.white54 : Colors.black12, width: 2),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(isDark ? 0.5 : 0.1), blurRadius: 15, offset: const Offset(0, 5))
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(100),
-                  child: Image.asset('assets/images/pulso-logo.png', fit: BoxFit.cover),
-                ),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(width: 42 * scale),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'PULSO',
-              style: GoogleFonts.outfit(
-                fontSize: 24 * scale,
-                fontWeight: FontWeight.w900,
-                color: displayTextColor,
-                letterSpacing: -0.5,
-              ),
-            ),
-            Text(
-              'CITY ENGINEERING',
-              style: GoogleFonts.outfit(
-                fontSize: 9 * scale,
-                fontWeight: FontWeight.w900,
-                color: AppTheme.primaryOrange,
-                letterSpacing: 2.0,
-              ),
-            ),
-          ],
-        )
-      ],
-    );
-  }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// END
+// ─────────────────────────────────────────────────────────────────────────────

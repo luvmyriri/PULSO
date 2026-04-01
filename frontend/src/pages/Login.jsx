@@ -144,7 +144,7 @@ export default function Login() {
     };
 
     const handleRecovery = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         setLoading(true);
         setError('');
         setRecoveryOtp(['', '', '', '', '', '']); // Clear previous inputs for security synchronization
@@ -660,19 +660,19 @@ export default function Login() {
                                         >
                                             {recoverySent ? (
                                                 <div className="text-center py-6">
-                                                    <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                                    <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-200 dark:border-emerald-500/20 shadow-lg">
                                                         <CheckCircle className="text-emerald-500" size={40} />
                                                     </div>
                                                     <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
                                                         Reset Complete
                                                     </h2>
-                                                    <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-10">
-                                                        Your password has been successfully updated.
+                                                    <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-10 leading-relaxed">
+                                                        Your password has been successfully updated.<br />
                                                         You may now sign in with your new credentials.
                                                     </p>
                                                     <button
                                                         onClick={() => { setView('login'); setRecoverySent(false); setRecoveryStep(1); }}
-                                                        className="flex items-center gap-2 mx-auto text-orange-600 font-bold uppercase tracking-widest text-[10px] hover:text-orange-500 transition-colors"
+                                                        className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-orange-600 dark:hover:bg-orange-500 rounded-2xl p-4 font-black text-xs uppercase tracking-[0.2em] transition-all transform hover:scale-[1.02] shadow-xl flex items-center justify-center gap-3"
                                                     >
                                                         <ArrowLeft size={16} /> Back to Sign In
                                                     </button>
@@ -701,6 +701,7 @@ export default function Login() {
                                                             )}
 
                                                             <form onSubmit={handleRecovery} className="space-y-6">
+
                                                                 <div className="space-y-2">
                                                                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Official Email Address</label>
                                                                     <div className="relative group/input">
@@ -738,7 +739,7 @@ export default function Login() {
                                                                     {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Verify Code'}
                                                                 </button>
 
-                                                                <div className="text-center mt-6">
+                                                                <div className="text-center mt-6 min-h-[32px] flex items-center justify-center">
                                                                     {resendTimer > 0 ? (
                                                                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
                                                                             Resend code in <span className="text-orange-600">{resendTimer}s</span>
@@ -748,12 +749,14 @@ export default function Login() {
                                                                             type="button"
                                                                             onClick={handleRecovery}
                                                                             disabled={loading || !canResend}
-                                                                            className="text-[11px] font-black text-orange-600 hover:text-orange-500 uppercase tracking-widest transition-colors flex items-center gap-2 mx-auto"
+                                                                            className="text-[11px] font-black text-orange-600 hover:text-orange-500 uppercase tracking-widest transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
                                                                         >
-                                                                            Resend Verification Code
+                                                                            {loading ? <div className="w-3 h-3 border-2 border-orange-600/30 border-t-orange-600 rounded-full animate-spin" /> : null}
+                                                                            {loading ? 'Sending...' : 'Resend Verification Code'}
                                                                         </button>
                                                                     )}
                                                                 </div>
+
                                                             </form>
                                                         </>
                                                     ) : (
@@ -778,7 +781,6 @@ export default function Login() {
                                                                         <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"> {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />} </button>
                                                                     </div>
 
-                                                                    {/* Password Strength Meter */}
                                                                     {newPassword && (
                                                                         <div className="mt-2 space-y-2 px-1">
                                                                             <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
@@ -850,4 +852,5 @@ export default function Login() {
             </div>
         </div>
     );
+
 }

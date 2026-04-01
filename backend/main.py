@@ -54,13 +54,7 @@ app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Configure CORS so the Vite frontend and Flutter mobile app can access the backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://10.0.2.2:8000",   # Android emulator → host loopback
-        "http://localhost:8081",  # Flutter web dev
-    ],
+    allow_origins=["*"], # Allow all origins (Physical mobile devices, Web, Emulators) during development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,8 +63,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Included Routers — Government-Side & Analytics Engine
 # ---------------------------------------------------------------------------
-app.include_router(gov_router.router)
-app.include_router(analytics_router.router)
+# Routers are included once later to avoid duplication
 
 # ---------------------------------------------------------------------------
 # Auth Utilities
@@ -78,11 +71,21 @@ app.include_router(analytics_router.router)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
+class VerificationRequest(BaseModel):
+    email: str
+    code: Optional[str] = None
+
+# send_otp_email was consolidated below to handle all notification types
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
+    )
+    unverified_exception = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Account not verified. Please check your email for the verification code.",
     )
     try:
         payload = auth.jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
@@ -95,6 +98,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = crud.get_user_by_email(db, email=email)
     if user is None:
         raise credentials_exception
+        
+    # STRICT ENFORCEMENT: Block any protected request if user is not verified
+    # (Except for system administrators who might need to fix things)
+    if not user.is_verified and user.role == "resident":
+        raise unverified_exception
+        
     return user
 
 def require_role(*roles):
@@ -120,228 +129,9 @@ def require_role(*roles):
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASS")
 
-def send_verification_email(email: str, code: str):
-    """Sends a 6-digit verification code using a professional PULSO HTML template."""
-    if not SMTP_USER or not SMTP_PASS:
-        print(f"[EMAIL] SMTP credentials missing. Skipping email send. (OTP: {code})")
-        return False
-        
-    try:
-        # Formatted code: e.g., 552 108
-        formatted_code = f"{code[:3]} {code[3:]}"
-        # Spaced code for the large display: e.g., 5  5  2   1  0  8
-        spaced_code = "  ".join(list(code[:3])) + " &nbsp; " + "  ".join(list(code[3:]))
-        
-        subject = "Official Account Verification Notice | City Government of Caloocan"
-        timestamp = datetime.now().strftime("%B %d, %Y, %I:%M %p")
-        
-        # Standardized Official Government Template (Consistent branding across all PULSO emails)
-        email_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <style>
-                body {{ font-family: 'Inter', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background-color: #f1f5f9; color: #1e293b; }}
-                .wrapper {{ padding: 20px; }}
-                .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
-                .header {{ padding: 40px 20px; text-align: center; border-bottom: 1px solid #f1f5f9; }}
-                .seal {{ width: 80px; height: 80px; margin-bottom: 20px; object-fit: contain; }}
-                .letterhead {{ font-family: 'Times New Roman', Times, serif; color: #1e3a8a; line-height: 1.2; text-transform: uppercase; }}
-                .letterhead-jurisdiction {{ font-weight: 800; font-size: 14px; margin-bottom: 2px; }}
-                .letterhead-office {{ font-weight: 800; font-size: 14px; margin-bottom: 4px; }}
-                .letterhead-title {{ font-weight: 900; font-size: 18px; margin-top: 15px; border-bottom: 2px solid #1e3a8a; display: inline-block; padding-bottom: 4px; }}
-                .content {{ padding: 40px; text-align: center; }}
-                .notice-intro {{ font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 30px; }}
-                .code-container {{ background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 30px; margin-bottom: 30px; }}
-                .otp-code {{ font-size: 42px; font-weight: 900; color: #ea580c; font-family: 'Courier New', Courier, monospace; }}
-                .validity-period {{ font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 30px; }}
-                .advisory {{ background-color: #fff1f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; text-align: left; margin-top: 40px; }}
-                .advisory-title {{ color: #991b1b; font-weight: 900; font-size: 12px; margin-bottom: 6px; letter-spacing: 0.05em; }}
-                .advisory-text {{ font-size: 12px; color: #7f1d1d; line-height: 1.5; }}
-                .footer-metadata {{ background-color: #ea580c; padding: 20px; text-align: center; color: #ffffff; }}
-                .footer-title {{ font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; opacity: 0.9; }}
-                .footer-info {{ font-size: 10px; font-weight: 400; opacity: 0.9; }}
-                .disclaimer {{ padding: 20px; text-align: center; font-size: 10px; color: #94a3b8; font-style: italic; }}
-            </style>
-        </head>
-        <body>
-            <div class="wrapper">
-                <div class="container">
-                    <div class="header">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Caloocan_City.png" class="seal" alt="Caloocan Seal">
-                        <div class="letterhead">
-                            <div class="letterhead-jurisdiction">Republic of the Philippines</div>
-                            <div class="letterhead-jurisdiction">City Government of Caloocan</div>
-                            <div class="letterhead-office">Office of the City Engineer</div>
-                            <div class="letterhead-title">Official Verification Notice</div>
-                        </div>
-                    </div>
-                    <div class="content">
-                        <div class="notice-intro">
-                            This serves as an automated notification to secure your digital access.<br>
-                            To complete the <b>Identity Validation Process</b>, please utilize the One-Time Password (OTP) provided below.
-                        </div>
-                        <div class="code-container">
-                            <div class="otp-code">{spaced_code}</div>
-                        </div>
-                        <div class="validity-period">
-                            <b>VALIDITY PERIOD:</b> This authorization code is valid for exactly <b>thirty (30) minutes</b> from the time of issuance.<br>
-                            If the code expires, a new request must be generated.
-                        </div>
-                        <div class="advisory">
-                            <div class="advisory-title">SECURITY AND COMPLIANCE ADVISORY</div>
-                            <div class="advisory-text">
-                                If you did not personally initiate this request, <b>disregard this message immediately</b>. Your account remains protected under current encryption standards, and no further intervention is required.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="footer-metadata">
-                        <div class="footer-title">Official Security Details</div>
-                        <div class="footer-info">
-                            {timestamp} | OFFICE: Engineer Department | Caloocan City Hall
-                        </div>
-                        <div style="font-size: 10px; font-style: italic; margin-top: 15px; opacity: 0.8; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
-                            This is an automated message. Please do not reply to this email.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg = MIMEMultipart('alternative')
-        msg['From'] = f"City Government of Caloocan | PULSO <{SMTP_USER}>"
-        msg['To'] = email
-        msg['Subject'] = subject
-        msg['X-Priority'] = '1 (Highest)'
-        msg['Importance'] = 'High'
-        
-        # Fallback text version
-        text_body = f"PULSO: Your official registration verification code is {formatted_code}. Issued by Office of the City Engineer."
-        msg.attach(MIMEText(text_body, 'plain'))
-        msg.attach(MIMEText(email_html, 'html'))
-        
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(SMTP_USER, SMTP_PASS.replace(" ", ""))
-            server.send_message(msg)
-        return True
-    except Exception as e:
-        print(f"[EMAIL] Error sending verification HTML email: {e}")
-        return False
+# Consolidating send_otp_email logic
 
-def send_password_reset_email(email: str, code: str, reference_id: str):
-    """Sends a 6-digit reset code using an official government letterhead HTML template."""
-    if not SMTP_USER or not SMTP_PASS:
-        print("[EMAIL] SMTP credentials missing. Skipping email send.")
-        return False
-        
-    try:
-        # Formatted code: e.g., 170 377
-        formatted_code = f"{code[:3]} {code[3:]}"
-        # Spaced code for the large display: e.g., 1 7 0   3 7 7
-        spaced_code = "  ".join(list(code[:3])) + " &nbsp; " + "  ".join(list(code[3:]))
-        
-        subject = "Official Identity Sync Notification | City Government of Caloocan"
-        # Format: March 30, 2026, 08:58 PM
-        timestamp = datetime.now().strftime("%B %d, %Y, %I:%M %p")
-        
-        # Official Government Letterhead HTML Template
-        email_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <style>
-                body {{ font-family: 'Inter', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background-color: #f1f5f9; color: #1e293b; }}
-                .wrapper {{ padding: 20px; }}
-                .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
-                .header {{ padding: 40px 20px; text-align: center; border-bottom: 1px solid #f1f5f9; }}
-                .seal {{ width: 80px; height: 80px; margin-bottom: 20px; object-fit: contain; }}
-                .letterhead {{ font-family: 'Times New Roman', Times, serif; color: #1e3a8a; line-height: 1.2; text-transform: uppercase; }}
-                .letterhead-jurisdiction {{ font-weight: 800; font-size: 14px; margin-bottom: 2px; }}
-                .letterhead-office {{ font-weight: 800; font-size: 14px; margin-bottom: 4px; }}
-                .letterhead-title {{ font-weight: 900; font-size: 18px; margin-top: 15px; border-bottom: 2px solid #1e3a8a; display: inline-block; padding-bottom: 4px; }}
-                .content {{ padding: 40px; text-align: center; }}
-                .notice-intro {{ font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 30px; }}
-                .code-container {{ background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 30px; margin-bottom: 30px; }}
-                .otp-code {{ font-size: 42px; font-weight: 900; color: #ea580c; font-family: 'Courier New', Courier, monospace; }}
-                .validity-period {{ font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 30px; }}
-                .advisory {{ background-color: #fff1f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; text-align: left; margin-top: 40px; }}
-                .advisory-title {{ color: #991b1b; font-weight: 900; font-size: 12px; margin-bottom: 6px; letter-spacing: 0.05em; }}
-                .advisory-text {{ font-size: 12px; color: #7f1d1d; line-height: 1.5; }}
-                .footer-metadata {{ background-color: #ea580c; padding: 20px; text-align: center; color: #ffffff; }}
-                .footer-title {{ font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; opacity: 0.9; }}
-                .footer-info {{ font-size: 10px; font-weight: 400; opacity: 0.9; }}
-                .disclaimer {{ padding: 20px; text-align: center; font-size: 10px; color: #94a3b8; font-style: italic; }}
-            </style>
-        </head>
-        <body>
-            <div class="wrapper">
-                <div class="container">
-                    <div class="header">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Caloocan_City.png" class="seal" alt="Caloocan Seal">
-                        <div class="letterhead">
-                            <div class="letterhead-jurisdiction">Republic of the Philippines</div>
-                            <div class="letterhead-jurisdiction">City Government of Caloocan</div>
-                            <div class="letterhead-office">Office of the City Engineer</div>
-                            <div class="letterhead-title">Official Verification Notice</div>
-                        </div>
-                    </div>
-                    <div class="content">
-                        <div class="notice-intro">
-                            This serves as an automated notification to secure your digital access.<br>
-                            To complete the <b>Account Recovery & Sync Process</b>, please utilize the One-Time Password (OTP) provided below.
-                        </div>
-                        <div class="code-container">
-                            <div class="otp-code">{spaced_code}</div>
-                        </div>
-                        <div class="validity-period">
-                            <b>VALIDITY PERIOD:</b> This authorization code is valid for exactly <b>thirty (30) minutes</b> from the time of issuance.<br>
-                            If the code expires, a new request must be generated.
-                        </div>
-                        <div class="advisory">
-                            <div class="advisory-title">SECURITY AND COMPLIANCE ADVISORY</div>
-                            <div class="advisory-text">
-                                If you did not personally initiate this request, <b>disregard this message immediately</b>. Your account remains protected under current encryption standards, and no further intervention is required.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="footer-metadata">
-                        <div class="footer-title">Official Security Details</div>
-                        <div class="footer-info">
-                            {timestamp} | OFFICE: Engineer Department | Caloocan City Hall
-                        </div>
-                        <div style="font-size: 10px; font-style: italic; margin-top: 15px; opacity: 0.8; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
-                            This is an automated message. Please do not reply to this email.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg = MIMEMultipart('alternative')
-        msg['From'] = f"City Government of Caloocan | PULSO <{SMTP_USER}>"
-        msg['To'] = email
-        msg['Subject'] = subject
-        msg['X-Priority'] = '1 (Highest)'
-        msg['Importance'] = 'High'
-        
-        # Fallback text version
-        text_body = f"PULSO: Your official identity verification code is {formatted_code}. Issued by Office of the City Engineer."
-        msg.attach(MIMEText(text_body, 'plain'))
-        msg.attach(MIMEText(email_html, 'html'))
-        
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(SMTP_USER, SMTP_PASS.replace(" ", ""))
-            server.send_message(msg)
-        return True
-    except Exception as e:
-        print(f"[EMAIL] Error sending reset html email: {e}")
-        return False
+
 
 async def verify_recaptcha(token: str):
     """Verifies reCAPTCHA token with Google."""
@@ -429,6 +219,20 @@ async def verify_residency(
 
 @app.post("/api/auth/register", response_model=schemas.UserResponse)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # Enforce lowercase and remove trailing spaces added by mobile keyboards
+    user.email = user.email.strip().lower()
+
+    # STRICT EMAIL VALIDATION: Reject place-holders or obvious fake emails
+    import re
+    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    if not re.match(email_regex, user.email):
+        raise HTTPException(status_code=400, detail="Invalid email format. Please provide a real email.")
+    
+    # Block obviously fake domains
+    blocked_domains = ["example.com", "email.com", "test.com", "fake.com", "mailinator.com", "tempmail.com"]
+    if any(domain in user.email for domain in blocked_domains):
+        raise HTTPException(status_code=400, detail="Please use a valid, official email account.")
+
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -451,43 +255,21 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     
     # Send email
-    send_verification_email(new_user.email, code)
+    if not send_otp_email(new_user.email, code, "Verification"):
+        # We created the user, but couldn't send the email.
+        # In a real system, you might want to rollback, but let's at least tell the user.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="User created but failed to send verification email. Please use 'Resend Code' on the login screen."
+        )
     
     return new_user
 
-class VerificationRequest(BaseModel):
-    email: str
-    code: str
 
-@app.post("/api/auth/verify-registration")
-def verify_registration(req: VerificationRequest, db: Session = Depends(get_db)):
-    user = crud.get_user_by_email(db, email=req.email)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Clean the code (remove spaces if user copied "552 108")
-    cleaned_code = req.code.replace(" ", "")
-    
-    if user.verification_code != cleaned_code and cleaned_code != "123456":
-        raise HTTPException(status_code=400, detail="Invalid verification code")
-        
-    user.is_verified = True
-    user.verification_code = None  # Clear the code after use
-    db.commit()
-    return {"status": "success", "message": "Account verified"}
 
-@app.post("/api/auth/resend-code")
-def resend_code(req: VerificationRequest, db: Session = Depends(get_db)):
-    user = crud.get_user_by_email(db, email=req.email)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-        
-    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-    user.verification_code = code
-    db.commit()
-    
-    send_verification_email(user.email, code)
-    return {"status": "success", "message": "New code sent"}
+
+
+# Registration logic moved below Login to avoid duplication
 
 
 
@@ -546,108 +328,173 @@ async def login(
         }
     }
 
+@app.post("/api/auth/verify-registration")
+def verify_registration(req: VerificationRequest, db: Session = Depends(get_db)):
+    email = req.email.strip().lower()
+    user = crud.get_user_by_email(db, email=email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Clean the code (remove spaces if user copied "552 108")
+    cleaned_code = req.code.replace(" ", "") if req.code else ""
+    
+    # REMOVED 123456 bypass for production-grade security synchronization
+    if user.verification_code != cleaned_code:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+        
+    user.is_verified = True
+    user.verification_code = None  # Clear the code after use
+    db.commit()
+    return {"status": "success", "message": "Account verified"}
+
+@app.post("/api/auth/resend-code")
+def resend_code(req: VerificationRequest, db: Session = Depends(get_db)):
+    email = req.email.strip().lower()
+    user = crud.get_user_by_email(db, email=email)
+    if not user or user.role != "resident":
+        raise HTTPException(status_code=404, detail="Resident account not found")
+        
+    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    user.verification_code = code
+    db.commit()
+    
+    if not send_otp_email(user.email, code, "Verification"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification code. Please check server logs."
+        )
+        
+    return {"status": "success", "message": "Official verification code resent."}
+
+
+
 class ForgotPasswordRequest(BaseModel):
     email: str
 
 class ResetPasswordRequest(BaseModel):
-    token: str
+    email: str
+    code: str
     new_password: str
 
-@app.post("/api/auth/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    user = crud.get_user_by_email(db, email=req.email)
-    if not user:
-        # For security, don't reveal if user exists. Just return success.
-        return {"message": "If this account exists, a recovery link has been sent."}
+class VerifyResetCodeRequest(BaseModel):
+    email: str
+    code: str
+
+def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id: Optional[str] = None):
+    """
+    Sends the official branding PULSO OTP email.
+    Handles both registration 'Verification' and password 'Recovery' flows.
+    """
+    to_email = to_email.strip().lower()
+    SMTP_USER = os.getenv("SMTP_USER")
+    SMTP_PASS = os.getenv("SMTP_PASS")
     
-    # Generate a secure token
-    import secrets
-    from datetime import datetime, timedelta
-    token = secrets.token_urlsafe(32)
-    expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    if not SMTP_USER or not SMTP_PASS:
+        print(f"[MAIL ERROR] SMTP credentials missing in .env. Cannot send {type} email to {to_email}")
+        return False
 
+    title = "Official Verification Notice" if type == "Verification" else "Password Recovery Notice"
     
-    # Save to DB
-    reset_token = models.PasswordResetToken(
-        email=req.email,
-        token=token,
-        expires_at=expires
-    )
-    db.add(reset_token)
-    db.commit()
-
-    reset_link = f"http://localhost:5173/reset-password?token={token}"
-
-    # -------------------------------------------------------------------------
-    # PROFESSIONAL HTML EMAIL TEMPLATE (PULSO THEME)
-    # -------------------------------------------------------------------------
-    # Standardized Official Government Template (Consistent branding across all PULSO emails)
+    # Format OTP as X X X   X X X (e.g. 1 1 0   9 1 7)
+    formatted_otp = f"{code[0]}&nbsp;{code[1]}&nbsp;{code[2]}&nbsp;&nbsp;&nbsp;&nbsp;{code[3]}&nbsp;{code[4]}&nbsp;{code[5]}"
+    
+    # Dynamic Security Details
+    now_str = datetime.now().strftime("%B %d, %Y, %I:%M %p")
+    
     email_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
         <style>
-            body {{ font-family: 'Inter', Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; color: #1e293b; }}
+            body {{ font-family: 'Inter', -apple-system, sans-serif; margin: 0; padding: 0; background-color: #f1f5f9; color: #334155; }}
             .wrapper {{ padding: 40px 20px; }}
-            .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }}
-            .header {{ padding: 40px 20px; text-align: center; border-bottom: 1px solid #f1f5f9; }}
-            .seal {{ width: 80px; height: 80px; margin-bottom: 20px; object-fit: contain; }}
-            .letterhead {{ font-family: 'Times New Roman', Times, serif; color: #1e3a8a; line-height: 1.2; text-transform: uppercase; }}
-            .letterhead-jurisdiction {{ font-weight: 800; font-size: 14px; margin-bottom: 2px; }}
-            .letterhead-office {{ font-weight: 800; font-size: 14px; margin-bottom: 4px; }}
-            .letterhead-title {{ font-weight: 900; font-size: 18px; margin-top: 15px; border-bottom: 2px solid #1e3a8a; display: inline-block; padding-bottom: 4px; }}
-            .content {{ padding: 40px; text-align: center; }}
-            .notice-intro {{ font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 30px; }}
-            .btn-container {{ margin: 30px 0; }}
-            .btn {{ display: inline-block; padding: 18px 40px; background-color: #ea580c; color: #ffffff !important; font-weight: 900; text-decoration: none; border-radius: 12px; text-transform: uppercase; font-size: 13px; letter-spacing: 0.1em; transition: all 0.2s ease; }}
-            .validity-period {{ font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 30px; }}
-            .advisory {{ background-color: #fff1f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; text-align: left; margin-top: 40px; }}
-            .advisory-title {{ color: #991b1b; font-weight: 900; font-size: 11px; margin-bottom: 6px; letter-spacing: 0.05em; }}
-            .advisory-text {{ font-size: 11px; color: #7f1d1d; line-height: 1.5; }}
-            .footer-metadata {{ background-color: #ea580c; padding: 30px 20px; text-align: center; color: #ffffff; }}
-            .footer-title {{ font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; opacity: 0.9; letter-spacing: 0.1em; }}
-            .footer-info {{ font-size: 10px; font-weight: 400; opacity: 0.9; }}
+            .container {{ max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }}
+            .header {{ padding: 40px 20px; text-align: center; }}
+            .seal {{ width: 90px; height: 90px; margin-bottom: 20px; }}
+            .gov-text {{ color: #1e3a8a; font-weight: 700; font-size: 14px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }}
+            .notice-title {{ 
+                display: inline-block; 
+                margin-top: 24px; 
+                color: #1e3a8a; 
+                font-size: 20px; 
+                font-weight: 900; 
+                border-bottom: 3px solid #1e3a8a; 
+                padding-bottom: 2px; 
+                text-transform: uppercase; 
+                letter-spacing: 0.1em; 
+            }}
+            .content {{ padding: 40px 32px; text-align: center; }}
+            .intro {{ font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 24px; }}
+            .otp-container {{ 
+                background-color: #f8fafc; 
+                border: 2px dashed #cbd5e1; 
+                border-radius: 16px; 
+                padding: 40px 20px; 
+                margin: 32px 0; 
+            }}
+            .otp-code {{ 
+                font-size: 46px; 
+                font-weight: 800; 
+                color: #ea580c; 
+                white-space: nowrap;
+                font-family: 'Courier New', Courier, monospace; 
+            }}
+            .validity {{ font-size: 12px; color: #64748b; line-height: 1.6; }}
+            .validity b {{ color: #475569; }}
+            .advisory {{ 
+                background-color: #fff1f2; 
+                border: 1.5px solid #fecaca; 
+                border-radius: 12px; 
+                padding: 24px; 
+                text-align: left; 
+                margin-top: 40px; 
+            }}
+            .advisory-title {{ color: #991b1b; font-weight: 900; font-size: 12px; margin-bottom: 8px; letter-spacing: 0.05em; }}
+            .advisory-text {{ font-size: 11px; color: #7f1d1d; line-height: 1.6; }}
+            .footer {{ background-color: #ea580c; padding: 32px 24px; text-align: center; color: #ffffff; }}
+            .footer-title {{ font-weight: 900; font-size: 11px; letter-spacing: 0.1em; margin-bottom: 12px; text-transform: uppercase; }}
+            .footer-details {{ font-size: 10px; opacity: 0.9; margin-bottom: 20px; }}
+            .footer-disclaimer {{ font-size: 9px; opacity: 0.7; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 12px; }}
         </style>
     </head>
     <body>
         <div class="wrapper">
             <div class="container">
                 <div class="header">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Caloocan_City.png" class="seal" alt="Caloocan Seal">
-                    <div class="letterhead">
-                        <div class="letterhead-jurisdiction">Republic of the Philippines</div>
-                        <div class="letterhead-jurisdiction">City Government of Caloocan</div>
-                        <div class="letterhead-office">Office of the City Engineer</div>
-                        <div class="letterhead-title">Official Verification Notice</div>
-                    </div>
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Caloocan_City.png/300px-Caloocan_City.png" class="seal" alt="Caloocan Seal">
+                    <div class="gov-text">Republic of the Philippines</div>
+                    <div class="gov-text">City Government of Caloocan</div>
+                    <div class="gov-text">Office of the City Engineer</div>
+                    <div class="notice-title">{title}</div>
                 </div>
                 <div class="content">
-                    <div class="notice-intro">
-                        A request has been received to authorize a <b>Credential Synchronisation</b> for your official PULSO account.<br>
-                        Please utilize the authorization link provided below to proceed.
+                    <div class="intro">
+                        This serves as an automated notification to secure your digital access.<br>
+                        To complete the <b>Credential Validation Process</b>, please utilize the One-Time Password (OTP) provided below.
                     </div>
-                    <div class="btn-container">
-                        <a href="{reset_link}" class="btn">Authorize Identity Synchronization</a>
+                    <div class="otp-container">
+                        <div class="otp-code">{formatted_otp}</div>
                     </div>
-                    <div class="validity-period">
-                        <b>VALIDITY PERIOD:</b> This authorization request will expire in <b>exactly 1 hour</b>.<br>
-                        If no action is taken, the request will be automatically voided for your protection.
+                    <div class="validity">
+                        <b>VALIDITY PERIOD:</b> This authorization code is valid for exactly <b>thirty (30) minutes</b> from the time of issuance.<br>
+                        If the code expires, a new request must be generated.
                     </div>
                     <div class="advisory">
                         <div class="advisory-title">SECURITY AND COMPLIANCE ADVISORY</div>
                         <div class="advisory-text">
-                            If you did not personally initiate this identity sync, <b>disregard this message immediately</b>. Your account remains protected under current secure encryption standards.
+                            If you did not personally initiate this request, <b>disregard this message immediately</b>. 
+                            Your account remains protected under current encryption standards, and no further intervention is required.
                         </div>
                     </div>
                 </div>
-                <div class="footer-metadata">
-                    <div class="footer-title">Official Security Context</div>
-                    <div class="footer-info">
-                        Protocol ID: {token[:8]}... | OFFICE: Engineer Department | Caloocan City Hall
+                <div class="footer">
+                    <div class="footer-title">Official Security Details</div>
+                    <div class="footer-details">
+                        {now_str} | OFFICE: Engineer Department | Caloocan City Hall
                     </div>
-                    <div style="font-size: 9px; font-style: italic; margin-top: 15px; opacity: 0.8; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
-                        This is an automated system notification. Replies to this address are not monitored.
+                    <div class="footer-disclaimer">
+                        This is an automated message. Please do not reply to this email.
                     </div>
                 </div>
             </div>
@@ -655,93 +502,147 @@ async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_
     </body>
     </html>
     """
-
-    # -------------------------------------------------------------------------
-    # EMULATION OF EMAIL SENDING
-    # -------------------------------------------------------------------------
-    # reset_link already defined above
     
-    # Check if SMTP is configured in .env (Add these to .env if you want real emails)
-    SMTP_USER = os.getenv("SMTP_USER")
-    SMTP_PASS = os.getenv("SMTP_PASS")
-    
-    print(f"\n[SECURITY PROTOCOL] Password recovery initiated for: {req.email}")
-    print(f"[RECOVERY LINK] {reset_link}\n")
-    
-    if SMTP_USER and SMTP_PASS:
-        try:
-            import smtplib
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
-            
-            # Clean app password (remove spaces)
-            clean_pass = SMTP_PASS.replace(" ", "")
-            
-            # Use Multi-part email for HTML/Text compatibility
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = '【PULSO Security】 Official Password Recovery Authorization'
-            msg['From'] = f"PULSO Security <{SMTP_USER}>"
-            msg['To'] = req.email
-            
-            # Fallback text
-            text = f"PULSO Security Protocol: Recover your password at {reset_link}"
-            
-            # Attach both versions
-            msg.attach(MIMEText(text, 'plain'))
-            msg.attach(MIMEText(email_html, 'html'))
-            
-            # Connect via Gmail's SSL port
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-                server.login(SMTP_USER, clean_pass)
-                server.send_message(msg)
-                print(f"[MAIL SYSTEM] SUCCESS: Recovery email dispatched to {req.email}")
-        except Exception as e:
-            print(f"\n[MAIL ERROR] System failed to dispatch email: {e}")
-    else:
-        print("[NOTICE] Real email sending skipped (SMTP_USER/PASS not found in .env). Link printed to terminal above.")
+    try:
+        clean_pass = SMTP_PASS.replace(" ", "")
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f'【PULSO Official】 {title}: {code}'
+        msg['From'] = f"PULSO Security <{SMTP_USER}>"
+        msg['To'] = to_email
+        msg['X-Priority'] = '1'
         
-    return {"message": "Recovery protocol initiated. Check your official inbox."}
+        ref_text = f"\nReference: {ref_id}" if ref_id else ""
+        msg.attach(MIMEText(f"Your PULSO security code is: {code}{ref_text}\nExpires in 30 minutes.", 'plain'))
+        msg.attach(MIMEText(email_html, 'html'))
+        
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.set_debuglevel(1) # Added verbose logging for debugging
+            server.login(SMTP_USER, clean_pass)
+            server.send_message(msg)
+            print(f"[MAIL] {type} email sent successfully to {to_email}")
+        return True
+    except smtplib.SMTPAuthenticationError:
+        print(f"[MAIL ERROR] Authentication failed for {SMTP_USER}. Check SMTP_PASS.")
+        return False
+    except smtplib.SMTPException as e:
+        print(f"[MAIL ERROR] SMTP error occurred: {e}")
+        return False
+    except Exception as e:
+        print(f"[MAIL ERROR] Unexpected error: {e}")
+        return False
 
-@app.get("/api/auth/verify-token/{token}")
-async def verify_token(token: str, db: Session = Depends(get_db)):
+@app.post("/api/auth/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Generates a 6-digit reset code and sends the official security email."""
+    email = req.email.strip().lower()
+    user = crud.get_user_by_email(db, email=email)
+    if not user:
+        # For security, don't reveal if the email is registered
+        return {"message": "If this email is registered, a security code will be sent."}
+    
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account not verified"
+        )
+    
+    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    ref_id = f"PC-{random.randint(10000, 99999)}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    
+    # Store or update the token record
+    reset_token = db.query(models.PasswordResetToken).filter(models.PasswordResetToken.email == email).first()
+    if reset_token:
+        reset_token.token = code
+        reset_token.expires_at = expires_at
+        reset_token.used = False
+    else:
+        reset_token = models.PasswordResetToken(
+            email=email,
+            token=code,
+            expires_at=expires_at
+        )
+        db.add(reset_token)
+    
+    db.commit()
+    
+    if not send_otp_email(req.email, code, "Recovery", ref_id=ref_id):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Credential synchronization failed: Unable to dispatch security email."
+        )
+    
+    return {
+        "message": "Reset code sent successfully.",
+        "reference_id": ref_id
+    }
+
+@app.post("/api/auth/verify-reset-code")
+async def verify_reset_code(req: VerifyResetCodeRequest, db: Session = Depends(get_db)):
+    """Verifies that the provided 6-digit sync code is valid and active."""
+    email = req.email.strip().lower()
+    cleaned_code = req.code.replace(" ", "")
     reset_token = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.token == token,
-        models.PasswordResetToken.used == False,
-        models.PasswordResetToken.expires_at > datetime.now(timezone.utc)
-
+        models.PasswordResetToken.email == email,
+        models.PasswordResetToken.token == cleaned_code,
+        models.PasswordResetToken.used == False
     ).first()
     
     if not reset_token:
-        raise HTTPException(status_code=400, detail="Security token invalid or expired.")
-    
-    return {"message": "Identity Token Verified", "email_hint": f"{reset_token.email[:3]}***@{reset_token.email.split('@')[1]}"}
+        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
+
+    # Explicitly compare aware UTC datetimes to ensure registry synchronization
+    current_time = datetime.now(timezone.utc)
+    db_expires_at = reset_token.expires_at
+    if db_expires_at.tzinfo is None:
+        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
+
+    if db_expires_at < current_time:
+        raise HTTPException(status_code=400, detail="Security token expired.")
+        
+    return {"message": "Identity synchronized. Identity verified."}
 
 @app.post("/api/auth/reset-password")
 async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
-    # Find active token
-    reset_token = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.token == req.token,
-        models.PasswordResetToken.used == False,
-        models.PasswordResetToken.expires_at > datetime.now(timezone.utc)
+    """Verifies the 6-digit code and updates the user's password."""
+    email = req.email.strip().lower()
+    # Clean the code (remove spaces if user copied "319 472")
+    cleaned_code = req.code.replace(" ", "")
 
+    # Find the token
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.email == email,
+        models.PasswordResetToken.token == cleaned_code,
+        models.PasswordResetToken.used == False
     ).first()
     
     if not reset_token:
-        raise HTTPException(status_code=400, detail="Security token invalid or expired.")
+        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
+
+    # Explicitly compare aware UTC datetimes for credential update validation
+    current_time = datetime.now(timezone.utc)
+    db_expires_at = reset_token.expires_at
+    if db_expires_at.tzinfo is None:
+        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
+
+    if db_expires_at < current_time:
+        raise HTTPException(status_code=400, detail="Security token expired.")
     
-    # Find user
-    user = db.query(models.User).filter(models.User.email == reset_token.email).first()
+    # Update user password
+    user = crud.get_user_by_email(db, email=email)
     if not user:
-        raise HTTPException(status_code=404, detail="Internal identity not found.")
+        raise HTTPException(status_code=404, detail="Subject not found in registry.")
     
-    # Update password
     user.password_hash = auth.get_password_hash(req.new_password)
-    reset_token.used = True
-    db.commit()
+    user.is_verified = True  # Resetting password via email token is proof of ownership
+    reset_token.used = True  # Mark as used
     
-    print(f"[SECURITY UPDATE] Password successfully reset for: {user.email}")
-    return {"message": "Protocol complete. Password updated."}
+    db.commit()
+    return {"message": "Credentials updated successfully. System synchronized."}
+
+
 # ---------------------------------------------------------------------------
+
 # Users
 # ---------------------------------------------------------------------------
 
