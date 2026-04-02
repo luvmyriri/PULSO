@@ -61,8 +61,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Color get brandOrange => AppTheme.primaryOrange;
 
-  // Base URL for API - Use 192.168.0.199 for PC IP resolver
-  static const String baseUrl = "http://192.168.0.199:8000";
+  // Base URL for API - Pointing to the specified backend address
+  static const String baseUrl = "http://192.168.1.121:33159";
 
   bool _initialized = false;
 

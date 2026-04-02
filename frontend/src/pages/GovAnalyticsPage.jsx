@@ -13,7 +13,7 @@ import {
 import { GoogleMap, useJsApiLoader, HeatmapLayer, CircleF, MarkerF } from '@react-google-maps/api';
 import GovSidebar from '../components/GovSidebar';
 
-const API = 'http://localhost:8000';
+const API = 'http://localhost:33159';
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const LIBRARIES = ['places', 'geometry', 'visualization'];
 

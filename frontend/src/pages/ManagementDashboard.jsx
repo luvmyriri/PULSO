@@ -119,7 +119,7 @@ const ManagementDashboard = () => {
             showToast('User list exported!');
         } else {
             // Full analytics report via backend
-            fetch('http://localhost:8000/api/gov/analytics/export/full-report', {
+            fetch('http://localhost:33159/api/gov/analytics/export/full-report', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(res => {
@@ -160,7 +160,7 @@ const ManagementDashboard = () => {
     useEffect(() => {
         if (activeTab === 'users' && token) {
             setLoadingUsers(true);
-            fetch('http://localhost:8000/api/users', {
+            fetch('http://localhost:33159/api/users', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(r => r.ok ? r.json() : [])
@@ -174,7 +174,7 @@ const ManagementDashboard = () => {
         e.preventDefault();
         setPostingAdvisory(true);
         try {
-            const res = await fetch('http://localhost:8000/api/advisories', {
+            const res = await fetch('http://localhost:33159/api/advisories', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(advisoryForm)
@@ -206,7 +206,7 @@ const ManagementDashboard = () => {
     useEffect(() => {
         if (activeTab === 'approvals' && token) {
             setLoadingApprovals(true);
-            fetch('http://localhost:8000/api/reports?status=pending_approval&limit=50', {
+            fetch('http://localhost:33159/api/reports?status=pending_approval&limit=50', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(r => r.ok ? r.json() : [])
@@ -219,7 +219,7 @@ const ManagementDashboard = () => {
     useEffect(() => {
         if (activeTab === 'overview' && token) {
             setLoadingStats(true);
-            fetch('http://localhost:8000/api/reports/stats', {
+            fetch('http://localhost:33159/api/reports/stats', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(r => r.ok ? r.json() : null)
@@ -232,7 +232,7 @@ const ManagementDashboard = () => {
     const handleApproveReport = async (reportId) => {
         setApprovingId(reportId);
         try {
-            const res = await fetch(`http://localhost:8000/api/reports/${reportId}/status`, {
+            const res = await fetch(`http://localhost:33159/api/reports/${reportId}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ status: 'approved_internal' })
@@ -254,7 +254,7 @@ const ManagementDashboard = () => {
     const handleRejectApproval = async (reportId) => {
         setApprovingId(reportId);
         try {
-            const res = await fetch(`http://localhost:8000/api/reports/${reportId}/reject`, {
+            const res = await fetch(`http://localhost:33159/api/reports/${reportId}/reject`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
             });
@@ -326,7 +326,7 @@ const ManagementDashboard = () => {
     useEffect(() => {
         if (activeTab === 'permits' && token) {
             setLoadingPermits(true);
-            fetch('http://localhost:8000/api/gov/obo?limit=50', {
+            fetch('http://localhost:33159/api/gov/obo?limit=50', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(r => r.ok ? r.json() : [])
@@ -342,7 +342,7 @@ const ManagementDashboard = () => {
     useEffect(() => {
         if (activeTab === 'procurement' && token) {
             setLoadingProcurement(true);
-            fetch('http://localhost:8000/api/gov/procurement?limit=50', {
+            fetch('http://localhost:33159/api/gov/procurement?limit=50', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(r => r.ok ? r.json() : [])

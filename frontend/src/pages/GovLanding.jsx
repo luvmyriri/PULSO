@@ -67,7 +67,7 @@ export default function GovLanding() {
             formData.append('password', password);
             formData.append('captcha_token', captchaToken || '');
 
-            const response = await fetch('http://localhost:8000/api/auth/login', {
+            const response = await fetch('http://localhost:33159/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -119,7 +119,7 @@ export default function GovLanding() {
         setError('');
         
         try {
-            const response = await fetch('http://localhost:8000/api/auth/forgot-password', {
+            const response = await fetch('http://localhost:33159/api/auth/forgot-password', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

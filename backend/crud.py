@@ -95,6 +95,29 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
             action=f"Report {db_report.ticket_id} status changed from {previous_status} to {status}"
         )
         db.add(audit_entry)
+        
+        # 3. Automated Trust Score Computation
+        # Valid reports build trust, fake or withdrawn reports reduce it.
+        user = db.query(models.User).filter(models.User.id == db_report.user_id).first()
+        if user:
+            if user.trust_score is None:
+                user.trust_score = 100
+                
+            # Only apply penalty/reward if status is actually DIFFERENT from before
+            if status != previous_status:
+                if status == "approved_internal" and previous_status in ["pending", "unverified"]:
+                    user.trust_score += 2
+                elif status == "resolved" and previous_status != "resolved":
+                    user.trust_score += 3
+                elif status == "rejected" and previous_status != "rejected":
+                    user.trust_score -= 10
+                elif status == "cancelled" and previous_status != "cancelled":
+                    user.trust_score -= 1
+                
+                # Clamp between 0 and 100
+                user.trust_score = max(0, min(100, user.trust_score))
+                db.add(user)
+        
         db.commit()
         
         # Notification messages for each status transition

@@ -150,7 +150,7 @@ Report Description: "{description}"
 
 Return ONLY a valid JSON object with EXACTLY these keys (no extra text before or after):
 {{
-  "category": "Road Issue",
+  "category": "Road Issue, Water/Drainage",
   "urgency": "Medium",
   "severity_score": 5.0,
   "smart_summary": "One-sentence technical summary for a dispatcher",
@@ -160,8 +160,11 @@ Return ONLY a valid JSON object with EXACTLY these keys (no extra text before or
   "rejection_reason": ""
 }}
 
-Category options: Road Issue | Water/Drainage | Waste Management | Lighting | Public Safety | Engineering Hazard | Inappropriate Content
-Urgency options: Low | Medium | High | Critical
+Intelligence Rules (STRICT):
+1. CATEGORY SELECTION: Identify ALL that apply, separated by comma.
+   Options: Road Issue | Water/Drainage | Waste Management | Lighting | Public Safety | Engineering Hazard | Inappropriate Content | Undetermined
+2. ZERO-GUESS POLICY: If the description or image does NOT clearly show an issue related to city infrastructure (e.g., personal indoor issues, unrelated complaints, or ambiguous content), you MUST set "category": "Undetermined". Do NOT guess or default to "Road Issue" if the evidence is weak.
+3. Urgency options: Low | Medium | High | Critical
 
 Severity Guidelines:
 - Downed electrical wires / structural collapse / active fire → Critical, score 9–10

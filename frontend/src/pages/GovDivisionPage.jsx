@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://localhost:33159';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OrangeSelect — custom styled dropdown replacing native <select>
@@ -1053,51 +1053,96 @@ const GovDivisionPage = () => {
                                             Showing <span className="font-bold text-slate-600 dark:text-slate-300">{Math.min((page - 1) * ITEMS_PER_PAGE + 1, filtered.length)}</span>–<span className="font-bold text-slate-600 dark:text-slate-300">{Math.min(page * ITEMS_PER_PAGE, filtered.length)}</span> of <span className="font-bold text-slate-600 dark:text-slate-300">{filtered.length}</span> records
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            {/* Prev */}
-                                            <button
-                                                onClick={() => setPage(p => Math.max(1, p - 1))}
-                                                disabled={page === 1}
-                                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-orange-400 hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                            >
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                                            </button>
-
-                                            {/* Page numbers */}
-                                            {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                                .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
-                                                .reduce((acc, n, idx, arr) => {
-                                                    if (idx > 0 && n - arr[idx - 1] > 1) acc.push('…');
-                                                    acc.push(n);
-                                                    return acc;
-                                                }, [])
-                                                .map((n, idx) =>
-                                                    typeof n === 'string' ? (
-                                                        <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-xs text-slate-400 select-none">{n}</span>
-                                                    ) : (
-                                                        <button
-                                                            key={n}
-                                                            onClick={() => setPage(n)}
-                                                            className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all ${
-                                                                n === page
-                                                                    ? 'bg-orange-500 text-white border border-orange-500 shadow-sm shadow-orange-500/30'
-                                                                    : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-orange-400 hover:text-orange-500'
-                                                            }`}
-                                                        >{n}</button>
-                                                    )
-                                                )
-                                            }
-
-                                            {/* Next */}
-                                            <button
-                                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                                disabled={page === totalPages}
-                                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-orange-400 hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                            >
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
+                                            {/* Prev */}
+
+                                            <button
+
+                                                onClick={() => setPage(p => Math.max(1, p - 1))}
+
+                                                disabled={page === 1}
+
+                                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-orange-400 hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+
+                                            >
+
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+
+                                            </button>
+
+
+
+                                            {/* Page numbers */}
+
+                                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+
+                                                .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
+
+                                                .reduce((acc, n, idx, arr) => {
+
+                                                    if (idx > 0 && n - arr[idx - 1] > 1) acc.push('…');
+
+                                                    acc.push(n);
+
+                                                    return acc;
+
+                                                }, [])
+
+                                                .map((n, idx) =>
+
+                                                    typeof n === 'string' ? (
+
+                                                        <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-xs text-slate-400 select-none">{n}</span>
+
+                                                    ) : (
+
+                                                        <button
+
+                                                            key={n}
+
+                                                            onClick={() => setPage(n)}
+
+                                                            className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all ${
+
+                                                                n === page
+
+                                                                    ? 'bg-orange-500 text-white border border-orange-500 shadow-sm shadow-orange-500/30'
+
+                                                                    : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-orange-400 hover:text-orange-500'
+
+                                                            }`}
+
+                                                        >{n}</button>
+
+                                                    )
+
+                                                )
+
+                                            }
+
+
+
+                                            {/* Next */}
+
+                                            <button
+
+                                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+
+                                                disabled={page === totalPages}
+
+                                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-orange-400 hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+
+                                            >
+
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+
+                                            </button>
+
+                                        </div>
+
+                                    </div>
+
+                                )}
+
                             </>
                         )}
                     </motion.div>

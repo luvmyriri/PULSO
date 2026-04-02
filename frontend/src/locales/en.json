@@ -1,5 +1,12 @@
 {
   "translation": {
+    "auth": {
+      "strength": {
+        "weak": "WEAK",
+        "medium": "MEDIUM",
+        "strong": "STRONG"
+      }
+    },
     "login": {
       "home": "Home",
       "welcome": "Welcome back to",
@@ -188,7 +195,8 @@
         "topReporters": "Top 5% of Reporters",
         "recentActivity": "Recent Activity",
         "viewAll": "View All",
-        "latestUpdate": "Latest Update"
+        "latestUpdate": "Latest Update",
+        "shortcuts": "Shortcuts"
       },
       "quickReport": {
         "title": "Quick Report",
@@ -201,8 +209,11 @@
         "requirePhoto": "Requires photo capture",
         "placeholder": "Brief details about the hazard...",
         "submit": "Submit Priority Report",
+        "submitBtn": "Submit a Report",
         "zoneCoverage": "Zone 15 Coverage",
-        "gpsAccuracy": "GPS accuracy:"
+        "gpsAccuracy": "GPS accuracy:",
+        "scanning": "Scanning...",
+        "aiDetected": "AI Detected"
       },
       "offline": "Offline Mode: Reports will be saved locally.",
       "reports": {
@@ -219,10 +230,24 @@
         "regName": "Registered Name",
         "accountId": "Account ID",
         "regAddress": "Registered Address (Barangay)",
+        "barangay": "Barangay",
         "memberSince": "Member Since",
         "update": "Update Information"
       },
       "settings": {
+        "portal": "Security Portal",
+        "portalDesc": "Manage your account protection and credentials",
+        "identity": "Identity Verification",
+        "currentPass": "Current Password",
+        "transition": "Transition New Credentials",
+        "newPass": "New Password",
+        "confirmPass": "Confirm New Password",
+        "secStrength": "Security Strength",
+        "updatePass": "Update Password",
+        "securing": "Securing...",
+        "confirmTitle": "Change Password?",
+        "confirmText": "Are you sure you want to update your security credentials? You will need to use your new password for all future logins.",
+        "confirmBtn": "Confirm Change",
         "alerts": "Announcements & Alerts",
         "alertsDesc": "Manage how the LGU contacts you for updates.",
         "push": "Push Notifications",

@@ -8,8 +8,10 @@ class ApiClient {
 
   // 10.0.2.2 is the special IP for the host machine's localhost on Android Emulator
   static String get baseUrl {
-    if (kIsWeb) return 'http://localhost:8000';
-    return Platform.isAndroid ? 'http://192.168.0.199:8000' : 'http://localhost:8000';
+    if (kIsWeb) return 'http://localhost:33159';
+    // Connected to local network backend
+    const String remoteUrl = 'http://192.168.1.121:33159';
+    return (Platform.isAndroid || Platform.isIOS) ? remoteUrl : 'http://localhost:33159';
   }
 
   ApiClient() {

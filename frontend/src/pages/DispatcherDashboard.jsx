@@ -69,6 +69,15 @@ const INFRASTRUCTURE_CATEGORIES = [
     'Public Facilities'
 ];
 
+const STATUS_OPTIONS = [
+    'All Statuses',
+    'Pending',
+    'Pending Approval',
+    'In Progress',
+    'Resolved',
+    'Rejected'
+];
+
 const DispatcherDashboard = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -126,6 +135,7 @@ const DispatcherDashboard = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
     const [selectedCategory, setSelectedCategory] = useState('All Categories');
+    const [selectedStatus, setSelectedStatus] = useState('All Statuses');
     const [showHeatmap, setShowHeatmap] = useState(false);
 
     // AI Omni-Assistant State
@@ -160,7 +170,7 @@ const DispatcherDashboard = () => {
 
             if (isLocationQuery) {
                 try {
-                    const rResp = await fetch('http://localhost:8000/api/reports?limit=30', {
+                    const rResp = await fetch('http://localhost:33159/api/reports?limit=30', {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (rResp.ok) {
@@ -173,7 +183,7 @@ const DispatcherDashboard = () => {
                 } catch { /* silently skip if reports unavailable */ }
             }
 
-            const resp = await fetch('http://localhost:8000/api/ai/assistant', {
+            const resp = await fetch('http://localhost:33159/api/ai/assistant', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -266,7 +276,7 @@ const DispatcherDashboard = () => {
             setDirectionsLoading(true);
             try {
                 // Using the secure backend proxy we created earlier
-                const response = await fetch(`http://localhost:8000/api/maps/directions?origin=${encodeURIComponent(originStr)}&destination=${encodeURIComponent(destStr)}`, {
+                const response = await fetch(`http://localhost:33159/api/maps/directions?origin=${encodeURIComponent(originStr)}&destination=${encodeURIComponent(destStr)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 
@@ -415,7 +425,7 @@ const DispatcherDashboard = () => {
     const fetchReports = async () => {
         setLoadingReports(true);
         try {
-            const response = await fetch('http://localhost:8000/api/reports', {
+            const response = await fetch('http://localhost:33159/api/reports', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
@@ -431,28 +441,60 @@ const DispatcherDashboard = () => {
 
     useEffect(() => {
         fetchReports();
+        // Live auto-refresh: ensure the triage queue is always accurate (every 30s)
+        const interval = setInterval(fetchReports, 30000);
+        return () => clearInterval(interval);
     }, []);
 
     const [actionLoading, setActionLoading] = useState(null); // tracks which report is being actioned
 
-    const handleStatusAction = async (reportId, endpoint, successMsg) => {
+    const handleStatusAction = async (reportId, endpoint, successMsg, confirmTitle = null) => {
+        if (confirmTitle) {
+            const result = await Swal.fire({
+                title: confirmTitle,
+                text: "Are you sure you want to perform this action?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f97316',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Yes, proceed',
+                background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
+                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+            });
+            if (!result.isConfirmed) return;
+        }
+
         setActionLoading(reportId);
         try {
-            const response = await fetch(`http://localhost:8000/api/reports/${reportId}${endpoint}`, {
+            const response = await fetch(`http://localhost:33159/api/reports/${reportId}${endpoint}`, {
                 method: 'PATCH',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                // /status endpoint requires a body; specific endpoints (/reject, /dispatch, /resolve) do not
                 body: endpoint === '/status' ? JSON.stringify({ status: 'pending_approval' }) : undefined
             });
             if (response.ok) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Action Successful',
+                    text: successMsg || 'Report status has been updated.',
+                    timer: 2000,
+                    showConfirmButton: false,
+                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
+                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                });
                 fetchReports();
                 setSelectedReport(null);
             } else {
                 const err = await response.json();
-                console.error(`Action failed: ${err.detail || endpoint}`);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Action Failed',
+                    text: err.detail || 'Could not update report status.',
+                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
+                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                });
             }
         } catch (error) {
             console.error(`Error on ${endpoint}:`, error);
@@ -461,9 +503,9 @@ const DispatcherDashboard = () => {
         }
     };
 
-    const handleVerifyReport  = (id) => handleStatusAction(id, '/status');
-    const handleRejectReport  = (id) => handleStatusAction(id, '/reject');
-    const handleResolveReport  = (id) => handleStatusAction(id, '/resolve');
+    const handleVerifyReport  = (id) => handleStatusAction(id, '/status', 'Report moved to verified queue.');
+    const handleRejectReport  = (id) => handleStatusAction(id, '/reject', 'Report rejected and resident penalized.', "Reject this report?");
+    const handleResolveReport  = (id) => handleStatusAction(id, '/resolve', 'Incident marked as resolved.', "Close this incident?");
 
     // Replaces the generic handleStatusAction('/dispatch') with actual Work Order creation
     const handleCreateWorkOrder = async (e) => {
@@ -481,7 +523,7 @@ const DispatcherDashboard = () => {
                 report_id: selectedReport.id
             };
 
-            const response = await fetch('http://localhost:8000/api/work-orders', {
+            const response = await fetch('http://localhost:33159/api/work-orders', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -507,17 +549,35 @@ const DispatcherDashboard = () => {
 
     const filteredReports = React.useMemo(() => {
         return allReports.filter(report => {
-            // 1. Dashboard Mode Filter (Triage vs Active)
-            const matchesMode = dashboardMode === 'triage' 
-                ? ['unverified', 'pending', 'pending_approval'].includes(report.status)
-                : report.status === 'approved_internal';
-            
-            if (!matchesMode) return false;
+            // 1. Dashboard Mode & Granular Status Filter
+            if (selectedStatus !== 'All Statuses') {
+                const statusMap = {
+                    'Pending': 'pending',
+                    'Pending Approval': 'pending_approval',
+                    'In Progress': ['approved_internal', 'dispatched'],
+                    'Resolved': 'resolved',
+                    'Rejected': 'rejected'
+                };
+                const targetStatus = statusMap[selectedStatus];
+                if (Array.isArray(targetStatus)) {
+                    if (!targetStatus.includes(report.status)) return false;
+                } else if (report.status !== targetStatus) {
+                    return false;
+                }
+            } else {
+                const matchesMode = dashboardMode === 'triage' 
+                    ? ['unverified', 'pending', 'pending_approval'].includes(report.status)
+                    : report.status === 'approved_internal';
+                
+                if (!matchesMode) return false;
+            }
 
             // 2. Search Query Filter
             const searchLower = searchQuery.toLowerCase();
+            const ticketIdText = (report.ticket_id || `RPT-${report.id}`).toLowerCase();
             const matchesSearch = !searchQuery || 
                 report.id.toString().includes(searchLower) || 
+                ticketIdText.includes(searchLower) ||
                 (report.ai_category || report.category || '').toLowerCase().includes(searchLower) ||
                 (report.location_string || '').toLowerCase().includes(searchLower);
             
@@ -563,7 +623,7 @@ const DispatcherDashboard = () => {
             
             return true;
         });
-    }, [allReports, dashboardMode, searchQuery, selectedBarangay, selectedCategory]);
+    }, [allReports, dashboardMode, searchQuery, selectedBarangay, selectedCategory, selectedStatus]);
 
     const activeReports = filteredReports; // Re-alias for minimal code disruption
 
@@ -792,7 +852,7 @@ const DispatcherDashboard = () => {
                                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
                                         <input 
                                             type="text" 
-                                            placeholder="Search reports..." 
+                                            placeholder="Search by RPT ID, Category, or Location..." 
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 transition-colors" 
@@ -823,6 +883,21 @@ const DispatcherDashboard = () => {
                                             >
                                                 {INFRASTRUCTURE_CATEGORIES.map(cat => (
                                                     <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 opacity-50">
+                                                <ChevronRight size={12} className="rotate-90" />
+                                            </div>
+                                        </div>
+                                        <div className="relative w-full">
+                                            <Activity size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+                                            <select 
+                                                value={selectedStatus}
+                                                onChange={(e) => setSelectedStatus(e.target.value)}
+                                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-8 py-2 text-[11px] font-bold text-slate-900 dark:text-white focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 appearance-none transition-colors"
+                                            >
+                                                {STATUS_OPTIONS.map(status => (
+                                                    <option key={status} value={status}>{status}</option>
                                                 ))}
                                             </select>
                                             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 opacity-50">
@@ -891,17 +966,28 @@ const DispatcherDashboard = () => {
                                                     </div>
                                                     <span className="font-bold text-slate-900 dark:text-white text-sm">{report.ticket_id || `RPT-${report.id}`}</span>
                                                 </div>
-                                                <span className="text-[10px] text-slate-500 whitespace-nowrap">{new Date(report.created_at).toLocaleDateString()}</span>
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-[10px] text-slate-500 whitespace-nowrap mb-1">{new Date(report.created_at).toLocaleDateString()}</span>
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border shadow-sm ${
+                                                        report.status === 'unverified' ? 'bg-slate-500/10 text-slate-400 border-slate-500/30' :
+                                                        report.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' :
+                                                        report.status === 'pending_approval' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' :
+                                                        report.status === 'rejected' ? 'bg-red-500/10 text-red-500 border-red-500/30' :
+                                                        'bg-slate-500/10 text-slate-400 border-slate-500/30'
+                                                    }`}>
+                                                        {report.status?.replace('_', ' ')}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div className="text-sm text-slate-700 dark:text-slate-300 font-medium truncate mb-1">{report.ai_category || report.category}</div>
-                                            <div className="text-xs text-slate-500 flex items-center gap-1 mb-3 truncate">
-                                                <MapPin size={12}/> {report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}
+                                            <div className="text-sm text-slate-700 dark:text-slate-300 font-bold truncate mb-1">{report.ai_category || report.category}</div>
+                                            <div className="text-xs text-slate-500 flex items-center gap-1 mb-3 truncate font-medium">
+                                                <MapPin size={12} className="text-slate-400"/> {report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}
                                             </div>
                                             
                                             <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
                                                 <div className="flex items-center gap-1">
-                                                    <span className={`w-2 h-2 rounded-full ${aiConfidence < 75 ? 'bg-orange-500' : 'bg-blue-500'}`}></span>
-                                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${aiConfidence < 75 ? 'bg-orange-500' : 'bg-blue-500'}`}></span>
+                                                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                                                         {report.ai_urgency ? `AI: ${report.ai_urgency}` : `Conf: ${aiConfidence}%`}
                                                     </span>
                                                 </div>
@@ -919,13 +1005,13 @@ const DispatcherDashboard = () => {
                                                     {(report.status === 'unverified' || report.status === 'pending') && (
                                                         <span 
                                                             onClick={(e) => { e.stopPropagation(); handleVerifyReport(report.id); }}
-                                                            className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-orange-500 hover:text-white dark:hover:bg-orange-500 transition-colors cursor-pointer"
+                                                            className="text-[10px] bg-orange-600 hover:bg-orange-500 text-white px-2.5 py-1 rounded-md uppercase font-black tracking-wider transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-95"
                                                         >
                                                             {actionLoading === report.id ? '...' : 'Verify'}
                                                         </span>
                                                     )}
                                                     {report.status === 'pending_approval' && (
-                                                        <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400 px-2 py-1 rounded uppercase font-bold tracking-wider flex items-center gap-1"><Clock size={10}/> Pending Eng</span>
+                                                        <span className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-1 rounded uppercase font-bold tracking-wider flex items-center gap-1"><Clock size={10}/> Pending Eng</span>
                                                     )}
                                                     {report.status === 'approved_internal' && (
                                                         <span 
@@ -1415,12 +1501,12 @@ const DispatcherDashboard = () => {
                                                     <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden flex items-center justify-center text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 relative group">
                                                         {selectedReport.image_url ? (
                                                             <button 
-                                                                onClick={() => setZoomedImage(`http://localhost:8000${selectedReport.image_url}`)}
+                                                                onClick={() => setZoomedImage(`http://localhost:33159${selectedReport.image_url}`)}
                                                                 className="w-full h-full cursor-zoom-in"
                                                                 title="Click to Zoom"
                                                             >
                                                                 <img 
-                                                                    src={`http://localhost:8000${selectedReport.image_url}`} 
+                                                                    src={`http://localhost:33159${selectedReport.image_url}`} 
                                                                     alt="Report Evidence" 
                                                                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" 
                                                                 />

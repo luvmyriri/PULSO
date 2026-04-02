@@ -747,12 +747,17 @@ def read_user_reports(
     user_id: int,
     skip: int = 0,
     limit: int = 50,
+    status: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: schemas.UserResponse = Depends(get_current_user)
 ):
     if current_user.id != user_id and current_user.role not in ["dispatcher", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized to access these reports")
-    return crud.get_reports_by_user(db, user_id=user_id, skip=skip, limit=limit)
+    
+    reports = crud.get_reports_by_user(db, user_id=user_id, skip=skip, limit=limit)
+    if status:
+        reports = [r for r in reports if r.status == status]
+    return reports
 
 @app.get("/api/reports/{report_id}", response_model=schemas.ReportResponse)
 def read_report(
@@ -767,6 +772,23 @@ def read_report(
     if current_user.role == "resident" and db_report.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to view this report")
     return _enrich_report(db_report, db)
+
+@app.post("/api/reports/analyze")
+async def analyze_report_only(
+    description: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
+    current_user: schemas.UserResponse = Depends(get_current_user)
+):
+    """
+    Perform AI analysis on a report description and image without saving to DB.
+    Used for real-time frontend categorization.
+    """
+    image_bytes = None
+    if image:
+        image_bytes = await image.read()
+    
+    ai_analysis = gemini_service.analyze_report(description or "", image_data=image_bytes)
+    return ai_analysis
 
 @app.post("/api/reports", response_model=schemas.ReportResponse)
 async def create_new_report(
@@ -842,9 +864,8 @@ async def create_new_report(
     
     if image_url:
         db_report.image_url = image_url
-        # If image provided, set to 'unverified' until AI processing is confirmed
-        # (Though we did it sync here, we flag it for system audit)
-        db_report.status = "unverified"
+        # Default to 'pending' after successful AI analysis and watermarking
+        db_report.status = "pending"
         db.commit()
 
     # 4. Geospatial Deduplication (Same as before)
@@ -966,6 +987,32 @@ def dispatch_report(
     if db_report.status != "approved_internal":
         raise HTTPException(status_code=400, detail=f"Cannot dispatch report with status '{db_report.status}'. Must be 'approved_internal'.")
     updated = crud.update_report_status(db, report_id=report_id, status="dispatched", actor_id=current_user.id)
+    return _enrich_report(updated, db)
+
+@app.patch("/api/reports/{report_id}/cancel", response_model=schemas.ReportResponse)
+def cancel_report(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserResponse = Depends(get_current_user)
+):
+    """
+    Allow a resident to cancel their own report if it's still in verification or rejected.
+    If it's already being worked on (approved_internal, dispatched, resolved), can't cancel.
+    """
+    db_report = crud.get_report(db, report_id=report_id)
+    if not db_report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    # Ownership Check
+    if db_report.user_id != current_user.id and current_user.role not in ["dispatcher", "manager"]:
+        raise HTTPException(status_code=403, detail="Not authorized to cancel this report")
+        
+    # State Check
+    locked_statuses = ["approved_internal", "dispatched", "resolved", "cancelled"]
+    if db_report.status in locked_statuses:
+        raise HTTPException(status_code=400, detail=f"Cannot cancel report with status '{db_report.status}'. Action blocked.")
+
+    updated = crud.update_report_status(db, report_id=report_id, status="cancelled", actor_id=current_user.id)
     return _enrich_report(updated, db)
 
 @app.patch("/api/reports/{report_id}/resolve", response_model=schemas.ReportResponse)
@@ -1128,9 +1175,30 @@ def create_new_work_order(
     """
     return crud.create_work_order(db=db, wo=wo, assigned_by_id=current_user.id)
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@app.patch("/api/auth/change-password")
+def change_password(
+    req: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Secure password transition logic."""
+    if not auth.verify_password(req.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+    
+    if req.current_password == req.new_password:
+        raise HTTPException(status_code=400, detail="New password cannot be the same as the current password")
+    
+    current_user.password_hash = auth.get_password_hash(req.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
 # ---------------------------------------------------------------------------
 # Entry Point
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=33159, reload=True)

@@ -1,7 +1,7 @@
 import requests
 import json
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:33159"
 
 def verify_ai_functionality():
     print("\n" + "="*60)

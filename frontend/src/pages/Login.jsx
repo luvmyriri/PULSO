@@ -97,7 +97,7 @@ export default function Login() {
             formData.append('password', password);
             formData.append('captcha_token', captchaValue);
 
-            const response = await fetch('http://localhost:8000/api/auth/login', {
+            const response = await fetch('http://localhost:33159/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData,
@@ -149,7 +149,7 @@ export default function Login() {
         setError('');
         setRecoveryOtp(['', '', '', '', '', '']); // Clear previous inputs for security synchronization
         try {
-            const response = await fetch('http://localhost:8000/api/auth/forgot-password', {
+            const response = await fetch('http://localhost:33159/api/auth/forgot-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: recoveryEmail }),
@@ -178,7 +178,7 @@ export default function Login() {
         setLoading(true);
         setError('');
         try {
-            const response = await fetch('http://localhost:8000/api/auth/verify-reset-code', {
+            const response = await fetch('http://localhost:33159/api/auth/verify-reset-code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -212,7 +212,7 @@ export default function Login() {
         setLoading(true);
         setError('');
         try {
-            const response = await fetch('http://localhost:8000/api/auth/reset-password', {
+            const response = await fetch('http://localhost:33159/api/auth/reset-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -242,7 +242,7 @@ export default function Login() {
         setLoading(true);
         setError('');
         try {
-            const response = await fetch('http://localhost:8000/api/auth/verify-registration', {
+            const response = await fetch('http://localhost:33159/api/auth/verify-registration', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -272,7 +272,7 @@ export default function Login() {
         setLoading(true);
         setError('');
         try {
-            const response = await fetch('http://localhost:8000/api/auth/resend-code', {
+            const response = await fetch('http://localhost:33159/api/auth/resend-code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: verificationEmail, code: "" }), // code is optional/not-used here in resend

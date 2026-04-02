@@ -41,7 +41,7 @@ export default function ResetPassword() {
                 return;
             }
             try {
-                const response = await fetch(`http://localhost:8000/api/auth/verify-token/${token}`);
+                const response = await fetch(`http://localhost:33159/api/auth/verify-token/${token}`);
                 if (response.ok) {
                     const data = await response.json();
                     setEmailHint(data.email_hint);
@@ -70,7 +70,7 @@ export default function ResetPassword() {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:8000/api/auth/reset-password', {
+            const response = await fetch('http://localhost:33159/api/auth/reset-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token, new_password: password })

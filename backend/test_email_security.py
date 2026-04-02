@@ -2,7 +2,7 @@ import httpx
 import asyncio
 
 async def test_email_security():
-    base_url = "http://localhost:8000"
+    base_url = "http://localhost:33159"
     
     print("\n--- 1. Testing Invalid Email Registration ---")
     try:

@@ -1,5 +1,12 @@
 {
   "translation": {
+    "auth": {
+      "strength": {
+        "weak": "MAHINA",
+        "medium": "KATAMTAMAN",
+        "strong": "MALAKAS"
+      }
+    },
     "login": {
       "home": "Home",
       "welcome": "Maligayang pagbabalik sa",
@@ -188,7 +195,8 @@
         "topReporters": "Nangungunang 5% na Nag-uulat",
         "recentActivity": "Kamakailang Aktibidad",
         "viewAll": "Tingnan Lahat",
-        "latestUpdate": "Pinakabagong Update"
+        "latestUpdate": "Pinakabagong Update",
+        "shortcuts": "Mga Shortcut"
       },
       "quickReport": {
         "title": "Mabilisang Ulat",
@@ -201,8 +209,11 @@
         "requirePhoto": "Kinakailangang kumuha ng litrato",
         "placeholder": "Maikling detalye tungkol sa panganib...",
         "submit": "Isumite ang Pangunahing Ulat",
+        "submitBtn": "Mag-submit ng Ulat",
         "zoneCoverage": "Saklaw ng Zone 15",
-        "gpsAccuracy": "Katumpakan ng GPS:"
+        "gpsAccuracy": "Katumpakan ng GPS:",
+        "scanning": "Sinusuri...",
+        "aiDetected": "Natukoy ng AI"
       },
       "offline": "Offline Mode: Ang mga ulat ay ise-save nang lokal.",
       "reports": {
@@ -219,10 +230,24 @@
         "regName": "Nakarehistrong Pangalan",
         "accountId": "Account ID",
         "regAddress": "Nakarehistrong Address (Barangay)",
+        "barangay": "Barangay",
         "memberSince": "Miyembro Mula Noong",
         "update": "I-update ang Impormasyon"
       },
       "settings": {
+        "portal": "Portal ng Seguridad",
+        "portalDesc": "Pamahalaan ang iyong proteksyon sa account at mga kredensyal",
+        "identity": "Pagpapatunay ng Pagkakakilanlan",
+        "currentPass": "Kasalukuyang Password",
+        "transition": "Paglipat sa Bagong Kredensyal",
+        "newPass": "Bagong Password",
+        "confirmPass": "I-kumpirma ang Bagong Password",
+        "secStrength": "Lakas ng Security",
+        "updatePass": "I-update ang Password",
+        "securing": "Sinisigurado...",
+        "confirmTitle": "Baguhin ang Password?",
+        "confirmText": "Sigurado ka bang gusto mong i-update ang iyong security credentials? Kakailanganin mong gamitin ang iyong bagong password para sa lahat ng susunod na logins.",
+        "confirmBtn": "I-kumpirma ang Pagbabago",
         "alerts": "Mga Anunsyo at Alerto",
         "alertsDesc": "Pamahalaan kung paano nakikipag-ugnayan ang LGU sa iyo para sa mga update.",
         "push": "Mga Push Notification",

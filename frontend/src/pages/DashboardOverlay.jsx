@@ -139,7 +139,7 @@ export default function DashboardOverlay({ onNavigate }) {
 
         try {
             const token = localStorage.getItem('pulso_token');
-            const resp = await fetch('http://localhost:8000/api/ai/assistant', {
+            const resp = await fetch('http://localhost:33159/api/ai/assistant', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
