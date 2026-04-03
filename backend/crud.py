@@ -155,17 +155,95 @@ def reject_report(db: Session, report_id: int, actor_id: int = None):
     return update_report_status(db, report_id, "rejected", actor_id=actor_id)
 
 def delete_report(db: Session, report_id: int) -> bool:
-    db_report = db.query(models.Report).filter(models.Report.id == report_id).first()
-    if not db_report:
+    """
+    Surgically purges a report using raw SQL in strict bottom-up FK order.
+    Bypasses the ORM entirely to avoid attribute resolution issues.
+    """
+    from sqlalchemy import text
+
+    # First confirm the report exists
+    exists = db.execute(text("SELECT id FROM reports WHERE id = :rid"), {"rid": report_id}).fetchone()
+    if not exists:
         return False
-    db.delete(db_report)
-    db.commit()
-    return True
+
+    try:
+        # Step 1: Find all work_order IDs linked to this report
+        wo_rows = db.execute(text("SELECT id FROM work_orders WHERE report_id = :rid"), {"rid": report_id}).fetchall()
+        wo_ids = [row[0] for row in wo_rows]
+
+        # Step 2: Find all procurement_request IDs linked to those work orders
+        prq_ids = []
+        if wo_ids:
+            placeholders = ", ".join(str(i) for i in wo_ids)
+            prq_rows = db.execute(text(f"SELECT id FROM procurement_requests WHERE work_order_id IN ({placeholders})")).fetchall()
+            prq_ids = [row[0] for row in prq_rows]
+
+        # Step 3: Delete BoQ Items (deepest level, depends on procurement_requests)
+        if prq_ids:
+            placeholders = ", ".join(str(i) for i in prq_ids)
+            db.execute(text(f"DELETE FROM boq_items WHERE procurement_request_id IN ({placeholders})"))
+
+        # Step 4: Delete Procurement Requests
+        if prq_ids:
+            placeholders = ", ".join(str(i) for i in prq_ids)
+            db.execute(text(f"DELETE FROM procurement_requests WHERE id IN ({placeholders})"))
+
+        # Step 5: Delete Audit Logs tied to the report or its work orders
+        db.execute(text("DELETE FROM audit_logs WHERE report_id = :rid"), {"rid": report_id})
+        if wo_ids:
+            placeholders = ", ".join(str(i) for i in wo_ids)
+            db.execute(text(f"DELETE FROM audit_logs WHERE work_order_id IN ({placeholders})"))
+
+        # Step 6: Delete Process Timelines tied to the report or its work orders
+        db.execute(text("DELETE FROM process_timelines WHERE report_id = :rid"), {"rid": report_id})
+        if wo_ids:
+            placeholders = ", ".join(str(i) for i in wo_ids)
+            db.execute(text(f"DELETE FROM process_timelines WHERE work_order_id IN ({placeholders})"))
+
+        # Step 7: Delete Work Orders
+        if wo_ids:
+            placeholders = ", ".join(str(i) for i in wo_ids)
+            db.execute(text(f"DELETE FROM work_orders WHERE id IN ({placeholders})"))
+
+        # Step 8: Delete OBO Inspections — use SAVEPOINT so a failure doesn't abort the transaction
+        try:
+            db.execute(text("SAVEPOINT obo_cleanup"))
+            db.execute(text("DELETE FROM obo_inspections WHERE source_report_id = :rid"), {"rid": report_id})
+            db.execute(text("RELEASE SAVEPOINT obo_cleanup"))
+        except Exception as e:
+            db.execute(text("ROLLBACK TO SAVEPOINT obo_cleanup"))
+            db.execute(text("RELEASE SAVEPOINT obo_cleanup"))
+            print(f"[DEBUG] obo_inspections skipped (safe): {e}")
+
+        # Step 9: Silently clean up optional/external tables using SAVEPOINTs
+        optional_cleanups = [
+            "DELETE FROM dispatch_incidents WHERE report_id = :rid",
+        ]
+        for sql in optional_cleanups:
+            try:
+                db.execute(text("SAVEPOINT opt_cleanup"))
+                db.execute(text(sql), {"rid": report_id})
+                db.execute(text("RELEASE SAVEPOINT opt_cleanup"))
+            except Exception:
+                db.execute(text("ROLLBACK TO SAVEPOINT opt_cleanup"))
+                db.execute(text("RELEASE SAVEPOINT opt_cleanup"))
+
+        # Step 10: Finally, delete the report itself
+        db.execute(text("DELETE FROM reports WHERE id = :rid"), {"rid": report_id})
+
+        db.commit()
+        print(f"[SUCCESS] Report {report_id} purged via raw SQL.")
+        return True
+
+    except Exception as e:
+        db.rollback()
+        print(f"[ERROR] Raw SQL Purge Failed for Report {report_id}: {e}")
+        return False
 
 def get_report_stats(db: Session) -> dict:
     """Get aggregated report counts by status for KPI dashboard."""
-    statuses = ["pending", "pending_approval", "approved_internal", "dispatched", "resolved", "rejected"]
-    stats = {"total": db.query(models.Report).count()}
+    statuses = ["pending", "pending_approval", "approved_internal", "dispatched", "resolved", "rejected", "cancelled"]
+    stats = {"total": db.query(models.Report).filter(models.Report.status != "cancelled").count()}
     for s in statuses:
         stats[s] = db.query(models.Report).filter(models.Report.status == s).count()
     return stats
@@ -190,6 +268,18 @@ def mark_notification_read(db: Session, notification_id: int, user_id: int) -> b
     if not db_notif:
         return False
     db_notif.is_read = True
+    db.commit()
+    return True
+
+def delete_notification(db: Session, notification_id: int, user_id: int) -> bool:
+    """Soft delete a single notification."""
+    db_notif = db.query(models.Notification).filter(
+        models.Notification.id == notification_id,
+        models.Notification.user_id == user_id
+    ).first()
+    if not db_notif:
+        return False
+    db_notif.is_hidden = True
     db.commit()
     return True
 

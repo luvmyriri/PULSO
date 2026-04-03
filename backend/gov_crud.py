@@ -11,6 +11,7 @@ from typing import Optional, List
 import gov_models
 import gov_schemas
 import models  # for User lookups
+import re
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -380,8 +381,22 @@ def list_all_records(db: Session, skip: int = 0, limit: int = 200) -> list:
             "issued_by_name": _name(db, p.approved_by_id) or "City Engineer"
         })
 
-    # Sort descending by date_issued
-    records.sort(key=lambda x: x["date_issued"], reverse=True)
+    # 4. Resolved Citizen Reports  (FR-14 Integrated)
+    reports = db.query(models.Report).filter(
+        models.Report.status == "resolved"
+    ).all()
+    for r in reports:
+        records.append({
+            "record_id": f"REC-RES-{r.id}",
+            "record_type": "Technical Completion Report",
+            "reference_no": r.ticket_id,
+            "title_or_applicant": r.category or "Maintenance Action",
+            "date_issued": r.updated_at or r.created_at,
+            "issued_by_name": "PULSO System" # In a real app, this would be the Dispatcher / Admin clerk who closed it
+        })
+
+    # Sort descending by date_issued (handle None dates)
+    records.sort(key=lambda x: x["date_issued"].timestamp() if hasattr(x["date_issued"], "timestamp") else 0, reverse=True)
     return records[skip : skip + limit]
 
 
@@ -845,47 +860,178 @@ def enrich_obo(obo: gov_models.OBOInspection, db: Session):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def get_gov_dashboard_stats(db: Session) -> dict:
-    wo = gov_models.WorkOrder
-    pr = gov_models.ProcurementRequest
+    from datetime import datetime, timedelta, timezone
+    from collections import defaultdict
+
+    wo   = gov_models.WorkOrder
+    pr   = gov_models.ProcurementRequest
     proj = gov_models.ProjectRequest
-    obo = gov_models.OBOInspection
+    obo  = gov_models.OBOInspection
     audit = gov_models.AuditLog
+    Report = models.Report
+
+    now = datetime.now(timezone.utc)
+
+    # ── Citizen Report KPIs ──────────────────────────────────────────────────
+    total_reports    = db.query(Report).filter(Report.status != "cancelled").count()
+    resolved_reports = db.query(Report).filter(Report.status == "resolved").count()
+    pending_approval = db.query(Report).filter(Report.status == "pending_approval").count()
+    dispatched_count = db.query(Report).filter(Report.status == "dispatched").count()
+
+    this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_month_start = (this_month_start - timedelta(days=1)).replace(day=1)
+
+    this_month_total    = db.query(Report).filter(Report.created_at >= this_month_start, Report.status != "cancelled").count()
+    last_month_total    = db.query(Report).filter(
+        Report.created_at >= last_month_start, Report.created_at < this_month_start,
+        Report.status != "cancelled"
+    ).count()
+    this_month_resolved = db.query(Report).filter(
+        Report.status == "resolved", Report.updated_at >= this_month_start
+    ).count()
+    last_month_resolved = db.query(Report).filter(
+        Report.status == "resolved",
+        Report.updated_at >= last_month_start, Report.updated_at < this_month_start
+    ).count()
+
+    def pct_change(current, prev):
+        if prev == 0:
+            return f"+{current * 100}%" if current > 0 else "—"
+        change = round(((current - prev) / prev) * 100)
+        return f"+{change}%" if change >= 0 else f"{change}%"
+
+    # ── 5 Utility Classifications ─────────────────────────────────────────────
+    CLASSIFICATIONS = [
+        {"label": "Roads & Bridges",              "exact": "Roads & Bridges",              "keywords": ["road", "roads", "pothole", "bridge", "pavement", "asphalt", "sidewalk", "infrastructure", "bridges"], "icon": "HardHat",    "color": "orange"},
+        {"label": "Water & Drainage",             "exact": "Water & Drainage",             "keywords": ["water", "drain", "drainage", "flood", "flooding", "leak", "pipe", "sewage", "canal", "clog"],             "icon": "Droplets",   "color": "blue"},
+        {"label": "Street Lighting",              "exact": "Street Lighting",              "keywords": ["street lighting", "electric", "electrical", "light", "lighting", "lamp", "wire", "post", "power", "dark", "bulb", "pole"],     "icon": "Zap",        "color": "yellow"},
+        {"label": "Public Safety & Regulatory",   "exact": "Public Safety & Regulatory",   "keywords": ["public safety", "safety", "hazard", "hazardous", "collapse", "tree", "trees", "danger", "dangerous", "obstacle", "risk", "garbage"],  "icon": "ShieldAlert","color": "red"},
+        {"label": "Public Facilities",            "exact": "Public Facilities",            "keywords": ["public facilities", "facility", "facilities", "building", "park", "playground", "library", "school", "structural"],  "icon": "Building2",  "color": "purple"},
+    ]
+
+    all_reports_raw = db.query(Report.category, Report.status, Report.ai_category).all()
+    classification_stats = []
+    
+    for cls in CLASSIFICATIONS:
+        total_cls = 0
+        resolved_cls = 0
+        keywords = cls["keywords"]
+        label = cls["label"]
+        
+        for category, status, ai_cat in all_reports_raw:
+            if status == "cancelled": 
+                continue
+                
+            is_match = False
+            # 1. Exact Name Match (Highest Fidelity)
+            if category and str(category).strip():
+                cat_lower = str(category).strip().lower()
+                if cat_lower == cls["exact"].lower():
+                    is_match = True
+                # 2. Legacy Fuzzy Match (If user categorized differently but it belongs here)
+                elif any(re.search(rf"\b{re.escape(kw)}\b", cat_lower) for kw in keywords):
+                    is_match = True
+                    
+            # 3. AI Insights Fallback (If manual categorization is totally missing)
+            if not is_match and ai_cat:
+                ai_lower = str(ai_cat).lower()
+                if any(re.search(rf"\b{re.escape(kw)}\b", ai_lower) for kw in keywords):
+                    is_match = True
+            
+            if is_match:
+                total_cls += 1
+                if status == "resolved":
+                    resolved_cls += 1
+                    
+        classification_stats.append({
+            "label": label,
+            "icon": cls["icon"],
+            "color": cls["color"],
+            "total": total_cls,
+            "resolved": resolved_cls,
+            "resolution_rate": round((resolved_cls / total_cls * 100) if total_cls > 0 else 0, 1),
+        })
+
+    # ── 30-Day Daily Resolution Velocity ─────────────────────────────────────
+    thirty_days_ago = now - timedelta(days=30)
+    resolved_30d = db.query(Report).filter(
+        Report.status == "resolved",
+        Report.updated_at >= thirty_days_ago,
+    ).all()
+
+    daily_velocity: dict = defaultdict(int)
+    for r in resolved_30d:
+        if r.updated_at:
+            day_key = r.updated_at.strftime("%Y-%m-%d")
+            daily_velocity[day_key] += 1
+
+    velocity_series = []
+    for i in range(29, -1, -1):
+        day = now - timedelta(days=i)
+        day_str = day.strftime("%Y-%m-%d")
+        velocity_series.append({
+            "date": day_str,
+            "label": day.strftime("%b %d"),
+            "count": daily_velocity.get(day_str, 0),
+        })
+
+    velocity_label = f"{(now - timedelta(days=30)).strftime('%b %d')} – {now.strftime('%b %d, %Y')}"
+
+    # ── Predictive Maintenance (Chronic Recurrence) ──────────────────────────
+    from analytics_service import get_recurrence_events
+    recurrence_events = get_recurrence_events(db, days_window=90)
+    predictive_alerts = []
+    for e in recurrence_events[:5]: # Top 5 alerts
+        predictive_alerts.append({
+            "title": f"Chronic {e['category'].replace('_',' ').title()} Failure",
+            "location": f"Brgy {e['barangay']} • {e['location_string'] or 'Multiple points'}",
+            "risk_score": 90 if e['severity'] == 'HIGH' else 65,
+            "risk_label": "Critical Risk" if e['severity'] == 'HIGH' else "Medium Risk",
+            "description": f"Recurrence detected within {e['distance_meters']}m of a prior repair ({e['days_since_resolved']} days ago). Systemic structural failure likely.",
+            "category": e['category']
+        })
+
+    # ── Staff Stats ────────────────────────────────────────────────────────
+    User = models.User
+    staff_counts = db.query(User.role, func.count(User.id)).filter(User.role != 'resident').group_by(User.role).all()
+    staff_stats = {role: count for role, count in staff_counts}
 
     return {
+        # Report KPIs
+        "total_reports":      total_reports,
+        "resolved":           resolved_reports,
+        "pending_approval":   pending_approval,
+        "dispatched":         dispatched_count,
+        "total_trend":        pct_change(this_month_total, last_month_total),
+        "resolved_trend":     pct_change(this_month_resolved, last_month_resolved),
+        # 5 Classifications
+        "classifications":    classification_stats,
+        # Velocity chart
+        "velocity_series":    velocity_series,
+        "velocity_label":     velocity_label,
+        # Predictive
+        "predictive_alerts":  predictive_alerts,
+        # Staff
+        "staff_stats":        staff_stats,
         # Work Orders
         "total_work_orders":       db.query(wo).count(),
         "open_work_orders":        db.query(wo).filter(wo.status == "open").count(),
         "in_progress_work_orders": db.query(wo).filter(wo.status == "in_progress").count(),
         "completed_work_orders":   db.query(wo).filter(wo.status == "completed").count(),
         "preemptive_work_orders":  db.query(wo).filter(wo.wo_type == "preemptive").count(),
-
         # Projects
-        "total_projects":    db.query(proj).count(),
-        "active_projects":   db.query(proj).filter(
-            proj.status.notin_(["closed_completion_certified", "request_received"])
-        ).count(),
-        "completed_projects": db.query(proj).filter(
-            proj.status == "closed_completion_certified"
-        ).count(),
-
+        "total_projects":     db.query(proj).count(),
+        "active_projects":    db.query(proj).filter(proj.status.notin_(["closed_completion_certified", "request_received"])).count(),
+        "completed_projects": db.query(proj).filter(proj.status == "closed_completion_certified").count(),
         # Procurement
         "total_procurement_requests": db.query(pr).count(),
-        "pending_procurement": db.query(pr).filter(
-            pr.status.in_(["draft", "submitted"])
-        ).count(),
-        "sent_to_procurement": db.query(pr).filter(
-            pr.status == "sent_to_procurement"
-        ).count(),
-
+        "pending_procurement":        db.query(pr).filter(pr.status.in_(["draft", "submitted"])).count(),
+        "sent_to_procurement":        db.query(pr).filter(pr.status == "sent_to_procurement").count(),
         # OBO
         "total_obo_inspections": db.query(obo).count(),
-        "pending_obo": db.query(obo).filter(
-            obo.status.in_(["application_received", "inspection_scheduled"])
-        ).count(),
-        "non_compliant_obo": db.query(obo).filter(
-            obo.status == "notice_issued"
-        ).count(),
-
+        "pending_obo":           db.query(obo).filter(obo.status.in_(["application_received", "inspection_scheduled"])).count(),
+        "non_compliant_obo":     db.query(obo).filter(obo.status == "notice_issued").count(),
         # Audit
         "total_audit_entries": db.query(audit).count(),
     }
+

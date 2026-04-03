@@ -1,11 +1,22 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Languages } from 'lucide-react';
 
 export default function LanguageSwitcher() {
     const { i18n } = useTranslation();
+    const location = useLocation();
     const [isOpen, setIsOpen] = React.useState(false);
+
+    // Hide on all government/internal dashboard pages
+    if (
+        location.pathname.startsWith('/gov') ||
+        location.pathname.startsWith('/management') ||
+        location.pathname.startsWith('/dispatcher')
+    ) {
+        return null;
+    }
 
     const changeLanguage = (lng) => {
         i18n.changeLanguage(lng);

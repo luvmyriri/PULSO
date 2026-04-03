@@ -37,6 +37,7 @@ class Notification(Base):
     title = Column(String)
     message = Column(String)
     is_read = Column(Boolean, default=False)
+    is_hidden = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="notifications")
@@ -54,6 +55,7 @@ class Report(Base):
     location_string = Column(String, nullable=True)
     status = Column(String, default="pending")
     image_url = Column(String, nullable=True)
+    resolution_image_url = Column(String, nullable=True)
     
     # AI Analysis Fields (Expanded)
     ai_category = Column(String, nullable=True)

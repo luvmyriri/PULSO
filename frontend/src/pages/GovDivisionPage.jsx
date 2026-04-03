@@ -16,80 +16,13 @@ import {
     ChevronDown, Check, X
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
+import OrangeSelect from '../components/OrangeSelect';
+import ThemeToggle from '../components/ThemeToggle';
 
 const API_BASE = 'http://localhost:33159';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OrangeSelect — custom styled dropdown replacing native <select>
-// ─────────────────────────────────────────────────────────────────────────────
-const OrangeSelect = ({ value, onChange, options, placeholder = 'Select…', minWidth = '160px' }) => {
-    const [open, setOpen] = useState(false);
-    const ref = useRef(null);
-
-    useEffect(() => {
-        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
-
-    const selected = options.find(o => o.value === value);
-
-    return (
-        <div ref={ref} className="relative" style={{ minWidth }}>
-            {/* Trigger button */}
-            <button
-                type="button"
-                onClick={() => setOpen(p => !p)}
-                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all duration-150 ${
-                    open
-                        ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-500 text-orange-700 dark:text-orange-300 shadow-sm shadow-orange-500/10'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-orange-400 hover:text-orange-600 dark:hover:text-orange-400'
-                }`}
-            >
-                <span className="truncate">{selected ? selected.label : placeholder}</span>
-                <ChevronDown
-                    size={14}
-                    className={`shrink-0 transition-transform duration-200 ${
-                        open ? 'rotate-180 text-orange-500' : 'text-slate-400'
-                    }`}
-                />
-            </button>
-
-            {/* Dropdown panel */}
-            {open && (
-                <div className="absolute top-full left-0 mt-1.5 w-full z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl shadow-black/10 dark:shadow-black/40 overflow-hidden">
-                    {/* Orange top accent line */}
-                    <div className="h-0.5 bg-gradient-to-r from-orange-400 to-orange-600" />
-                    <div className="py-1.5 max-h-64 overflow-y-auto custom-scrollbar">
-                        {options.map(opt => {
-                            const isSelected = opt.value === value;
-                            return (
-                                <button
-                                    key={opt.value}
-                                    type="button"
-                                    onClick={() => { onChange(opt.value); setOpen(false); }}
-                                    className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors ${
-                                        isSelected
-                                            ? 'bg-orange-50 dark:bg-orange-900/25 text-orange-700 dark:text-orange-300 font-bold'
-                                            : 'text-slate-700 dark:text-slate-300 hover:bg-orange-50/60 dark:hover:bg-orange-900/10 hover:text-orange-600 dark:hover:text-orange-400 font-medium'
-                                    }`}
-                                >
-                                    <span>{opt.label}</span>
-                                    {isSelected && <Check size={13} className="text-orange-500 shrink-0" />}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Page config map: route → UI metadata + content
-// ─────────────────────────────────────────────────────────────────────────────
 const PAGE_CONFIG = {
     '/gov/work-orders': {
         title: 'Work Orders',
@@ -216,6 +149,7 @@ const PAGE_CONFIG = {
 
 // Status badge colors
 const STATUS_COLORS = {
+    open: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
     assigned: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     in_progress: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
@@ -227,6 +161,7 @@ const STATUS_COLORS = {
     approved_by_city_engineer: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
     resolved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
     closed_completion_certified: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+    closed: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
     application_received: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
     inspection_scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     inspection_complete: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
@@ -258,16 +193,24 @@ const ItemRow = ({ item, path, onView }) => {
     const idKey = item.wo_number || item.project_number || item.pr_number || item.obo_number || `#${item.id}`;
     const title = item.title || item.description?.substring(0, 60) || item.scope_of_work?.substring(0, 60) || item.project_name || item.building_name || idKey;
     const status = item.status || 'unknown';
-    const statusClass = STATUS_COLORS[status] || 'bg-slate-100 text-slate-600';
+    const normalizedStatus = status.toLowerCase();
+    const statusClass = STATUS_COLORS[normalizedStatus] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
     const date = item.created_at ? new Date(item.created_at).toLocaleDateString('en-PH') : '—';
+
+    const extractBarangay = (b, loc) => {
+        if (b && b !== '—') return b;
+        const m = loc?.match(/(?:Barangay|Brgy\.?)\s*(\d+[A-Za-z]?)/i);
+        return m ? m[1] : null;
+    };
+    const displayBarangay = extractBarangay(item.barangay, item.location);
 
     return (
         <tr onClick={() => onView?.(item)} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
             <td className="p-4 font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs">{idKey}</td>
             <td className="p-4">
                 <div className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-xs">{title}</div>
-                {item.barangay && <div className="text-xs text-slate-500">Brgy {item.barangay}</div>}
-                {item.location && <div className="text-xs text-slate-500">{item.location}</div>}
+                {displayBarangay && <div className="text-xs text-slate-500">Brgy {displayBarangay}</div>}
+                {item.location && item.location !== '—' && <div className="text-xs text-slate-500">{item.location}</div>}
             </td>
             <td className="p-4">
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusClass}`}>
@@ -276,7 +219,7 @@ const ItemRow = ({ item, path, onView }) => {
             </td>
             <td className="p-4 text-xs text-slate-500">{date}</td>
             <td className="p-4 text-right">
-                <button className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ml-auto">
+                <button className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-bold text-xs transition-opacity flex items-center gap-1 ml-auto">
                     View <ArrowRight size={12} />
                 </button>
             </td>
@@ -334,7 +277,10 @@ const TimelineEvent = ({ entry }) => {
                 </div>
                 
                 <p className="text-sm text-slate-700 dark:text-slate-300 mb-3 leading-relaxed">
-                    {entry.note || `Status updated to ${statusText.toLowerCase()}`}
+                    {(entry.note || `Status updated to ${statusText.toLowerCase()}`)
+                        .replace(/_/g, ' ')
+                        .replace(/\b\w/g, c => c.toUpperCase())
+                        .replace(/\bTo\b/g, 'to')}
                 </p>
                 
                 <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950/50 rounded-xl p-2.5 border border-slate-100 dark:border-slate-800/80">
@@ -344,12 +290,12 @@ const TimelineEvent = ({ entry }) => {
                         </div>
                         <div className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                             {entry.actor_name || 'System Automated'}
-                            {entry.actor_role && <span className="text-slate-400 dark:text-slate-500"> • {entry.actor_role.replace(/_/g, ' ')}</span>}
+                            {entry.actor_role && <span className="text-slate-400 dark:text-slate-500"> • {entry.actor_role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>}
                         </div>
                     </div>
                     {entry.previous_status && (
                         <div className="text-[10px] text-slate-400 italic hidden sm:block">
-                            Prev: {entry.previous_status.replace(/_/g, ' ')}
+                            Prev: {entry.previous_status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\bTo\b/g, 'to')}
                         </div>
                     )}
                 </div>
@@ -361,14 +307,24 @@ const TimelineEvent = ({ entry }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Record log row (Records & Registry)
 // ─────────────────────────────────────────────────────────────────────────────
-const RecordRow = ({ entry }) => {
+const RecordRow = ({ entry, onView }) => {
     let typeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
     if (entry.record_type.includes('Completion')) typeColor = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400';
     else if (entry.record_type.includes('Permit')) typeColor = 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400';
     else if (entry.record_type.includes('Award')) typeColor = 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400';
 
+    const handleView = () => {
+        onView?.({
+            ...entry,
+            id: entry.record_id || entry.id,
+            title: entry.title_or_applicant,
+            description: `Document Type: ${entry.record_type}\nReference: ${entry.reference_no}\nFinalized By: ${entry.issued_by_name}`,
+            created_at: entry.date_issued
+        });
+    };
+
     return (
-        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group text-sm">
+        <tr onClick={handleView} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group text-sm">
             <td className="p-4">
                 <div className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs">{entry.record_id}</div>
                 <div className="text-[10px] text-slate-500 font-mono mt-0.5">Ref: {entry.reference_no}</div>
@@ -386,7 +342,10 @@ const RecordRow = ({ entry }) => {
             </td>
             <td className="p-4 text-xs font-medium text-slate-600 dark:text-slate-400">{entry.issued_by_name}</td>
             <td className="p-4 text-right">
-                <button className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ml-auto">
+                <button
+                    onClick={(e) => { e.stopPropagation(); handleView(); }}
+                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-bold text-xs transition-opacity flex items-center gap-1 ml-auto"
+                >
                     Open <ArrowRight size={12} />
                 </button>
             </td>
@@ -397,17 +356,43 @@ const RecordRow = ({ entry }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Audit log row
 // ─────────────────────────────────────────────────────────────────────────────
-const AuditRow = ({ entry }) => (
-    <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors text-xs">
-        <td className="p-3 font-mono text-slate-500">{entry.id}</td>
-        <td className="p-3 font-bold text-slate-900 dark:text-white">{entry.action}</td>
-        <td className="p-3">
-            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">{entry.trigger_type}</span>
-        </td>
-        <td className="p-3 text-slate-500">{entry.actor_id ? `User #${entry.actor_id}` : 'System'}</td>
-        <td className="p-3 text-slate-500">{entry.created_at ? new Date(entry.created_at).toLocaleString('en-PH') : '—'}</td>
-    </tr>
-);
+// ─────────────────────────────────────────────────────────────────────────────
+// Utility Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+const toTitleCase = str => {
+    if (!str) return '—';
+    return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
+
+const AuditRow = ({ entry, index }) => {
+    // Resolve actor name with fallback to persona/role for deleted users
+    const getActorName = () => {
+        if (entry.actor_name) return entry.actor_name;
+        if (entry.actor_role) return `Deleted ${toTitleCase(entry.actor_role)}`;
+        if (entry.actor_id) return `User #${entry.actor_id}`;
+        return 'System';
+    };
+
+    // Replace technical strings with readable ones (e.g., pending_approval -> Pending Approval)
+    const beautifyAction = (text) => {
+        if (!text) return '—';
+        return text.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    };
+
+    return (
+        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors text-xs border-b border-slate-50 dark:border-slate-800/50 last:border-0">
+            <td className="p-3 font-mono text-slate-400 text-[10px] w-12">{index}</td>
+            <td className="p-3">
+                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-[9px] uppercase tracking-wider">
+                    {toTitleCase(entry.trigger_type)}
+                </span>
+            </td>
+            <td className="p-3 font-semibold text-slate-900 dark:text-slate-100 min-w-[300px]">{beautifyAction(entry.action)}</td>
+            <td className="p-3 text-slate-700 dark:text-slate-300 font-medium">{getActorName()}</td>
+            <td className="p-3 text-slate-400 dark:text-slate-500 whitespace-nowrap italic">{entry.created_at ? new Date(entry.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+        </tr>
+    );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Page Component
@@ -516,15 +501,13 @@ const GovDivisionPage = () => {
     const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
     const GOV_ROLE_OPTIONS = [
-        'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
-        'records_officer','division_chief','design_engineer','estimator',
-        'cad_operator','project_engineer','construction_foreman','field_worker',
-        'building_inspector','electrical_inspector','mechanical_inspector',
-        'dispatcher','manager','system_admin','resident',
+        'resident', 'city_engineer', 'asst_city_engineer', 'admin_officer', 'admin_clerk',
+        'records_officer', 'division_chief', 'design_engineer', 'estimator',
+        'cad_operator', 'project_engineer', 'construction_foreman', 'field_worker',
+        'building_inspector', 'electrical_inspector', 'mechanical_inspector',
+        'dispatcher', 'manager', 'system_admin'
     ];
 
-    // Title-case helper: "city_engineer" → "City Engineer"
-    const toTitleCase = str => str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
     // Reset page when filters/search change
     useEffect(() => { setPage(1); }, [search, roleFilter, trustFilter, statusFilter, location.pathname]);
@@ -569,6 +552,7 @@ const GovDivisionPage = () => {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <ThemeToggle />
                         <button
                             onClick={() => { setLoading(true); fetch(`${API_BASE}${config.apiPath}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.ok ? r.json() : []).then(data => setItems(Array.isArray(data) ? data : [])).catch(() => setItems([])).finally(() => setLoading(false)); }}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-600 hover:text-indigo-600 transition-all"
@@ -909,8 +893,8 @@ const GovDivisionPage = () => {
                                                         {isAuditLog ? (
                                                             <>
                                                                 <th className="p-3">ID</th>
-                                                                <th className="p-3">Action</th>
                                                                 <th className="p-3">Type</th>
+                                                                <th className="p-3">Action</th>
                                                                 <th className="p-3">Actor</th>
                                                                 <th className="p-3">Timestamp</th>
                                                             </>
@@ -945,9 +929,9 @@ const GovDivisionPage = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                                                    {paginated.map(item =>
-                                                        isAuditLog ? <AuditRow key={item.id || item.record_id} entry={item} /> :
-                                                        isRecords ? <RecordRow key={item.record_id} entry={item} /> :
+                                                    {paginated.map((item, idx) =>
+                                                        isAuditLog ? <AuditRow key={item.id || item.record_id} entry={item} index={(page - 1) * ITEMS_PER_PAGE + idx + 1} /> :
+                                                        isRecords ? <RecordRow key={item.record_id} entry={item} onView={setSelectedItem} /> :
                                                         isUsers ? (
                                                             <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors text-sm group">
                                                                 <td className="p-4 font-mono text-slate-400 text-xs">{item.id}</td>
@@ -990,38 +974,47 @@ const GovDivisionPage = () => {
                                                                             </button>
                                                                         </div>
                                                                     ) : (
-                                                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400">
-                                                                            {toTitleCase(item.role || '')}
+                                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide ${
+                                                                            GOV_ROLE_OPTIONS.includes(item.role) 
+                                                                                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400' 
+                                                                                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                                                                        }`}>
+                                                                            {toTitleCase(item.role || 'Unassigned')}
+                                                                            {!GOV_ROLE_OPTIONS.includes(item.role) && item.role !== 'resident' && ' (Legacy)'}
                                                                         </span>
                                                                     )}
                                                                 </td>
                                                                 <td className="p-4 text-xs text-slate-500">{item.barangay || '—'}</td>
                                                                 <td className="p-4">
                                                                     {/* Trust score redesigned */}
-                                                                    <div className="flex flex-col gap-1 min-w-[80px]">
-                                                                        <div className="flex items-center justify-between mb-0.5">
-                                                                            <span className={`text-xs font-black ${
-                                                                                (item.trust_score ?? 100) >= 90 ? 'text-green-600 dark:text-green-400' :
-                                                                                (item.trust_score ?? 100) >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500'
-                                                                            }`}>{item.trust_score ?? 100}</span>
-                                                                            <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
-                                                                                (item.trust_score ?? 100) >= 90 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
-                                                                                (item.trust_score ?? 100) >= 70 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
-                                                                                'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                                                                            }`}>
-                                                                                {(item.trust_score ?? 100) >= 90 ? 'High' : (item.trust_score ?? 100) >= 70 ? 'Med' : 'Low'}
-                                                                            </span>
+                                                                    {item.role === 'resident' ? (
+                                                                        <div className="flex flex-col gap-1 min-w-[80px]">
+                                                                            <div className="flex items-center justify-between mb-0.5">
+                                                                                <span className={`text-xs font-black ${
+                                                                                    (item.trust_score ?? 100) >= 90 ? 'text-green-600 dark:text-green-400' :
+                                                                                    (item.trust_score ?? 100) >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500'
+                                                                                }`}>{item.trust_score ?? 100}</span>
+                                                                                <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
+                                                                                    (item.trust_score ?? 100) >= 90 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                                                                                    (item.trust_score ?? 100) >= 70 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
+                                                                                    'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                                                                }`}>
+                                                                                    {(item.trust_score ?? 100) >= 90 ? 'High' : (item.trust_score ?? 100) >= 70 ? 'Med' : 'Low'}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                                                                <div
+                                                                                    className={`h-full rounded-full transition-all ${
+                                                                                        (item.trust_score ?? 100) >= 90 ? 'bg-green-500' :
+                                                                                        (item.trust_score ?? 100) >= 70 ? 'bg-yellow-400' : 'bg-red-400'
+                                                                                    }`}
+                                                                                    style={{ width: `${item.trust_score ?? 100}%` }}
+                                                                                />
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                                                            <div
-                                                                                className={`h-full rounded-full transition-all ${
-                                                                                    (item.trust_score ?? 100) >= 90 ? 'bg-green-500' :
-                                                                                    (item.trust_score ?? 100) >= 70 ? 'bg-yellow-400' : 'bg-red-400'
-                                                                                }`}
-                                                                                style={{ width: `${item.trust_score ?? 100}%` }}
-                                                                            />
-                                                                        </div>
-                                                                    </div>
+                                                                    ) : (
+                                                                        <div className="text-slate-400 font-bold ml-6">—</div>
+                                                                    )}
                                                                 </td>
                                                                 <td className="p-4 text-xs text-slate-500">
                                                                     {item.created_at ? new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric'}) : '—'}
@@ -1201,12 +1194,22 @@ const GovDivisionPage = () => {
                                         </span>
                                     </div>
                                 )}
-                                {selectedItem.barangay && (
-                                    <div>
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Barangay</div>
-                                        <div className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedItem.barangay}</div>
-                                    </div>
-                                )}
+                                {(() => {
+                                    const b = selectedItem.barangay;
+                                    const loc = selectedItem.location || selectedItem.location_string;
+                                    let displayB = (b && b !== '—') ? b : null;
+                                    if (!displayB && loc) {
+                                        const m = loc.match(/(?:Barangay|Brgy\.?)\s*(\d+[A-Za-z]?)/i);
+                                        if (m) displayB = m[1];
+                                    }
+                                    if (!displayB) return null;
+                                    return (
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Barangay</div>
+                                            <div className="text-sm font-bold text-slate-700 dark:text-slate-300">Brgy. {displayB}</div>
+                                        </div>
+                                    );
+                                })()}
                                 {selectedItem.current_phase && (
                                     <div>
                                         <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Phase</div>

@@ -19,7 +19,7 @@ from collections import defaultdict
 
 import numpy as np
 from sklearn.cluster import DBSCAN
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 import models
@@ -149,11 +149,11 @@ def get_infrastructure_clusters(
     """
     since = datetime.now(timezone.utc) - timedelta(days=days_back)
 
-    q = db.query(models.Report).filter(
+    q = db.query(models.Report).options(joinedload(models.Report.reporter)).filter(
         models.Report.location_lat.isnot(None),
         models.Report.location_lng.isnot(None),
         models.Report.created_at >= since,
-        models.Report.status.notin_(["rejected", "spam"]),
+        models.Report.status.notin_(["rejected", "spam", "cancelled"]),
     )
     if category_filter:
         q = q.filter(models.Report.category.ilike(f"%{category_filter}%"))
@@ -242,8 +242,21 @@ def get_infrastructure_clusters(
         threat_level = _classify_threat(severity_score, recurrence_score, len(group), growth_rate)
         estimated_cost = _estimate_cost(dominant_category, cluster_radius, len(group))
 
-        # Barangay extraction
-        barangays = [getattr(r, "barangay", None) or _extract_barangay(r.location_string) for r in group]
+        # Barangay extraction (Prioritize official reporter barangay, fallback to regex)
+        barangays = []
+        for r in group:
+            b = getattr(r, "barangay", None)
+            if not b and r.reporter:
+                b = r.reporter.barangay
+            if not b:
+                b = _extract_barangay(r.location_string)
+            
+            # Clean up: ensure only the number remains
+            if b:
+                import re
+                nums = re.findall(r"\d+", str(b))
+                b = nums[0] if nums else str(b)
+            barangays.append(b)
         barangay_counts = defaultdict(int)
         for b in barangays:
             if b:
@@ -291,7 +304,9 @@ def _extract_barangay(location_string: Optional[str]) -> Optional[str]:
     if not location_string:
         return None
     import re
-    m = re.search(r"[Bb]r(?:gy?|arangay)\.?\s*(\d+)", location_string)
+    # Match various formats: Brgy 176, Barangay 176, Bgy 176, or just 176 (if it looks like a Caloocan North brgy number)
+    # Using \b for word boundary instead of variable-width look-behind
+    m = re.search(r"(?:[Bb]r(?:gy?|arangay)\.?\s*|\b)((?:16[5-9]|17\d|18[0-8]))(?:\b|$)", location_string)
     return m.group(1) if m else None
 
 
@@ -306,9 +321,9 @@ def get_forecast(db: Session, weeks_back: int = 12, weeks_forward: int = 4) -> L
     Returns sorted by projected urgency (highest first).
     """
     since = datetime.now(timezone.utc) - timedelta(weeks=weeks_back)
-    reports = db.query(models.Report).filter(
+    reports = db.query(models.Report).options(joinedload(models.Report.reporter)).filter(
         models.Report.created_at >= since,
-        models.Report.status.notin_(["rejected", "spam"]),
+        models.Report.status.notin_(["rejected", "spam", "cancelled"]),
     ).all()
 
     # Bucket into (barangay, category, week_number)
@@ -318,7 +333,17 @@ def get_forecast(db: Session, weeks_back: int = 12, weeks_forward: int = 4) -> L
     for r in reports:
         if not r.created_at:
             continue
-        barangay = getattr(r, "barangay", None) or _extract_barangay(r.location_string) or "Unknown"
+        barangay = getattr(r, "barangay", None)
+        if not barangay and r.reporter:
+            barangay = r.reporter.barangay
+        if not barangay:
+            barangay = _extract_barangay(r.location_string) or "Unknown"
+        
+        # Clean to just number
+        if barangay != "Unknown":
+            import re
+            nums = re.findall(r"\d+", str(barangay))
+            barangay = nums[0] if nums else str(barangay)
         category = (r.category or "infrastructure").lower()
         week_num = (r.created_at.date() - week_zero).days // 7
         buckets[(barangay, category)][week_num] += 1
@@ -401,7 +426,7 @@ def get_heatmap_intelligence(db: Session, days_back: int = 90) -> Dict[str, Any]
         models.Report.location_lat.isnot(None),
         models.Report.location_lng.isnot(None),
         models.Report.created_at >= since,
-        models.Report.status.notin_(["rejected", "spam"]),
+        models.Report.status.notin_(["rejected", "spam", "cancelled"]),
     ).all()
 
     # Build cluster lookup
@@ -550,7 +575,7 @@ def get_recurrence_events(db: Session, days_window: int = 90) -> List[Dict]:
     ).order_by(models.Report.updated_at.desc()).all()
 
     # Get new reports since window
-    new_reports = db.query(models.Report).filter(
+    new_reports = db.query(models.Report).options(joinedload(models.Report.reporter)).filter(
         models.Report.created_at >= since,
         models.Report.status.notin_(["resolved", "rejected"]),
         models.Report.location_lat.isnot(None),
@@ -579,10 +604,18 @@ def get_recurrence_events(db: Session, days_window: int = 90) -> List[Dict]:
                     "lng":                new_r.location_lng,
                     "distance_meters":    round(dist, 1),
                     "days_since_resolved": (datetime.now(timezone.utc) - res_r.updated_at).days if res_r.updated_at else None,
-                    "barangay":           _extract_barangay(new_r.location_string),
+                    "barangay":           None,  # placeholder
                     "severity":           "HIGH" if dist < 30 else "MEDIUM",
                     "recommendation":     "Systemic infrastructure failure. Recommend full structural assessment and budget escalation.",
                 })
+                # Clean barangay number for recurrence event
+                b_raw = getattr(new_r, "barangay", None) or (new_r.reporter.barangay if new_r.reporter else None) or _extract_barangay(new_r.location_string)
+                if b_raw:
+                    import re
+                    nums = re.findall(r"\d+", str(b_raw))
+                    b_raw = nums[0] if nums else str(b_raw)
+                recurrence_events[-1]["barangay"] = b_raw
+
                 matched_resolved.add(res_r.id)
                 break
 
@@ -687,12 +720,12 @@ def get_analytics_summary(db: Session) -> Dict[str, Any]:
     cat_totals: Dict[str, int] = defaultdict(int)
     for r in db.query(models.Report).filter(
         models.Report.created_at >= datetime.now(timezone.utc) - timedelta(days=90),
-        models.Report.status.notin_(["rejected", "spam"]),
+        models.Report.status.notin_(["rejected", "spam", "cancelled"]),
     ).all():
         cat_totals[(r.category or "other").lower()] += 1
 
     # Resolution rate
-    total_all = db.query(models.Report).count()
+    total_all = db.query(models.Report).filter(models.Report.status != "cancelled").count()
     total_resolved = db.query(models.Report).filter(models.Report.status == "resolved").count()
     resolution_rate = round((total_resolved / max(total_all, 1)) * 100, 1)
 

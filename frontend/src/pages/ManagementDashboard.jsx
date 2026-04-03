@@ -26,10 +26,15 @@ import {
     Loader2,
     LogOut,
     CheckCircle,
-    Download
+    Download,
+    ShieldAlert,
+    Brain
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
+import ThemeToggle from '../components/ThemeToggle';
+
+const API_BASE_URL = `http://${window.location.hostname}:33159`;
 
 // Simple bar chart placeholder since recharts is not installed yet
 const MockBarChart = ({ color, values }) => (
@@ -119,7 +124,7 @@ const ManagementDashboard = () => {
             showToast('User list exported!');
         } else {
             // Full analytics report via backend
-            fetch('http://localhost:33159/api/gov/analytics/export/full-report', {
+            fetch(`${API_BASE_URL}/api/gov/analytics/export/full-report`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(res => {
@@ -160,7 +165,7 @@ const ManagementDashboard = () => {
     useEffect(() => {
         if (activeTab === 'users' && token) {
             setLoadingUsers(true);
-            fetch('http://localhost:33159/api/users', {
+            fetch(`${API_BASE_URL}/api/users`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(r => r.ok ? r.json() : [])
@@ -174,7 +179,7 @@ const ManagementDashboard = () => {
         e.preventDefault();
         setPostingAdvisory(true);
         try {
-            const res = await fetch('http://localhost:33159/api/advisories', {
+            const res = await fetch(`${API_BASE_URL}/api/advisories`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(advisoryForm)
@@ -199,32 +204,20 @@ const ManagementDashboard = () => {
     const [loadingApprovals, setLoadingApprovals] = useState(false);
     const [approvingId, setApprovingId] = useState(null);
 
-    // Real KPI stats from the API
-    const [reportStats, setReportStats] = useState(null);
+    // ── Single source of truth: /api/gov/dashboard/stats ──────────────────
+    // Fetches KPIs, 5 classifications, velocity, and gov-side stats in one call
+    const [dashStats, setDashStats] = useState(null);
     const [loadingStats, setLoadingStats] = useState(false);
-
-    useEffect(() => {
-        if (activeTab === 'approvals' && token) {
-            setLoadingApprovals(true);
-            fetch('http://localhost:33159/api/reports?status=pending_approval&limit=50', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            .then(r => r.ok ? r.json() : [])
-            .then(data => setPendingApprovals(Array.isArray(data) ? data.filter(r => r.status === 'pending_approval') : []))
-            .catch(() => setPendingApprovals([]))
-            .finally(() => setLoadingApprovals(false));
-        }
-    }, [activeTab, token]);
 
     useEffect(() => {
         if (activeTab === 'overview' && token) {
             setLoadingStats(true);
-            fetch('http://localhost:33159/api/reports/stats', {
+            fetch(`${API_BASE_URL}/api/gov/dashboard/stats`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(r => r.ok ? r.json() : null)
-            .then(data => setReportStats(data))
-            .catch(() => setReportStats(null))
+            .then(data => setDashStats(data))
+            .catch(() => setDashStats(null))
             .finally(() => setLoadingStats(false));
         }
     }, [activeTab, token]);
@@ -232,7 +225,7 @@ const ManagementDashboard = () => {
     const handleApproveReport = async (reportId) => {
         setApprovingId(reportId);
         try {
-            const res = await fetch(`http://localhost:33159/api/reports/${reportId}/status`, {
+            const res = await fetch(`${API_BASE_URL}/api/reports/${reportId}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ status: 'approved_internal' })
@@ -254,7 +247,7 @@ const ManagementDashboard = () => {
     const handleRejectApproval = async (reportId) => {
         setApprovingId(reportId);
         try {
-            const res = await fetch(`http://localhost:33159/api/reports/${reportId}/reject`, {
+            const res = await fetch(`${API_BASE_URL}/api/reports/${reportId}/reject`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
             });
@@ -272,12 +265,12 @@ const ManagementDashboard = () => {
         }
     };
 
-    // KPI Data - use real stats when available, fallback display otherwise
+    // KPI Data — driven by dashStats from /api/gov/dashboard/stats
     const kpis = [
         {
             label: 'Total Reports (All Time)',
-            value: reportStats ? reportStats.total.toLocaleString() : '—',
-            trend: '+12%', trendLabel: 'vs last month',
+            value: dashStats?.total_reports?.toLocaleString() ?? (loadingStats ? '…' : '—'),
+            trend: dashStats?.total_trend || '—', trendLabel: 'vs last month',
             goodTrend: true,
             Icon: Activity,
             iconBg: 'bg-blue-100 dark:bg-blue-900/30',
@@ -287,8 +280,8 @@ const ManagementDashboard = () => {
         },
         {
             label: 'Resolved Tickets',
-            value: reportStats ? reportStats.resolved.toLocaleString() : '—',
-            trend: '+18%', trendLabel: 'vs last month',
+            value: dashStats?.resolved?.toLocaleString() ?? (loadingStats ? '…' : '—'),
+            trend: dashStats?.resolved_trend || '—', trendLabel: 'vs last month',
             goodTrend: true,
             Icon: CheckCircle2,
             iconBg: 'bg-green-100 dark:bg-green-900/30',
@@ -298,8 +291,8 @@ const ManagementDashboard = () => {
         },
         {
             label: 'Pending Approval',
-            value: reportStats ? reportStats.pending_approval.toLocaleString() : '—',
-            trend: '', trendLabel: 'vs last month',
+            value: dashStats?.pending_approval?.toLocaleString() ?? (loadingStats ? '…' : '—'),
+            trend: dashStats?.pending_approval > 0 ? `${dashStats.pending_approval} queued` : '—', trendLabel: 'awaiting review',
             goodTrend: false,
             Icon: Clock,
             iconBg: 'bg-orange-100 dark:bg-orange-900/30',
@@ -309,8 +302,8 @@ const ManagementDashboard = () => {
         },
         {
             label: 'Active (Dispatched)',
-            value: reportStats ? reportStats.dispatched.toLocaleString() : '—',
-            trend: 'Live', trendLabel: 'vs last month',
+            value: dashStats?.dispatched?.toLocaleString() ?? (loadingStats ? '…' : '—'),
+            trend: 'Live', trendLabel: 'field teams',
             goodTrend: true,
             Icon: Users,
             iconBg: 'bg-indigo-100 dark:bg-indigo-900/30',
@@ -320,13 +313,23 @@ const ManagementDashboard = () => {
         },
     ];
 
+    // Icon map for classifications returned from backend
+    const ICON_MAP = { HardHat, Droplets, Zap, ShieldAlert, Building2 };
+    const COLOR_MAP = {
+        orange: { bar: 'bg-orange-500', icon: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600' },
+        blue:   { bar: 'bg-blue-500',   icon: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600' },
+        yellow: { bar: 'bg-yellow-400', icon: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600' },
+        red:    { bar: 'bg-red-500',    icon: 'bg-red-100 dark:bg-red-900/30 text-red-600' },
+        purple: { bar: 'bg-purple-500', icon: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600' },
+    };
+
     // Permit Tracking — live from /api/gov/obo
     const [permits, setPermits] = useState([]);
     const [loadingPermits, setLoadingPermits] = useState(false);
     useEffect(() => {
         if (activeTab === 'permits' && token) {
             setLoadingPermits(true);
-            fetch('http://localhost:33159/api/gov/obo?limit=50', {
+            fetch(`${API_BASE_URL}/api/gov/obo?limit=50`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(r => r.ok ? r.json() : [])
@@ -342,7 +345,7 @@ const ManagementDashboard = () => {
     useEffect(() => {
         if (activeTab === 'procurement' && token) {
             setLoadingProcurement(true);
-            fetch('http://localhost:33159/api/gov/procurement?limit=50', {
+            fetch(`${API_BASE_URL}/api/gov/procurement?limit=50`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             .then(r => r.ok ? r.json() : [])
@@ -396,6 +399,7 @@ const ManagementDashboard = () => {
                         >
                             <Download size={15} /> Export Report
                         </button>
+                        <ThemeToggle />
                         <button
                             onClick={() => { 
                                 const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
@@ -449,47 +453,77 @@ const ManagementDashboard = () => {
 
                                 {/* Charts Area */}
                                 <div className="grid grid-cols-2 gap-6">
+                                    {/* ── 5 Utility Classifications (LIVE) ── */}
                                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
                                         <h3 className="font-bold text-slate-900 dark:text-white mb-1">Reports by Utility Classification</h3>
-                                        <p className="text-xs text-slate-500 mb-4">Volume of citizen AI reports resolved vs unresolved.</p>
-                                        
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-8 h-8 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 shrink-0 flex items-center justify-center"><Droplets size={16}/></div>
-                                                <div className="flex-1">
-                                                    <div className="flex justify-between text-xs font-bold mb-1"><span>Water / Drainage</span> <span>420 / 450 Resolved</span></div>
-                                                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-blue-500 w-[93%]"></div>
-                                                    </div>
-                                                </div>
+                                        <p className="text-xs text-slate-500 mb-4">Volume of citizen reports resolved vs total, by infrastructure type.</p>
+                                        {loadingStats ? (
+                                            <div className="flex items-center gap-2 text-slate-400 py-6 justify-center">
+                                                <Loader2 size={18} className="animate-spin" /> Loading classifications...
                                             </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-8 h-8 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 shrink-0 flex items-center justify-center"><Zap size={16}/></div>
-                                                <div className="flex-1">
-                                                    <div className="flex justify-between text-xs font-bold mb-1"><span>Electrical / Poles</span> <span>210 / 280 Resolved</span></div>
-                                                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-orange-500 w-[75%]"></div>
+                                        ) : (
+                                        <div className="space-y-3">
+                                            {(dashStats?.classifications || []).map((cls, idx) => {
+                                                const IconComp = ICON_MAP[cls.icon] || AlertTriangle;
+                                                const colors = COLOR_MAP[cls.color] || COLOR_MAP.orange;
+                                                const pct = cls.total > 0 ? Math.round((cls.resolved / cls.total) * 100) : 0;
+                                                return (
+                                                    <div key={idx} className="flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded shrink-0 flex items-center justify-center ${colors.icon}`}>
+                                                            <IconComp size={15} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex justify-between text-xs font-bold mb-1">
+                                                                <span className="truncate">{cls.label}</span>
+                                                                <span className="shrink-0 ml-2 text-slate-500">{cls.resolved} / {cls.total} Resolved</span>
+                                                            </div>
+                                                            <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full ${colors.bar} transition-all duration-700`}
+                                                                    style={{ width: `${pct}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <span className="shrink-0 text-[10px] font-black text-slate-400 w-8 text-right">{pct}%</span>
                                                     </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-8 h-8 rounded bg-green-100 dark:bg-green-900/30 text-green-600 shrink-0 flex items-center justify-center"><HardHat size={16}/></div>
-                                                <div className="flex-1">
-                                                    <div className="flex justify-between text-xs font-bold mb-1"><span>Roads / Infrastructure</span> <span>472 / 554 Resolved</span></div>
-                                                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-green-500 w-[85%]"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                                );
+                                            })}
                                         </div>
+                                        )}
                                     </div>
+
+                                    {/* ── Resolution Velocity Chart (LIVE) ── */}
                                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
                                         <h3 className="font-bold text-slate-900 dark:text-white mb-1">Resolution Velocity (30 Days)</h3>
-                                        <p className="text-xs text-slate-500 mb-2">Daily completed work orders across all field fleets.</p>
+                                        <p className="text-xs text-slate-500 mb-2">Daily completed work orders — resolved citizen reports over the last 30 days.</p>
                                         <div className="flex-1 flex flex-col justify-end border-b border-l border-slate-200 dark:border-slate-800 pb-2 pl-2">
-                                           <MockBarChart color="indigo" values={[30, 45, 25, 60, 80, 55, 90, 40, 65, 75, 50, 85, 95, 60, 40]} />
+                                            {loadingStats ? (
+                                                <div className="flex items-center justify-center h-32 text-slate-400 gap-2">
+                                                    <Loader2 size={16} className="animate-spin" /> Loading...
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-end gap-0.5 h-32 mt-4">
+                                                    {(dashStats?.velocity_series || []).map((day, idx) => {
+                                                        const maxCount = Math.max(...(dashStats?.velocity_series || [{ count: 1 }]).map(d => d.count), 1);
+                                                        const heightPct = Math.round((day.count / maxCount) * 100);
+                                                        return (
+                                                            <div key={idx} className="flex-1 h-full bg-slate-100 dark:bg-slate-800/40 rounded-t-sm relative group" title={`${day.label}: ${day.count} resolved`}>
+                                                                <div
+                                                                    className="absolute bottom-0 left-0 right-0 bg-indigo-500 rounded-t-sm transition-all duration-700"
+                                                                    style={{ height: `${Math.max(heightPct, day.count > 0 ? 4 : 0)}%` }}
+                                                                />
+                                                                <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                                                    {day.label}: {day.count}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="text-center text-[10px] text-slate-400 font-bold mt-2 tracking-widest uppercase">Aug 1st - Aug 15th</div>
+                                        <div className="text-center text-[10px] text-slate-400 font-bold mt-2 tracking-widest uppercase">
+                                            {dashStats?.velocity_label || 'Last 30 Days'}
+                                        </div>
                                     </div>
                                 </div>
                             </motion.div>
@@ -503,55 +537,57 @@ const ManagementDashboard = () => {
                                             <TrendingUp size={24}/>
                                         </div>
                                         <div>
-                                            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Predictive Maintenance Alerts</h2>
+                                            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Predictive Maintenance Advisory</h2>
                                             <p className="text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl">
-                                                Our AI analysis of historical failure frequencies indicates several infrastructure nodes are approaching their <strong>Remaining Useful Life (RUL) limits</strong>. Proactive Work Orders are highly recommended to prevent catastrophic failure based on predictive modeling.
+                                                The PULSO Analytics Engine has detected {dashStats?.predictive_alerts?.length || 0} chronic infrastructure recurrence points. These nodes have a high probability of persistent failure due to systemic structural issues or climate-induced stress. <strong>Preemptive intervention</strong> is suggested.
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-4">
-                                    <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 rounded-xl p-5 shadow-sm">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 flex items-center justify-center shrink-0">
-                                                    <AlertTriangle size={20}/>
+                                    {loadingStats ? (
+                                        <div className="py-12 flex justify-center text-slate-400 gap-2">
+                                            <Loader2 className="animate-spin" /> Loading intelligence alerts...
+                                        </div>
+                                    ) : (dashStats?.predictive_alerts?.length || 0) === 0 ? (
+                                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center text-slate-500">
+                                            No critical recurrence events detected in the last 90 days. Systems stable.
+                                        </div>
+                                    ) : (
+                                        dashStats.predictive_alerts.map((alert, idx) => (
+                                            <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm transition-hover hover:border-orange-500/40">
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${alert.risk_score >= 80 ? 'bg-red-100 text-red-600 dark:bg-red-900/40' : 'bg-orange-100 text-orange-500 dark:bg-orange-900/30'}`}>
+                                                            <AlertTriangle size={20}/>
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-bold text-slate-900 dark:text-white text-base">{alert.title}</h3>
+                                                            <div className="text-xs font-semibold text-slate-500">Location: {alert.location}</div>
+                                                        </div>
+                                                    </div>
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${alert.risk_score >= 80 ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400'}`}>
+                                                        {alert.risk_label} ({alert.risk_score}%)
+                                                    </span>
                                                 </div>
-                                                <div>
-                                                    <h3 className="font-bold text-slate-900 dark:text-white text-base">Main Culvert Node #4A - High Collision Hazard</h3>
-                                                    <div className="text-xs font-semibold text-slate-500">Location: Highway 5 Intersection • Utility: Drainage/Structure</div>
+                                                <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 leading-relaxed italic border-l-2 border-slate-200 dark:border-slate-700 pl-3">
+                                                    "{alert.description}"
+                                                </p>
+                                                <div className="flex gap-3">
+                                                    <button 
+                                                        onClick={() => navigate('/gov/analytics')}
+                                                        className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold px-4 py-2 rounded-lg transition-colors text-[10px] uppercase tracking-wider"
+                                                    >
+                                                        Investigate Analytics
+                                                    </button>
+                                                    <button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow font-bold px-4 py-2 rounded-lg transition-colors text-[10px] uppercase tracking-wider">
+                                                        Dispatch Early Inspector
+                                                    </button>
                                                 </div>
                                             </div>
-                                            <span className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Critical Risk (92%)</span>
-                                        </div>
-                                        <p className="text-slate-600 dark:text-slate-400 text-sm mb-4">
-                                            Historical data shows this culvert requires median structural repairs every 4.2 years. We are currently at year 3.9, and adjacent citizen reports indicate early-stage asphalt cracking.
-                                        </p>
-                                        <div className="flex gap-3">
-                                            <button className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold px-4 py-2 rounded-lg transition-colors">View AI Analysis</button>
-                                            <button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow font-bold px-4 py-2 rounded-lg transition-colors">Generate Proactive Work Order</button>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white dark:bg-slate-900 border border-orange-200 dark:border-orange-900/30 rounded-xl p-5 shadow-sm opacity-80">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-500 flex items-center justify-center shrink-0">
-                                                    <AlertTriangle size={20}/>
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-bold text-slate-900 dark:text-white text-base">Transformer T-Sigma - Overload Warning</h3>
-                                                    <div className="text-xs font-semibold text-slate-500">Location: Substation Alpha • Utility: Electrical</div>
-                                                </div>
-                                            </div>
-                                            <span className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Medium Risk (65%)</span>
-                                        </div>
-                                        <div className="flex gap-3">
-                                            <button className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold px-4 py-2 rounded-lg transition-colors">View AI Analysis</button>
-                                            <button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow font-bold px-4 py-2 rounded-lg transition-colors">Generate Proactive Work Order</button>
-                                        </div>
-                                    </div>
+                                        ))
+                                    )}
                                 </div>
                             </motion.div>
                         )}
@@ -656,7 +692,7 @@ const ManagementDashboard = () => {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <span className="text-xs text-slate-400 font-bold whitespace-nowrap">{new Date(approval.created_at).toLocaleString()}</span>
+                                                <span className="text-xs text-slate-400 font-bold whitespace-nowrap">{approval.created_at ? new Date(approval.created_at).toLocaleString() : '—'}</span>
                                             </div>
                                             {approval.ai_summary && (
                                                 <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-3 mb-4">
@@ -867,7 +903,9 @@ const ManagementDashboard = () => {
                                                                 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                                                             }`}>{u.role}</span>
                                                         </td>
-                                                        <td className="p-4 font-bold text-slate-700 dark:text-slate-300">{u.trust_score}</td>
+                                                        <td className="p-4 font-bold text-slate-700 dark:text-slate-300">
+                                                            {u.role === 'resident' ? u.trust_score : <span className="text-slate-400 ml-4">—</span>}
+                                                        </td>
                                                         <td className="p-4 text-slate-500 text-sm">{new Date(u.created_at).toLocaleDateString()}</td>
                                                     </tr>
                                                 ))}

@@ -69,8 +69,10 @@ import {
     Upload,
     Calendar,
     MicOff,
-    Volume2
+    Volume2,
+    MessageSquareText
 } from 'lucide-react';
+
 import { useTheme } from '../contexts/ThemeContext';
 import Swal from 'sweetalert2';
 import Branding from '../components/Branding';
@@ -266,7 +268,7 @@ const RightSidebar = ({
                                     </span>
                                 </div>
                                 <p className="text-[11px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-tight mt-0.5 flex items-center gap-1">
-                                    {hazard.category} • {hazard.time}
+                                    {hazard.category || hazard.ai_category} • {hazard.time}
                                 </p>
                                 <div className="mt-2.5 flex items-center gap-4">
                                     <button
@@ -389,6 +391,8 @@ const StatusBadge = ({ status }) => {
 
 const MyReports = ({ userReports, loadingReports, handleSetModal, containerVariants, setZoomedImage, reportStatusFilter, setReportStatusFilter, handleCancelReport, t }) => {
     const scrollRef = useRef(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 3;
 
     const scrollItems = (direction) => {
         if (scrollRef.current) {
@@ -421,6 +425,13 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
             }
             return r.status === reportStatusFilter;
         });
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [reportStatusFilter]);
+
+    const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+    const paginatedReports = filteredReports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     return (
         <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 md:p-10">
@@ -506,7 +517,7 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
                         <p className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">No {reportStatusFilter !== 'all' ? reportStatusFilter : ''} Records Found</p>
                         <p className="text-slate-500 dark:text-slate-500 mt-2 font-medium max-w-sm mx-auto px-4">There are no reports matching your current filter criteria. Try adjusting your selection or contribute by reporting a new hazard.</p>
                     </div>
-                ) : filteredReports.map((report) => (
+                ) : paginatedReports.map((report) => (
                     <div
                         key={report.id}
                         className={`group bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 lg:p-5 flex flex-col md:flex-row items-center gap-6 transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/20 dark:hover:shadow-none hover:border-orange-500/30 ${(report.status === 'resolved' || report.status === 'cancelled') ? 'opacity-80' : ''
@@ -540,7 +551,7 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
                         <div className="flex-1 min-w-0 w-full flex flex-col justify-center">
                             <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
                                 <h3 className="text-[17px] font-black text-slate-900 dark:text-white truncate">
-                                    {report.ai_category || report.category}
+                                    {report.category || report.ai_category}
                                 </h3>
                                 <span className="text-[10px] font-mono font-bold bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700">
                                     {report.ticket_id}
@@ -578,10 +589,61 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
                                     Retract
                                 </button>
                             )}
+
+                            {report.status === 'resolved' && report.resolution_image_url && (
+                                <button
+                                    onClick={() => setZoomedImage(`http://localhost:33159${report.resolution_image_url}`)}
+                                    className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 hover:text-white bg-emerald-50 hover:bg-emerald-500 dark:bg-emerald-500/10 dark:hover:bg-emerald-500 px-3 py-1.5 rounded transition-all border border-emerald-100 dark:border-emerald-500/20 active:scale-95 uppercase tracking-wider flex items-center justify-center gap-1 w-full"
+                                >
+                                    <ImageIcon size={12} /> View Proof
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}
             </div>
+
+            {/* Pagination Controls */}
+            {filteredReports.length > 0 && (
+                <div className="flex flex-col items-center gap-3 pt-6 mt-6 border-t border-slate-200 dark:border-slate-800">
+                    <div className="text-[13px] text-slate-500 dark:text-slate-400">
+                        Showing <span className="font-bold text-slate-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredReports.length)}</span> of <span className="font-bold text-slate-900 dark:text-white">{filteredReports.length}</span> records
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="w-[34px] h-[34px] flex items-center justify-center rounded-lg bg-transparent border border-slate-200 dark:border-slate-700 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                            >
+                                <ChevronLeft size={14} strokeWidth={2.5} />
+                            </button>
+                            
+                            {[...Array(totalPages)].map((_, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setCurrentPage(i + 1)}
+                                    className={`w-[34px] h-[34px] flex items-center justify-center rounded-lg text-[13px] font-bold transition-all ${
+                                        currentPage === i + 1 
+                                        ? 'bg-orange-500 text-white border border-transparent' 
+                                        : 'bg-transparent border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800'
+                                    }`}
+                                >
+                                    {i + 1}
+                                </button>
+                            ))}
+
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="w-[34px] h-[34px] flex items-center justify-center rounded-lg bg-transparent border border-slate-200 dark:border-slate-700 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                            >
+                                <ChevronRight size={14} strokeWidth={2.5} />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </motion.div>
     );
 };
@@ -1024,7 +1086,7 @@ const COLOR_MAP = {
     green: { ring: 'ring-green-500', bg: 'bg-green-500/10 dark:bg-green-500/15', dot: 'bg-green-500', text: 'text-green-600 dark:text-green-400', border: 'border-green-400', badge: 'bg-green-500' },
 };
 
-const ReportCategoryRadio = ({ value, onChange, options, disabled = false }) => {
+const ReportCategoryRadio = ({ value, onChange, options, disabled = false, darkMode = false }) => {
     const [tooltip, setTooltip] = useState(null); // key of open tooltip
     const tooltipRef = useRef(null);
 
@@ -1041,7 +1103,6 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false }) => 
 
     const handleToggle = (opt) => {
         if (selectedOptions.includes(opt)) {
-            // Cannot deselect if it's the very last one (prevents empty submit) — optional, or allow it
             if (selectedOptions.length > 1) {
                 onChange(selectedOptions.filter(v => v !== opt));
             }
@@ -1054,17 +1115,87 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false }) => 
 
     return (
         <div className={disabled ? 'opacity-40 grayscale pointer-events-none' : ''}>
-            <div className="flex justify-between items-center mb-3">
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Issue Type</p>
-                <p className="text-[10px] font-bold text-slate-400">Max 3 selections</p>
-            </div>
-            <div className="grid grid-cols-1 gap-2" ref={tooltipRef}>
+            {/* Header — hidden in darkMode since parent renders it */}
+            {!darkMode && (
+                <div className="flex justify-between items-center mb-3">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Issue Type</p>
+                    <p className="text-[10px] font-bold text-slate-400">Max 3 selections</p>
+                </div>
+            )}
+            <div className="grid grid-cols-1 gap-1.5" ref={tooltipRef}>
                 {options.map(opt => {
                     const meta = CATEGORY_META[opt];
                     const clr = COLOR_MAP[meta.color];
                     const selected = selectedOptions.includes(opt);
                     const infoOpen = tooltip === opt;
                     const atCapacity = !selected && selectedOptions.length >= 3;
+
+                    if (darkMode) {
+                        return (
+                            <div key={opt} className="relative">
+                                <div
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all"
+                                    style={{
+                                        background: selected ? 'rgba(99,102,241,0.12)' : atCapacity ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
+                                        border: selected ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.07)',
+                                        opacity: atCapacity ? 0.5 : 1,
+                                        cursor: atCapacity ? 'not-allowed' : 'default',
+                                    }}
+                                >
+                                    <button
+                                        type="button"
+                                        disabled={atCapacity}
+                                        onClick={() => { handleToggle(opt); setTooltip(null); }}
+                                        className="flex items-center gap-2.5 flex-1 text-left disabled:cursor-not-allowed"
+                                    >
+                                        <span
+                                            className="w-4 h-4 rounded flex items-center justify-center shrink-0 transition-all"
+                                            style={{
+                                                border: selected ? '2px solid #818cf8' : '2px solid rgba(255,255,255,0.18)',
+                                                background: selected ? 'rgba(99,102,241,0.2)' : 'transparent'
+                                            }}
+                                        >
+                                            {selected && <span className="w-2 h-2 rounded-sm bg-indigo-400" />}
+                                        </span>
+                                        <span
+                                            className="text-[13px] font-semibold leading-tight"
+                                            style={{ color: selected ? '#a5b4fc' : '#94a3b8' }}
+                                        >{opt}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={e => { e.stopPropagation(); setTooltip(infoOpen ? null : opt); }}
+                                        className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black transition-colors"
+                                        style={{
+                                            border: infoOpen ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                                            background: infoOpen ? '#6366f1' : 'transparent',
+                                            color: infoOpen ? '#fff' : '#475569'
+                                        }}
+                                        title="What does this category cover?"
+                                    >i</button>
+                                </div>
+                                {/* Dark popover */}
+                                {infoOpen && (
+                                    <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-xl shadow-2xl p-4 pointer-events-auto"
+                                        style={{ background: '#0f1825', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-lg">{meta.icon}</span>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${clr.text}`}>{opt}</span>
+                                        </div>
+                                        <p className="text-[9px] font-black uppercase tracking-widest mb-2" style={{ color: '#475569' }}>Scope of Service</p>
+                                        <ul className="space-y-1">
+                                            {meta.scope.map((line, i) => (
+                                                <li key={i} className="flex items-start gap-2 text-[11px] leading-snug" style={{ color: '#64748b' }}>
+                                                    <span className={`mt-1 w-1.5 h-1.5 rounded-full ${clr.badge} shrink-0 opacity-80`} />
+                                                    {line}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    }
 
                     return (
                         <div key={opt} className="relative">
@@ -1140,8 +1271,9 @@ const ResidentModals = ({
     reportToCancel, setReportToCancel, confirmCancelReport,
     isSubmitConfirmOpen, setIsSubmitConfirmOpen, actuallySubmitReport,
     t
-}) => (
-    <AnimatePresence>
+}) => {
+    return (
+        <AnimatePresence>
         {activeModal && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setActiveModal(null)}>
                 <motion.div
@@ -1149,154 +1281,170 @@ const ResidentModals = ({
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.95, opacity: 0 }}
                     className={`pointer-events-auto ${activeModal === 'map'
-                            ? 'w-full max-w-7xl h-[90vh] flex flex-col my-8 bg-white dark:bg-slate-900 rounded-3xl'
+                            ? 'w-full max-w-7xl h-[90vh] flex flex-col my-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[40px] border border-slate-200/50 dark:border-slate-800/50 shadow-2xl'
                             : activeModal === 'file-report'
-                                ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[70] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl flex flex-col overflow-hidden'
-                                : 'w-full max-w-xl flex flex-col my-8 bg-white dark:bg-slate-900 rounded-3xl'
+                                ? 'fixed z-[70] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-[40px] shadow-[0_32px_128px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden border border-slate-200/50 dark:border-slate-800/50 w-[calc(100vw-2rem)] max-w-[1400px] h-[calc(100vh-2rem)] max-h-[900px] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
+                                : 'w-full max-w-xl flex flex-col my-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[40px] border border-slate-200/50 dark:border-slate-800/50 shadow-2xl'
                         }`}
+
                     onClick={e => e.stopPropagation()}
                 >
                     {activeModal === 'file-report' && (
-                        <div className="flex flex-col h-full p-8">
-                            {/* Header */}
-                            <div className="flex justify-between items-center mb-6 shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 ${isAnalyzing ? 'animate-pulse' : ''}`}>
-                                        {isAnalyzing ? <Zap size={22} /> : <FileText size={22} />}
-                                    </div>
-                                    <div>
-                                        <h3 className="font-black text-2xl text-slate-900 dark:text-white flex items-center gap-2">
-                                            {t('dashboard.quickReport.title', { defaultValue: 'New AI Report' })}
-                                            {isAnalyzing && <span className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full font-black animate-pulse">{t('dashboard.quickReport.scanning', { defaultValue: 'Scanning...' })}</span>}
-                                        </h3>
-                                        <p className="text-sm text-slate-400 font-medium mt-0.5">{aiFeedback ? `${t('dashboard.quickReport.aiDetected', { defaultValue: 'AI Detected' })}: ${aiFeedback.category}` : t('dashboard.quickReport.desc', { defaultValue: 'Submit an infrastructure issue supported by PULSO' })}</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => { setActiveModal(null); setAiFeedback(null); setSelectedImage(null); setReportNotes(''); setReportCategory([]); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full transition-colors"><X size={22} /></button>
-                            </div>
+                        <div className="flex flex-col h-full p-6 sm:p-8">
+                             {/* Header */}
+                             <div className="flex justify-between items-start mb-6 shrink-0">
+                                 <div className="flex items-center gap-4">
+                                     <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 ${isAnalyzing ? 'animate-pulse' : ''}`}>
+                                         {isAnalyzing ? <Zap size={24} /> : <FileText size={24} />}
+                                     </div>
+                                     <div>
+                                         <h3 className="font-black text-2xl text-slate-900 dark:text-white flex items-center gap-3 tracking-tight">
+                                             {t('dashboard.quickReport.title', { defaultValue: 'Quick Report' })}
+                                             {isAnalyzing && <span className="text-[10px] bg-blue-500 text-white px-3 py-1 rounded-full font-black animate-pulse uppercase tracking-wider">{t('dashboard.quickReport.scanning', { defaultValue: 'Scanning...' })}</span>}
+                                         </h3>
+                                         <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mt-0.5 opacity-80 uppercase tracking-widest text-[10px]">{aiFeedback ? `${t('dashboard.quickReport.aiDetected', { defaultValue: 'Assessment Complete' })}: ${aiFeedback.category}` : t('dashboard.quickReport.desc', { defaultValue: 'Snap a priority infrastructure hazard' })}</p>
+                                     </div>
+                                 </div>
+                                 <button onClick={() => { setActiveModal(null); setAiFeedback(null); setSelectedImage(null); setReportNotes(''); setReportCategory([]); }} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-full transition-all active:scale-90"><X size={24} /></button>
+                             </div>
+                               {/* Main Content Area - Scrollable for safety but optimized */}
+                             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">
+                                 {/* Verified Location Banner */}
+                                 <div className="mb-6 p-4 bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/50 rounded-2xl flex items-center gap-4 shrink-0 shadow-inner relative overflow-hidden group">
+                                     <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-2xl rounded-full" />
+                                     <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm">
+                                         <MapPin size={20} />
+                                     </div>
+                                     <div className="flex-1 min-w-0">
+                                         <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 mb-0.5 opacity-80">Verified Incident Location</p>
+                                         <h4 className="font-black text-base text-slate-900 dark:text-white truncate tracking-tight">
+                                             {locationAddress || "Locating exact address..."}
+                                         </h4>
+                                     </div>
+                                     <div className="px-3 py-1.5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg border border-slate-200/50 dark:border-slate-700/50 shadow-sm shrink-0">
+                                         <span className="text-[10px] font-mono font-black text-slate-400 dark:text-slate-500 tracking-wider">
+                                             {reportLocation.lat.toFixed(4)}, {reportLocation.lng.toFixed(4)}
+                                         </span>
+                                     </div>
+                                 </div>
 
-                            {/* Verified Location Banner */}
-                            <div className="mb-6 p-4 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl flex items-center gap-4 shrink-0">
-                                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                                    <MapPin size={20} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600/70 dark:text-blue-400/70 mb-0.5">Verified Incident Location</p>
-                                    <h4 className="font-bold text-slate-900 dark:text-white truncate">
-                                        {locationAddress || "Locating exact address..."}
-                                    </h4>
-                                </div>
-                                <div className="px-3 py-1 bg-white dark:bg-slate-800 rounded-lg border border-blue-100 dark:border-blue-900/20 shadow-sm shrink-0">
-                                    <span className="text-[10px] font-mono font-bold text-slate-500">
-                                        {reportLocation.lat.toFixed(6)}, {reportLocation.lng.toFixed(6)}
-                                    </span>
-                                </div>
-                            </div>
+                                 {/* Landscape 2-col layout */}
+                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                                     {/* LEFT — Camera / Photo */}
+                                     <div className="flex flex-col gap-4 h-full">
+                                         <div className="flex-1 min-h-[16rem] sm:min-h-[20rem] bg-slate-100/50 dark:bg-slate-900/50 rounded-[28px] p-1 shadow-inner border border-slate-200/50 dark:border-slate-800/50 overflow-hidden">
+                                             {selectedImage
+                                                 ? (
+                                                     <div className="relative w-full h-full group bg-slate-950 rounded-[26px] overflow-hidden">
+                                                         <img src={selectedImage} alt="Selected Issue" className="w-full h-full object-contain" />
+                                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                         <button
+                                                             onClick={(e) => { e.stopPropagation(); setSelectedImage(null); setAiFeedback(null); }}
+                                                             className="absolute top-4 right-4 w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-red-500 transition-all shadow-xl border border-white/20 active:scale-90"
+                                                             title="Remove Image"
+                                                         >
+                                                             <X size={20} strokeWidth={3} />
+                                                         </button>
+                                                     </div>
+                                                 )
+                                                 : (
+                                                     <div className="w-full h-full bg-white dark:bg-slate-800/40 rounded-[26px] flex flex-col items-center justify-center text-white border-2 border-dashed border-slate-200 dark:border-slate-800/60 hover:border-orange-500 dark:hover:border-orange-500/50 transition-all group p-6 text-center relative overflow-hidden">
+                                                         <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                         <div className="w-16 h-16 rounded-[24px] bg-orange-500/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                                                             <Camera size={32} className="text-orange-500" />
+                                                         </div>
+                                                         <div className="text-xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Add Issue Photo</div>
+                                                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 px-4 font-medium leading-relaxed">Technical photo required for AI triage.</p>
+                                                         <div className="flex flex-col sm:flex-row gap-3 w-full relative z-10 px-2">
+                                                             <button onClick={() => setIsIDCameraOpen(true)} className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:bg-orange-600 transition-all active:scale-95 flex items-center justify-center gap-2">
+                                                                 <Camera size={14} /> Camera
+                                                             </button>
+                                                             <button onClick={() => fileInputRef.current?.click()} className="flex-1 px-4 py-3 bg-white dark:bg-slate-900/80 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700/50 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2">
+                                                                 <Upload size={14} /> Upload
+                                                             </button>
+                                                         </div>
+                                                         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+                                                     </div>
+                                                 )
+                                             }
+                                         </div>
+                                         <IDCameraModal
+                                             isOpen={isIDCameraOpen}
+                                             onClose={() => setIsIDCameraOpen(false)}
+                                             onCapture={file => setSelectedImage(URL.createObjectURL(file))}
+                                             title="Infrastructure Issue Photo"
+                                             side="ISSUE"
+                                             metadata={{
+                                                 lat: reportLocation.lat,
+                                                 lng: reportLocation.lng,
+                                                 address: locationAddress
+                                             }}
+                                             guideText="Center the infrastructure issue in the frame"
+                                         />
+                                     </div>
 
-                            {/* Landscape 2-col layout — fills remaining height */}
-                            <div className="grid grid-cols-2 gap-8 flex-1 min-h-0">
-                                {/* LEFT — Camera / Photo */}
-                                <div className="flex flex-col gap-4 min-h-0">
-                                    <div className="flex-1 min-h-0">
-                                        {selectedImage
-                                            ? (
-                                                <div className="relative w-full h-full group bg-slate-950 rounded-2xl overflow-hidden shadow-inner">
-                                                    <img src={selectedImage} className="w-full h-full object-contain" />
-                                                    <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
-                                                    <button
-                                                        onClick={() => { setSelectedImage(null); setAiFeedback(null); }}
-                                                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/90 active:scale-95 transition-all shadow-xl backdrop-blur-sm border border-white/20"
-                                                        title="Remove Image"
-                                                    >
-                                                        <X size={20} className="stroke-[3px]" />
-                                                    </button>
-                                                </div>
-                                            )
-                                            : <div
-                                                className="w-full h-full bg-slate-50 dark:bg-slate-800/80 rounded-2xl flex flex-col items-center justify-center text-white border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-orange-500 dark:hover:border-orange-500 transition-colors group p-6 text-center"
-                                            >
-                                                <div className="w-16 h-16 rounded-3xl bg-orange-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                                    <Camera size={32} className="text-orange-500" />
-                                                </div>
-                                                <div className="text-lg font-black text-slate-900 dark:text-white mb-1">Add Issue Photo</div>
-                                                <p className="text-[13px] text-slate-500 mb-6 px-4">Take a photo with your camera or upload a file from your device for AI assessment.</p>
-                                                <div className="flex flex-col sm:flex-row gap-3 w-full">
-                                                    <button onClick={() => setIsIDCameraOpen(true)} className="flex-1 px-4 py-2.5 bg-orange-500 text-white rounded-xl font-bold text-sm shadow-md shadow-orange-500/20 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2">
-                                                        <Camera size={16} /> Open Camera
-                                                    </button>
-                                                    <button onClick={() => fileInputRef.current?.click()} className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 text-nowrap">
-                                                        <Upload size={16} /> Upload File
-                                                    </button>
-                                                </div>
-                                                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
-                                            </div>
-                                        }
-                                    </div>
-                                    {selectedImage && (
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => setIsIDCameraOpen(true)}
-                                                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-500 hover:border-orange-400 hover:text-orange-500 transition-colors flex items-center justify-center gap-2"
-                                            >
-                                                <Camera size={14} /> Retake
-                                            </button>
-                                            <button
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-500 hover:border-orange-400 hover:text-orange-500 transition-colors flex items-center justify-center gap-2"
-                                            >
-                                                <Upload size={14} /> Change File
-                                            </button>
-                                            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
-                                        </div>
-                                    )}
-                                    <IDCameraModal
-                                        isOpen={isIDCameraOpen}
-                                        onClose={() => setIsIDCameraOpen(false)}
-                                        onCapture={file => setSelectedImage(URL.createObjectURL(file))}
-                                        title="Infrastructure Issue Photo"
-                                        side="ISSUE"
-                                        metadata={{
-                                            lat: reportLocation.lat,
-                                            lng: reportLocation.lng,
-                                            address: locationAddress
-                                        }}
-                                        guideText="Center the infrastructure issue in the frame"
-                                    />
-                                </div>
+                                     {/* RIGHT — Issue type + notes */}
+                                     <div className="flex flex-col gap-6">
+                                         <div className="relative group shrink-0">
+                                             <ReportCategoryRadio
+                                                 value={reportCategory}
+                                                 onChange={setReportCategory}
+                                                 options={REPORT_CATEGORIES(t)}
+                                                 disabled={!selectedImage || isAnalyzing || aiFeedback?.category === 'Undetermined'}
+                                             />
+                                             {(!selectedImage || isAnalyzing || aiFeedback?.category === 'Undetermined') && (
+                                                 <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px] rounded-[28px] flex items-center justify-center z-10 border border-white/5 cursor-not-allowed">
+                                                     <div className="bg-slate-900/90 px-4 py-2.5 rounded-xl border border-white/10 shadow-2xl flex items-center gap-2.5 active:scale-95 transition-transform">
+                                                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isAnalyzing ? 'bg-blue-500/20' : 'bg-orange-500/20'}`}>
+                                                             {isAnalyzing ? (
+                                                                 <Zap size={14} className="text-blue-500 animate-pulse" />
+                                                             ) : (
+                                                                 <Lock size={14} className="text-orange-500" />
+                                                             )}
+                                                         </div>
+                                                         <span className="text-[10px] font-black uppercase tracking-widest text-white/90">
+                                                             {isAnalyzing ? "AI Scanning Image..." : aiFeedback?.category === 'Undetermined' ? "Out of Scope / Undetermined" : "Photo Required to Select Type"}
+                                                         </span>
+                                                     </div>
+                                                 </div>
+                                             )}
+                                         </div>
+                                         <div className="flex flex-col">
+                                             <div className="flex items-center gap-3 mb-2.5 ml-1">
+                                                 <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-sm border border-slate-200 dark:border-slate-700/50">
+                                                     <MessageSquareText size={14} />
+                                                 </div>
+                                                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Additional Notes</p>
+                                             </div>
+                                             <div className="h-32 sm:h-40 relative group overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 focus-within:border-orange-500/50 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] bg-white dark:bg-slate-800/40">
+                                                 <textarea
+                                                     className="w-full h-full bg-transparent text-slate-900 dark:text-white p-5 outline-none placeholder:text-slate-400/60 text-sm font-semibold tracking-tight resize-none transition-colors"
+                                                     placeholder="Provide technical markers, landmarks, or specific damage details..."
+                                                     value={reportNotes}
+                                                     onChange={e => setReportNotes(e.target.value)}
+                                                 />
+                                                 <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-orange-500/10 to-transparent translate-y-full group-focus-within:translate-y-0 transition-transform" />
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
 
-                                {/* RIGHT — Issue type + notes */}
-                                <div className="flex flex-col gap-5">
-                                    <ReportCategoryRadio
-                                        value={reportCategory}
-                                        onChange={setReportCategory}
-                                        options={REPORT_CATEGORIES(t)}
-                                        disabled={aiFeedback?.category?.toLowerCase().includes('undetermined')}
-                                    />
-                                    <div className="flex-1 flex flex-col">
-                                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Additional Notes</p>
-                                        <textarea
-                                            className="flex-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white p-4 rounded-xl focus:ring-2 focus:ring-orange-500/50 outline-none placeholder:text-slate-400 text-sm resize-none"
-                                            placeholder="Describe the issue in detail — type, severity, location landmarks, and any other relevant information..."
-                                            value={reportNotes}
-                                            onChange={e => setReportNotes(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Actions — pinned to bottom */}
-                            <div className="flex gap-4 mt-6 shrink-0">
-                                <button className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 text-sm" onClick={() => { setActiveModal(null); setReportCategory([]); setAiFeedback(null); setSelectedImage(null); setReportNotes(''); }}>Cancel</button>
-                                <button
-                                    className="flex-1 py-3.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-all disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-400 text-sm shadow-lg shadow-orange-500/25 active:scale-95"
-                                    onClick={handleFileReport}
-                                    disabled={submittingReport || (reportCategory.length === 0)}
-                                >
-                                    {submittingReport ? 'Submitting…' : 'Submit Report'}
-                                </button>
-                            </div>
+                             {/* Actions — pinned to bottom */}
+                             <div className="flex gap-4 shrink-0 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
+                                 <button className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black rounded-xl transition-all hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 text-[10px] uppercase tracking-[0.2em] active:scale-95" onClick={() => { setActiveModal(null); setReportCategory([]); setAiFeedback(null); setSelectedImage(null); setReportNotes(''); }}>Cancel</button>
+                                 <button
+                                     className="flex-[2] py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-black rounded-xl hover:shadow-[0_15px_40px_rgba(249,115,22,0.3)] transition-all disabled:opacity-30 disabled:grayscale disabled:pointer-events-none text-[10px] uppercase tracking-[0.2em] shadow-xl active:scale-[0.98] relative overflow-hidden group"
+                                     onClick={handleFileReport}
+                                     disabled={submittingReport || (reportCategory.length === 0)}
+                                 >
+                                     <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-700 skew-x-12" />
+                                     <span className="relative z-10">{submittingReport ? 'Encrypting…' : 'Finalize & Submit Report'}</span>
+                                 </button>
+                             </div>
                         </div>
                     )}
+
                     {activeModal === 'map' && (
                         <div className="flex flex-col h-full bg-white dark:bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800">
                             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
@@ -1533,6 +1681,39 @@ const ResidentModals = ({
                             </div>
                         </div>
                     )}
+                    {activeModal === 'post-details' && selectedPost && (
+                        <div className="flex flex-col h-full max-h-[85vh]">
+                            <div className="p-8 pb-4 shrink-0 border-b border-slate-100 dark:border-slate-800">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-100 dark:border-orange-500/20 shrink-0">
+                                            <Bell size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight pr-4">{selectedPost.department}</h3>
+                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mt-1">{new Date(selectedPost.created_at).toLocaleDateString()} • Ref: {selectedPost.advisory_id}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors shrink-0"><X size={24} /></button>
+                                </div>
+                            </div>
+                            <div className="p-8 overflow-y-auto custom-scrollbar space-y-6">
+                                <div>
+                                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">{selectedPost.title}</h2>
+                                    <p className="text-[15px] leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{selectedPost.description}</p>
+                                </div>
+                                {selectedPost.has_image && selectedPost.image_url && (
+                                    <div className="mt-6 rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
+                                        <img src={`http://localhost:33159${selectedPost.image_url}`} alt="Advisory Content" className="w-full object-cover" />
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2 mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+                                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${selectedPost.priority?.toLowerCase() === 'high' ? 'bg-rose-50 text-rose-500 dark:bg-rose-500/10' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>Priority: {selectedPost.priority}</span>
+                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-500 dark:bg-blue-500/10">Category: {selectedPost.category}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {activeModal === 'cookies' && (
                         <div className="p-8">
@@ -1622,7 +1803,7 @@ const ResidentModals = ({
                     onClick={(e) => e.stopPropagation()}
                     className="w-full max-w-lg bg-[#0f172a] border border-slate-800 rounded-[32px] overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.5)] p-10 flex flex-col items-center text-center space-y-6"
                 >
-                    <div className="w-24 h-24 rounded-full border-4 border-orange-500/30 flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.1)] relative">
+                    <div className="w-24 h-24 rounded-full border-4 border-orange-500/30 flex items-center justify-center shadow-[0_0_40_rgba(249,115,22,0.1)] relative">
                         <div className="absolute inset-0 rounded-full animate-ping bg-orange-500/10" style={{ animationDuration: '3s' }}></div>
                         <AlertTriangle size={48} className="text-orange-500" strokeWidth={1.5} />
                     </div>
@@ -1652,7 +1833,8 @@ const ResidentModals = ({
             </motion.div>
         )}
     </AnimatePresence>
-);
+    );
+};
 
 // --- MAIN COMPONENT ---
 
@@ -1661,11 +1843,13 @@ const ResidentModals = ({
 const TopNavigation = ({
     activeTab,
     handleSetTab,
+    handleSetModal,
     theme,
     changeTheme,
     showNotifications,
     setShowNotifications,
     notifications,
+    setNotifications,
     handleMarkAllRead,
     handleNotificationClick,
     handleLogout,
@@ -1744,21 +1928,7 @@ const TopNavigation = ({
             {/* Right Area: Profile & Settings */}
             <div className="flex items-center justify-end gap-2 sm:gap-3 w-1/4 min-w-[200px]">
 
-                {/* Language Switcher */}
-                <div className="bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700/50 flex items-center">
-                    <button 
-                        onClick={() => i18n.changeLanguage('en')} 
-                        className={`px-2 py-1 rounded-full text-[10px] font-black transition-all ${i18n.language === 'en' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-                    >
-                        EN
-                    </button>
-                    <button 
-                        onClick={() => i18n.changeLanguage('tl')} 
-                        className={`px-2 py-1 rounded-full text-[10px] font-black transition-all ${i18n.language === 'tl' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-                    >
-                        TL
-                    </button>
-                </div>
+
 
                 {/* Theme Toggle menu item */}
                 <div className="hidden lg:flex bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700/50 mr-2">
@@ -1773,7 +1943,7 @@ const TopNavigation = ({
                         onClick={() => setShowNotifications(!showNotifications)}
                     >
                         <Bell size={20} />
-                        {notifications.length > 0 && notifications.some(n => !n.is_read) && (
+                        {notifications.length > 0 && notifications.some(n => !n.is_read && !n.is_hidden) && (
                             <span className="absolute top-[8px] right-[10px] w-2 h-2 bg-red-500 rounded-full ring-2 ring-slate-100 dark:ring-slate-800"></span>
                         )}
                     </button>
@@ -1786,39 +1956,64 @@ const TopNavigation = ({
                             >
                                 <div className="flex justify-between items-center mb-3 px-1">
                                     <h3 className="font-bold text-lg">Notifications</h3>
-                                    <button
-                                        onClick={handleMarkAllRead}
-                                        className="text-orange-500 text-xs font-bold hover:underline"
-                                    >
-                                        Mark all as read
-                                    </button>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            onClick={handleMarkAllRead}
+                                            className="text-orange-500 text-xs font-bold hover:underline shrink-0"
+                                        >
+                                            Mark all as read
+                                        </button>
+                                        <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                            <X size={18} />
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-1 max-h-[400px] overflow-y-auto custom-scrollbar">
-                                    {notifications.length === 0 ? (
+                                    {notifications.filter(n => !n.is_hidden).length === 0 ? (
                                         <div className="p-4 text-center text-sm text-slate-500">No new notifications</div>
                                     ) : (
-                                        notifications.map(notification => (
-                                            <button 
-                                                key={notification.id} 
-                                                onClick={() => handleNotificationClick(notification)}
-                                                className="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex gap-3 relative overflow-hidden group"
-                                            >
-                                                <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
-                                                    <FileText size={18} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{notification.title}</p>
-                                                    <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{notification.message}</p>
-                                                    <span className="text-[10px] text-blue-500 font-bold mt-1 block">{new Date(notification.created_at).toLocaleString()}</span>
-                                                </div>
-                                                {!notification.is_read && (
-                                                    <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-4 right-3 group-hover:opacity-0 transition-opacity"></div>
-                                                )}
-                                            </button>
+                                        notifications.filter(n => !n.is_hidden).map(notification => (
+                                            <div key={notification.id} className="relative group block w-full">
+                                                <button 
+                                                    onClick={() => handleNotificationClick(notification)}
+                                                    className="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex gap-3 overflow-hidden pr-10"
+                                                >
+                                                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                                                        <FileText size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-slate-900 dark:text-white pr-2">{notification.title}</p>
+                                                        <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{notification.message}</p>
+                                                        <span className="text-[10px] text-blue-500 font-bold mt-1 block">{new Date(notification.created_at).toLocaleString()}</span>
+                                                    </div>
+                                                    {!notification.is_read && (
+                                                        <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-4 right-3 group-hover:opacity-0 transition-opacity"></div>
+                                                    )}
+                                                </button>
+                                                <button 
+                                                    onClick={async (e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_hidden: true } : n));
+                                                        try {
+                                                            await fetch(`http://localhost:33159/api/notifications/${notification.id}`, {
+                                                                method: 'DELETE',
+                                                                headers: { 'Authorization': `Bearer ${token}` }
+                                                            });
+                                                        } catch (err) {
+                                                            console.error("Delete error:", err);
+                                                        }
+                                                    }}
+                                                    title="Dismiss notification"
+                                                    className="absolute top-3 right-2 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-all z-10"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
                                         ))
                                     )}
                                 </div>
-                                <button className="w-full text-center text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mt-2 py-2 border-t border-slate-100 dark:border-slate-800">See previous notifications</button>
+                                <button onClick={() => { setShowNotifications(false); handleSetModal('all-notifications'); }} className="w-full text-center text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mt-2 py-2 border-t border-slate-100 dark:border-slate-800">See previous notifications</button>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -2211,17 +2406,7 @@ export default function ResidentDashboard() {
         return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
     };
 
-    // Simulated data for presentation layer
-    const simulatedHazards = [
-        { id: 1, category: 'Water & Drainage', title: 'Deep Puddles on Highway', lat: 14.7566, lng: 121.0450, status: 'pending', time: '10 mins ago', distance: '1.2 km' },
-        { id: 2, category: 'Roads & Bridges', title: 'Cracked Surface', lat: 14.7610, lng: 121.0480, status: 'unverified', time: '1 hr ago', distance: '2.5 km' },
-        { id: 3, category: 'Street Lighting', title: 'Fallen Wire Hazard', lat: 14.7520, lng: 121.0410, status: 'pending', time: '5 hrs ago', distance: '0.8 km' },
-        { id: 4, category: 'Public Facilities', title: 'Uncollected Trash Blockage', lat: 14.7590, lng: 121.0390, status: 'pending', time: '1 day ago', distance: '3.1 km' },
-        { id: 5, category: 'Water & Drainage', title: 'Blocked City Drainage', lat: 14.7650, lng: 121.0500, status: 'pending', time: '30 mins ago', distance: '4.0 km' },
-        { id: 6, category: 'Roads & Bridges', title: 'Severe Pothole', lat: 14.7480, lng: 121.0350, status: 'resolved', time: '2 days ago', distance: '1.5 km' },
-        { id: 7, category: 'Public Safety & Regulatory', title: 'Broken Street Light', lat: 14.7630, lng: 121.0420, status: 'pending', time: '2 hrs ago', distance: '0.5 km' },
-        { id: 8, category: 'Street Lighting', title: 'Transformer Sparking', lat: 14.7540, lng: 121.0550, status: 'pending', time: '4 hrs ago', distance: '2.2 km' }
-    ];
+    // Simulated data removal (simulatedHazards removed per request)
 
     // Distance Calculation Logic
     const getDistance = (loc1, loc2) => {
@@ -2248,16 +2433,14 @@ export default function ResidentDashboard() {
                 lat,
                 lng,
                 title: r.description || `Resident Report - ${r.ticket_id}`,
-                category: r.ai_category || r.category || 'Resident Report',
+                category: r.category || r.ai_category || 'Resident Report',
                 status: (r.status || 'pending').toLowerCase(),
                 location: r.location_string || 'N/A'
             };
         }).filter(r => !isNaN(r.lat) && !isNaN(r.lng));
 
-        // Combine simulated hazards with the resident's actual reports
-        const combined = [...simulatedHazards, ...myReportMarkers];
-
-        return combined.map(hazard => {
+        // Process only actual user reports from the database
+        return myReportMarkers.map(hazard => {
             const meters = getDistance(reportLocation, { lat: hazard.lat, lng: hazard.lng });
             return {
                 ...hazard,
@@ -2265,7 +2448,7 @@ export default function ResidentDashboard() {
                 distanceValue: meters || 999999
             };
         }).sort((a, b) => a.distanceValue - b.distanceValue);
-    }, [reportLocation, simulatedHazards, userReports, isLoaded]);
+    }, [reportLocation, userReports, isLoaded]);
 
 
     // Auto-fetch location on mount and periodic updates for proximity tracking
@@ -2478,6 +2661,8 @@ export default function ResidentDashboard() {
 
                 if (mapped.length > 0) {
                     setReportCategory(mapped);
+                } else {
+                    setReportCategory(['Undetermined']);
                 }
             }
         } catch (err) {
@@ -2717,6 +2902,8 @@ export default function ResidentDashboard() {
     };
 
     const navItems = NAV_ITEMS(t);
+
+
     const quickFunctions = QUICK_FUNCTIONS_DATA(t).map(f => ({
         ...f,
         action: f.modal ? () => handleSetModal(f.modal) : () => handleSetTab(f.tab)
@@ -2810,15 +2997,101 @@ export default function ResidentDashboard() {
                 actuallySubmitReport={actuallySubmitReport}
             />
 
+            {activeModal === 'all-notifications' && (
+                <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setActiveModal(null)}>
+                    <motion.div
+                        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+                    >
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                                <Bell className="text-orange-500" /> {t('All Notifications', { defaultValue: 'All Notifications' })}
+                            </h2>
+                            <button onClick={() => setActiveModal(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition focus:outline-none">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-3">
+                            <div className="flex justify-end mb-2">
+                                <button
+                                    onClick={handleMarkAllRead}
+                                    className="text-orange-500 text-sm font-bold hover:underline shrink-0 focus:outline-none"
+                                >
+                                    Mark all as read
+                                </button>
+                            </div>
+                            {notifications.length === 0 ? (
+                                <p className="text-center text-slate-500 py-8">No notifications available.</p>
+                            ) : (
+                                notifications.map(notif => (
+                                    <div key={notif.id} className={`p-4 rounded-xl border ${notif.is_read ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800/80' : 'bg-white dark:bg-slate-800/80 border-blue-100 dark:border-blue-900/60 shadow-sm'} ${notif.is_hidden ? 'opacity-50' : ''}`}>
+                                        <div className="flex justify-between items-start gap-4">
+                                            <div className="flex gap-4">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${notif.is_read ? 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400'}`}>
+                                                    <FileText size={18} />
+                                                </div>
+                                                <div>
+                                                    <h4 className={`font-bold text-[15px] ${notif.is_read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>
+                                                        {notif.title} 
+                                                        {notif.is_hidden && <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-500 px-2.5 py-0.5 rounded-md ml-3 uppercase tracking-wider font-bold">Dismissed</span>}
+                                                    </h4>
+                                                    <p className={`text-[13px] mt-1 ${notif.is_read ? 'text-slate-500 dark:text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{notif.message}</p>
+                                                    <p className="text-[11px] text-blue-500 mt-2 font-bold">{new Date(notif.created_at).toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-2 items-end shrink-0">
+                                                {!notif.is_read && (
+                                                    <button 
+                                                        onClick={() => handleNotificationClick(notif)}
+                                                        className="text-[11px] uppercase tracking-wider font-bold text-blue-500 hover:text-blue-600 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition focus:outline-none"
+                                                    >
+                                                        Mark Read
+                                                    </button>
+                                                )}
+                                                {!notif.is_hidden && (
+                                                    <button 
+                                                        onClick={async (e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_hidden: true } : n));
+                                                            try {
+                                                                await fetch(`http://localhost:33159/api/notifications/${notif.id}`, {
+                                                                    method: 'DELETE',
+                                                                    headers: { 'Authorization': `Bearer ${token}` }
+                                                                });
+                                                            } catch (err) {
+                                                                console.error("Delete error:", err);
+                                                            }
+                                                        }}
+                                                        className="text-[11px] uppercase tracking-wider font-bold text-slate-400 hover:text-red-500 px-3 py-1.5 bg-slate-50 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-900/20 rounded-lg transition focus:outline-none"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
             {/* Top Navigation */}
             <TopNavigation
                 activeTab={activeTab}
                 handleSetTab={handleSetTab}
+                handleSetModal={handleSetModal}
                 theme={theme}
                 changeTheme={changeTheme}
                 showNotifications={showNotifications}
                 setShowNotifications={setShowNotifications}
                 notifications={notifications}
+                setNotifications={setNotifications}
                 handleMarkAllRead={handleMarkAllRead}
                 handleNotificationClick={handleNotificationClick}
                 handleLogout={handleLogout}

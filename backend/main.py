@@ -17,6 +17,10 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import random
+import urllib.request
+import xml.etree.ElementTree as ET
+import email.utils
+from html import unescape
 load_dotenv()
 
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe") # Default to test key
@@ -814,6 +818,24 @@ async def create_new_report(
         location_string=location_string
     )
 
+    # 0. DUPLICATE VALIDATION
+    # Prevent duplicate reports of the exact same issue type at the same location (within ~15 meters)
+    if lat is not None and lng is not None:
+        active_reports = db.query(models.Report).filter(
+            models.Report.category == category,
+            models.Report.status.notin_(["resolved", "cancelled", "rejected"]),
+            models.Report.location_lat != None,
+            models.Report.location_lng != None
+        ).all()
+        
+        for r in active_reports:
+            # Quick approx distance check (0.00015 deg is ~15 meters)
+            if abs(r.location_lat - lat) < 0.00015 and abs(r.location_lng - lng) < 0.00015:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"A report for '{category}' at this exact location is already being processed."
+                )
+
     image_bytes = None
     image_url = None
     if image:
@@ -1016,18 +1038,44 @@ def cancel_report(
     return _enrich_report(updated, db)
 
 @app.patch("/api/reports/{report_id}/resolve", response_model=schemas.ReportResponse)
-def resolve_report(
+async def resolve_report(
     report_id: int,
+    image: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
 ):
-    """Mark a dispatched report as resolved."""
+    """Mark a dispatched report as resolved and require a proof picture."""
     db_report = crud.get_report(db, report_id=report_id)
     if not db_report:
         raise HTTPException(status_code=404, detail="Report not found")
     if db_report.status != "dispatched":
         raise HTTPException(status_code=400, detail=f"Cannot resolve report with status '{db_report.status}'. Must be 'dispatched'.")
+    
+    # Process Proof Image
+    image_bytes = await image.read()
+    file_extension = os.path.splitext(image.filename)[1] or ".jpg"
+    unique_filename = f"resolution_{report_id}_{secrets.token_hex(4)}{file_extension}"
+    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    
+    with open(file_path, "wb") as buffer:
+        buffer.write(image_bytes)
+        
+    image_url = f"/api/uploads/reports/{unique_filename}"
+    db_report.resolution_image_url = image_url
+    db.commit()
+
     updated = crud.update_report_status(db, report_id=report_id, status="resolved", actor_id=current_user.id)
+    
+    # Notify Resident
+    ticket_id = updated.ticket_id or f"RPT-{updated.id}"
+    db_notif = models.Notification(
+        user_id=updated.user_id,
+        title="Infrastructure Repaired",
+        message=f"Success! The issue {ticket_id} has been fully resolved by City Engineering. A proof picture of the finalized repair has been attached to your report for transparency."
+    )
+    db.add(db_notif)
+    db.commit()
+    
     return _enrich_report(updated, db)
 
 @app.delete("/api/reports/{report_id}")
@@ -1053,7 +1101,20 @@ def read_advisories(
     db: Session = Depends(get_db),
     current_user: schemas.UserResponse = Depends(get_current_user)
 ):
-    return crud.get_advisories(db, skip=skip, limit=limit)
+    internal = crud.get_advisories(db, skip=skip, limit=limit)
+    
+    # User requested to remove the auto-monitor contents from the feed
+    # try:
+    #     import re
+    #     req = urllib.request.urlopen("https://news.google.com/rss/search?q=%22North+Caloocan%22+AND+(water+OR+road+OR+power+OR+typhoon+OR+emergency+OR+suspension+OR+class)&hl=en-PH&gl=PH&ceid=PH:en", timeout=1.5)
+    #     tree = ET.parse(req)
+    #     items = tree.findall('.//item')
+    #     for idx, item in enumerate(items[:2]):
+    #         pass # RSS parsing logic hidden
+    # except Exception as e:
+    #     print("Live Feed Error:", e)
+        
+    return internal
 
 @app.post("/api/advisories", response_model=schemas.AdvisoryResponse)
 def create_advisory_route(
@@ -1148,6 +1209,18 @@ def mark_single_notification_read(
     if not success:
         raise HTTPException(status_code=404, detail="Notification not found or not yours")
     return {"message": "Notification marked as read"}
+
+@app.delete("/api/notifications/{notification_id}")
+def delete_single_notification(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserResponse = Depends(get_current_user)
+):
+    """Hard delete a single notification."""
+    success = crud.delete_notification(db, notification_id=notification_id, user_id=current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Notification not found or not yours")
+    return {"message": "Notification deleted"}
 
 # ---------------------------------------------------------------------------
 # Government Workflows (Work Orders, etc.)

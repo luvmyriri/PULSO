@@ -307,8 +307,45 @@ class OBOInspectionResponse(BaseModel):
 # Dashboard Summary Schemas
 # ─────────────────────────────────────────────────────────────────────────────
 
+class ClassificationStat(BaseModel):
+    label: str
+    total: int
+    resolved: int
+    resolution_rate: float
+    icon: str
+    color: str
+
+class VelocityPoint(BaseModel):
+    date: str
+    label: str
+    count: int
+
+class PredictiveAlert(BaseModel):
+    title: str
+    location: str
+    risk_score: int
+    risk_label: str
+    description: str
+    category: str
+
 class GovDashboardStats(BaseModel):
     """Aggregated KPIs for the LGU Command Center dashboard."""
+    # Citizen Reports (PULSO Core)
+    total_reports: int
+    resolved: int
+    pending_approval: int
+    dispatched: int
+    total_trend: Optional[str] = None
+    resolved_trend: Optional[str] = None
+    
+    # Advanced Intelligence
+    classifications: List[ClassificationStat] = []
+    velocity_series: List[VelocityPoint] = []
+    velocity_label: Optional[str] = None
+    predictive_alerts: List[PredictiveAlert] = []
+    staff_stats: dict = {}
+
+    # Departmental KPIs
     total_work_orders: int
     open_work_orders: int
     in_progress_work_orders: int

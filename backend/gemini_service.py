@@ -154,17 +154,29 @@ Return ONLY a valid JSON object with EXACTLY these keys (no extra text before or
   "urgency": "Medium",
   "severity_score": 5.0,
   "smart_summary": "One-sentence technical summary for a dispatcher",
-  "reasoning": "Brief justification for the severity score",
-  "image_analysis": "Description of detected hazards, or 'No image provided'",
+  "reasoning": "Brief justification for the severity score and category choice based on Scope of Service",
+  "image_analysis": "Detailed description of detected hazards, infrastructure types, and technical markers seen in the image",
   "is_inappropriate": false,
   "rejection_reason": ""
 }}
 
-Intelligence Rules (STRICT):
-1. CATEGORY SELECTION: Identify ALL that apply, separated by comma.
-   Options: Road Issue | Water/Drainage | Waste Management | Lighting | Public Safety | Engineering Hazard | Inappropriate Content | Undetermined
-2. ZERO-GUESS POLICY: If the description or image does NOT clearly show an issue related to city infrastructure (e.g., personal indoor issues, unrelated complaints, or ambiguous content), you MUST set "category": "Undetermined". Do NOT guess or default to "Road Issue" if the evidence is weak.
-3. Urgency options: Low | Medium | High | Critical
+Intelligence Rules (STRICT SCOPE OF SERVICE):
+1. CATEGORY SELECTION: Identify ALL that apply, separated by comma. Use the following Scope of Service:
+   - Roads & Bridges: Local city/barangay roads, potholes, broken pavement, sidewalks, gutters, pavement markings (crossings/dividers).
+   - Water & Drainage: De-clogging canals/manholes, pumping stations, estero flood control. Public fountains/toilets in parks. 
+     *EXCLUSION: Do NOT include potable water supply (Maynilad) or major rivers.*
+   - Street Lighting: Burned-out streetlight bulbs, city-owned electrical wiring/lamp posts.
+   - Public Safety & Regulatory: Structural safety (post-earthquake), building permit compliance, debris/fallen tree clearing, fire/electrical compliance for NEW constructions.
+   - Public Facilities: Public schools, health centers, City Hall, basketball courts, plazas, covered courts, parks.
+   - Waste Management: General trash/garbage blockages not related to drainage.
+
+2. SCANNING GUIDELINES: 
+   - Examine images CAREFULLY for infrastructure markers (city-owned vs private utility).
+   - Look for specific technical details: pavement cracks, clogged drainage grates, burnt out LED modules, or structural fractures in public school walls.
+
+3. ZERO-GUESS POLICY: If the issue is NOT within the Engineering Office scope (e.g., private indoor plumbing, Maynilad water leaks, Meralco power line issues without post damage) or is ambiguous, you MUST set "category": "Undetermined" or "Waste Management".
+
+4. Urgency options: Low | Medium | High | Critical
 
 Severity Guidelines:
 - Downed electrical wires / structural collapse / active fire → Critical, score 9–10

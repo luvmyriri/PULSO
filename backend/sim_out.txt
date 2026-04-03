@@ -1,0 +1,20 @@
+﻿Classification: Roads & Infrastructure
+  Total: 0, Resolved: 0
+  Matching Report IDs: []
+--------------------
+Classification: Water & Drainage
+  Total: 0, Resolved: 0
+  Matching Report IDs: []
+--------------------
+Classification: Electrical & Street Lighting
+  Total: 2, Resolved: 1
+  Matching Report IDs: [89, 90]
+--------------------
+Classification: Public Safety & Hazards
+  Total: 1, Resolved: 0
+  Matching Report IDs: [90]
+--------------------
+Classification: Public Facilities & Others
+  Total: 0, Resolved: 0
+  Matching Report IDs: []
+--------------------

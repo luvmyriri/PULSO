@@ -210,7 +210,6 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
 
                 {/* ── OPERATIONS ── */}
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-1">Operations</div>
-                <NavItem icon={Home} label="Portal Home" to="/" />
                 <NavItem icon={LayoutDashboard} label="My Dashboard" to="/gov/my-dashboard" />
                 {/* Command Center only for dispatcher / admin clerk + senior roles */}
                 {hasRole(role, ['admin_clerk', 'dispatcher', 'admin_officer', ...SENIOR_ROLES]) && (

@@ -36,6 +36,7 @@ class ReportBase(BaseModel):
     location_lng: Optional[float] = None
     location_string: Optional[str] = None
     image_url: Optional[str] = None
+    resolution_image_url: Optional[str] = None
     ai_metadata: Optional[str] = None
 
 class ReportCreate(ReportBase):
@@ -93,6 +94,7 @@ class NotificationResponse(NotificationBase):
     id: int
     user_id: int
     is_read: bool
+    is_hidden: bool = False
     created_at: datetime
 
     class Config:
