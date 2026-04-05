@@ -1,6 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:mobile_app/core/theme/app_theme.dart';
+import 'package:pulso_mobile/core/theme/app_theme.dart';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter_animate/flutter_animate.dart';

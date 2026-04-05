@@ -12,8 +12,10 @@ import {
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, HeatmapLayer, CircleF, MarkerF } from '@react-google-maps/api';
 import GovSidebar from '../components/GovSidebar';
+import { useTheme } from '../contexts/ThemeContext';
+import ThemeToggle from '../components/ThemeToggle';
 
-const API = 'http://localhost:8000';
+const API_BASE_URL = `http://${window.location.hostname}:33159`;
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const LIBRARIES = ['places', 'geometry', 'visualization'];
 
@@ -25,13 +27,22 @@ const THREAT_CONFIG = {
     MONITORING: { color: '#22c55e', bg: 'bg-green-50 dark:bg-green-900/10',  border: 'border-green-200 dark:border-green-800',  text: 'text-green-700 dark:text-green-400',  badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',  ring: '#22c55e', fillOpacity: 0.08, label: 'OK' },
 };
 
-const mapStyle = [
+const DARK_MAP_STYLE = [
     { elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
     { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
     { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
     { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#334155' }] },
     { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#475569' }] },
     { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0c4a6e' }] },
+    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+];
+
+const LIGHT_MAP_STYLE = [
+    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#f8fafc' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
     { featureType: 'poi', stylers: [{ visibility: 'off' }] },
 ];
 
@@ -105,6 +116,10 @@ const ClusterCard = ({ cluster, onSelect, selected }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function GovAnalyticsPage() {
+    const { theme } = useTheme();
+    const isDarkMode = theme === 'system' 
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches 
+        : theme === 'dark';
     const navigate = useNavigate();
     const token = localStorage.getItem('pulso_token');
     const headers = { Authorization: `Bearer ${token}` };
@@ -126,7 +141,6 @@ export default function GovAnalyticsPage() {
     const [categoryFilter, setCategoryFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [mapRef, setMapRef] = useState(null);
-    const [darkMode] = useState(true);
     const [currentUser] = useState(() => JSON.parse(localStorage.getItem('pulso_user') || '{}'));
     const [toast, setToast] = useState(null);
     const [fetchError, setFetchError] = useState(null);
@@ -146,11 +160,11 @@ export default function GovAnalyticsPage() {
         setFetchError(null);
         try {
             const [summaryRes, clustersRes, forecastRes, recurrenceRes, heatmapRes] = await Promise.all([
-                fetch(`${API}/api/gov/analytics/summary`, { headers }),
-                fetch(`${API}/api/gov/analytics/clusters?days_back=${daysBack}${categoryFilter ? `&category=${categoryFilter}` : ''}`, { headers }),
-                fetch(`${API}/api/gov/analytics/forecast`, { headers }),
-                fetch(`${API}/api/gov/analytics/recurrence`, { headers }),
-                fetch(`${API}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/summary`, { headers }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/clusters?days_back=${daysBack}${categoryFilter ? `&category=${categoryFilter}` : ''}`, { headers }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/forecast`, { headers }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/recurrence`, { headers }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers }),
             ]);
             if (summaryRes.ok)    setSummary(await summaryRes.json());
             else throw new Error(`Summary: ${summaryRes.status}`);
@@ -176,7 +190,7 @@ export default function GovAnalyticsPage() {
             recurrence: `/api/gov/analytics/export/recurrence?days_window=${daysBack}`,
             full: `/api/gov/analytics/export/full-report?days_back=${daysBack}`,
         };
-        const url = `${API}${endpoints[type] || endpoints.full}`;
+        const url = `${API_BASE_URL}${endpoints[type] || endpoints.full}`;
         fetch(url, { headers })
             .then(res => {
                 if (!res.ok) throw new Error('Export failed');
@@ -202,7 +216,7 @@ export default function GovAnalyticsPage() {
         setNarrative(null);
         setNarrativeError(null);
         try {
-            const res = await fetch(`${API}/api/gov/analytics/narrative`, {
+            const res = await fetch(`${API_BASE_URL}/api/gov/analytics/narrative`, {
                 method: 'POST',
                 headers: { ...headers, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ cluster_id: cluster.cluster_id, days_back: daysBack }),
@@ -232,7 +246,7 @@ export default function GovAnalyticsPage() {
         setAiBrief(null);
         try {
             const topCluster = clusters[0];
-            const res = await fetch(`${API}/api/ai/assistant`, {
+            const res = await fetch(`${API_BASE_URL}/api/ai/assistant`, {
                 method: 'POST',
                 headers: { ...headers, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -257,7 +271,7 @@ export default function GovAnalyticsPage() {
         setCreatingPR(true);
         setPrSuccess(null);
         try {
-            const res = await fetch(`${API}/api/gov/analytics/create-procurement`, {
+            const res = await fetch(`${API_BASE_URL}/api/gov/analytics/create-procurement`, {
                 method: 'POST',
                 headers: { ...headers, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -335,6 +349,7 @@ export default function GovAnalyticsPage() {
                             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold text-sm px-4 py-2 rounded-xl transition-colors">
                             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
                         </button>
+                        <ThemeToggle />
                         <button onClick={() => exportCSV(activeTab === 'clusters' ? 'clusters' : activeTab === 'forecast' ? 'forecast' : activeTab === 'recurrence' ? 'recurrence' : 'full')}
                             className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded-xl transition-colors">
                             <Download size={15} /> Export CSV
@@ -459,7 +474,7 @@ export default function GovAnalyticsPage() {
                                             center={mapCenter}
                                             zoom={selectedCluster ? 16 : 14}
                                             mapContainerStyle={{ width: '100%', height: '100%' }}
-                                            options={{ styles: mapStyle, disableDefaultUI: false, mapTypeControl: false, zoomControl: true, streetViewControl: false, fullscreenControl: false }}
+                                            options={{ styles: isDarkMode ? DARK_MAP_STYLE : LIGHT_MAP_STYLE, disableDefaultUI: false, mapTypeControl: false, zoomControl: true, streetViewControl: false, fullscreenControl: false }}
                                             onLoad={map => setMapRef(map)}
                                         >
                                             {/* Heatmap layer */}
@@ -645,9 +660,36 @@ export default function GovAnalyticsPage() {
                                                 {creatingPR ? <><Loader2 size={15} className="animate-spin" /> Creating PR...</> : <><ClipboardList size={15} /> Create Procurement Request</>}
                                             </button>
                                             <button
-                                                onClick={() => navigate('/gov/work-orders')}
-                                                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold text-sm px-4 py-3 rounded-xl transition-colors">
-                                                <Package size={15} /> Dispatch Work Order
+                                                onClick={() => navigate('/dispatcher', { 
+                                                    state: { 
+                                                        // Geographic targeting
+                                                        center: { lat: selectedCluster.centroid_lat, lng: selectedCluster.centroid_lng },
+                                                        zoom: 17,
+                                                        // Fuzzy filters (fallback)
+                                                        category: selectedCluster.dominant_category,
+                                                        barangay: selectedCluster.barangay,
+                                                        // ── REPORT-DRIVEN CONNECTION ──
+                                                        // Exact report IDs from DBSCAN cluster — dispatcher uses
+                                                        // these to pinpoint precisely which citizen reports
+                                                        // belong to this stress zone
+                                                        report_ids: selectedCluster.report_ids || [],
+                                                        // Cluster metadata for the mission banner
+                                                        cluster_id: selectedCluster.cluster_id,
+                                                        radius_meters: selectedCluster.radius_meters,
+                                                        threat_level: selectedCluster.threat_level,
+                                                        severity_score: selectedCluster.severity_score,
+                                                        estimated_cost: selectedCluster.estimated_cost_formatted,
+                                                        report_count: selectedCluster.report_count,
+                                                    } 
+                                                })}
+                                                className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm px-4 py-3 rounded-xl transition-all shadow-lg shadow-orange-900/20 active:scale-95 group">
+                                                <Navigation size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" /> 
+                                                Tactical Command Response
+                                                {selectedCluster.report_ids?.length > 0 && (
+                                                    <span className="bg-white/20 text-white text-[10px] font-black px-2 py-0.5 rounded-full ml-1">
+                                                        {selectedCluster.report_ids.length} reports
+                                                    </span>
+                                                )}
                                             </button>
                                         </div>
                                     </motion.div>

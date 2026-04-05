@@ -5,7 +5,7 @@
 /// /api/geocode/reverse endpoint so the Google Maps key stays server-side.
 
 import 'package:geolocator/geolocator.dart';
-import 'package:mobile_app/core/api/api_client.dart';
+import 'package:pulso_mobile/core/api/api_client.dart';
 
 class LocationService {
   final ApiClient _api;

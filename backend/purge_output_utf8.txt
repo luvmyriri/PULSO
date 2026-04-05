@@ -1,0 +1,81 @@
+Traceback (most recent call last):
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.ForeignKeyViolation: update or delete on table "users" violates foreign key constraint "dispatch_crews_user_id_fkey" on table "dispatch_crews"
+DETAIL:  Key (id)=(40) is still referenced from table "dispatch_crews".
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Apache24\htdocs\PULSO\backend\deep_purge.py", line 57, in deep_purge_legacy_data
+    deleted_count = db.query(User).filter(User.id.in_(legacy_ids)).delete(synchronize_session=False)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\orm\query.py", line 3210, in delete
+    self.session.execute(
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\orm\bulk_persistence.py", line 2033, in orm_execute_statement
+    return super().orm_execute_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\Gene\AppData\Roaming\Python\Python311\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.ForeignKeyViolation) update or delete on table "users" violates foreign key constraint "dispatch_crews_user_id_fkey" on table "dispatch_crews"
+DETAIL:  Key (id)=(40) is still referenced from table "dispatch_crews".
+
+[SQL: DELETE FROM users WHERE users.id IN (%(id_1_1)s, %(id_1_2)s, %(id_1_3)s, %(id_1_4)s, %(id_1_5)s, %(id_1_6)s, %(id_1_7)s, %(id_1_8)s, %(id_1_9)s, %(id_1_10)s, %(id_1_11)s, %(id_1_12)s, %(id_1_13)s, %(id_1_14)s, %(id_1_15)s, %(id_1_16)s, %(id_1_17)s, %(id_1_18)s, %(id_1_19)s, %(id_1_20)s, %(id_1_21)s)]
+[parameters: {'id_1_1': 40, 'id_1_2': 41, 'id_1_3': 30, 'id_1_4': 31, 'id_1_5': 42, 'id_1_6': 32, 'id_1_7': 33, 'id_1_8': 34, 'id_1_9': 35, 'id_1_10': 36, 'id_1_11': 37, 'id_1_12': 38, 'id_1_13': 39, 'id_1_14': 43, 'id_1_15': 44, 'id_1_16': 45, 'id_1_17': 46, 'id_1_18': 47, 'id_1_19': 48, 'id_1_20': 49, 'id_1_21': 50}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Dropping obsolete table: dispatch_notifications
+Dropping obsolete table: dispatch_tasks
+Table dispatch_teams already absent/dropped.
+Scrubbing references for 21 legacy users: [40, 41, 30, 31, 42, 32, 33, 34, 35, 36, 37, 38, 39, 43, 44, 45, 46, 47, 48, 49, 50]
+Scrubbed audit_logs.actor_id
+Scrubbed work_orders.assigned_to_id
+Scrubbed work_orders.assigned_by_id
+Scrubbed process_timelines.actor_id
+Scrubbed procurement_requests.raised_by_id
+Scrubbed procurement_requests.validated_by_id
+Scrubbed procurement_requests.approved_by_id
+Scrubbed project_requests.created_by_id
+Scrubbed project_requests.survey_engineer_id
+Scrubbed project_requests.design_lead_id
+Scrubbed project_requests.project_engineer_id
+Scrubbed project_requests.certificate_issued_by_id
+Scrubbed obo_inspections.assigned_inspector_id
+Scrubbed obo_inspections.filed_by_id
+Scrubbed obo_inspections.cleared_by_id
+Scrubbed reports.user_id
+CRITICAL ERROR during deep purge: (psycopg2.errors.ForeignKeyViolation) update or delete on table "users" violates foreign key constraint "dispatch_crews_user_id_fkey" on table "dispatch_crews"
+DETAIL:  Key (id)=(40) is still referenced from table "dispatch_crews".
+
+[SQL: DELETE FROM users WHERE users.id IN (%(id_1_1)s, %(id_1_2)s, %(id_1_3)s, %(id_1_4)s, %(id_1_5)s, %(id_1_6)s, %(id_1_7)s, %(id_1_8)s, %(id_1_9)s, %(id_1_10)s, %(id_1_11)s, %(id_1_12)s, %(id_1_13)s, %(id_1_14)s, %(id_1_15)s, %(id_1_16)s, %(id_1_17)s, %(id_1_18)s, %(id_1_19)s, %(id_1_20)s, %(id_1_21)s)]
+[parameters: {'id_1_1': 40, 'id_1_2': 41, 'id_1_3': 30, 'id_1_4': 31, 'id_1_5': 42, 'id_1_6': 32, 'id_1_7': 33, 'id_1_8': 34, 'id_1_9': 35, 'id_1_10': 36, 'id_1_11': 37, 'id_1_12': 38, 'id_1_13': 39, 'id_1_14': 43, 'id_1_15': 44, 'id_1_16': 45, 'id_1_17': 46, 'id_1_18': 47, 'id_1_19': 48, 'id_1_20': 49, 'id_1_21': 50}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)

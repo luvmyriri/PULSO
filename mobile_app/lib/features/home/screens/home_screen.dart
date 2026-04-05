@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_app/core/theme/app_theme.dart';
+import 'package:pulso_mobile/core/theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
-import 'package:mobile_app/features/home/home_provider.dart';
-import 'package:mobile_app/features/registration/screens/camera_screen.dart';
-import 'package:mobile_app/features/home/screens/map_screen.dart';
+import 'package:pulso_mobile/features/home/home_provider.dart';
+import 'package:pulso_mobile/features/registration/screens/camera_screen.dart';
+import 'package:pulso_mobile/features/home/screens/map_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

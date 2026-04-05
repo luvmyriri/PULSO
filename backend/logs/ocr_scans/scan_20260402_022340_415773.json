@@ -1,0 +1,28 @@
+{
+    "timestamp": "2026-04-02T02:23:40.415773",
+    "ai_ver": "fallback",
+    "engine": "google-vision-gemini-v2",
+    "raw_text": "REPUBLIKA NG PILIPINAS\nRepublic of the Philippines\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine Identification Card\n2197-1609-8154-0734\nApelyido/Last Name\nTAMUNDAY\nMga Pangalan/Given Names\nJHAMES WILMAR\nGitnang Apelyido/Middle Name\nNATIVIDAD\nPetsa ng Kapanganakan/Date of Birth\nDECEMBER 13, 2005\nTirahan/Address\nPH8A PKG14 BLK15 LOT11, BARANGAY 176, CITY OF\nCALOOCAN, NCR, THIRD DISTRICT\nPHL\nAraw ng pagkakaloob/Date of\n11 NOVEMBER 2021\nKasarian/Sex\nMALE\nUri ng Dugo/Blood Type\nO+\nKalagayang Sibil/Marital Status\nMARRIED\nLugar ng Kapanganakan/Place of Birth\nCAMALIGAN, CAMARINES SUR\nIf found, please return to the nearest\nPSA Office\nwww.psa.gov.ph\n21H1153840",
+    "parsed_data": {
+        "id_type": "philid",
+        "id_type_label": "Philippine National ID",
+        "first_name": "Jhames Wilmar",
+        "last_name": "Tamunday",
+        "middle_name": "Natividad",
+        "dob": "2005-12-13",
+        "sex": "Male",
+        "address": "Blk15 Lot11 Ph8A Pkg14",
+        "house_no": "",
+        "block_lot": "BLK15 LOT11",
+        "subdivision": "",
+        "street": "Ph8A Pkg14",
+        "barangay": "176",
+        "postal_code": "",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 176).",
+        "pcn": "2197-1609-8154-0734",
+        "is_document_mismatch": false,
+        "mismatch_reason": ""
+    },
+    "ai_intelligence_layer": null
+}

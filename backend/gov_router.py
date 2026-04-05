@@ -869,8 +869,8 @@ def list_boq(
             "title": item.item_name,
             "description": f"Qty: {item.quantity} {item.unit} @ ₱{item.unit_cost:,.2f} = ₱{item.total_cost:,.2f}",
             "status": pr.status if pr else "unknown",
-            "barangay": pr.title if pr else "—",
-            "created_at": str(item.created_at) if hasattr(item, "created_at") else "—",
+            "barangay": None,
+            "created_at": str(pr.created_at) if pr else None,
         })
     return result
 

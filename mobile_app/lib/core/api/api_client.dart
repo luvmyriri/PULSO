@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:mobile_app/core/api/api_endpoints.dart';
+import 'package:pulso_mobile/core/api/api_endpoints.dart';
 import 'package:flutter/foundation.dart';
 
 class ApiClient {
@@ -8,14 +8,16 @@ class ApiClient {
 
   // 10.0.2.2 is the special IP for the host machine's localhost on Android Emulator
   static String get baseUrl {
-    if (kIsWeb) return 'http://localhost:8000';
-    return Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://localhost:8000';
+    if (kIsWeb) return 'http://localhost:33159';
+    // Connected to local network backend
+    const String remoteUrl = 'http://192.168.1.121:33159';
+    return (Platform.isAndroid || Platform.isIOS) ? remoteUrl : 'http://localhost:33159';
   }
 
   ApiClient() {
     _dio.options.baseUrl = baseUrl;
-    _dio.options.connectTimeout = const Duration(seconds: 15);
-    _dio.options.receiveTimeout = const Duration(seconds: 15);
+    _dio.options.connectTimeout = const Duration(seconds: 30);
+    _dio.options.receiveTimeout = const Duration(seconds: 60);
 
     _dio.interceptors.add(LogInterceptor(
       request: true,

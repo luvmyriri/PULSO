@@ -854,13 +854,18 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
             mismatch_detected = True
             mismatch_reason = "Identity Mismatch: The portrait photo on the front does not match the individual on the back."
 
-        # Only overwrite if LLM found something useful, else keep parser's result
+        # Address Consistency Check (Specific to LTO/Dual-Sided IDs)
+        if llm_extracted.get('is_address_match') == False:
+            mismatch_detected = True
+            mismatch_reason = "Address Error: The address printed on the front ID does not match the record on the back. Please scan the same physical document."
+
+        # AI-FIRST EXTRACTION: Gemini is now the primary source of truth for intelligence.
+        # We trust AI for semantic cleaning and structural decomposition.
         for key in ('first_name', 'last_name', 'middle_name', 'suffix', 'dob', 'sex', 'address', 'barangay', 'pcn', 'postal_code', 'license_no'):
-            if llm_extracted.get(key) and not parsed.get(key):
-                parsed[key] = llm_extracted.get(key)
-            elif llm_extracted.get(key) and len(str(llm_extracted.get(key))) > len(str(parsed.get(key, ''))):
-                # Trust LLM for better cleaning
-                parsed[key] = llm_extracted.get(key)
+            ai_val = llm_extracted.get(key)
+            if ai_val is not None and str(ai_val).strip() != "":
+                parsed[key] = ai_val
+                print(f"[OCR] AI Intelligent Field: {key}='{ai_val}'")
 
     first_name  = parsed.get('first_name', '')
     last_name   = parsed.get('last_name', '')
@@ -938,27 +943,31 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
         res['verification_message'] = mismatch_reason
 
     # Log the attempt for future improvement
-    log_ocr_attempt(full_text, res)
+    log_ocr_attempt(full_text, res, ai_raw=llm_extracted)
 
     return res
 
 
-def log_ocr_attempt(raw_text: str, parsed_data: Dict[str, Any]):
+def log_ocr_attempt(raw_text: str, parsed_data: Dict[str, Any], ai_raw: Optional[Dict] = None):
     """Saves the OCR attempt to a local file for analysis."""
     try:
         log_dir = os.path.join(os.getcwd(), 'logs', 'ocr_scans')
         os.makedirs(log_dir, exist_ok=True)
-
+        
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
         filename = f"scan_{timestamp}.json"
-        filepath = os.path.join(log_dir, filename)
-
+        
+        # Enhanced metadata for tracking AI performance
         log_entry = {
             'timestamp': datetime.now().isoformat(),
+            'ai_ver': "gemini-2.0-flash" if ai_raw else "fallback",
+            'engine': "google-vision-gemini-v2",
             'raw_text': raw_text,
-            'parsed_data': parsed_data
+            'parsed_data': parsed_data,
+            'ai_intelligence_layer': ai_raw
         }
 
+        filepath = os.path.join(log_dir, filename)
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(log_entry, f, indent=4)
         print(f"[OCR] Attempt logged to {filename}")

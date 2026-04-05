@@ -367,7 +367,7 @@ function Landing() {
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
                     >
                         <div>
-                            <div className="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-sm tracking-widest uppercase mb-3">
+                            <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-500 font-bold text-sm tracking-widest uppercase mb-3">
                                 <ExternalLink size={16} /> {t('landing.services.badge')}
                             </div>
                             <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-tight">

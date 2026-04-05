@@ -12,7 +12,7 @@ import {
     HardHat, Ruler, Building2, ShieldCheck, PackageCheck, FlaskConical,
     Wrench, BarChart as BarChart2, ChevronDown, ChevronRight, Map,
     ClipboardList, GitBranch, FileCheck, Truck, Eye, UserCog,
-    BookOpen, Activity, FileBarChart2, FileCheck2, Brain
+    BookOpen, Activity, FileBarChart2, FileCheck2, Brain, Home
 } from 'lucide-react';
 import Branding from './Branding';
 

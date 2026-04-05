@@ -1,16 +1,21 @@
+import os
 import psycopg2
+from dotenv import load_dotenv
 
-try:
-    conn = psycopg2.connect("dbname='pulso_db' user='postgres' password='0428' host='localhost'")
-    cursor = conn.cursor()
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-    cursor.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'users'")
-    columns = cursor.fetchall()
-    
-    print("Table: users")
-    for col in columns:
-        print(f"- {col[0]} ({col[1]})")
-
+def check_columns(table):
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+    cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}';")
+    cols = cur.fetchall()
+    print(f"Columns in {table}:", [c[0] for c in cols])
     conn.close()
-except Exception as e:
-    print(f"Error: {e}")
+
+if __name__ == "__main__":
+    check_columns('dispatch_status_updates')
+    check_columns('audit_logs')
+    check_columns('process_timeline')
+    check_columns('work_orders')
+    check_columns('reports')

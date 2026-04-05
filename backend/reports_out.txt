@@ -1,0 +1,19 @@
+﻿--- Detailed Report Audit ---
+ID: 88
+  Ticket:   RPT-11561295
+  Status:   cancelled
+  Category: Roads & Bridges, Water & Drainage, Public Safety & Regulatory
+  AI Cat:   Road Issue, Water/Drainage
+--------------------
+ID: 89
+  Ticket:   RPT-10296030
+  Status:   resolved
+  Category: Street Lighting
+  AI Cat:   Lighting
+--------------------
+ID: 90
+  Ticket:   RPT-27445556
+  Status:   pending
+  Category: Street Lighting
+  AI Cat:   Lighting, Public Safety
+--------------------
