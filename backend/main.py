@@ -7,7 +7,8 @@ from pydantic import BaseModel
 import uvicorn
 import shutil
 import httpx
-from typing import Optional, List
+import socket
+from typing import Optional, List, Union
 from sqlalchemy.orm import Session
 import auth
 import secrets
@@ -32,10 +33,14 @@ import deduplication_service
 import maps_service
 
 # Database imports
+import gov_models, gov_router, gov_schemas, gov_crud           # Government-side modules
 import models, schemas, crud
-import gov_models, gov_router           # Government-side modules
 import analytics_router                 # AI Analytics & Intelligence Engine
+import philsys_router                   # PhilSys Check Authentication (PSA)
+import predictive_router                # Predictive Maintenance Engine
+import document_router                  # System Document & FQA Manager
 from database import engine, get_db
+from utils.geometry_utils import is_in_caloocan
 
 # Create ALL tables — citizen-side + government-side
 models.Base.metadata.create_all(bind=engine)
@@ -55,14 +60,100 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+from fastapi.responses import FileResponse
+@app.get("/api/download/agent-app")
+async def download_agent_app():
+    """
+    Official APK distribution endpoint. 
+    Forces the correct Android MIME type to prevent browsers from renaming it to .zip.
+    """
+    # Look for the APK in the shared production path
+    apk_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "public", "apk", "pulso-agent.apk")
+    
+    if not os.path.exists(apk_path):
+        # Local fallback if sibling directory is not accessible
+        apk_path = "pulso-agent.apk"
+        
+    if not os.path.exists(apk_path):
+        raise HTTPException(status_code=404, detail="PULSO Agent APK not found on server.")
+
+    return FileResponse(
+        path=apk_path,
+        filename="pulso-agent.apk",
+        media_type="application/vnd.android.package-archive"
+    )
+
+@app.get("/api/geo/caloocan-border")
+async def get_caloocan_border(sector: Optional[str] = Query(None)):
+    """Returns Caloocan City boundary GeoJSON for map visualization with optional sector filtering."""
+    import json
+    border_path = os.path.join(os.path.dirname(__file__), "caloocan_border.json")
+    if not os.path.exists(border_path):
+        return {"type": "FeatureCollection", "features": []}
+    
+    with open(border_path, 'r') as f:
+        data = json.load(f)
+        
+    if sector:
+        # Filter features based on the provided sector (e.g., 'North' or 'South')
+        data["features"] = [f for f in data.get("features", []) 
+                           if f.get("properties", {}).get("sector") == sector]
+    
+    return data
+
+@app.get("/api/download/resident-app")
+async def download_resident_app():
+    """
+    Official Resident APK distribution endpoint.
+    """
+    # Look for the APK in the shared production path
+    apk_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "public", "apk", "pulso-resident.apk")
+    
+    if not os.path.exists(apk_path):
+        raise HTTPException(status_code=404, detail="PULSO Resident APK not found on server.")
+
+    return FileResponse(
+        path=apk_path,
+        filename="pulso-resident.apk",
+        media_type="application/vnd.android.package-archive"
+    )
+
 # Configure CORS so the Vite frontend and Flutter mobile app can access the backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all origins (Physical mobile devices, Web, Emulators) during development
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/api/system/ip")
+async def get_system_ip():
+    """
+    Returns the current local network IP address of the server.
+    Used by the frontend to dynamically update download links for mobile devices.
+    """
+    try:
+        # Create a dummy socket to detect the preferred interface/IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0)
+        try:
+            # doesn't even have to be reachable
+            s.connect(('10.254.254.254', 1))
+            IP = s.getsockname()[0]
+        except Exception:
+            IP = '127.0.0.1'
+        finally:
+            s.close()
+        return {"ip": IP}
+    except Exception:
+        # Fallback to standard hostname resolution
+        try:
+            hostname = socket.gethostname()
+            IP = socket.gethostbyname(hostname)
+            return {"ip": IP}
+        except:
+            return {"ip": "127.0.0.1"}
 
 # ---------------------------------------------------------------------------
 # Included Routers — Government-Side & Analytics Engine
@@ -81,38 +172,12 @@ class VerificationRequest(BaseModel):
 
 # send_otp_email was consolidated below to handle all notification types
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    unverified_exception = HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Account not verified. Please check your email for the verification code.",
-    )
-    try:
-        payload = auth.jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except auth.JWTError:
-        raise credentials_exception
-        
-    user = crud.get_user_by_email(db, email=email)
-    if user is None:
-        raise credentials_exception
-        
-    # STRICT ENFORCEMENT: Block any protected request if user is not verified
-    # (Except for system administrators who might need to fix things)
-    if not user.is_verified and user.role == "resident":
-        raise unverified_exception
-        
-    return user
+# Use centralized auth.get_current_user from auth.py (includes DB session management)
+get_current_user = auth.get_current_user
 
 def require_role(*roles):
     """Dependency factory: ensures current user has one of the given roles or is an executive/admin."""
-    def _check(current_user: schemas.UserResponse = Depends(get_current_user)):
+    def _check(current_user: Union[models.Official, models.Resident] = Depends(get_current_user)):
         # Inherently grant system administrators and senior executives access to manager/dispatcher functions
         expanded_roles = list(roles)
         if "manager" in roles or "dispatcher" in roles:
@@ -164,6 +229,12 @@ async def verify_recaptcha(token: str):
 app.include_router(gov_router.router)
 # AI Analytics & Intelligence Engine
 app.include_router(analytics_router.router)
+# PhilSys Check Authentication (PSA National ID Verification)
+app.include_router(philsys_router.router)
+# Predictive Maintenance Engine
+app.include_router(predictive_router.router)
+# System Document tracking & validation (FQA)
+app.include_router(document_router.router, prefix="/api/gov/documents", tags=["System Documents"])
 
 # ---------------------------------------------------------------------------
 # Health & Root
@@ -181,6 +252,16 @@ async def root():
 async def health_check():
     return {"status": "healthy", "service": "PULSO Core Engine"}
 
+@app.get("/api/ai/rate-limits")
+async def ai_rate_limit_status(
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("manager"))
+):
+    """
+    Returns current AI API usage stats for billing monitoring.
+    Only accessible by managers/admins to track consumption.
+    """
+    return gemini_service.get_rate_limit_stats()
+
 class AIChatRequest(BaseModel):
     query: str
     context: Optional[str] = None
@@ -188,7 +269,7 @@ class AIChatRequest(BaseModel):
 @app.post("/api/ai/assistant")
 async def ai_omni_assistant(
     req: AIChatRequest,
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """
     PULSO Omni-Assistant: AI integration for all screens and inputs.
@@ -233,8 +314,8 @@ async def verify_residency(
 # Authentication
 # ---------------------------------------------------------------------------
 
-@app.post("/api/auth/register", response_model=schemas.UserResponse)
-def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+@app.post("/api/auth/register", response_model=schemas.ResidentResponse)
+def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
     # Enforce lowercase and remove trailing spaces added by mobile keyboards
     user.email = user.email.strip().lower()
 
@@ -259,8 +340,13 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     user_data = user.model_dump()
     user_data["password"] = auth.get_password_hash(user_data["password"])
     
+    # Remove 'barangay' which is a property with no setter to prevent AttributeError
+    brgy_str = user_data.pop("barangay", None)
+    if brgy_str and str(brgy_str).isdigit() and not user_data.get("barangay_id"):
+        user_data["barangay_id"] = int(brgy_str)
+    
     # Create user as unverified
-    new_user = models.User(
+    new_user = models.Resident(
         **{k: v for k, v in user_data.items() if k != "password"},
         password_hash=user_data["password"],
         verification_code=code,
@@ -296,9 +382,23 @@ async def login(
     captcha_token: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
+    import logging
+    logging.warning(f"LOGIN DEBUG: username={form_data.username}, password_length={len(form_data.password)}")
+    
     # 1. Verify basic credentials first (to determine if we should challenge with reCAPTCHA)
     user = crud.get_user_by_email(db, email=form_data.username)
-    if not user or not auth.verify_password(form_data.password, user.password_hash):
+    logging.warning(f"LOGIN DEBUG: user found = {user is not None}")
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    verify_result = auth.verify_password(form_data.password, user.password_hash)
+    logging.warning(f"LOGIN DEBUG: verify_result = {verify_result}")
+    
+    if not verify_result:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -306,23 +406,34 @@ async def login(
         )
     
     # 2. Check for reCAPTCHA if credentials are valid
-    if not captcha_token:
-        return {
-            "require_captcha": True,
-            "message": "Security synchronization required. Please verify you are not a robot."
-        }
+    if user.role == "resident":
+        if captcha_token == "mobile_bypass":
+            pass # mobile app bypass check
+        else:
+            if not captcha_token:
+                return {
+                    "require_captcha": True,
+                    "message": "Security synchronization required. Please verify you are not a robot."
+                }
 
-    if not await verify_recaptcha(captcha_token):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid reCAPTCHA. Please try again."
-        )
+            if not await verify_recaptcha(captcha_token):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid reCAPTCHA. Please try again."
+                )
     
-    # 3. Check verification status (Mandatory for public residents)
+    # 3. Check verification status (Mandatory for residents)
     if not user.is_verified and user.role == "resident":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account not verified. Please check your email for the verification code.",
+        )
+
+    # 4. Check suspension status (Officials only)
+    if getattr(user, "is_suspended", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account suspended by administration. Please contact your department head.",
         )
         
     from datetime import timedelta
@@ -340,7 +451,11 @@ async def login(
             "role": user.role,
             "barangay": user.barangay,
             "phone_number": user.phone_number,
-            "created_at": user.created_at
+            "address": getattr(user, "address", ""),
+            "display_name": getattr(user, "display_name", user.full_name),
+            "created_at": user.created_at,
+            "capabilities": user.capabilities,
+            "access_level": getattr(getattr(user, "role_ref", None), "access_level", None)
         }
     }
 
@@ -663,7 +778,7 @@ async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db
 # ---------------------------------------------------------------------------
 
 @app.get("/api/me", response_model=schemas.UserResponse)
-def get_me(current_user: schemas.UserResponse = Depends(get_current_user)):
+def get_me(current_user: Union[models.Resident, models.Official] = Depends(get_current_user)):
     """Returns the currently authenticated user's profile."""
     return current_user
 
@@ -672,20 +787,23 @@ def list_users(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("manager"))
 ):
     """List all users. Manager only."""
-    users = db.query(models.User).offset(skip).limit(limit).all()
+    # Only managers can list residents (for now, we'll focus on residents)
+    users = db.query(models.Resident).offset(skip).limit(limit).all()
     return users
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserResponse)
 def get_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
-    if current_user.id != user_id and current_user.role not in ["dispatcher", "manager"]:
-        raise HTTPException(status_code=403, detail="Not authorized to access this user")
+    if current_user.id != user_id and not hasattr(current_user, 'role_id'): # simplistic check, improved legacy
+        if getattr(current_user, 'role', None) not in ["dispatcher", "manager", "admin"]:
+            raise HTTPException(status_code=403, detail="Not authorized to access this user")
+    
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -696,7 +814,7 @@ def update_user(
     user_id: int,
     user_update: schemas.UserUpdate,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized to modify this user")
@@ -710,20 +828,16 @@ def update_user(
 # ---------------------------------------------------------------------------
 
 class ReportStatusUpdate(BaseModel):
-    status: str
+    status: Optional[str] = None
+    targetStatus: Optional[str] = None # Frontend sends both for compatibility
+    budget: Optional[float] = None
+    deployment_date: Optional[datetime] = None
 
-def _enrich_report(report, db: Session):
-    """Attach reporter_name to a report object for serialization."""
-    if report is None:
-        return None
-    reporter = db.query(models.User).filter(models.User.id == report.user_id).first()
-    report.reporter_name = reporter.full_name if reporter else None
-    return report
 
 @app.get("/api/reports/stats", response_model=schemas.ReportStats)
 def get_report_stats(
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("manager", "dispatcher"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("manager", "dispatcher"))
 ):
     """Returns aggregated report counts by status. For management KPI dashboard."""
     return crud.get_report_stats(db)
@@ -731,19 +845,18 @@ def get_report_stats(
 @app.get("/api/reports", response_model=List[schemas.ReportResponse])
 def read_reports(
     skip: int = 0,
-    limit: int = 50,
+    limit: int = 200,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
+    """
+    Returns a listing of all city reports with status filtering.
+    Restricted to city officials for operational dispatching.
+    """
     reports = crud.get_reports(db, skip=skip, limit=limit)
-    # Optional server-side status filter
     if status:
         reports = [r for r in reports if r.status == status]
-    # Enrich with reporter names
-    for r in reports:
-        reporter = db.query(models.User).filter(models.User.id == r.user_id).first()
-        r.reporter_name = reporter.full_name if reporter else None
     return reports
 
 @app.get("/api/reports/user/{user_id}", response_model=List[schemas.ReportResponse])
@@ -753,35 +866,81 @@ def read_user_reports(
     limit: int = 50,
     status: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     if current_user.id != user_id and current_user.role not in ["dispatcher", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized to access these reports")
     
-    reports = crud.get_reports_by_user(db, user_id=user_id, skip=skip, limit=limit)
+    reports = crud.get_reports_by_user(db, resident_id=user_id, skip=skip, limit=limit)
     if status:
         reports = [r for r in reports if r.status == status]
     return reports
+
+@app.get("/api/reports/public", response_model=List[schemas.ReportResponse])
+def read_public_reports(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
+):
+    """
+    Returns public/verified reports that residents should see as 'Nearby Hazards'.
+    Excludes pending/unverified reports and anonymizes reporters for privacy.
+    """
+    reports = crud.get_reports(db, skip=skip, limit=limit)
+    
+    # Filter for reports that are validated or further in the workflow
+    public_statuses = ["validated", "dispatched", "approved_internal", "in_progress", "resolved"]
+    public_reports = [r for r in reports if r.status in public_statuses]
+    
+    # Anonymize reporter names if the requester is a resident
+    if isinstance(current_user, models.Resident):
+        for r in public_reports:
+            if r.resident_id != current_user.id:
+                r.reporter_name = "Anonymous Resident"
+                
+    return public_reports
 
 @app.get("/api/reports/{report_id}", response_model=schemas.ReportResponse)
 def read_report(
     report_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """Get a single report by ID. Residents can only see their own."""
     db_report = crud.get_report(db, report_id=report_id)
     if db_report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    if current_user.role == "resident" and db_report.user_id != current_user.id:
+    if current_user.role == "resident" and db_report.resident_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to view this report")
-    return _enrich_report(db_report, db)
+    return db_report
+
+@app.get("/api/reports/{report_id}/timeline", response_model=List[gov_schemas.ProcessTimelineResponse])
+def read_report_timeline(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
+):
+    """Get the process timeline for a report. Residents see public entries only."""
+    # Auth check: same as read_report
+    db_report = crud.get_report(db, report_id=report_id)
+    if db_report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    public_only = False
+    if current_user.role == "resident":
+        if db_report.resident_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this timeline")
+        public_only = True
+        
+    entries = gov_crud.get_timeline_for_report(db, report_id, public_only=public_only)
+    return gov_crud.enrich_timeline(entries, db)
 
 @app.post("/api/reports/analyze")
 async def analyze_report_only(
     description: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """
     Perform AI analysis on a report description and image without saving to DB.
@@ -803,7 +962,7 @@ async def create_new_report(
     location_string: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """
     Creates a new report with multi-modal AI Scanning.
@@ -817,6 +976,14 @@ async def create_new_report(
         location_lng=lng,
         location_string=location_string
     )
+
+    # 0. GEOGRAPHIC BOUNDARY VALIDATION
+    if lat is not None and lng is not None:
+        if not is_in_caloocan(lat, lng):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Location (Lat: {lat}, Lng: {lng}) is outside the jurisdiction of Caloocan City. Please move the pin within the city borders."
+            )
 
     # 0. DUPLICATE VALIDATION
     # Prevent duplicate reports of the exact same issue type at the same location (within ~15 meters)
@@ -880,7 +1047,7 @@ async def create_new_report(
     db_report = crud.create_report(
         db=db, 
         report=report_dto, 
-        user_id=current_user.id, 
+        resident_id=current_user.id, 
         ai_analysis=ai_analysis
     )
     
@@ -917,6 +1084,95 @@ async def create_new_report(
 
     return db_report
 
+@app.post("/api/reports/{report_id}/confirm", response_model=schemas.ReportResponse)
+def confirm_report_resolution(
+    report_id: int,
+    confirm: schemas.ReportResolutionConfirm,
+    db: Session = Depends(get_db),
+    current_user: models.Resident = Depends(get_current_user)
+):
+    """
+    Final 'Digital Handshake' — allows a resident to close the loop on a resolved report.
+    This increases their trust score and provides public proof of resolution.
+    """
+    if current_user.role != "resident":
+        raise HTTPException(status_code=403, detail="Only residents can confirm resolution.")
+        
+    report = crud.confirm_report_resolution(
+        db=db, 
+        report_id=report_id, 
+        resident_id=current_user.id,
+        rating=confirm.rating,
+        note=confirm.note
+    )
+    
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found or not owned by you.")
+        
+    return report
+
+@app.get("/api/residents/kyc-status", response_model=schemas.KYCStatusResponse)
+def get_kyc_status(
+    db: Session = Depends(get_db),
+    current_user: models.Resident = Depends(get_current_user)
+):
+    """
+    Get the current KYC and Trust status of the resident.
+    Used for showing verification badges and tier progress.
+    """
+    if not isinstance(current_user, models.Resident):
+        raise HTTPException(status_code=403, detail="Resident only endpoint.")
+    
+    return {
+        "is_verified": current_user.is_verified,
+        "kyc_level": current_user.kyc_level,
+        "trust_score": current_user.trust_score,
+        "last_verification": current_user.last_kyc_verification,
+        "registration_date": current_user.created_at
+    }
+
+@app.post("/api/residents/upgrade-kyc")
+async def upgrade_resident_kyc(
+    front_image: UploadFile = File(...),
+    back_image: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    current_user: models.Resident = Depends(get_current_user)
+):
+    """
+    Self-service KYC upgrade. Accepts high-res scans of government IDs.
+    Uses Multi-modal Gemini Vision + OCR for identity cross-referencing.
+    """
+    if not isinstance(current_user, models.Resident):
+        raise HTTPException(status_code=403, detail="Only residents can upgrade their KYC.")
+        
+    front_bytes = await front_image.read()
+    back_bytes = await back_image.read() if back_image else None
+    
+    # 1. Process with AI-first Multi-side Pipeline
+    results = await ocr_service.perform_ocr(front_bytes, back_bytes)
+    
+    if not results.get("success"):
+        raise HTTPException(status_code=400, detail=results.get("error", "OCR Processing failed. Please use a clearer photo."))
+        
+    ocr_data = results.get("extracted_data", {})
+    
+    # Extract ID type and perform integrity check
+    id_type = ocr_data.get("id_type", "unknown")
+    
+    # 2. Update DB using the hardened CRUD logic
+    updated_user = crud.upgrade_resident_kyc(db, current_user.id, id_type, ocr_data)
+    
+    if not updated_user:
+        raise HTTPException(status_code=500, detail="Database update failed.")
+        
+    return {
+        "status": "success",
+        "message": f"Identity Verified! You are now {updated_user.kyc_level}.",
+        "new_tier": updated_user.kyc_level,
+        "trust_score": updated_user.trust_score,
+        "extracted_name": f"{ocr_data.get('first_name', '')} {ocr_data.get('last_name', '')}".strip()
+    }
+
 
 # ---------------------------------------------------------------------------
 # Geocoding Proxy Endpoints  (keeps Google API key server-side)
@@ -926,7 +1182,7 @@ async def create_new_report(
 async def geocode_reverse(
     lat: float = Query(..., description="Latitude"),
     lng: float = Query(..., description="Longitude"),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """
     Reverse-geocode GPS coordinates → human-readable address.
@@ -939,7 +1195,7 @@ async def geocode_reverse(
 @app.get("/api/geocode/search")
 async def geocode_search(
     q: str = Query(..., min_length=2, description="Search query"),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """
     Forward geocode / place search.
@@ -954,7 +1210,7 @@ async def get_directions_proxy(
     origin: str = Query(..., description="Origin coords or address"),
     destination: str = Query(..., description="Destination coords or address"),
     mode: str = Query("driving", description="driving, walking, bicycling, or transit"),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """
     Get routing directions between two locations.
@@ -976,31 +1232,39 @@ def update_report_status(
     report_id: int,
     status_update: ReportStatusUpdate,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
     """Generic status update. Dispatchers/Managers and Admins only."""
-    updated_report = crud.update_report_status(db=db, report_id=report_id, status=status_update.status, actor_id=current_user.id)
+    status = status_update.status or status_update.targetStatus
+    updated_report = crud.update_report_status(
+        db=db, 
+        report_id=report_id, 
+        status=status, 
+        actor_id=current_user.id,
+        budget=status_update.budget,
+        deployment_date=status_update.deployment_date
+    )
     if not updated_report:
         raise HTTPException(status_code=404, detail="Report not found")
-    return _enrich_report(updated_report, db)
+    return updated_report
 
 @app.patch("/api/reports/{report_id}/reject", response_model=schemas.ReportResponse)
 def reject_report(
     report_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
     """Reject a report (sets status to 'rejected' and notifies user)."""
     updated = crud.reject_report(db, report_id=report_id, actor_id=current_user.id)
     if not updated:
         raise HTTPException(status_code=404, detail="Report not found")
-    return _enrich_report(updated, db)
+    return updated
 
 @app.patch("/api/reports/{report_id}/dispatch", response_model=schemas.ReportResponse)
 def dispatch_report(
     report_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
     """Dispatch a report (approved_internal → dispatched)."""
     db_report = crud.get_report(db, report_id=report_id)
@@ -1009,13 +1273,14 @@ def dispatch_report(
     if db_report.status != "approved_internal":
         raise HTTPException(status_code=400, detail=f"Cannot dispatch report with status '{db_report.status}'. Must be 'approved_internal'.")
     updated = crud.update_report_status(db, report_id=report_id, status="dispatched", actor_id=current_user.id)
-    return _enrich_report(updated, db)
+    return updated
 
+@app.post("/api/reports/{report_id}/cancel", response_model=schemas.ReportResponse)
 @app.patch("/api/reports/{report_id}/cancel", response_model=schemas.ReportResponse)
 def cancel_report(
     report_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """
     Allow a resident to cancel their own report if it's still in verification or rejected.
@@ -1026,7 +1291,7 @@ def cancel_report(
         raise HTTPException(status_code=404, detail="Report not found")
     
     # Ownership Check
-    if db_report.user_id != current_user.id and current_user.role not in ["dispatcher", "manager"]:
+    if db_report.resident_id != current_user.id and current_user.role not in ["dispatcher", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized to cancel this report")
         
     # State Check
@@ -1035,14 +1300,14 @@ def cancel_report(
         raise HTTPException(status_code=400, detail=f"Cannot cancel report with status '{db_report.status}'. Action blocked.")
 
     updated = crud.update_report_status(db, report_id=report_id, status="cancelled", actor_id=current_user.id)
-    return _enrich_report(updated, db)
+    return updated
 
 @app.patch("/api/reports/{report_id}/resolve", response_model=schemas.ReportResponse)
 async def resolve_report(
     report_id: int,
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
     """Mark a dispatched report as resolved and require a proof picture."""
     db_report = crud.get_report(db, report_id=report_id)
@@ -1069,20 +1334,20 @@ async def resolve_report(
     # Notify Resident
     ticket_id = updated.ticket_id or f"RPT-{updated.id}"
     db_notif = models.Notification(
-        user_id=updated.user_id,
+        resident_id=updated.resident_id,
         title="Infrastructure Repaired",
         message=f"Success! The issue {ticket_id} has been fully resolved by City Engineering. A proof picture of the finalized repair has been attached to your report for transparency."
     )
     db.add(db_notif)
     db.commit()
     
-    return _enrich_report(updated, db)
+    return updated
 
 @app.delete("/api/reports/{report_id}")
 def delete_report(
     report_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
     """Hard-delete a report. Dispatcher and manager only."""
     success = crud.delete_report(db, report_id=report_id)
@@ -1099,7 +1364,7 @@ def read_advisories(
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     internal = crud.get_advisories(db, skip=skip, limit=limit)
     
@@ -1120,7 +1385,7 @@ def read_advisories(
 def create_advisory_route(
     advisory: schemas.AdvisoryCreate,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("manager", "dispatcher"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("manager", "dispatcher"))
 ):
     return crud.create_advisory(db=db, advisory=advisory)
 
@@ -1128,7 +1393,7 @@ def create_advisory_route(
 def delete_advisory(
     advisory_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("manager"))
 ):
     """Delete an advisory. Manager only."""
     success = crud.delete_advisory(db, advisory_id=advisory_id)
@@ -1140,7 +1405,7 @@ def delete_advisory(
 async def generate_ai_advisory(
     report_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
     """
     Dispatcher-only: Triggers AI to draft a public advisory based on a validated report.
@@ -1151,11 +1416,14 @@ async def generate_ai_advisory(
         raise HTTPException(status_code=404, detail="Report not found")
         
     import json
+    import logging
+    logger = logging.getLogger(__name__)
     ai_meta = {}
     if db_report.ai_metadata:
         try:
             ai_meta = json.loads(db_report.ai_metadata)
-        except: pass
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse ai_metadata for report {report_id}: {e}")
         
     report_data = {
         "category": db_report.category,
@@ -1180,32 +1448,46 @@ def read_user_notifications(
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized to access these notifications")
-    return crud.get_notifications_by_user(db, user_id=user_id, skip=skip, limit=limit)
+    
+    # Segregated: determine if resident or official
+    if isinstance(current_user, models.Resident):
+        return crud.get_notifications(db, resident_id=user_id, skip=skip, limit=limit)
+    else:
+        return crud.get_notifications(db, official_id=user_id, skip=skip, limit=limit)
 
 @app.patch("/api/notifications/user/{user_id}/read")
 def mark_user_notifications_read(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """Mark ALL notifications for a user as read."""
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized to modify these notifications")
-    crud.mark_notifications_read(db, user_id=user_id)
+    
+    # Segregated: determine if resident or official
+    if isinstance(current_user, models.Resident):
+        crud.mark_notifications_read(db, resident_id=user_id)
+    else:
+        crud.mark_notifications_read(db, official_id=user_id)
     return {"message": "All notifications marked as read"}
 
 @app.patch("/api/notifications/{notification_id}/read")
 def mark_single_notification_read(
     notification_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """Mark a single notification as read."""
-    success = crud.mark_notification_read(db, notification_id=notification_id, user_id=current_user.id)
+    # Segregated: determine if resident or official
+    if isinstance(current_user, models.Resident):
+        success = crud.mark_notification_read(db, notification_id=notification_id, resident_id=current_user.id)
+    else:
+        success = crud.mark_notification_read(db, notification_id=notification_id, official_id=current_user.id)
     if not success:
         raise HTTPException(status_code=404, detail="Notification not found or not yours")
     return {"message": "Notification marked as read"}
@@ -1214,10 +1496,14 @@ def mark_single_notification_read(
 def delete_single_notification(
     notification_id: int,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """Hard delete a single notification."""
-    success = crud.delete_notification(db, notification_id=notification_id, user_id=current_user.id)
+    # Segregated: determine if resident or official
+    if isinstance(current_user, models.Resident):
+        success = crud.delete_notification(db, notification_id=notification_id, resident_id=current_user.id)
+    else:
+        success = crud.delete_notification(db, notification_id=notification_id, official_id=current_user.id)
     if not success:
         raise HTTPException(status_code=404, detail="Notification not found or not yours")
     return {"message": "Notification deleted"}
@@ -1231,7 +1517,7 @@ def read_work_orders(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager", "engineer"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "engineer"))
 ):
     return crud.get_work_orders(db, skip=skip, limit=limit)
 
@@ -1239,7 +1525,7 @@ def read_work_orders(
 def create_new_work_order(
     wo: schemas.WorkOrderCreate,
     db: Session = Depends(get_db),
-    current_user: schemas.UserResponse = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
     """
     Creates a formal government work order.
@@ -1252,11 +1538,12 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
+
 @app.patch("/api/auth/change-password")
 def change_password(
     req: ChangePasswordRequest,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """Secure password transition logic."""
     if not auth.verify_password(req.current_password, current_user.password_hash):

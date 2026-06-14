@@ -10,14 +10,22 @@ import {
     PieChart, LineChart as LineChartIcon, Globe, Navigation,
     AlertCircle, Package, ChevronDown, X, RotateCcw
 } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, HeatmapLayer, CircleF, MarkerF } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, HeatmapLayer, CircleF, MarkerF, PolygonF } from '@react-google-maps/api';
 import GovSidebar from '../components/GovSidebar';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 
-const API_BASE_URL = `http://${window.location.hostname}:33159`;
+import { API_BASE_URL } from '../utils/apiBase';
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const LIBRARIES = ['places', 'geometry', 'visualization'];
+
+const CATEGORY_LABELS = {
+    'roads_bridges': 'Roads & Bridges',
+    'water_drainage': 'Water & Drainage',
+    'street_lighting': 'Street Lighting',
+    'public_safety_regulatory': 'Public Safety & Regulatory',
+    'public_facilities': 'Public Facilities'
+};
 
 // ─── Theme Constants ─────────────────────────────────────────────────────────
 const THREAT_CONFIG = {
@@ -90,7 +98,7 @@ const ClusterCard = ({ cluster, onSelect, selected }) => {
                 <div>
                     <ThreatBadge level={cluster.threat_level} />
                     <p className="font-black text-slate-900 dark:text-white text-sm mt-1.5 leading-tight">
-                        {cluster.dominant_category.replace(/_/g,'  ').replace(/\b\w/g, l => l.toUpperCase())}
+                        {CATEGORY_LABELS[cluster.dominant_category] || cluster.dominant_category.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5 font-medium">
                         Barangay {cluster.barangay} · {cluster.radius_meters.toFixed(0)}m radius
@@ -129,6 +137,13 @@ export default function GovAnalyticsPage() {
     const [forecast, setForecast] = useState([]);
     const [recurrence, setRecurrence] = useState([]);
     const [heatmapData, setHeatmapData] = useState(null);
+    const [borderData, setBorderData] = useState(null);
+    const [liveReports, setLiveReports] = useState([]);
+    const [liveReportsLoading, setLiveReportsLoading] = useState(false);
+    const [reportSearch, setReportSearch] = useState('');
+    const [reportStatusFilter, setReportStatusFilter] = useState('');
+    const [reportCategoryFilter, setReportCategoryFilter] = useState('');
+    const [showNorthBorder, setShowNorthBorder] = useState(true);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('map');
     const [selectedCluster, setSelectedCluster] = useState(null);
@@ -159,12 +174,15 @@ export default function GovAnalyticsPage() {
         setLoading(true);
         setFetchError(null);
         try {
-            const [summaryRes, clustersRes, forecastRes, recurrenceRes, heatmapRes] = await Promise.all([
+            const sectorParam = '?sector=North';
+
+            const [summaryRes, clustersRes, forecastRes, recurrenceRes, heatmapRes, borderRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/api/gov/analytics/summary`, { headers }),
                 fetch(`${API_BASE_URL}/api/gov/analytics/clusters?days_back=${daysBack}${categoryFilter ? `&category=${categoryFilter}` : ''}`, { headers }),
                 fetch(`${API_BASE_URL}/api/gov/analytics/forecast`, { headers }),
                 fetch(`${API_BASE_URL}/api/gov/analytics/recurrence`, { headers }),
                 fetch(`${API_BASE_URL}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers }),
+                fetch(`${API_BASE_URL}/api/geo/caloocan-border${sectorParam}`, { headers }),
             ]);
             if (summaryRes.ok)    setSummary(await summaryRes.json());
             else throw new Error(`Summary: ${summaryRes.status}`);
@@ -172,15 +190,66 @@ export default function GovAnalyticsPage() {
             if (forecastRes.ok)   setForecast(await forecastRes.json());
             if (recurrenceRes.ok) setRecurrence((await recurrenceRes.json()).recurrence_events || []);
             if (heatmapRes.ok)    setHeatmapData(await heatmapRes.json());
+            if (borderRes.ok)    setBorderData(await borderRes.json());
         } catch (e) {
             console.error('Analytics fetch error:', e);
             setFetchError(e.message || 'Failed to connect to analytics engine');
         } finally {
             setLoading(false);
         }
-    }, [daysBack, categoryFilter]);
+    }, [daysBack, categoryFilter, showNorthBorder]);
+
+    // ── Fetch Live Reports ──────────────────────────────────────────────────
+    const fetchLiveReports = useCallback(async () => {
+        setLiveReportsLoading(true);
+        try {
+            const params = new URLSearchParams({ days_back: daysBack, limit: 200 });
+            if (reportStatusFilter) params.set('status', reportStatusFilter);
+            if (reportCategoryFilter) params.set('category', reportCategoryFilter);
+            const res = await fetch(`${API_BASE_URL}/api/gov/analytics/reports?${params}`, { headers });
+            if (res.ok) {
+                const data = await res.json();
+                setLiveReports(data.reports || []);
+            }
+        } catch (e) {
+            console.error('Live reports fetch error:', e);
+        } finally {
+            setLiveReportsLoading(false);
+        }
+    }, [daysBack, reportStatusFilter, reportCategoryFilter]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+    useEffect(() => { if (activeTab === 'reports') fetchLiveReports(); }, [activeTab, fetchLiveReports]);
+
+    // Refetch borders only when map toggles change (Strict Pipeline Requirement)
+    useEffect(() => {
+        const fetchBordersOnly = async () => {
+            const sectorParam = '?sector=North';
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/geo/caloocan-border${sectorParam}`, { headers });
+                if (res.ok) setBorderData(await res.json());
+            } catch(e) { console.error("Border reload failed", e); }
+        };
+        fetchBordersOnly();
+    }, [showNorthBorder]);
+
+    // Auto-fit map to visible boundaries
+    useEffect(() => {
+        if (borderData?.features?.length > 0 && mapRef) {
+            const bounds = new window.google.maps.LatLngBounds();
+            let hasPoints = false;
+            borderData.features.forEach(f => {
+                if (f.geometry?.type === 'Polygon') {
+                    f.geometry.coordinates[0].forEach(c => { bounds.extend({lng: c[0], lat: c[1]}); hasPoints = true; });
+                } else if (f.geometry?.type === 'MultiPolygon') {
+                    f.geometry.coordinates.forEach(poly => {
+                        poly[0].forEach(c => { bounds.extend({lng: c[0], lat: c[1]}); hasPoints = true; });
+                    });
+                }
+            });
+            if (hasPoints) mapRef.fitBounds(bounds);
+        }
+    }, [borderData, mapRef]);
 
     // ── Export CSV ───────────────────────────────────────────────────────
     const exportCSV = (type) => {
@@ -250,7 +319,7 @@ export default function GovAnalyticsPage() {
                 method: 'POST',
                 headers: { ...headers, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    query: `Generate a concise executive intelligence brief (3-4 paragraphs) summarizing the current infrastructure status of North Caloocan based on ${summary?.total_reports || 0} citizen reports across ${clusters.length} stress zones. There are ${summary?.critical_zones || 0} CRITICAL zones, ${summary?.high_zones || 0} HIGH priority zones, and ${summary?.emerging_zones || 0} EMERGING zones. Total budget exposure is ${summary?.total_budget_exposure || 'N/A'}. Resolution rate is ${summary?.resolution_rate_pct || 0}%. The most severe cluster is in Barangay ${topCluster.barangay} with ${topCluster.report_count} reports of ${topCluster.dominant_category.replace(/_/g,' ')} at threat level ${topCluster.threat_level}. Chronic recurrence events: ${summary?.chronic_recurrence_events || 0}. Provide actionable recommendations for the City Engineer.`,
+                    query: `Generate a concise executive intelligence brief (3-4 paragraphs) summarizing the current infrastructure status of North Caloocan jurisdictional theater based on ${summary?.total_reports || 0} citizen reports across ${clusters.length} stress zones. There are ${summary?.critical_zones || 0} CRITICAL zones, ${summary?.high_zones || 0} HIGH priority zones, and ${summary?.emerging_zones || 0} EMERGING zones. Total budget exposure is ${summary?.total_budget_exposure || 'N/A'}. Resolution rate is ${summary?.resolution_rate_pct || 0}%. The most severe cluster is in Barangay ${topCluster.barangay} with ${topCluster.report_count} reports of ${topCluster.dominant_category.replace(/_/g,' ')} at threat level ${topCluster.threat_level}. Chronic recurrence events: ${summary?.chronic_recurrence_events || 0}. Provide actionable recommendations for the City Engineer.`,
                     context: 'Analytics Command Center — Executive Intelligence Brief'
                 }),
             });
@@ -297,6 +366,19 @@ export default function GovAnalyticsPage() {
         : { lat: 14.749, lng: 120.983 };
 
     // ── Forecast chart (simple bar) ─────────────────────────────────────────
+    // ─── Helper: Standardized Image URL ──────────────────────────────────────────
+    const getImageUrl = (url) => {
+        if (!url) return 'https://images.unsplash.com/photo-1544983391-f9147eb1f042?q=80&w=2070&auto=format&fit=crop';
+        if (url.startsWith('http')) return url;
+        
+        // Ensure standard /api/uploads prefix if not present
+        const cleanUrl = url.replace(/^\//, '');
+        if (cleanUrl.startsWith('api/')) {
+            return `${API_BASE_URL}/${cleanUrl}`;
+        }
+        return `${API_BASE_URL}/api/uploads/${cleanUrl}`;
+    };
+
     const getCategoryColor = (cat) => {
         const c = (cat || '').toLowerCase();
         if (c.includes('flood') || c.includes('drain')) return '#3b82f6';
@@ -315,29 +397,47 @@ export default function GovAnalyticsPage() {
 
     const TABS = [
         { key: 'map',        label: 'Intelligence Map',  icon: Globe },
+        { key: 'reports',    label: 'Live Reports',      icon: FileText },
         { key: 'clusters',   label: 'Stress Zones',      icon: Target },
         { key: 'forecast',   label: 'Forecast',          icon: TrendingUp },
         { key: 'recurrence', label: 'Chronic Failures',  icon: RotateCcw },
     ];
 
+    // Reports tab filtered list
+    const filteredLiveReports = liveReports.filter(r => {
+        if (!reportSearch) return true;
+        const s = reportSearch.toLowerCase();
+        return (
+            (r.full_location || '').toLowerCase().includes(s) ||
+            (r.category || '').toLowerCase().includes(s) ||
+            (r.description || '').toLowerCase().includes(s) ||
+            (r.report_id || '').toLowerCase().includes(s) ||
+            (r.location_barangay || '').toLowerCase().includes(s)
+        );
+    });
+
+    // Urgency/status color helpers for reports tab
+    const urgencyColor = u => ({ Critical: 'text-red-400 bg-red-900/20 border-red-800/40', High: 'text-orange-400 bg-orange-900/20 border-orange-800/40', Medium: 'text-yellow-400 bg-yellow-900/20 border-yellow-800/40', Low: 'text-green-400 bg-green-900/20 border-green-800/40' }[u] || 'text-slate-400 bg-slate-800 border-slate-700');
+    const statusColor = s => ({ pending: 'text-slate-300 bg-slate-800 border-slate-700', validated: 'text-blue-400 bg-blue-900/20 border-blue-800/40', dispatched: 'text-indigo-400 bg-indigo-900/20 border-indigo-800/40', in_progress: 'text-yellow-400 bg-yellow-900/20 border-yellow-800/40', resolved: 'text-green-400 bg-green-900/20 border-green-800/40', approved_internal: 'text-violet-400 bg-violet-900/20 border-violet-800/40' }[s] || 'text-slate-400 bg-slate-800 border-slate-700');
+
     return (
-        <div className="flex h-screen bg-slate-950 text-white overflow-hidden">
+        <div className={`flex h-screen overflow-hidden ${isDarkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
             <GovSidebar currentUser={currentUser} activeTab="analytics" />
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Header */}
-                <div className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md px-8 py-4 flex items-center justify-between shrink-0">
+                <div className={`border-b px-8 py-4 flex items-center justify-between shrink-0 backdrop-blur-md ${isDarkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white/80 border-slate-200'}`}>
                     <div>
                         <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
                             <Brain size={12}/> Infrastructure Intelligence Engine
                         </div>
-                        <h1 className="text-2xl font-black text-white tracking-tight">Analytics Command Center</h1>
+                        <h1 className={`text-2xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Analytics Command Center</h1>
                         <p className="text-slate-400 text-sm mt-0.5">Data-driven insights for budget justification and resource allocation</p>
                     </div>
                     <div className="flex items-center gap-3">
                         <select
                             value={daysBack}
                             onChange={e => setDaysBack(Number(e.target.value))}
-                            className="bg-slate-900 border border-slate-700 text-slate-300 text-sm rounded-xl px-4 py-2 font-semibold focus:outline-none focus:border-indigo-500"
+                            className={`border text-sm rounded-xl px-4 py-2 font-semibold focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}
                         >
                             <option value={30}>Last 30 days</option>
                             <option value={60}>Last 60 days</option>
@@ -346,12 +446,12 @@ export default function GovAnalyticsPage() {
                             <option value={365}>Last year</option>
                         </select>
                         <button onClick={fetchData}
-                            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold text-sm px-4 py-2 rounded-xl transition-colors">
+                            className={`flex items-center gap-2 border font-bold text-sm px-4 py-2 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}>
                             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
                         </button>
                         <ThemeToggle />
                         <button onClick={() => exportCSV(activeTab === 'clusters' ? 'clusters' : activeTab === 'forecast' ? 'forecast' : activeTab === 'recurrence' ? 'recurrence' : 'full')}
-                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded-xl transition-colors">
+                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded-xl transition-colors shadow-lg shadow-emerald-500/10">
                             <Download size={15} /> Export CSV
                         </button>
                     </div>
@@ -410,14 +510,16 @@ export default function GovAnalyticsPage() {
                     )}
 
                     {/* Navigation Tabs */}
-                    <div className="px-8 mt-6 flex items-center gap-1 border-b border-slate-800 shrink-0">
+                    <div className={`px-8 mt-6 flex items-center gap-1 shrink-0 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                         {TABS.map(tab => (
                             <button key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
                                 className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors ${
                                     activeTab === tab.key
                                         ? 'border-indigo-500 text-indigo-400'
-                                        : 'border-transparent text-slate-500 hover:text-slate-300'
+                                        : isDarkMode 
+                                            ? 'border-transparent text-slate-500 hover:text-slate-300'
+                                            : 'border-transparent text-slate-400 hover:text-slate-600'
                                 }`}>
                                 <tab.icon size={15} /> {tab.label}
                             </button>
@@ -428,14 +530,16 @@ export default function GovAnalyticsPage() {
                     {activeTab === 'map' && (
                         <div className="flex flex-1 overflow-hidden gap-0">
                             {/* Cluster List Sidebar */}
-                            <div className="w-80 border-r border-slate-800 flex flex-col overflow-hidden bg-slate-950">
-                                <div className="p-4 border-b border-slate-800">
+                            <div className={`w-80 border-r flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                <div className={`p-4 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                                     <div className="relative">
                                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                                         <input
                                             type="text" placeholder="Search barangay or category..."
                                             value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                            className="w-full bg-slate-900 border border-slate-700 text-slate-300 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                                            className={`w-full border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 ${
+                                                isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'
+                                            }`}
                                         />
                                     </div>
                                     <p className="text-xs text-slate-500 font-bold mt-2">{filteredClusters.length} stress zone{filteredClusters.length !== 1 ? 's' : ''} detected</p>
@@ -474,7 +578,15 @@ export default function GovAnalyticsPage() {
                                             center={mapCenter}
                                             zoom={selectedCluster ? 16 : 14}
                                             mapContainerStyle={{ width: '100%', height: '100%' }}
-                                            options={{ styles: isDarkMode ? DARK_MAP_STYLE : LIGHT_MAP_STYLE, disableDefaultUI: false, mapTypeControl: false, zoomControl: true, streetViewControl: false, fullscreenControl: false }}
+                                            options={{ 
+                                                styles: isDarkMode ? DARK_MAP_STYLE : LIGHT_MAP_STYLE, 
+                                                disableDefaultUI: false, 
+                                                mapTypeControl: false, 
+                                                zoomControl: true, 
+                                                streetViewControl: false, 
+                                                fullscreenControl: false,
+                                                mapId: isDarkMode ? null : (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || '42e0e28462d4a298b3b3eb3f')
+            }}
                                             onLoad={map => setMapRef(map)}
                                         >
                                             {/* Heatmap layer */}
@@ -514,21 +626,62 @@ export default function GovAnalyticsPage() {
                                                     options={{ zIndex: 20 }}
                                                 />
                                             )}
+                                            {/* Caloocan City Borders — North (Orange) & South (Blue) */}
+                                            {borderData?.features?.map((feature, i) => {
+                                                const props = feature.properties || {};
+                                                const sector = props.sector || 'Caloocan';
+                                                const isNorth = sector === 'North';
+                                                // Respect toggle
+                                                if (!showNorthBorder) return null;
+
+                                                const polygonOptions = {
+                                                    strokeColor: isNorth ? '#f97316' : '#3b82f6',
+                                                    strokeOpacity: isNorth ? 1.0 : 0.85,
+                                                    strokeWeight: isNorth ? 3.0 : 2.5,
+                                                    fillColor: isNorth ? '#f97316' : '#3b82f6',
+                                                    fillOpacity: isNorth
+                                                        ? (isDarkMode ? 0.10 : 0.06)
+                                                        : (isDarkMode ? 0.07 : 0.04),
+                                                    clickable: false,
+                                                    zIndex: isNorth ? 2 : 1,
+                                                };
+
+                                                const paths = feature.geometry.type === 'MultiPolygon'
+                                                    ? feature.geometry.coordinates.map(poly => poly[0].map(c => ({ lng: c[0], lat: c[1] })))
+                                                    : [feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))];
+
+                                                return paths.map((path, pi) => (
+                                                    <PolygonF
+                                                        key={`border-${i}-${pi}`}
+                                                        paths={path}
+                                                        options={polygonOptions}
+                                                    />
+                                                ));
+                                            })}
                                         </GoogleMap>
                                     ) : (
-                                        <div className="w-full h-full bg-slate-900 flex items-center justify-center text-slate-500">
+                                        <div className={`w-full h-full flex items-center justify-center text-slate-500 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
                                             <Globe size={40} className="opacity-20" />
                                         </div>
                                     )}
 
                                     {/* Map Legend */}
-                                    <div className="absolute bottom-4 left-4 bg-slate-950/90 backdrop-blur border border-slate-800 rounded-2xl p-3 space-y-1.5">
+                                    <div className={`absolute bottom-4 left-4 backdrop-blur border rounded-2xl p-3 space-y-1.5 ${isDarkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-white/90 border-slate-200 shadow-lg'}`}>
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2">Threat Levels</p>
                                         {Object.entries(THREAT_CONFIG).map(([key, cfg]) => (
                                             <div key={key} className="flex items-center gap-2 text-xs">
                                                 <span className="w-3 h-3 rounded-full border-2 shrink-0" style={{ borderColor: cfg.ring, background: cfg.ring + '30' }} />
-                                                <span className="text-slate-400 font-semibold">{cfg.label}</span>
+                                                <span className={`font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{cfg.label}</span>
                                             </div>
                                         ))}
+                                        <div className="border-t border-slate-800 pt-2 mt-2 space-y-1.5">
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5">City Boundaries</p>
+                                            <button onClick={() => setShowNorthBorder(v => !v)}
+                                                className={`flex items-center gap-2 text-xs w-full transition-opacity ${showNorthBorder ? '' : 'opacity-40'}`}>
+                                                <span className="w-3 h-1.5 rounded-sm shrink-0" style={{ background: '#f97316' }} />
+                                                <span className={`font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>North Caloocan Jurisdiction</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -539,16 +692,16 @@ export default function GovAnalyticsPage() {
                                     <motion.div
                                         initial={{ x: 400, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 400, opacity: 0 }}
                                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                                        className="w-96 border-l border-slate-800 bg-slate-950 flex flex-col overflow-hidden"
+                                        className={`w-96 border-l flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}
                                     >
-                                        <div className="p-4 border-b border-slate-800 flex items-center justify-between shrink-0">
+                                        <div className={`p-4 border-b flex items-center justify-between shrink-0 ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                                             <div>
                                                 <ThreatBadge level={selectedCluster.threat_level} />
-                                                <h3 className="font-black text-white text-sm mt-1">
+                                                <h3 className={`font-black text-sm mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                                     Cluster {selectedCluster.cluster_id} — Brgy {selectedCluster.barangay}
                                                 </h3>
                                             </div>
-                                            <button onClick={() => setSelectedCluster(null)} className="text-slate-500 hover:text-white">
+                                            <button onClick={() => setSelectedCluster(null)} className={`hover:scale-110 transition-transform ${isDarkMode ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600'}`}>
                                                 <X size={18} />
                                             </button>
                                         </div>
@@ -561,21 +714,21 @@ export default function GovAnalyticsPage() {
                                                     { label: 'Recurrence', value: `${(selectedCluster.recurrence_score * 100).toFixed(0)}%`, icon: RotateCcw },
                                                     { label: 'Radius', value: `${selectedCluster.radius_meters.toFixed(0)}m`, icon: Target },
                                                 ].map(m => (
-                                                    <div key={m.label} className="bg-slate-900 border border-slate-800 rounded-xl p-3">
+                                                    <div key={m.label} className={`border rounded-xl p-3 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                                         <div className="flex items-center gap-2 text-slate-500 text-xs font-bold mb-1">
                                                             <m.icon size={12} /> {m.label}
                                                         </div>
-                                                        <p className="text-lg font-black text-white">{m.value}</p>
+                                                        <p className={`text-lg font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{m.value}</p>
                                                     </div>
                                                 ))}
                                             </div>
 
                                             {/* Category breakdown */}
-                                            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                                            <div className={`border rounded-xl p-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Categories</p>
                                                 {Object.entries(selectedCluster.categories || {}).map(([cat, count]) => (
                                                     <div key={cat} className="flex items-center gap-2 mb-2">
-                                                        <div className="flex-1 bg-slate-800 rounded-full h-2 overflow-hidden">
+                                                        <div className={`flex-1 rounded-full h-2 overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}>
                                                             <div className="h-2 rounded-full" style={{
                                                                 width: `${(count / selectedCluster.report_count) * 100}%`,
                                                                 background: getCategoryColor(cat)
@@ -588,7 +741,7 @@ export default function GovAnalyticsPage() {
                                             </div>
 
                                             {/* BoQ Estimate */}
-                                            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                                            <div className={`border rounded-xl p-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <DollarSign size={15} className="text-emerald-400" />
                                                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Preliminary Estimate</p>
@@ -599,7 +752,7 @@ export default function GovAnalyticsPage() {
 
                                             {/* Sample descriptions */}
                                             {selectedCluster.sample_descriptions?.length > 0 && (
-                                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                                                <div className={`border rounded-xl p-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Citizen Reports</p>
                                                     {selectedCluster.sample_descriptions.slice(0, 3).map((d, i) => (
                                                         <p key={i} className="text-xs text-slate-400 italic border-l-2 border-slate-700 pl-3 mb-2">"{d}"</p>
@@ -646,7 +799,7 @@ export default function GovAnalyticsPage() {
                                         </div>
 
                                         {/* Action Buttons */}
-                                        <div className="p-4 border-t border-slate-800 space-y-2 shrink-0">
+                                        <div className={`p-4 border-t space-y-2 shrink-0 ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                                             <button
                                                 onClick={() => generateNarrative(selectedCluster)}
                                                 disabled={generatingNarrative}
@@ -680,9 +833,15 @@ export default function GovAnalyticsPage() {
                                                         severity_score: selectedCluster.severity_score,
                                                         estimated_cost: selectedCluster.estimated_cost_formatted,
                                                         report_count: selectedCluster.report_count,
+                                                        // Forecast & Recurrence Intelligence
+                                                        growth_rate: selectedCluster.growth_rate,
+                                                        recurrence_score: selectedCluster.recurrence_score,
+                                                        forecast_trend: selectedCluster.growth_rate > 0.30 ? 'WORSENING'
+                                                            : selectedCluster.growth_rate < -0.15 ? 'IMPROVING'
+                                                            : 'STABLE',
                                                     } 
                                                 })}
-                                                className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm px-4 py-3 rounded-xl transition-all shadow-lg shadow-orange-900/20 active:scale-95 group">
+                                                className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm px-4 py-3 rounded-xl transition-all shadow-lg shadow-orange-500/10 active:scale-95 group">
                                                 <Navigation size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" /> 
                                                 Tactical Command Response
                                                 {selectedCluster.report_ids?.length > 0 && (
@@ -698,6 +857,170 @@ export default function GovAnalyticsPage() {
                         </div>
                     )}
 
+                    {/* ── Live Reports Tab ── */}
+                    {activeTab === 'reports' && (
+                        <div className="flex-1 flex flex-col overflow-hidden">
+                            {/* Filters bar */}
+                            <div className={`px-8 py-3 flex items-center gap-3 shrink-0 border-b ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                <div className="relative flex-1 max-w-sm">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                    <input type="text" placeholder="Search location, category, description..."
+                                        value={reportSearch} onChange={e => setReportSearch(e.target.value)}
+                                        className={`w-full border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}
+                                    />
+                                </div>
+                                <select value={reportStatusFilter} onChange={e => setReportStatusFilter(e.target.value)}
+                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                                    <option value="">All Statuses</option>
+                                    {['pending','validated','dispatched','approved_internal','in_progress','resolved'].map(s => (
+                                        <option key={s} value={s}>{s.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                                    ))}
+                                </select>
+                                <select value={reportCategoryFilter} onChange={e => setReportCategoryFilter(e.target.value)}
+                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                                    <option value="">All Categories</option>
+                                    {[
+                                        { value: 'roads_bridges', label: 'Roads & Bridges' },
+                                        { value: 'water_drainage', label: 'Water & Drainage' },
+                                        { value: 'street_lighting', label: 'Street Lighting' },
+                                        { value: 'public_safety_regulatory', label: 'Public Safety & Regulatory' },
+                                        { value: 'public_facilities', label: 'Public Facilities' }
+                                    ].map(c => (
+                                        <option key={c.value} value={c.value}>{c.label}</option>
+                                    ))}
+                                </select>
+                                <button onClick={fetchLiveReports} disabled={liveReportsLoading}
+                                    className={`flex items-center gap-1.5 border font-bold text-sm px-3 py-2 rounded-xl transition-colors disabled:opacity-50 ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}>
+                                    <RefreshCw size={13} className={liveReportsLoading ? 'animate-spin' : ''} /> Refresh
+                                </button>
+                                <div className="ml-auto">
+                                    <span className={`text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                        {filteredLiveReports.length} of {liveReports.length} reports
+                                    </span>
+                                </div>
+                            </div>
+                            {/* Reports list */}
+                            <div className="flex-1 overflow-y-auto p-6">
+                                {liveReportsLoading ? (
+                                    <div className="flex items-center justify-center py-24 text-slate-500">
+                                        <Loader2 size={28} className="animate-spin mr-3" /> Loading live citizen reports...
+                                    </div>
+                                ) : filteredLiveReports.length === 0 ? (
+                                    <div className="text-center py-24 text-slate-500">
+                                        <FileText size={40} className="mx-auto mb-3 opacity-20" />
+                                        <p className="font-bold">No reports found</p>
+                                        <p className="text-sm mt-1">Try adjusting filters or date range</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {filteredLiveReports.map((r, i) => (
+                                            <motion.div key={r.id}
+                                                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
+                                                className={`border rounded-2xl p-4 flex gap-4 ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'} transition-colors`}
+                                            >
+                                                {/* Thumbnail */}
+                                                {r.image_url ? (
+                                                    <img 
+                                                        src={getImageUrl(r.image_url)} 
+                                                        alt="report" 
+                                                        className="w-20 h-20 rounded-xl object-cover shrink-0 border border-slate-700"
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.src = 'https://via.placeholder.com/80?text=No+Photo';
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className={`w-20 h-20 rounded-xl shrink-0 flex items-center justify-center border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
+                                                        <MapPin size={24} className="text-slate-500 opacity-40" />
+                                                    </div>
+                                                )}
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-start justify-between gap-3 mb-2">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${urgencyColor(r.urgency)}`}>{r.urgency}</span>
+                                                            <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${statusColor(r.status)}`}>{r.status?.replace(/_/g,' ')}</span>
+                                                            <span className={`text-[10px] font-semibold capitalize ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{r.category?.replace(/_/g,' ')}</span>
+                                                        </div>
+                                                        <span className={`shrink-0 text-[10px] font-black font-mono ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{r.report_id}</span>
+                                                    </div>
+                                                    {/* FULL LOCATION — not lat/lng */}
+                                                    <div className="flex items-start gap-1.5 mb-1.5">
+                                                        <MapPin size={12} className="text-orange-400 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <span className="text-[10px] font-black uppercase tracking-wider text-orange-500 mb-0.5 block">Verified Incident Location</span>
+                                                            {(() => {
+                                                                if (!r.full_location?.includes('|')) {
+                                                                    return <p className={`text-sm font-semibold leading-snug ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{r.full_location}</p>;
+                                                                }
+                                                                
+                                                                const parts = r.full_location.split('|').map(p => p.trim());
+                                                                const plusCode = parts[0];
+                                                                const humanAddr = parts[1];
+                                                                const detectedBrgy = parts[2] || "Barangay Unknown";
+                                                                
+                                                                return (
+                                                                    <div className="flex flex-col">
+                                                                        <p className={`text-[11px] font-black leading-tight ${isDarkMode ? 'text-slate-400' : 'text-slate-700'}`}>
+                                                                            {(() => {
+                                                                                const parts = r.full_location.split('|').map(p => p.trim());
+                                                                                const plus = parts[0] || "";
+                                                                                let addr = parts[1] || "";
+                                                                                const brgy = parts[2] || "Barangay Unknown";
+                                                                                
+                                                                                let cleanAddr = addr.replace(new RegExp(`,?\\s*${brgy}`, 'i'), '')
+                                                                                                    .replace(/,?\s*Caloocan(?: City)?/i, '')
+                                                                                                    .replace(/,?\s*Metro Manila/i, '')
+                                                                                                    .replace(/,?\s*Philippines/i, '')
+                                                                                                    .replace(/,$/, '')
+                                                                                                    .trim();
+                                                                                
+                                                                                return `${plus}, ${cleanAddr}, ${brgy}, Caloocan, Metro Manila`;
+                                                                            })()}
+                                                                        </p>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                    {r.description && (
+                                                        <p className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{r.description}</p>
+                                                    )}
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <span className={`text-[10px] font-bold ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                                                            Barangay {r.location_barangay}
+                                                        </span>
+                                                        <span className={`text-[10px] font-bold ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                                                            {r.created_at ? new Date(r.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                        </span>
+                                                        {r.reporter_name && r.reporter_name !== 'Anonymous' && (
+                                                            <span className={`text-[10px] font-bold ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                                                                Reported by: {r.reporter_name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {/* Map pin button */}
+                                                {r.location_lat && r.location_lng && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setActiveTab('map');
+                                                            if (mapRef) mapRef.panTo({ lat: r.location_lat, lng: r.location_lng });
+                                                        }}
+                                                        className="shrink-0 self-center bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-700/40 text-indigo-400 rounded-xl p-2.5 transition-colors"
+                                                        title="View on map"
+                                                    >
+                                                        <Navigation size={15} />
+                                                    </button>
+                                                )}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* ── Stress Zones Tab ── */}
                     {activeTab === 'clusters' && (
                         <div className="flex-1 overflow-y-auto p-8">
@@ -708,20 +1031,28 @@ export default function GovAnalyticsPage() {
                                         className="w-full bg-slate-900 border border-slate-700 text-slate-300 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
                                 </div>
                                 <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
-                                    className="bg-slate-900 border border-slate-700 text-slate-300 text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500">
+                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 ${
+                                        isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'
+                                    }`}>
                                     <option value="">All Categories</option>
-                                    {['pothole','road_damage','drainage','flooding','streetlight','structural','sidewalk','garbage'].map(c => (
-                                        <option key={c} value={c}>{c.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                                    {[
+                                        { value: 'roads_bridges', label: 'Roads & Bridges' },
+                                        { value: 'water_drainage', label: 'Water & Drainage' },
+                                        { value: 'street_lighting', label: 'Street Lighting' },
+                                        { value: 'public_safety_regulatory', label: 'Public Safety & Regulatory' },
+                                        { value: 'public_facilities', label: 'Public Facilities' }
+                                    ].map(c => (
+                                        <option key={c.value} value={c.value}>{c.label}</option>
                                     ))}
                                 </select>
                             </div>
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                                <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                            <div className={`border rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                                <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
                                     <span className="font-bold text-slate-300">{filteredClusters.length} Infrastructure Stress Zones</span>
                                     <span className="text-xs text-slate-500 font-semibold">Sorted by threat severity</span>
                                 </div>
                                 <table className="w-full">
-                                    <thead className="text-xs uppercase text-slate-500 font-bold border-b border-slate-800">
+                                    <thead className={`text-xs uppercase font-bold border-b ${isDarkMode ? 'text-slate-500 border-slate-800' : 'text-slate-400 border-slate-100 bg-slate-50/50'}`}>
                                         <tr>
                                             <th className="p-4 text-left">Zone</th>
                                             <th className="p-4 text-left">Category</th>
@@ -733,12 +1064,14 @@ export default function GovAnalyticsPage() {
                                             <th className="p-4 text-right">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-800">
+                                    <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                                         {filteredClusters.map(c => (
-                                            <tr key={c.cluster_id} className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                                            <tr key={c.cluster_id} className={`transition-colors cursor-pointer ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}`}
                                                 onClick={() => { setActiveTab('map'); setSelectedCluster(c); }}>
                                                 <td className="p-4"><ThreatBadge level={c.threat_level} /></td>
-                                                <td className="p-4 font-bold text-slate-300 capitalize">{c.dominant_category.replace(/_/g,' ')}</td>
+                                                <td className="p-4 font-bold text-slate-300">
+                                                    {CATEGORY_LABELS[c.dominant_category] || c.dominant_category.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                                </td>
                                                 <td className="p-4 text-slate-400 font-semibold">Brgy {c.barangay}</td>
                                                 <td className="p-4 text-right font-black text-white">{c.report_count}</td>
                                                 <td className="p-4 text-right font-bold text-orange-400">{c.severity_score.toFixed(1)}</td>
@@ -767,13 +1100,13 @@ export default function GovAnalyticsPage() {
                     {activeTab === 'forecast' && (
                         <div className="flex-1 overflow-y-auto p-8">
                             <div className="mb-6">
-                                <h2 className="text-xl font-black text-white">30-Day Infrastructure Forecast</h2>
+                                <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>30-Day Infrastructure Forecast</h2>
                                 <p className="text-slate-400 text-sm mt-1">Weekly report frequency trends per barangay and category. EMERGING zones need preemptive action.</p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 {forecast.slice(0, 12).map((f, i) => (
                                     <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                                        className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                                        className={`border rounded-2xl p-5 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                                         <div className="flex items-start justify-between mb-4">
                                             <div>
                                                 <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-2 ${
@@ -785,11 +1118,11 @@ export default function GovAnalyticsPage() {
                                                     {f.status === 'EMERGING' ? <TrendingUp size={10}/> : f.status === 'DECLINING' ? <TrendingDown size={10}/> : <Minus size={10}/>}
                                                     {f.status}
                                                 </div>
-                                                <p className="font-black text-white text-sm capitalize">{f.category.replace(/_/g,' ')}</p>
+                                                <p className={`font-black text-sm capitalize ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{f.category.replace(/_/g,' ')}</p>
                                                 <p className="text-xs text-slate-500 font-semibold">Brgy {f.barangay}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-2xl font-black text-white">{f.total_reports}</p>
+                                                <p className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{f.total_reports}</p>
                                                 <p className="text-[10px] text-slate-500 font-bold uppercase">Total</p>
                                             </div>
                                         </div>
@@ -826,7 +1159,7 @@ export default function GovAnalyticsPage() {
                     {/* ── Recurrence Tab ── */}
                     {activeTab === 'recurrence' && (
                         <div className="flex-1 overflow-y-auto p-8">
-                            <div className="mb-6 bg-red-950/20 border border-red-900/30 rounded-2xl p-5">
+                            <div className={`border rounded-2xl p-5 ${isDarkMode ? 'bg-red-950/20 border-red-900/30' : 'bg-red-50 border-red-100'}`}>
                                 <div className="flex items-start gap-3">
                                     <AlertCircle size={20} className="text-red-400 shrink-0 mt-0.5" />
                                     <div>
@@ -845,7 +1178,7 @@ export default function GovAnalyticsPage() {
                                     <p className="text-sm mt-1">All resolved repairs appear to be holding within the monitoring window.</p>
                                 </div>
                             ) : (
-                                <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                                <div className={`border rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                                     <table className="w-full">
                                         <thead className="text-xs uppercase text-slate-500 font-bold border-b border-slate-800">
                                             <tr>
@@ -863,7 +1196,9 @@ export default function GovAnalyticsPage() {
                                                 <tr key={i} className="hover:bg-slate-800/30 transition-colors">
                                                     <td className="p-4 font-mono font-bold text-slate-400 text-xs">#{r.prior_report_id}</td>
                                                     <td className="p-4 font-mono font-bold text-red-400 text-xs">#{r.new_report_id}</td>
-                                                    <td className="p-4 font-bold text-slate-300 capitalize">{(r.category || '').replace(/_/g,' ')}</td>
+                                                    <td className="p-4 font-bold text-slate-300">
+                                                        {CATEGORY_LABELS[r.category] || (r.category || '').replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                                    </td>
                                                     <td className="p-4 text-slate-400 text-sm">{r.location_string || `Brgy ${r.barangay}`}</td>
                                                     <td className="p-4 text-right text-slate-400 text-sm">{r.distance_meters}m</td>
                                                     <td className="p-4 text-right">
@@ -893,7 +1228,7 @@ export default function GovAnalyticsPage() {
                     <motion.div
                         initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
                         className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2 text-sm whitespace-nowrap ${
-                            toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-white text-slate-900'
+                            toast.type === 'error' ? 'bg-red-600 text-white' : (isDarkMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white border border-slate-800')
                         }`}
                     >
                         {toast.type === 'error' ? <XCircle size={16} /> : <CheckCircle size={16} className="text-green-500" />}

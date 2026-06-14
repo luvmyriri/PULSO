@@ -12,40 +12,39 @@ import {
     HardHat, Ruler, Building2, ShieldCheck, PackageCheck, FlaskConical,
     Wrench, BarChart as BarChart2, ChevronDown, ChevronRight, Map,
     ClipboardList, GitBranch, FileCheck, Truck, Eye, UserCog,
-    BookOpen, Activity, FileBarChart2, FileCheck2, Brain, Home
+    BookOpen, Activity, FileBarChart2, FileCheck2, Brain, Home, FileText, Shield
 } from 'lucide-react';
 import Branding from './Branding';
+import { checkPermission, canAccessModule, hasPIIAccess } from '../utils/rbac_utils';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Role-based menu visibility
+// Role-based menu visibility (updated for granular RBAC)
 // ─────────────────────────────────────────────────────────────────────────────
-const GOV_ROLES = [
-    'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
-    'records_officer','division_chief','design_engineer','estimator',
-    'cad_operator','project_engineer','construction_foreman','field_worker',
-    'building_inspector','electrical_inspector','mechanical_inspector',
-    'dispatcher','manager','system_admin',
-];
+const ROLE_EXECUTIVE = ['city_engineer', 'asst_city_engineer'];
+const ROLE_ADMIN = ['system_admin', 'admin_officer', 'records_officer'];
+const ROLE_SENIOR = ['division_chief', 'division_chief_arch', 'division_chief_structural', 'division_chief_electrical', 'project_engineer', 'design_engineer', 'manager'];
+const ROLE_STAFF = ['cad_operator', 'estimator', 'construction_foreman', 'field_worker', 'building_inspector', 'electrical_inspector', 'mechanical_inspector', 'admin_clerk'];
+const ROLE_INSPECTOR = ['building_inspector', 'electrical_inspector', 'mechanical_inspector'];
+const ROLE_DESIGN = ['design_engineer', 'cad_operator', 'division_chief', 'division_chief_arch'];
+const ROLE_SURVEY = ['project_engineer', 'estimator', 'construction_foreman', 'division_chief_structural'];
+const ROLE_PROCUREMENT = ['project_engineer', 'admin_officer', 'estimator'];
+const ROLE_CONSTRUCTION = ['construction_foreman', 'field_worker', 'project_engineer'];
+const ROLE_OBO = [...ROLE_INSPECTOR, ...ROLE_EXECUTIVE];
 
-const SENIOR_ROLES = ['city_engineer','asst_city_engineer','admin_officer','division_chief','manager','system_admin'];
-const EXECUTIVE_ROLES = ['city_engineer','asst_city_engineer','manager','system_admin'];
-const INSPECTOR_ROLES = ['building_inspector','electrical_inspector','mechanical_inspector','city_engineer','asst_city_engineer','manager','system_admin'];
-const PROCUREMENT_ROLES = ['project_engineer','admin_officer','estimator','city_engineer','asst_city_engineer','manager','system_admin'];
-const ADMIN_ONLY = ['system_admin','manager'];
-const DESIGN_ROLES = ['design_engineer','cad_operator','division_chief','city_engineer','asst_city_engineer','system_admin'];
-const SURVEY_ROLES = ['project_engineer','estimator','construction_foreman','division_chief','city_engineer','asst_city_engineer','system_admin'];
-const CONSTRUCTION_ROLES = ['project_engineer','construction_foreman','field_worker','dispatcher','division_chief','city_engineer','asst_city_engineer','system_admin'];
-
-const hasRole = (userRole, allowed) => allowed.includes(userRole);
+const hasRole = (userRole, allowed) => {
+    if (!userRole) return false;
+    if (userRole === 'system_admin') return true;
+    return allowed.includes(userRole);
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Nav Item structure
 // ─────────────────────────────────────────────────────────────────────────────
-const NavItem = ({ icon: Icon, label, to, tab, activeTab, onTabChange, badge, indent = false, external = false }) => {
+const NavItem = ({ icon: Icon, label, to, tab, activeTab, onTabChange, badge, indent = false, state = null }) => {
     const location = useLocation();
-    const isActive = to
-        ? location.pathname === to || location.pathname.startsWith(to + '/')
-        : activeTab === tab;
+    const isActive = (tab && activeTab !== undefined)
+        ? activeTab === tab
+        : to ? (location.pathname === to || location.pathname.startsWith(to + '/')) : false;
 
     const baseClass = `w-full flex items-center justify-between px-3 py-2 rounded-lg font-bold transition-all group text-sm ${indent ? 'pl-8' : ''}`;
     const activeClass = 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400';
@@ -63,9 +62,21 @@ const NavItem = ({ icon: Icon, label, to, tab, activeTab, onTabChange, badge, in
         </>
     );
 
+    const handleClick = (e) => {
+        if (to && tab && onTabChange && location.pathname === (to.split('?')[0])) {
+            e.preventDefault();
+            onTabChange(tab);
+        }
+    };
+
     if (to) {
         return (
-            <Link to={to} className={`${baseClass} ${isActive ? activeClass : inactiveClass}`}>
+            <Link 
+                to={to} 
+                state={state || (tab ? { tab } : undefined)}
+                onClick={handleClick}
+                className={`${baseClass} ${isActive ? activeClass : inactiveClass}`}
+            >
                 {content}
             </Link>
         );
@@ -147,6 +158,26 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
     const navigate = useNavigate();
     const role = currentUser?.role || 'dispatcher';
 
+    // Add scroll retention to automatically restore sidebar scroll position across page navigation
+    const sidebarRef = React.useRef(null);
+    React.useEffect(() => {
+        const scrollKey = 'pulso_sidebar_scroll_position';
+        const scrollPos = sessionStorage.getItem(scrollKey);
+        if (scrollPos && sidebarRef.current) {
+            sidebarRef.current.scrollTop = parseInt(scrollPos, 10);
+        }
+        
+        const handleScroll = (e) => {
+            sessionStorage.setItem(scrollKey, e.target.scrollTop);
+        };
+        
+        const el = sidebarRef.current;
+        if (el) {
+            el.addEventListener('scroll', handleScroll, { passive: true });
+            return () => el.removeEventListener('scroll', handleScroll);
+        }
+    }, []);
+
     const handleSignOut = () => {
         const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
         const wasGov = user?.role && user.role !== 'resident';
@@ -161,12 +192,15 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
 
     // Role display label mapping
     const roleLabels = {
-        city_engineer: 'City Engineer',
+        city_engineer: 'City Engineer / BO',
         asst_city_engineer: 'Asst. City Engineer',
         admin_officer: 'Administrative Officer V',
         admin_clerk: 'Administrative Clerk',
         records_officer: 'Records Officer',
         division_chief: 'Division Chief',
+        division_chief_arch: 'Div Chief - Architectural',
+        division_chief_structural: 'Div Chief - Structural',
+        division_chief_electrical: 'Div Chief - Electrical',
         design_engineer: 'Design Engineer',
         estimator: 'Estimator / QS',
         cad_operator: 'CAD Operator',
@@ -206,54 +240,48 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
             </div>
 
             {/* Navigation */}
-            <div className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5 custom-scrollbar" ref={sidebarRef}>
 
-                {/* ── OPERATIONS ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-1">Operations</div>
-                <NavItem icon={LayoutDashboard} label="My Dashboard" to="/gov/my-dashboard" />
-                {/* Command Center only for dispatcher / admin clerk + senior roles */}
-                {hasRole(role, ['admin_clerk', 'dispatcher', 'admin_officer', ...SENIOR_ROLES]) && (
+                {/* ── MAIN HUB ── */}
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-1">Main Hub</div>
+                <NavItem icon={Home} label="My Dashboard" to="/gov/my-dashboard" />
+                {checkPermission(currentUser, 'ops', 'manage') && (
+                    <NavItem icon={LayoutDashboard} label="Executive Performance" tab="overview" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
+                )}
+                {checkPermission(currentUser, 'ops', 'manage') && (
                     <NavItem icon={AlertTriangle} label="Command Center" to="/dispatcher" />
                 )}
-                {hasRole(role, SENIOR_ROLES) && (
-                    <NavItem icon={LayoutDashboard} label="Exec Overview" tab="overview" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
+                {checkPermission(currentUser, 'admin', 'audit') && (
+                    <NavItem icon={Brain} label="Analytics Command Center" to="/gov/analytics" />
+                )}
+                {checkPermission(currentUser, 'reports', 'view') && (
+                    <NavItem icon={TrendingUp} label="Predictive Maintenance" to="/gov/predictive" />
                 )}
 
-                {/* ── ANALYTICS INTELLIGENCE (admin + exec only) ── */}
-                {hasRole(role, ['system_admin', 'city_engineer', 'asst_city_engineer']) && (
-                    <>
-                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Intelligence</div>
-                        <NavItem icon={Brain} label="Analytics Command Center" to="/gov/analytics" />
-                    </>
-                )}
-
-                {/* ── WORK & TRIAGE ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Triage & Work Orders</div>
-                {hasRole(role, SENIOR_ROLES) && (
-                    <NavItem icon={ClipboardCheck} label="W.O. Approvals" tab="approvals" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
-                )}
-                {hasRole(role, GOV_ROLES) && (
-                    <NavItem icon={GitBranch} label="Work Orders" to="/gov/work-orders" />
-                )}
-                {hasRole(role, GOV_ROLES) && (
+                {/* ── OPERATIONS & TRIAGE ── */}
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-4">Operations & Triage</div>
+                {checkPermission(currentUser, 'reports', 'view') && (
                     <NavItem icon={Activity} label="Process Timeline" to="/gov/timeline" />
                 )}
+                {checkPermission(currentUser, 'ops', 'manage') && (
+                    <NavItem icon={Megaphone} label="Post Advisory" tab="advisories" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
+                )}
 
-                {/* ── DIVISIONS ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Divisions</div>
+                {/* ── LGU DEPARTMENTS ── */}
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-4">LGU Departments</div>
 
                 {/* Administrative Division */}
-                {hasRole(role, ['admin_officer','admin_clerk','records_officer','system_admin','manager','city_engineer','asst_city_engineer']) && (
+                {checkPermission(currentUser, 'records', 'view') && (
                     <NavSection title="Administrative" icon={Briefcase} defaultOpen={['admin_officer','admin_clerk','records_officer'].includes(role)}>
-                        <NavItem icon={Users} label="Manage Users" tab="users" activeTab={activeTab} onTabChange={onTabChange} indent to="/gov/users" />
                         <NavItem icon={BookOpen} label="Records & Registry" to="/gov/records" indent />
+                        <NavItem icon={FileText} label="Document Archive" to="/gov/document-registry" indent />
                         <NavItem icon={FileBarChart2} label="Reports Archive" to="/gov/reports-archive" indent />
                         <NavItem icon={FileCheck2} label="Audit Logs" to="/gov/audit-logs" indent />
                     </NavSection>
                 )}
 
                 {/* Design Division */}
-                {hasRole(role, DESIGN_ROLES) && (
+                {hasRole(role, ROLE_DESIGN) && (
                     <NavSection title="Design & Planning" icon={Ruler} defaultOpen={['design_engineer','cad_operator'].includes(role)}>
                         <NavItem icon={Map} label="LGU Projects" to="/gov/projects" indent />
                         <NavItem icon={Building2} label="Design Requests" to="/gov/design-requests" indent />
@@ -262,7 +290,7 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
                 )}
 
                 {/* Survey Division */}
-                {hasRole(role, SURVEY_ROLES) && (
+                {hasRole(role, ROLE_SURVEY) && (
                     <NavSection title="Survey & Estimation" icon={Eye} defaultOpen={role === 'estimator'}>
                         <NavItem icon={Map} label="Field Surveys" to="/gov/surveys" indent />
                         <NavItem icon={ClipboardList} label="Bill of Quantities" to="/gov/boq" indent />
@@ -270,48 +298,37 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
                     </NavSection>
                 )}
 
-                {/* Construction / Field Division */}
-                {hasRole(role, CONSTRUCTION_ROLES) && (
-                    <NavSection title="Construction & Field" icon={HardHat} defaultOpen={['project_engineer','construction_foreman','field_worker','dispatcher'].includes(role)}>
-                        <NavItem icon={Truck} label="Dispatch & Fleet" to="/dispatcher" indent />
-                        <NavItem icon={Wrench} label="Active Work Orders" to="/gov/work-orders" indent />
-                        <NavItem icon={TrendingUp} label="Predictive Maint." tab="predictive" activeTab={activeTab} onTabChange={onTabChange} badge={2} to="/management" indent />
-                    </NavSection>
-                )}
-
                 {/* OBO Division */}
-                {hasRole(role, INSPECTOR_ROLES) && (
-                    <NavSection title="OBO — Building Official" icon={ShieldCheck} defaultOpen={['building_inspector','electrical_inspector','mechanical_inspector'].includes(role)} color="teal">
+                {hasRole(role, ROLE_OBO) && (
+                    <NavSection title="Building Official (OBO)" icon={ShieldCheck} defaultOpen={['building_inspector','electrical_inspector','mechanical_inspector'].includes(role)} color="teal">
                         <NavItem icon={Building2} label="OBO Inspections" to="/gov/obo" indent />
                         <NavItem icon={Briefcase} label="Permit Tracking" tab="permits" activeTab={activeTab} onTabChange={onTabChange} to="/management" indent />
                     </NavSection>
                 )}
 
                 {/* Procurement / BAC */}
-                {hasRole(role, PROCUREMENT_ROLES) && (
+                {hasRole(role, ROLE_PROCUREMENT) && (
                     <NavSection title="Procurement / BAC" icon={PackageCheck} defaultOpen={['estimator'].includes(role)} color="violet">
                         <NavItem icon={Landmark} label="RA 9184 Bidding" tab="procurement" activeTab={activeTab} onTabChange={onTabChange} to="/management" indent />
                         <NavItem icon={ClipboardList} label="Procurement Requests" to="/gov/procurement" indent />
                     </NavSection>
                 )}
 
-                {/* ── BROADCAST & COMMS ── */}
-                {hasRole(role, SENIOR_ROLES) && (
+                {/* ── PLATFORM SETTINGS ── */}
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-4">Platform Settings</div>
+                {role === 'system_admin' && (
                     <>
-                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Communications</div>
-                        <NavItem icon={Megaphone} label="Post Advisory" tab="advisories" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
+                        <NavItem icon={UserCog} label="Gov Accounts" to="/gov/users" />
+                        <NavItem icon={Shield} label="Resident Accounts" to="/gov/residents" />
                     </>
                 )}
-
-                {/* ── SYSTEM ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">System</div>
-                {hasRole(role, ADMIN_ONLY) && (
-                    <NavItem icon={UserCog} label="Role Management" to="/gov/users" />
-                )}
                 <NavItem icon={Settings} label="Settings" to="/gov/settings" />
+                {role === 'system_admin' && (
+                    <NavItem icon={HardHat} label="Agent App Download" to="/gov/agent-app" />
+                )}
                 <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg font-bold text-sm transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 mt-1"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg font-bold text-sm transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 mt-2"
                 >
                     <LogOut size={16} />
                     Sign Out

@@ -13,9 +13,9 @@ import sys
 BASE = "http://localhost:33159"
 
 # ─── Styled output ───────────────────────────────────────────────────── 
-def ok(msg):   print(f"  ✅ {msg}")
-def fail(msg): print(f"  ❌ {msg}")
-def info(msg): print(f"  ℹ️  {msg}")
+def ok(msg):   print(f"  [OK] {msg}")
+def fail(msg): print(f"  [FAIL] {msg}")
+def info(msg): print(f"  [INFO] {msg}")
 def header(msg): print(f"\n{'='*60}\n  {msg}\n{'='*60}")
 
 errors = []
@@ -62,14 +62,20 @@ try:
     logged_user = None
     token = None
     for email in test_emails:
-        user = _db.query(db_models.User).filter(db_models.User.email == email).first()
+        # Check Official table first
+        user = _db.query(db_models.Official).filter(db_models.Official.email == email).first()
+        # Fallback to Resident table
+        if not user:
+            user = _db.query(db_models.Resident).filter(db_models.Resident.email == email).first()
+            
         if user:
             token = auth_mod.create_access_token(
                 data={"sub": user.email},
                 expires_delta=timedelta(minutes=30)
             )
             logged_user = user.email
-            info(f"Logged in as: {user.full_name} ({user.role}) — {user.email}")
+            role_name = getattr(user, "role", "unknown")
+            info(f"Logged in as: {getattr(user, 'full_name', 'System')} ({role_name}) — {user.email}")
             break
     _db.close()
 except Exception as e:
@@ -280,13 +286,17 @@ if r.status_code == 200:
 # Summary
 # ═══════════════════════════════════════════════════════════════════════
 header("VERIFICATION SUMMARY")
+final_success = len(errors) == 0
 if errors:
-    print(f"\n  ❌ {len(errors)} test(s) FAILED:")
+    print(f"\n  [FAIL] {len(errors)} test(s) FAILED:")
     for e in errors:
-        print(f"     • {e}")
-    sys.exit(1)
+        print(f"     - {e}")
 else:
-    print("\n  ✅ ALL TESTS PASSED — Full CRUD lifecycle is operational.")
-    print("     Government-side endpoints are mounted and functional.")
-    print("     Citizen ↔ Government status propagation is wired.")
-    sys.exit(0)
+    print("\n  [PASS] ALL TESTS PASSED — Full CRUD lifecycle is operational.")
+
+if final_success:
+    print("\n  [PASS] SYSTEM VERIFIED: All CRUD operations are operational.")
+else:
+    print("\n  [FAIL] SYSTEM DEGRADED: Please review the errors above.")
+print("     Citizen <-> Government status propagation is wired.")
+sys.exit(0 if final_success else 1)

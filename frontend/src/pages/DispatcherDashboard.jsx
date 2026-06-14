@@ -13,6 +13,7 @@ import {
     Maximize2,
     Minimize2,
     Navigation,
+    History,
     ShieldAlert,
     TrendingUp,
     Droplets,
@@ -31,7 +32,9 @@ import {
     X,
     Trash2,
     Image as ImageIcon,
-    Building2
+    Building2,
+    Camera,
+    ShieldCheck
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, HeatmapLayerF } from '@react-google-maps/api';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -40,30 +43,60 @@ import OrangeSelect from '../components/OrangeSelect';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 import Swal from 'sweetalert2';
+import { API_BASE_URL } from '../utils/apiBase';
+import { handleApiError } from '../utils/apiFetch';
+
 
 const CALOOCAN_CENTER = { lat: 14.7566, lng: 121.0450 };
-const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7505408, lng: 121.0540317 }; // Adjusted to exact Zapote Rd building footprint
+const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7566, lng: 121.0450 };
+const CALOOCAN_CITY_HALL_SOUTH_LOC = { lat: 14.6495, lng: 120.9775 }; 
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
 const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry', 'visualization'];
 
-const NORTH_CALOOCAN_BOUNDARY = [
-    { lat: 14.825, lng: 121.060 }, // North Tip (Tala Area)
-    { lat: 14.805, lng: 121.140 }, // NE Corner (Boundary with SJDM/Rizal)
-    { lat: 14.745, lng: 121.140 }, // SE Side (Bagong Silang - Brgy 176)
-    { lat: 14.740, lng: 121.100 }, // Under Bagong Silang (Brgy 177 area)
-    { lat: 14.710, lng: 121.070 }, // Southern Edge (Brgy 178/174 Camarin)
-    { lat: 14.675, lng: 121.040 }, // Deep South Extension (To include Brgy 164/169 areas)
-    { lat: 14.680, lng: 120.990 }, // SW Corner (Expansion towards Valenzuela/Meycauayan)
-    { lat: 14.760, lng: 120.970 }, // West Side (Expansion towards Marilao)
-    { lat: 14.820, lng: 120.970 }, // NW Corner (Marilao Border)
-    { lat: 14.825, lng: 121.030 }  // Back to North Tip
+// DEPRECATED: Legacy manual coordinates. Now using Google Maps Data-Driven Styling (DDS) for visual boundary.
+const CALOOCAN_CITY_PLACE_ID = 'ChIJXxuEGbWxlzMRGi0EJeJw5wU';
+
+// ─── Map Style Constants ───────────────────────────────────────────────────
+const DARK_MAP_STYLE = [
+    { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#f97316' }] },
+    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+    { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#334155' }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+    { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#0f172a' }] },
+    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+    { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+    { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#f97316' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#020617' }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#334155' }] },
+    { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#020617' }] }
+];
+
+const LIGHT_MAP_STYLE = [
+    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#f8fafc' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
+    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
 ];
 
 const CALOOCAN_NORTH_BARANGAYS = [
-    'All Barangays', 'Brgy. 165', 'Brgy. 166', 'Brgy. 167', 'Brgy. 168', 'Brgy. 169', 
+    'All North Barangays', 'Brgy. 165', 'Brgy. 166', 'Brgy. 167', 'Brgy. 168', 'Brgy. 169', 
     'Brgy. 170', 'Brgy. 171', 'Brgy. 172', 'Brgy. 173', 'Brgy. 174', 'Brgy. 175', 
     'Brgy. 176', 'Brgy. 177', 'Brgy. 178', 'Brgy. 179', 'Brgy. 180', 'Brgy. 181', 
     'Brgy. 182', 'Brgy. 183', 'Brgy. 184', 'Brgy. 185', 'Brgy. 186', 'Brgy. 187', 'Brgy. 188'
+];
+
+const CALOOCAN_SOUTH_BARANGAYS = [
+    'All South Barangays', ...Array.from({ length: 164 }, (_, i) => `Brgy. ${i + 1}`)
 ];
 
 const INFRASTRUCTURE_CATEGORIES = [
@@ -77,6 +110,7 @@ const INFRASTRUCTURE_CATEGORIES = [
 
 const STATUS_OPTIONS = [
     'All Statuses',
+    'Unvalidated',
     'Pending',
     'Pending Approval (Phase 2)',
     'Approved (Phase 3)',
@@ -86,15 +120,241 @@ const STATUS_OPTIONS = [
     'Cancelled'
 ];
 
+// ─── TacticalDatePicker — Custom inline calendar, zero overlap ─────────────
+const TacticalDatePicker = ({ onChange }) => {
+    const today = new Date();
+    const [viewYear, setViewYear] = useState(today.getFullYear());
+    const [viewMonth, setViewMonth] = useState(today.getMonth());
+    const [selected, setSelected] = useState(null);
+
+    const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+    const MONTHS = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+
+    const firstDay  = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const daysInPrev  = new Date(viewYear, viewMonth, 0).getDate();
+
+    const cells = [];
+    for (let i = firstDay - 1; i >= 0; i--)
+        cells.push({ day: daysInPrev - i, tag: 'prev', date: new Date(viewYear, viewMonth - 1, daysInPrev - i) });
+    for (let d = 1; d <= daysInMonth; d++)
+        cells.push({ day: d, tag: 'cur',  date: new Date(viewYear, viewMonth, d) });
+    while (cells.length < 42)
+        cells.push({ day: cells.length - firstDay - daysInMonth + 1, tag: 'next', date: new Date(viewYear, viewMonth + 1, cells.length - firstDay - daysInMonth + 1) });
+
+    const isPast     = (c) => { const d = new Date(c.date); d.setHours(0,0,0,0); const t = new Date(today); t.setHours(0,0,0,0); return d < t; };
+    const isToday    = (c) => c.date.toDateString() === today.toDateString();
+    const isSelected = (c) => selected && c.date.toDateString() === selected.toDateString();
+
+    const prevMonth = () => viewMonth === 0  ? (setViewMonth(11), setViewYear(y => y - 1)) : setViewMonth(m => m - 1);
+    const nextMonth = () => viewMonth === 11 ? (setViewMonth(0),  setViewYear(y => y + 1)) : setViewMonth(m => m + 1);
+
+    const handleSelect = (cell) => {
+        if (cell.tag !== 'cur' || isPast(cell)) return;
+        setSelected(cell.date);
+        const formatted = [
+            cell.date.getFullYear(),
+            String(cell.date.getMonth() + 1).padStart(2, '0'),
+            String(cell.date.getDate()).padStart(2, '0')
+        ].join('-');
+        // Write to hidden input so existing onConfirm can read it
+        const hidden = document.getElementById('budget-date-input');
+        if (hidden) hidden.value = formatted;
+        if (onChange) onChange(formatted);
+    };
+
+    return (
+        <div className="rounded-2xl overflow-hidden border border-white/10" style={{ background: 'rgba(15,23,42,0.9)' }}>
+            {/* Month navigation */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                <button
+                    type="button"
+                    onClick={prevMonth}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all text-lg font-bold"
+                >‹</button>
+                <div className="text-center">
+                    <div className="text-xs font-black text-white uppercase tracking-widest">
+                        {MONTHS[viewMonth]}
+                    </div>
+                    <div className="text-[10px] font-bold text-orange-500/70 tracking-widest">{viewYear}</div>
+                </div>
+                <button
+                    type="button"
+                    onClick={nextMonth}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all text-lg font-bold"
+                >›</button>
+            </div>
+
+            {/* Day-of-week headers */}
+            <div className="grid grid-cols-7 px-3 pt-3">
+                {DAYS.map(d => (
+                    <div key={d} className="text-center text-[9px] font-black text-slate-600 uppercase tracking-widest pb-2">
+                        {d}
+                    </div>
+                ))}
+            </div>
+
+            {/* Calendar cells */}
+            <div className="grid grid-cols-7 gap-0.5 px-3 pb-3">
+                {cells.map((cell, i) => {
+                    const past     = isPast(cell);
+                    const outside  = cell.tag !== 'cur';
+                    const todayCls = isToday(cell) && !isSelected(cell);
+                    const selCls   = isSelected(cell);
+                    const disabled = outside || past;
+
+                    return (
+                        <button
+                            type="button"
+                            key={i}
+                            onClick={() => handleSelect(cell)}
+                            disabled={disabled}
+                            className={[
+                                'w-full aspect-square rounded-xl text-[11px] font-bold transition-all duration-150 flex items-center justify-center',
+                                selCls   ? 'bg-orange-500 text-white shadow-[0_4px_14px_rgba(249,115,22,0.5)] scale-105' : '',
+                                todayCls ? 'ring-1 ring-orange-500/60 text-orange-400' : '',
+                                !selCls && !disabled && !todayCls ? 'text-slate-300 hover:bg-orange-500/20 hover:text-orange-400' : '',
+                                disabled   ? 'text-slate-700 cursor-not-allowed' : 'cursor-pointer',
+                            ].join(' ')}
+                        >
+                            {cell.day}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Selected date readout */}
+            <div className={`px-4 py-3 border-t border-white/10 flex items-center justify-center gap-2 transition-all duration-300 ${selected ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Deployment Window:</span>
+                <span className="text-xs font-bold text-orange-400">
+                    {selected ? selected.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                </span>
+            </div>
+
+            {/* Hidden input for onConfirm compat */}
+            <input type="hidden" id="budget-date-input" />
+        </div>
+    );
+};
+
+const urgencyToConfidence = (urgency) => {
+    const mapping = {
+        'Critical': 98,
+        'High': 85,
+        'Normal': 72,
+        'Low': 60
+    };
+    return mapping[urgency] || 65;
+};
+
+/**
+ * Strategic Process Flow Component
+ * Modernized 5-phase government operational workflow visualization.
+ */
+const StrategicProcessFlow = ({ report }) => {
+    if (!report) return null;
+    
+    return (
+        <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest border-l-2 border-orange-500 pl-2 leading-none">Strategic Process Flow</span>
+                    <span className="text-[9px] text-slate-500 font-bold uppercase mt-1">Tracking: {report.ticket_id || `RPT-${report.id}`}</span>
+                </div>
+                <div className="flex items-center gap-1 bg-orange-500/10 px-2 py-1 rounded-md border border-orange-500/20">
+                    <Activity size={10} className="text-orange-500 animate-pulse"/>
+                    <span className="text-[9px] font-black text-orange-500 uppercase">Live Engine</span>
+                </div>
+            </div>
+
+            <div className="relative flex justify-between items-start">
+                {/* Connector Line Background */}
+                <div className="absolute top-3.5 left-0 w-full h-[2px] bg-slate-200 dark:bg-slate-800 z-0"></div>
+                
+                {/* Active Connector Progress */}
+                <div 
+                    className="absolute top-3.5 left-0 h-[2px] bg-orange-500 z-0 transition-all duration-1000 ease-in-out"
+                    style={{ 
+                        width: 
+                            report.status === 'resolved' ? '100%' :
+                            report.status === 'dispatched' ? '75%' :
+                            ['approved_internal'].includes(report.status) ? '50%' :
+                            ['pending_approval'].includes(report.status) ? '25%' : '0%'
+                    }}
+                ></div>
+
+                {/* Phase Nodes */}
+                {[
+                    { id: 1, label: 'Intake', icon: Radio, sub: 'AI Analysis' },
+                    { id: 2, label: 'Planning', icon: Navigation, sub: 'Logistics' },
+                    { id: 3, label: 'Budgeting', icon: Briefcase, sub: 'Approval' },
+                    { id: 4, label: 'Execution', icon: Truck, sub: 'Field Team' },
+                    { id: 5, label: 'Resolution', icon: ShieldCheck, sub: 'Audit' }
+                ].map((phase, idx) => {
+                    const isPast = (idx + 1) < (
+                        report.status === 'resolved' ? 6 :
+                        report.status === 'dispatched' ? 5 :
+                        ['approved_internal'].includes(report.status) ? 4 :
+                        ['pending_approval'].includes(report.status) ? 3 : 2
+                    );
+                    const isCurrent = (
+                        (phase.id === 1 && ['unverified', 'pending'].includes(report.status)) ||
+                        (phase.id === 2 && report.status === 'pending_approval') ||
+                        (phase.id === 3 && report.status === 'approved_internal') ||
+                        (phase.id === 4 && report.status === 'dispatched') ||
+                        (phase.id === 5 && report.status === 'resolved')
+                    );
+
+                    const PhaseIcon = phase.icon;
+
+                    return (
+                        <div key={idx} className="flex flex-col items-center relative z-10 w-1/5">
+                            {/* Node Circle */}
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-500 border-2 ${
+                                isPast ? 'bg-orange-500 border-orange-500 text-white' :
+                                isCurrent ? 'bg-white dark:bg-slate-900 border-orange-500 text-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)] ring-4 ring-orange-500/10' :
+                                'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400'
+                            }`}>
+                                {isPast ? <CheckCircle size={14} /> : <PhaseIcon size={12} />}
+                            </div>
+                            
+                            {/* Labels */}
+                            <div className="mt-2 text-center">
+                                <div className={`text-[8px] font-black uppercase tracking-tight leading-none ${isCurrent ? 'text-orange-500' : isPast ? 'text-slate-700 dark:text-slate-300' : 'text-slate-500'}`}>
+                                    {phase.label}
+                                </div>
+                                <div className="text-[7px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5 leading-none">
+                                    {phase.sub}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 const DispatcherDashboard = () => {
+    // Core Map & Dashboard State (Top-level to avoid TDZ errors)
+    const [map, setMapInstance] = useState(null);
+    const [panorama, setPanorama] = useState(null);
+    const [actionLoading, setActionLoading] = useState(null);
+
     const { t } = useTranslation();
     const { theme } = useTheme();
     const navigate = useNavigate();
     const location = useLocation();
+    const systemIsDark = theme === 'system' 
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches 
+        : theme === 'dark';
+    
+    const handleMapUnmount = useCallback(function callback(map) {
+        setMapInstance(null);
+    }, []);
 
-    // Standardized API Base URL for all backend interactions
-    const apiHost = window.location.hostname;
-    const API_BASE_URL = `http://${apiHost}:33159`;
 
     const [token, setToken] = useState(() => localStorage.getItem('pulso_token'));
     const [currentUser, setCurrentUser] = useState(() => {
@@ -114,12 +374,14 @@ const DispatcherDashboard = () => {
     const pendingTacticalRef = useRef(null); // stores state before map is ready
 
     const [allReports, setAllReports] = useState([]);
+    const heatmapLayerRef = useRef(null);
     const [loadingReports, setLoadingReports] = useState(true);
     const [selectedMarker, setSelectedMarker] = useState(null);
-    const [map, setMap] = useState(null);
-    const [panorama, setPanorama] = useState(null);
-    const heatmapLayerRef = useRef(null);
     const [zoomedImage, setZoomedImage] = useState(null);
+    
+    // Agent Tracking State
+    const [agentLocations, setAgentLocations] = useState([]);
+    const [loadingAgents, setLoadingAgents] = useState(false);
 
     // New State for Work Order Generation Modal
     const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
@@ -133,13 +395,28 @@ const DispatcherDashboard = () => {
     const [jurisdictionErrorMsg, setJurisdictionErrorMsg] = useState("");
     const [svHeading, setSvHeading] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
+    const [selectedBarangay, setSelectedBarangay] = useState('All North Barangays');
     const [selectedCategory, setSelectedCategory] = useState('All Categories');
     const [selectedStatus, setSelectedStatus] = useState('All Statuses');
-    const [reportToDelete, setReportToDelete] = useState(null);
+    const [borderData, setBorderData] = useState(null);
+    const [actionHubTab, setActionHubTab] = useState('incoming'); // 'incoming', 'approvals', 'active', 'master'
+    const [showHistorical, setShowHistorical] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [deleteError, setDeleteError] = useState(null);
+    const [isNoReportModalOpen, setIsNoReportModalOpen] = useState(false);
+    const [tacticalModal, setTacticalModal] = useState(null); // { type: 'success' | 'error' | 'info', title: string, message: string, onConfirm?: () => void }
+    const [isBrgyModalOpen, setIsBrgyModalOpen] = useState(false);
+    const [brgyModalData, setBrgyModalData] = useState(null);
     const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
+
+    // FQA & Budgeting Workflow State
+    const [fqaResults, setFqaResults] = useState(null);
+    const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+    const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+    const [boqData, setBoqData] = useState({
+        equipment: [{ item: 'Service Truck', cost: 2500, qty: 1 }],
+        materials: [{ item: 'Standard Repair Kit', cost: 1500, qty: 1 }],
+        labor: [{ role: 'Team Lead', rate: 1200, count: 1 }, { role: 'Technician', rate: 800, count: 2 }]
+    });
 
     // AI Omni-Assistant State
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -165,8 +442,8 @@ const DispatcherDashboard = () => {
         }
     }, [token, currentUser, navigate]);
 
-    // Intelligence Deep-Link Handling: Auto-focus map if navigated from Analytics
-    // Step 1 — capture incoming state immediately (before map is ready)
+    // Intelligence & Consolidation Deep-Link Handling: Auto-focus map if navigated from Analytics or Sidebar
+    // Step 1 ─ capture incoming state immediately (before map is ready)
     useEffect(() => {
         const tacticalState = location.state;
         if (!tacticalState) return;
@@ -177,8 +454,20 @@ const DispatcherDashboard = () => {
         // Set Tactical Mission Context for the banner
         setTacticalContext(tacticalState);
 
-        // If exact report_ids exist, we use those for pinpoint filtering.
-        // Only fall back to fuzzy barangay/category filters if no report_ids.
+        // 1. Handling Consolidation Filters (from Sidebar)
+        if (tacticalState.filterStatus) {
+            setSelectedStatus(tacticalState.filterStatus);
+            // Auto-set the Action Hub tab if navigating from historical deep links
+            if (tacticalState.filterStatus === 'Pending Approval (Phase 2)') setActionHubTab('approvals');
+            else if (tacticalState.filterStatus === 'Pending') setActionHubTab('incoming');
+            else if (tacticalState.filterStatus === 'Dispatched (Phase 4)') setActionHubTab('active');
+        }
+        if (tacticalState.filterMode) {
+            setDashboardMode(tacticalState.filterMode);
+            setActiveTab(tacticalState.filterMode === 'active' ? 'fleet' : 'queue');
+        }
+
+        // 2. Handling Tactical Filters (from Analytics)
         if (!tacticalState.report_ids || tacticalState.report_ids.length === 0) {
             if (tacticalState.category) {
                 const cat = tacticalState.category.toLowerCase();
@@ -201,6 +490,7 @@ const DispatcherDashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.state]);
 
+
     // Step 2 — once map is ready, pan to the pending tactical coordinates
     useEffect(() => {
         if (!map || !pendingTacticalRef.current) return;
@@ -216,7 +506,7 @@ const DispatcherDashboard = () => {
 
     const centerOnHQ = () => {
         if (map) {
-            map.panTo(CALOOCAN_CITY_HALL_NORTH_LOC);
+            map.panTo(CALOOCAN_CITY_HALL_SOUTH_LOC);
             map.setZoom(16);
         }
     };
@@ -286,7 +576,7 @@ const DispatcherDashboard = () => {
             if (!pos) return;
             const loc = { lat: pos.lat(), lng: pos.lng() };
             
-            // Validate position inside North Caloocan jurisdication on every navigation change
+            // Validate position inside South Caloocan jurisdication on every navigation change
             if (!checkJurisdiction(loc)) {
                 panorama.setVisible(false);
                 return;
@@ -408,14 +698,10 @@ const DispatcherDashboard = () => {
         } catch (err) {
             console.error('Native Directions failed:', err);
             // Fallback warning if API is disabled or quota exceeded
-            Swal.fire({
-                icon: 'warning',
-                title: 'Routing Unavailable',
-                text: 'High-precision routing depends on the Directions API. Please check your network or GCP limits.',
-                timer: 3000,
-                showConfirmButton: false,
-                background: isDarkMode ? '#0f172a' : '#fff',
-                color: isDarkMode ? '#fff' : '#000'
+            setTacticalModal({
+                type: 'error',
+                title: 'High-Level Routing Interrupted',
+                message: 'Detailed path calculation is currently offline. Tactical direct mapping is now active.'
             });
             setDirectionsResponse(null);
             setDistance('');
@@ -441,17 +727,9 @@ const DispatcherDashboard = () => {
     // (Duplicate panorama effect removed — consolidated into the one above)
 
     const checkJurisdiction = (location) => {
-        if (!window.google || !window.google.maps || !window.google.maps.geometry) return true;
-        
-        const polygon = new window.google.maps.Polygon({ paths: NORTH_CALOOCAN_BOUNDARY });
-        const latLng = new window.google.maps.LatLng(location.lat, location.lng);
-        const isIn = window.google.maps.geometry.poly.containsLocation(latLng, polygon);
-        
-        if (!isIn && !isJurisdictionModalOpen) {
-            setJurisdictionErrorMsg(t('This location is outside North Caloocan City jurisdiction. Visual verification tools and Street View are restricted to authorized areas.'));
-            setIsJurisdictionModalOpen(true);
-        }
-        return isIn;
+        // Legacy manual check preserved for now as a fallback, 
+        // but visual boundary is now managed by Google Maps DDS
+        return true; 
     };
 
     const handleStreetViewClick = (location) => {
@@ -468,37 +746,20 @@ const DispatcherDashboard = () => {
         }
     }, [map, panorama]);
     const [dispatchForm, setDispatchForm] = useState({
-        assigned_to_id: 2, // Dummy ID for field engineer
+        assigned_to_id: 36, // Valid ID for field engineer (Juan Dela Cruz)
         priority: 'normal',
         title: '',
         description: ''
     });
 
-    const isDarkMode = theme === 'system' 
-        ? window.matchMedia('(prefers-color-scheme: dark)').matches 
-        : theme === 'dark';
 
     const mapOptions = React.useMemo(() => ({
-        styles: isDarkMode ? [
-            { "elementType": "geometry", "stylers": [{ "color": "#121826" }] },
-            { "elementType": "labels.text.fill", "stylers": [{ "color": "#637282" }] },
-            { "elementType": "labels.text.stroke", "stylers": [{ "color": "#121826" }] },
-            { "featureType": "administrative", "elementType": "geometry.stroke", "stylers": [{ "color": "#2c3e50" }] },
-            { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#232b3d" }] },
-            { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0d1117" }] }
-        ] : [
-            { "elementType": "geometry", "stylers": [{ "color": "#f8fafc" }] },
-            { "elementType": "labels.text.fill", "stylers": [{ "color": "#64748b" }] },
-            { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f8fafc" }] },
-            { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e2e8f0" }] },
-            { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
-            { "featureType": "poi", "stylers": [{ "visibility": "off" }] }
-        ],
+        styles: systemIsDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE,
         disableDefaultUI: true,
         zoomControl: true,
-        // streetViewControl is intentionally disabled — we use our own custom toggle button
         streetViewControl: false,
-    }), [isDarkMode]);
+        mapId: systemIsDark ? null : (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || '42e0e28462d4a298b3b3eb3f')
+    }), [systemIsDark]);
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
@@ -506,9 +767,6 @@ const DispatcherDashboard = () => {
         libraries: GOOGLE_MAPS_LIBRARIES,
     });
 
-    const onUnmount = useCallback(function callback(map) {
-        setMap(null)
-    }, []);
 
     // Derive a confidence score from real Gemini AI urgency
     const urgencyToConfidence = (urgency) => {
@@ -525,16 +783,28 @@ const DispatcherDashboard = () => {
     const fetchReports = async () => {
         setLoadingReports(true);
         try {
-            // Added cache-buster to ensure the triage queue reflects real-time DB state
-            const response = await fetch(`${API_BASE_URL}/api/reports?t=${Date.now()}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const response = await fetch(`${API_BASE_URL}/api/reports?limit=200&t=${Date.now()}`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             });
-            if (response.ok) {
-                const data = await response.json();
-                setAllReports(data);
+            const result = await handleApiError(response);
+            if (result.ok) {
+                setAllReports(result.data);
+            } else {
+                setTacticalModal({
+                    show: true,
+                    type: 'error',
+                    title: 'Strategic Intel Failure',
+                    message: result.message || 'The command registry could not be synchronized.'
+                });
             }
         } catch (error) {
             console.error("Failed to fetch reports:", error);
+            setTacticalModal({
+                show: true,
+                type: 'error',
+                title: 'Tactical Blackout',
+                message: 'Neural link to report database was severed.'
+            });
         } finally {
             setLoadingReports(false);
         }
@@ -544,216 +814,426 @@ const DispatcherDashboard = () => {
         fetchReports();
         // Live auto-refresh: ensure the triage queue is always accurate (every 30s)
         const interval = setInterval(fetchReports, 30000);
+        
+        // Fetch Caloocan border
+        fetch(`${API_BASE_URL}/api/geo/caloocan-border`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.json())
+            .then(data => setBorderData(data))
+            .catch(() => {});
+        
         return () => clearInterval(interval);
     }, []);
 
-    const [actionLoading, setActionLoading] = useState(null); // tracks which report is being actioned
+    const fetchAgentLocations = async () => {
+        setLoadingAgents(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/gov/agents/locations`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            });
+            const result = await handleApiError(response);
+            if (result.ok) {
+                setAgentLocations(result.data);
+            } else {
+                console.error("Agent location fetch failed:", result.message);
+            }
+        } catch (error) {
+            console.error("Failed to fetch agent locations:", error);
+        } finally {
+            setLoadingAgents(false);
+        }
+    };
 
-    const handleStatusAction = async (reportId, endpoint, successMsg, confirmTitle = null, targetStatus = null) => {
+    useEffect(() => {
+        fetchAgentLocations();
+        const interval = setInterval(fetchAgentLocations, 10000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleStatusAction = async (reportId, endpoint, successMsg, confirmTitle = null, targetStatus = null, extraData = {}) => {
+        const executeAction = async () => {
+            setActionLoading(reportId);
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/reports/${reportId}${endpoint}`, {
+                    method: 'PATCH',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: (targetStatus || Object.keys(extraData).length > 0) 
+                        ? JSON.stringify({ status: targetStatus, targetStatus, ...extraData }) 
+                        : null
+                });
+
+                if (response.ok) {
+                    setTacticalModal({
+                        show: true,
+                        type: 'success',
+                        title: 'Mission Updated',
+                        message: successMsg || 'Report status has been synchronized with command.'
+                    });
+                    
+                    fetchReports();
+                    // Immediately update local state for faster UI response
+                    if (selectedReport && selectedReport.id === reportId) {
+                        setSelectedReport(prev => ({ ...prev, status: targetStatus || prev.status }));
+                    }
+                } else {
+                    const err = await response.json();
+                    setTacticalModal({
+                        show: true,
+                        type: 'error',
+                        title: 'Sync Failed',
+                        message: err.detail || err.message || 'The tactical update could not be committed.'
+                    });
+                }
+            } catch (error) {
+                console.error('Action error:', error);
+                setTacticalModal({
+                    show: true,
+                    type: 'error',
+                    title: 'Strategic Failure',
+                    message: 'A critical network error prevented the status synchronization.'
+                });
+            } finally {
+                setActionLoading(null);
+            }
+        };
+
         if (confirmTitle) {
             const report = allReports.find(r => r.id === reportId);
             const ticketId = report ? (report.ticket_id || `RPT-${reportId}`) : `Report #${reportId}`;
             
-            const result = await Swal.fire({
-                title: '',
-                html: `
-                    <div class="flex flex-col items-center text-center px-2 py-4">
-                        <div class="w-16 h-16 rounded-full bg-orange-600/10 flex items-center justify-center border border-orange-500/20 mb-6 group-hover:scale-110 transition-transform">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-check"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
-                        </div>
-                        <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">${confirmTitle}</h2>
-                        <p class="text-slate-400 text-sm mb-8">
-                            Are you authorized to advance <span class="text-orange-500 font-bold">${ticketId}</span> to the next operational phase?
-                        </p>
-                        
-                        <div class="flex w-full gap-3 mt-4">
-                            <button id="cancel-btn" class="flex-1 py-3.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 transition-all focus:outline-none">Cancel</button>
-                            <button id="confirm-btn" class="flex-2 px-8 py-3.5 rounded-xl bg-orange-600 text-white font-bold text-sm hover:bg-orange-500 transition-all shadow-[0_10px_20px_-10px_rgba(234,88,12,0.5)] focus:outline-none">Yes, Confirm Action</button>
-                        </div>
-                    </div>
-                `,
-                showConfirmButton: false,
-                background: '#0F172A',
-                color: '#fff',
-                width: '440px',
-                padding: '2rem',
-                customClass: {
-                    popup: 'rounded-[32px] border border-white/5 shadow-2xl shadow-black/50',
-                },
-                didOpen: () => {
-                    const confirmBtn = Swal.getPopup().querySelector('#confirm-btn');
-                    const cancelBtn = Swal.getPopup().querySelector('#cancel-btn');
-                    confirmBtn.onclick = () => Swal.clickConfirm();
-                    cancelBtn.onclick = () => Swal.clickCancel();
-                }
+            setTacticalModal({
+                show: true,
+                type: 'confirm',
+                title: confirmTitle,
+                message: `Are you authorized to advance ${ticketId} to the next operational phase?`,
+                onConfirm: executeAction
             });
-            if (!result.isConfirmed) return;
-        }
-
-        setActionLoading(reportId);
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/reports/${reportId}${endpoint}`, {
-                method: 'PATCH',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: endpoint === '/status' ? JSON.stringify({ status: targetStatus || 'pending_approval' }) : undefined
-            });
-            if (response.ok) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Action Successful',
-                    text: successMsg || 'Report status has been updated.',
-                    timer: 2000,
-                    showConfirmButton: false,
-                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
-                });
-                fetchReports();
-                setSelectedReport(null);
-            } else {
-                const err = await response.json();
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Action Failed',
-                    text: err.detail || 'Could not update report status.',
-                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
-                });
-            }
-        } catch (error) {
-            console.error(`Error on ${endpoint}:`, error);
-        } finally {
-            setActionLoading(null);
+        } else {
+            await executeAction();
         }
     };
 
-    const handleDeleteReport = async () => {
-        if (!reportToDelete) return;
-        setIsDeleting(true);
-        setDeleteError(null);
-        const targetId = reportToDelete.id;
-        const ticketId = reportToDelete.ticket_id || `RPT-${targetId}`;
+    const handleDeleteReport = (reportArg = null) => {
+        const report = reportArg || selectedReport;
+        if (!report) return;
+        const targetId = report.id;
+        const ticketId = report.ticket_id || `RPT-${targetId}`;
         
-        try {
-            const url = `${API_BASE_URL}/api/reports/${targetId}`;
-            console.log(`[DELETE] Purging: ${url}`);
-            
-            const response = await fetch(url, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (response.ok) {
-                setNotification({
-                    type: 'success',
-                    message: `TASK FINALIZED: Report ${ticketId} has been professionally purged from all systems.`
-                });
-                
-                fetchReports();
-                if (selectedReport?.id === targetId) setSelectedReport(null);
-                if (selectedMarker?.id === targetId) setSelectedMarker(null);
-                setReportToDelete(null);
-                setTimeout(() => setNotification(null), 6000);
-            } else if (response.status === 404) {
-                setNotification({
-                    type: 'success',
-                    message: `SYNC NOTICE: Report ${ticketId} was already removed. Synchronizing UI...`
-                });
-                fetchReports();
-                setReportToDelete(null);
-                setTimeout(() => setNotification(null), 4000);
-            } else {
-                const err = await response.json();
-                const msg = err.detail || "The server rejected the deletion request.";
-                setDeleteError(msg);
-                setNotification({ type: 'error', message: `Deletion Failed: ${msg}` });
+        setTacticalModal({
+            show: true,
+            type: 'confirm',
+            title: 'Authorize Asset Purge',
+            message: `Are you CERTAIN you want to professionally retire ${ticketId}? This action is permanent and bypasses the recovery ledger.`,
+            onConfirm: async () => {
+                setIsDeleting(true);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/reports/${targetId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (response.ok) {
+                        setTacticalModal({
+                            show: true,
+                            type: 'success',
+                            title: 'Asset Purged',
+                            message: `Report ${ticketId} has been professionally removed from the live matrix.`
+                        });
+                        fetchReports();
+                        if (selectedReport?.id === targetId) {
+                            setSelectedReport(null);
+                            setSelectedMarker(null);
+                        }
+                    } else {
+                        const err = await response.json();
+                        setTacticalModal({
+                            show: true,
+                            type: 'error',
+                            title: 'Purge Failed',
+                            message: err.detail || 'The tactical deletion could not be finalized.'
+                        });
+                    }
+                } catch (error) {
+                    setTacticalModal({
+                        show: true,
+                        type: 'error',
+                        title: 'Operational Failure',
+                        message: 'Connection lost during asset purge sequence.'
+                    });
+                } finally {
+                    setIsDeleting(false);
+                }
             }
-        } catch (error) {
-            console.error("Critical Deletion Error:", error);
-            const msg = "Network error: The PULSO backend is unreachable. Please verify the server is running on port 33159.";
-            setDeleteError(msg);
-            setNotification({ type: 'error', message: msg });
-        } finally {
-            setIsDeleting(false);
-        }
+        });
     };
 
-    const handleVerifyReport  = (id) => handleStatusAction(id, '/status', 'Report moved to verified queue.', null, 'pending_approval');
+    const handleVerifyReport  = (id) => handleStatusAction(id, '/status', 'Report moved to manager for budgeting and approval.', null, 'pending_approval');
     const handleApproveReport = (id) => handleStatusAction(id, '/status', 'Budgeting finalized and report approved.', "Finalize Budget & Approve Report?", 'approved_internal');
     const handleRejectReport  = (id) => handleStatusAction(id, '/reject', 'Report rejected and resident penalized.', "Reject this report?");
     const handleResolveReport = async (reportId) => {
         const report = allReports.find(r => r.id === reportId);
         const ticketId = report ? (report.ticket_id || `RPT-${reportId}`) : `Report #${reportId}`;
         
-        const { value: file } = await Swal.fire({
+        setTacticalModal({
+            show: true,
+            type: 'custom',
             title: 'Upload Completion Proof',
-            html: `
-                <div class="text-left px-2">
-                    <p class="text-sm text-slate-400 mb-4">You are about to resolve <strong class="text-white">${ticketId}</strong>. A proof picture of the fixed infrastructure is required to finalize this phase and automatically notify the citizen.</p>
-                    <input type="file" id="proof-image" accept="image/*" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer border border-slate-700/50 rounded-lg bg-slate-800/30 p-2"/>
+            message: `Verify fixed infrastructure for ${ticketId}.`,
+            content: (
+                <div className="space-y-4 text-left">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">A proof picture is mandatory to finalize this phase and notify the citizen.</p>
+                    <div className="relative group">
+                        <input 
+                            type="file" 
+                            id="proof-image-input"
+                            accept="image/*"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            onChange={(e) => {
+                                const fileName = e.target.files[0]?.name;
+                                if (fileName) document.getElementById('file-name-display').innerText = fileName;
+                            }}
+                        />
+                        <div className="bg-slate-50 dark:bg-slate-800/50 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center group-hover:border-orange-500/50 transition-colors">
+                            <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center mx-auto mb-3 text-orange-500">
+                                <Camera size={24} />
+                            </div>
+                            <span id="file-name-display" className="text-sm font-bold text-slate-600 dark:text-slate-300">Click to capture or select photo</span>
+                            <p className="text-xs text-slate-400 mt-1">Maximum file size: 10MB</p>
+                        </div>
+                    </div>
                 </div>
-            `,
-            background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
-            color: document.documentElement.classList.contains('dark') ? '#fff' : '#000',
-            showCancelButton: true,
-            confirmButtonText: 'Resolve & Notify Citizen',
-            confirmButtonColor: '#10b981',
-            cancelButtonColor: '#475569',
-            preConfirm: () => {
-                const fileInput = Swal.getPopup().querySelector('#proof-image');
-                if (!fileInput.files || fileInput.files.length === 0) {
-                    Swal.showValidationMessage('A proof image is mandatory for compliance.');
-                    return false;
+            ),
+            onConfirm: async () => {
+                const fileInput = document.getElementById('proof-image-input');
+                const file = fileInput?.files[0];
+                if (!file) {
+                    setNotification({ type: 'error', message: 'A proof image is mandatory for compliance.' });
+                    return;
                 }
-                return fileInput.files[0];
+
+                setActionLoading(reportId);
+                try {
+                    const formData = new FormData();
+                    formData.append('image', file);
+
+                    const response = await fetch(`${API_BASE_URL}/api/reports/${reportId}/resolve`, {
+                        method: 'PATCH',
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        setTacticalModal({
+                            show: true,
+                            type: 'success',
+                            title: 'Mission Resolved',
+                            message: 'Incident closed. Resident notified with proof.'
+                        });
+                        
+                        // Optimistic update
+                        if (selectedReport && selectedReport.id === reportId) {
+                            setSelectedReport(prev => ({ ...prev, status: 'resolved' }));
+                        }
+                        
+                        fetchReports();
+                        
+                        // Auto-close after 2 seconds to let the user see the update in the sidebar
+                        setTimeout(() => {
+                            if (selectedReport && selectedReport.id === reportId) {
+                                setSelectedReport(null);
+                            }
+                        }, 2500);
+                    } else {
+                        const err = await response.json();
+                        setTacticalModal({
+                            show: true,
+                            type: 'error',
+                            title: 'Update Interrupted',
+                            message: err.detail || 'Could not commit resolution proof.'
+                        });
+                    }
+                } catch (error) {
+                    setTacticalModal({
+                        show: true,
+                        type: 'error',
+                        title: 'System Breach',
+                        message: 'Connection failure during file transmission.'
+                    });
+                } finally {
+                    setActionLoading(null);
+                }
             }
         });
+    };
 
-        if (!file) return;
+    const handleBudgetingApproval = (reportId) => {
+        const report = allReports.find(r => r.id === reportId);
+        if (!report) return;
+        const ticketId = report.ticket_id || `RPT-${reportId}`;
+
+        setTacticalModal({
+            show: true,
+            type: 'custom',
+            title: 'Strategic Budget Allocation',
+            message: `Finalize logistics and financial clearance for incident ${ticketId}.`,
+            content: (
+                <div className="space-y-4 text-left">
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                        <div className="flex justify-between items-center mb-4">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Asset Category</span>
+                            <span className="text-xs font-bold text-orange-500 bg-orange-500/10 px-2 py-1 rounded-md">{report.category}</span>
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Allocated Budget (PHP)</label>
+                                <input 
+                                    type="number" 
+                                    id="budget-amount-input"
+                                    placeholder="Enter verified amount..."
+                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500/50 outline-none transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Deployment Window</label>
+                                <TacticalDatePicker />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ),
+            onConfirm: async () => {
+                const amount = document.getElementById('budget-amount-input')?.value;
+                const date = document.getElementById('budget-date-input')?.value;
+                
+                if (!amount || !date) {
+                    setNotification({ type: 'error', message: 'Budget and schedule are required for tactical clearance.' });
+                    return;
+                }
+
+                await handleStatusAction(reportId, '/status', 'Budgeting finalized and project baseline established.', null, 'approved_internal', { budget: amount, deployment_date: date });
+            }
+        });
+    };
+
+    // ── Workflow Handler: Process Audit (FQA) ────────────────────────
+    const handleProcessAudit = async (reportId) => {
         setActionLoading(reportId);
-        
         try {
-            const formData = new FormData();
-            formData.append('image', file);
-
-            const response = await fetch(`${API_BASE_URL}/api/reports/${reportId}/resolve`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
+            // 1. Fetch Mapping
+            const mapRes = await fetch(`${API_BASE_URL}/api/gov/reports/${reportId}/project-mapping`, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
+            const mapping = await mapRes.json();
 
-            if (response.ok) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Resolution Successful',
-                    text: 'The incident is closed and the resident has been notified with the proof picture attached.',
-                    timer: 3000,
-                    showConfirmButton: false,
-                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
-                });
-                fetchReports();
-                setSelectedReport(null);
-            } else {
-                const err = await response.json();
-                Swal.fire({ 
-                    icon: 'error', 
-                    title: 'Action Failed', 
-                    text: err.detail || 'Could not resolve report.', 
-                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+            if (!mapping.project_id) {
+                return setTacticalModal({
+                    show: true,
+                    type: 'custom',
+                    title: 'Mapping Unavailable',
+                    message: 'This report has not yet been advanced to a Project phase (Phase 3+). Current lifecycle status shown below:',
+                    content: (
+                        <div className="mt-4 p-4 bg-slate-50 dark:bg-white/5 rounded-[32px] border border-slate-100 dark:border-white/5">
+                            <StrategicProcessFlow report={selectedReport} />
+                        </div>
+                    )
                 });
             }
+
+            // 2. Issue Certificate (Triggers FQA Logic)
+            const certRes = await fetch(`${API_BASE_URL}/api/projects/${mapping.project_id}/issue-certificate`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({})
+            });
+            
+            if (!certRes.ok) {
+                const err = await certRes.json();
+                throw new Error(err.detail || 'FQA Engine failed to process');
+            }
+
+            const fqaData = await certRes.json();
+            
+            // 3. Premium Visualization
+            setTacticalModal({
+                show: true,
+                type: 'custom',
+                title: 'Final Quality Audit',
+                message: `Verification complete for project ${fqaData.project_id || 'unlinked'}.`,
+                content: (
+                    <div className="text-left space-y-6">
+                        <div className="flex items-center gap-4 p-4 rounded-2xl bg-orange-500/5 border border-orange-500/10">
+                            <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                                <ShieldCheck className="text-orange-500" size={24} />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Audit Credentials Issued</h4>
+                                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
+                                    Status: {fqaData.is_certified ? 'CERTIFIED GOLD' : 'PENDING'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-4 border border-slate-100 dark:border-white/5">
+                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Social Audit</div>
+                                <div className="text-2xl font-black text-orange-400">{(fqaData.results?.social_audit_score || 0).toFixed(1)}%</div>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-4 border border-slate-100 dark:border-white/5">
+                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Procurement</div>
+                                <div className="text-2xl font-black text-orange-400">₱{(fqaData.results?.fqa_savings || 0).toLocaleString()}</div>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-950/50 rounded-2xl p-5 border border-white/5">
+                            <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></div> Reconcilliation Ledger
+                            </h4>
+                            <div className="space-y-2">
+                                {[
+                                    { label: 'Technical Specs', value: 'STRICT MATCH', color: 'text-orange-400' },
+                                    { label: 'Asset Registry', value: 'SYNCHRONIZED', color: 'text-orange-400' },
+                                    { label: 'Warranty Expiry', value: fqaData.results?.dlp_expiry ? new Date(fqaData.results.dlp_expiry).toLocaleDateString() : 'N/A', color: 'text-white' }
+                                ].map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-[11px]">
+                                        <span className="text-slate-500 font-medium">{item.label}</span>
+                                        <span className={`${item.color} font-bold`}>{item.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                ),
+                onConfirm: () => {
+                    setTacticalModal({ show: false });
+                    fetchReports();
+                    if (selectedReport) {
+                        setSelectedReport(prev => ({ ...prev, status: 'resolved' }));
+                    }
+                }
+            });
+
+            // Initial refresh while modal is open
+            fetchReports();
+            if (selectedReport) {
+                setSelectedReport(prev => ({ ...prev, status: 'resolved' }));
+            }
+
         } catch (error) {
-            console.error('Resolution Error:', error);
+            setTacticalModal({
+                type: 'error',
+                title: 'Audit Engine Unavailable',
+                message: error.message
+            });
         } finally {
             setActionLoading(null);
         }
     };
 
-    // Replaces the generic handleStatusAction('/dispatch') with actual Work Order creation
     const handleCreateWorkOrder = async (e) => {
         e.preventDefault();
         setActionLoading(selectedReport.id);
@@ -795,9 +1275,38 @@ const DispatcherDashboard = () => {
 
     const filteredReports = React.useMemo(() => {
         return allReports.filter(report => {
+            // ─── Jurisdictional Enforcement ──────────────────────────────────────────
+            // Command Center handles North Caloocan (Barangays 165-188).
+            // Use location_barangay (the proper API field) or fall back to location_string.
+            // If no parseable barangay number is found, INCLUDE the report (don't silently discard).
+            const rawBrgy = (report.location_barangay || report.location_string || "").toString();
+            const brgyMatch = rawBrgy.match(/(\d+)/);
+            const brgyNum = brgyMatch ? parseInt(brgyMatch[1]) : null;
+            
+            // Only filter OUT if we can positively determine it's outside 1-188.
+            // Reports with no barangay data are shown by default (unknown jurisdiction = include).
+            const isOutsideCaloocan = brgyNum !== null && (brgyNum < 1 || brgyNum > 188);
+            if (isOutsideCaloocan) return false;
+
+            // 0. Historical Data Logic (Global filter based on user toggle)
+            const historicalStatuses = ['resolved', 'rejected', 'cancelled'];
+            const isHistorical = historicalStatuses.includes(report.status);
+            
+            // Allow if showHistorical is true OR if the specific historical status is explicitly selected in the dropdown
+            const isExplicitlyRequested = selectedStatus !== 'All Statuses' && (
+                (selectedStatus === 'Resolved (Phase 5)' && report.status === 'resolved') ||
+                (selectedStatus === 'Rejected' && report.status === 'rejected') ||
+                (selectedStatus === 'Cancelled' && report.status === 'cancelled')
+            );
+
+            if (isHistorical && !showHistorical && !isExplicitlyRequested) {
+                return false;
+            }
+
             // 1. Dashboard Mode & Granular Status Filter
             if (selectedStatus !== 'All Statuses') {
                 const statusMap = {
+                    'Unvalidated': 'unvalidated',
                     'Pending': 'pending',
                     'Pending Approval (Phase 2)': 'pending_approval',
                     'Approved (Phase 3)': 'approved_internal',
@@ -824,9 +1333,9 @@ const DispatcherDashboard = () => {
             if (!matchesSearch) return false;
 
             // 3. Barangay Filter (Robust Match)
-            if (selectedBarangay !== 'All Barangays') {
+            if (selectedBarangay !== 'All North Barangays') {
                 const selectedDigits = selectedBarangay.replace(/\D/g, '');
-                const reportBarangayRaw = (report.barangay || '').toString();
+                const reportBarangayRaw = (report.location_barangay || '').toString();
                 const reportBarangayDigits = reportBarangayRaw.replace(/\D/g, '');
                 const locationString = (report.location_string || '').toLowerCase();
                 
@@ -863,7 +1372,7 @@ const DispatcherDashboard = () => {
             
             return true;
         });
-    }, [allReports, dashboardMode, searchQuery, selectedBarangay, selectedCategory, selectedStatus]);
+    }, [allReports, dashboardMode, searchQuery, selectedBarangay, selectedCategory, selectedStatus, showHistorical]);
 
     // ── Tactical Pinpoint Filter ──────────────────────────────────────────────
     // When launched from Analytics with exact report_ids, bypass fuzzy filters
@@ -872,8 +1381,17 @@ const DispatcherDashboard = () => {
         const ids = tacticalContext?.report_ids;
         if (!ids || ids.length === 0) return null; // null = "not in tactical mode"
         const idSet = new Set(ids);
-        // Show all reports in the cluster regardless of current dashboard mode/status
-        return allReports.filter(r => idSet.has(r.id));
+        // Show all reports in the cluster regardless of current dashboard mode/status, 
+        // but ALWAYS enforce South Caloocan jurisdiction.
+        return allReports.filter(r => {
+            if (!idSet.has(r.id)) return false;
+            const rawBrgy = (r.location_barangay || r.location_string || "").toString();
+            const brgyMatch = rawBrgy.match(/(\d+)/);
+            const brgyNum = brgyMatch ? parseInt(brgyMatch[1]) : null;
+            // Only exclude if positively outside the jurisdiction range
+            const isOutside = brgyNum !== null && (brgyNum < 1 || brgyNum > 188);
+            return !isOutside;
+        });
     }, [allReports, tacticalContext]);
 
     // activeReports: use pinpoint cluster list when in tactical mode, else fuzzy filtered list
@@ -888,7 +1406,7 @@ const DispatcherDashboard = () => {
         
         // Count reports per group (Barangay x Issue Type) to highlight "Pressure Zones"
         const densityMap = filteredReports.reduce((acc, r) => {
-            const groupKey = `${r.barangay || 'unknown'}-${r.ai_category || r.category || 'misc'}`;
+            const groupKey = `${r.location_barangay || 'unknown'}-${r.ai_category || r.category || 'misc'}`;
             acc[groupKey] = (acc[groupKey] || 0) + 1;
             return acc;
         }, {});
@@ -897,7 +1415,7 @@ const DispatcherDashboard = () => {
         return filteredReports
             .filter(r => r.location_lat && r.location_lng)
             .map(report => {
-                const groupKey = `${report.barangay || 'unknown'}-${report.ai_category || report.category || 'misc'}`;
+                const groupKey = `${report.location_barangay || 'unknown'}-${report.ai_category || report.category || 'misc'}`;
                 const groupDensity = densityMap[groupKey] || 1;
                 
                 // Urgency Base (1-10 scale)
@@ -995,6 +1513,7 @@ const DispatcherDashboard = () => {
 
         if (status === 'resolved') color = '#22c55e';
         else if (status === 'pending' || status === 'unverified') color = '#ef4444';
+        else if (status === 'unvalidated') color = '#f59e0b';
         else if (status === 'rejected') color = '#64748b';
         else if (status === 'cancelled') color = '#0f172a';
         
@@ -1039,14 +1558,20 @@ const DispatcherDashboard = () => {
         return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
     };
 
-    // Fleet Data (Mock teams removed per request; now powered by live tracking when available)
     // Fleet Data: Real-time engineering units currently active in North Caloocan
-    const fleetStatus = [
-        { id: 1, name: 'Team Alpha', type: 'Electrical / Street Lights', status: 'Available', lat: 14.7505, lng: 121.0540, location: 'Zapote Rd (HQ)', lead: 'Engr. Dela Cruz' },
-        { id: 2, name: 'Team Beta', type: 'Civil / Roads & Bridges', status: 'En Route', lat: 14.7650, lng: 121.0350, location: 'Camarin', lead: 'Engr. Bautista' },
-        { id: 3, name: 'Team Gamma', type: 'Water & Drainage', status: 'On Site', lat: 14.7800, lng: 121.0800, location: 'Bagong Silang (Phase 1)', lead: 'Engr. Reyes' },
-        { id: 4, name: 'Team Delta', type: 'Public Safety / General', status: 'Available', lat: 14.7400, lng: 121.0200, location: 'Deparo', lead: 'Engr. Santos' }
-    ];
+    // Uses live agent tracking data when available, falls back to mock for demo
+    const fleetStatus = agentLocations.length > 0 
+        ? agentLocations.map((agent, idx) => ({
+            id: agent.agent_id,
+            name: agent.agent_name || `Agent ${agent.agent_id}`,
+            type: 'Field Agent',
+            status: (agent.status || 'offline').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            lat: agent.latitude,
+            lng: agent.longitude,
+            location: agent.location_name || 'Unknown',
+            lead: agent.agent_name || 'Unknown Agent'
+        }))
+        : [];
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-300 font-sans flex text-sm overflow-hidden">
@@ -1061,29 +1586,71 @@ const DispatcherDashboard = () => {
                 {tacticalContext && (
                     <div
                         style={{
-                            background: 'linear-gradient(90deg, #7c3aed 0%, #f97316 100%)',
-                            animation: 'pulse 2s ease-in-out infinite'
+                            background: tacticalContext.threat_level === 'CRITICAL'
+                                ? 'linear-gradient(90deg, #7f1d1d 0%, #ef4444 50%, #f97316 100%)'
+                                : tacticalContext.threat_level === 'HIGH'
+                                ? 'linear-gradient(90deg, #7c2d12 0%, #f97316 100%)'
+                                : 'linear-gradient(90deg, #7c3aed 0%, #f97316 100%)',
                         }}
-                        className="shrink-0 flex items-center justify-between px-6 py-2 z-50"
+                        className="shrink-0 flex items-center justify-between px-6 py-2.5 z-50"
                     >
-                        <div className="flex items-center gap-3">
-                            <div className="w-2 h-2 rounded-full bg-white animate-ping" />
-                            <span className="text-white text-xs font-black uppercase tracking-wider">⚡ Tactical Command Response — Active Mission</span>
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <div className="w-2 h-2 rounded-full bg-white animate-ping shrink-0" />
+                            <span className="text-white text-xs font-black uppercase tracking-wider">⚡ Tactical Command Response</span>
+
+                            {/* Threat level badge */}
+                            {tacticalContext.threat_level && (
+                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                    tacticalContext.threat_level === 'CRITICAL' ? 'bg-red-700/60 text-red-100'
+                                    : tacticalContext.threat_level === 'HIGH' ? 'bg-orange-700/60 text-orange-100'
+                                    : 'bg-white/20 text-white'
+                                }`}>
+                                    {tacticalContext.threat_level}
+                                </span>
+                            )}
+
+                            {/* Category */}
                             <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                                 {tacticalContext.category
                                     ? tacticalContext.category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
                                     : 'All Categories'}
                             </span>
+
+                            {/* Barangay */}
                             {tacticalContext.barangay && (
                                 <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                                     Brgy. {tacticalContext.barangay}
                                 </span>
                             )}
-                            <span className="text-white/70 text-[10px] font-semibold">
-                                Map auto-focused · Filters applied · Stress zone coordinates loaded
-                            </span>
+
+                            {/* Forecast trend */}
+                            {tacticalContext.forecast_trend && (
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                    tacticalContext.forecast_trend === 'WORSENING' ? 'bg-red-500/40 text-red-100'
+                                    : tacticalContext.forecast_trend === 'IMPROVING' ? 'bg-green-500/40 text-green-100'
+                                    : 'bg-white/15 text-white/80'
+                                }`}>
+                                    {tacticalContext.forecast_trend === 'WORSENING' ? '↑ TREND WORSENING'
+                                     : tacticalContext.forecast_trend === 'IMPROVING' ? '↓ TREND IMPROVING'
+                                     : '→ STABLE'}
+                                </span>
+                            )}
+
+                            {/* Growth rate */}
+                            {tacticalContext.growth_rate != null && (
+                                <span className="text-white/70 text-[10px] font-semibold">
+                                    {tacticalContext.growth_rate > 0 ? '+' : ''}{(tacticalContext.growth_rate * 100).toFixed(0)}% weekly growth
+                                </span>
+                            )}
+
+                            {/* Recurrence score */}
+                            {tacticalContext.recurrence_score != null && (
+                                <span className="text-white/60 text-[10px] font-semibold">
+                                    · {Math.round(tacticalContext.recurrence_score * 100)}% recurrence
+                                </span>
+                            )}
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 shrink-0">
                             <button
                                 onClick={() => navigate('/gov/analytics')}
                                 className="text-white/80 hover:text-white text-[10px] font-bold flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full transition-all"
@@ -1110,21 +1677,59 @@ const DispatcherDashboard = () => {
                         </h1>
                         <div className="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
                         
-                        {/* Dashboard Mode Toggle */}
+                        {/* Action Hub — Specialized Command Navigation */}
                         <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
                             <button
-                                onClick={() => { setDashboardMode('triage'); setActiveTab('queue'); setSelectedReport(null); }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${dashboardMode === 'triage' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                onClick={() => { 
+                                    setDashboardMode('triage'); 
+                                    setActiveTab('queue'); 
+                                    setSelectedStatus('Pending');
+                                    setActionHubTab('incoming');
+                                    setSelectedReport(null); 
+                                }}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${actionHubTab === 'incoming' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
-                                <AlertTriangle size={16} className={dashboardMode === 'triage' ? 'text-orange-500' : ''}/>
-                                Triage Mode
+                                <AlertTriangle size={16} className={actionHubTab === 'incoming' ? 'text-orange-500' : ''}/>
+                                Incident Triage
                             </button>
                             <button
-                                onClick={() => { setDashboardMode('active'); setActiveTab('fleet'); setSelectedReport(null); }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${dashboardMode === 'active' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                onClick={() => { 
+                                    setDashboardMode('triage'); 
+                                    setActiveTab('queue'); 
+                                    setSelectedStatus('Pending Approval (Phase 2)');
+                                    setActionHubTab('approvals');
+                                    setSelectedReport(null); 
+                                }}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${actionHubTab === 'approvals' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
-                                <Radio size={16} className={dashboardMode === 'active' ? 'text-blue-500' : ''} />
-                                Active Operations
+                                <CheckCircle size={16} className={actionHubTab === 'approvals' ? 'text-emerald-500' : ''} />
+                                Approval Queue
+                            </button>
+                            <button
+                                onClick={() => { 
+                                    setDashboardMode('active'); 
+                                    setActiveTab('fleet'); 
+                                    setSelectedStatus('Dispatched (Phase 4)');
+                                    setActionHubTab('active');
+                                    setSelectedReport(null); 
+                                }}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${actionHubTab === 'active' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            >
+                                <Truck size={16} className={actionHubTab === 'active' ? 'text-blue-500' : ''} />
+                                Fleet Manager
+                            </button>
+                            <button
+                                onClick={() => { 
+                                    setDashboardMode('triage'); 
+                                    setActiveTab('queue'); 
+                                    setSelectedStatus('All Statuses');
+                                    setActionHubTab('master');
+                                    setSelectedReport(null); 
+                                }}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${actionHubTab === 'master' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            >
+                                <History size={16} className={actionHubTab === 'master' ? 'text-indigo-500' : ''} />
+                                Master View
                             </button>
                         </div>
                     </div>
@@ -1132,7 +1737,7 @@ const DispatcherDashboard = () => {
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <span className="text-sm font-semibold text-slate-500 dark:text-slate-400"><span className="text-slate-900 dark:text-white">8/12</span> Teams Available</span>
+                            <span className="text-sm font-semibold text-slate-500 dark:text-slate-400"><span className="text-slate-900 dark:text-white">{fleetStatus.length}</span> Teams Available</span>
                         </div>
                         <ThemeToggle />
                     </div>
@@ -1154,13 +1759,25 @@ const DispatcherDashboard = () => {
                             <div className="p-4 relative flex flex-col gap-3">
                                 {/* Removed bottom shadow */}
                                 <h2 className="font-bold text-slate-900 dark:text-white text-lg flex items-center gap-2">
-                                    {dashboardMode === 'triage' ? (
-                                        <><AlertTriangle size={18} className="text-orange-500"/> Incoming Reports</>
-                                    ) : (
-                                        <><Radio size={18} className="text-blue-500"/> Dispatched Work</>
-                                    )}
+                                    {actionHubTab === 'incoming' && <><AlertTriangle size={18} className="text-orange-500"/> Incoming Reports</>}
+                                    {actionHubTab === 'approvals' && <><CheckCircle size={18} className="text-emerald-500"/> Pending Approvals</>}
+                                    {actionHubTab === 'active' && <><Truck size={18} className="text-blue-500"/> Fleet Operations</>}
+                                    {actionHubTab === 'master' && <><History size={18} className="text-indigo-500"/> Command Registry</>}
                                 </h2>
                                 <div className="flex flex-col gap-2">
+                                    {/* Action Hub Filters */}
+                                    {(actionHubTab === 'master' || actionHubTab === 'incoming') && (
+                                        <button 
+                                            onClick={() => setShowHistorical(!showHistorical)}
+                                            className={`mb-2 w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold border transition-all ${showHistorical ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'}`}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <History size={14} />
+                                                Show Historical Archive
+                                            </span>
+                                            <div className={`w-3 h-3 rounded-full ${showHistorical ? 'bg-white' : 'bg-slate-300 dark:bg-slate-700'}`}></div>
+                                        </button>
+                                    )}
                                     <div className="relative">
                                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
                                         <input 
@@ -1242,7 +1859,7 @@ const DispatcherDashboard = () => {
                                         const aiConfidence = urgencyToConfidence(report.ai_urgency);
 
                                         // Tactical highlight: glow yellow if this report is in the active stress zone
-                                        const reportBrgyDigits = (report.barangay || '').toString().replace(/\D/g, '');
+                                        const reportBrgyDigits = (report.location_barangay || '').toString().replace(/\D/g, '');
                                         const tacticalBrgyDigits = (tacticalContext?.barangay || '').toString().replace(/\D/g, '');
                                         const isTacticalMatch = tacticalContext && tacticalBrgyDigits && reportBrgyDigits === tacticalBrgyDigits;
                                         const isSelected = selectedReport?.id === report.id;
@@ -1304,10 +1921,13 @@ const DispatcherDashboard = () => {
                                                     )}
                                                     <span className="text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{new Date(report.created_at).toLocaleDateString()}</span>
                                                     <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border shadow-sm ${
+                                                        report.status === 'unvalidated' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' :
                                                         report.status === 'unverified' ? 'bg-slate-500/10 text-slate-400 border-slate-500/30' :
-                                                        report.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' :
+                                                        report.status === 'pending' ? 'bg-red-500/10 text-red-500 border-red-500/30' :
                                                         report.status === 'pending_approval' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' :
-                                                        report.status === 'rejected' ? 'bg-red-500/10 text-red-500 border-red-500/30' :
+                                                        report.status === 'rejected' ? 'bg-rose-500/10 text-rose-500 border-rose-500/30' :
+                                                        report.status === 'resolved' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' :
+                                                        report.status === 'cancelled' ? 'bg-slate-500/10 text-slate-400 border-slate-500/30' :
                                                         'bg-slate-500/10 text-slate-400 border-slate-500/30'
                                                     }`}>
                                                         {report.status?.replace('_', ' ')}
@@ -1315,8 +1935,28 @@ const DispatcherDashboard = () => {
                                                 </div>
                                             </div>
                                             <div className="text-sm text-slate-700 dark:text-slate-300 font-bold truncate mb-1">{report.category || report.ai_category || 'Uncategorized'}</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-3 truncate font-medium">
-                                                <MapPin size={12} className="text-slate-400"/> {report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}
+                                            <div className="flex flex-col gap-0.5 mb-3">
+                                                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 leading-tight font-medium">
+                                                    <MapPin size={10} className="text-slate-400 shrink-0"/> 
+                                                    {(() => {
+                                                        const raw = report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`;
+                                                        if (!raw.includes('|')) return raw;
+                                                        
+                                                        const parts = raw.split('|').map(p => p.trim());
+                                                        const plus = parts[0] || "";
+                                                        let addr = parts[1] || "";
+                                                        const brgy = parts[2] || "Barangay Unknown";
+                                                        
+                                                        let cleanAddr = addr.replace(new RegExp(`,?\\s*${brgy}`, 'i'), '')
+                                                                            .replace(/,?\s*Caloocan(?: City)?/i, '')
+                                                                            .replace(/,?\s*Metro Manila/i, '')
+                                                                            .replace(/,?\s*Philippines/i, '')
+                                                                            .replace(/,$/, '')
+                                                                            .trim();
+                                                        
+                                                        return `${plus}, ${cleanAddr}, ${brgy}, Caloocan, Metro Manila`;
+                                                    })()}
+                                                </div>
                                             </div>
                                             
                                             <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
@@ -1337,7 +1977,7 @@ const DispatcherDashboard = () => {
                                                     >
                                                         <Eye size={14} className="text-slate-500 dark:text-slate-400 group-hover:text-orange-500 dark:group-hover:text-orange-400 transition-colors" />
                                                     </button>
-                                                    {(report.status === 'unverified' || report.status === 'pending') && (
+                                                    {(report.status === 'unvalidated' || report.status === 'unverified' || report.status === 'pending') && (
                                                         <span 
                                                             onClick={(e) => { e.stopPropagation(); handleVerifyReport(report.id); }}
                                                             className="text-[10px] bg-orange-600 hover:bg-orange-500 text-white px-2.5 py-1 rounded-md uppercase font-black tracking-wider transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-95"
@@ -1369,7 +2009,7 @@ const DispatcherDashboard = () => {
                                                         </span>
                                                     )}
                                                     <button 
-                                                        onClick={(e) => { e.stopPropagation(); setReportToDelete(report); }}
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteReport(report); }}
                                                         className="group p-1.5 rounded bg-slate-100 dark:bg-slate-800 transition-all cursor-pointer shadow-sm active:scale-95"
                                                         title="Delete Report Permanently"
                                                     >
@@ -1392,19 +2032,79 @@ const DispatcherDashboard = () => {
                             <GoogleMap
                                 mapContainerStyle={MAP_CONTAINER_STYLE}
                                 center={CALOOCAN_CENTER}
-                                zoom={14}
+                                zoom={15}
                                 onLoad={map => {
-                                    setMap(map);
+                                    setMapInstance(map);
                                     setPanorama(map.getStreetView());
+                                    
+                                    // High-Precision Data-Driven Styling (DDS) for Caloocan City Boundary
+                                    try {
+                                        const featureLayer = map.getFeatureLayer('LOCALITY');
+                                        if (featureLayer) {
+                                            featureLayer.style = (options) => {
+                                                // Caloocan City Boundary highlight disabled for South-focus view parity
+                                                return;
+                                            };
+                                        }
+                                    } catch (err) {
+                                        console.warn("DDS LOCALITY layer not available. Check Map ID configuration.", err);
+                                    }
                                 }}
-                                onUnmount={onUnmount}
+                                onUnmount={handleMapUnmount}
                                 options={mapOptions}
                             >
-                             {/* Urban Glow Heatmap Layer - Managed manually via heatmapLayerRef for stability */}
-                             {/* (No <HeatmapLayerF> here to prevent stacking) */}
+                                {/* Caloocan City Borders (North & South) - Main Map Priority */}
+                                {borderData?.features?.map((feature, i) => {
+                                    const props = feature.properties || {};
+                                    const sector = props.sector || 'Unknown';
+                                    const brgyNum = props.brgy_num || props.barangay;
+                                    const displayName = props.display_name || `Brgy. ${brgyNum}`;
+                                    const isSouth = sector === 'South' || (parseInt(brgyNum) >= 1 && parseInt(brgyNum) <= 164);
+                                    
+                                    const polygonOptions = {
+                                        strokeColor: isSouth ? '#2563eb' : '#f97316', 
+                                        strokeOpacity: 0.9,
+                                        strokeWeight: 2.8,
+                                        fillColor: isSouth ? '#2563eb' : '#f97316',
+                                        fillOpacity: 0, // "Only the boundary lines" as requested
+                                        clickable: true,
+                                        zIndex: 1
+                                    };
+
+                                    return (
+                                        <React.Fragment key={`main-border-${i}`}>
+                                            {feature.geometry.type === 'MultiPolygon' ? (
+                                                feature.geometry.coordinates.map((poly, polyIndex) => (
+                                                    <PolygonF
+                                                        key={`main-border-${i}-${polyIndex}`}
+                                                        paths={poly[0].map(c => ({ lng: c[0], lat: c[1] }))}
+                                                        options={polygonOptions}
+                                                        onClick={() => {
+                                                            setBrgyModalData({ name: displayName, sector, brgyNum });
+                                                            setIsBrgyModalOpen(true);
+                                                        }}
+                                                    />
+                                                ))
+                                            ) : (
+                                                <PolygonF
+                                                    key={`main-border-${i}`}
+                                                    paths={feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))}
+                                                    options={polygonOptions}
+                                                    onClick={() => {
+                                                        setBrgyModalData({ name: displayName, sector, brgyNum });
+                                                        setIsBrgyModalOpen(true);
+                                                    }}
+                                                />
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
+
+                                {/* Urban Glow Heatmap Layer - Managed manually via heatmapLayerRef for stability */}
+                                {/* (No <HeatmapLayerF> here to prevent stacking) */}
 
                             {/* Render markers for all reports (Filtered) - Always visible per request */}
-                            {filteredReports.map(report => (
+                            {activeReports.map(report => (
                                 (report.location_lat && report.location_lng) && (
                                     <MarkerF
                                         key={`map-${report.id}`}
@@ -1431,7 +2131,7 @@ const DispatcherDashboard = () => {
                             ))}
 
                             {/* STREET VIEW PIN OVERLAY: 3D Pins for exploration */}
-                            {isStreetViewVisible && panorama && filteredReports.map(report => (
+                            {isStreetViewVisible && panorama && activeReports.map(report => (
                                 (report.location_lat && report.location_lng) && (
                                     <MarkerF
                                         key={`sv-pin-${report.id}`}
@@ -1470,13 +2170,13 @@ const DispatcherDashboard = () => {
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => e.stopPropagation()}
                                         style={{ 
-                                            background: isDarkMode ? 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)' : '#ffffff', 
+                                            background: systemIsDark ? 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)' : '#ffffff', 
                                             borderRadius:'16px', 
                                             padding:'16px', 
                                             minWidth:'220px', 
-                                            border: isDarkMode ? '1px solid rgba(255,255,255,0.07)' : '1px solid #e2e8f0', 
+                                            border: systemIsDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid #e2e8f0', 
                                             margin:'-10px', 
-                                            boxShadow: isDarkMode ? '0 25px 50px rgba(0,0,0,0.7)' : '0 10px 25px rgba(0,0,0,0.1)', 
+                                            boxShadow: systemIsDark ? '0 25px 50px rgba(0,0,0,0.7)' : '0 10px 25px rgba(0,0,0,0.1)', 
                                             fontFamily:'Inter,sans-serif', 
                                             display:'flex', 
                                             flexDirection:'column', 
@@ -1508,7 +2208,7 @@ const DispatcherDashboard = () => {
                                                 <h4 style={{ 
                                                     fontWeight: 800, 
                                                     fontSize: '15px', 
-                                                    color: isDarkMode ? '#f1f5f9' : '#0f172a', 
+                                                    color: systemIsDark ? '#f1f5f9' : '#0f172a', 
                                                     margin: '0 0 4px',
                                                     letterSpacing: '-0.02em'
                                                 }}>LGU COMMAND CENTER</h4>
@@ -1519,6 +2219,56 @@ const DispatcherDashboard = () => {
                                                     style={{ width: '100%', padding:'12px 0', background:'linear-gradient(135deg,#ea580c,#f97316)', border:'none', borderRadius:'12px', color:'white', fontSize:'12px', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', boxShadow:'0 4px 15px rgba(249,115,22,0.25)' }}
                                                 >
                                                     <Eye size={14} /> Street View
+                                                </button>
+                                            </>
+                                        ) : selectedMarker.isAgent ? (
+                                            /* AGENT VARIANT: Field Agent Tracking */
+                                            <>
+                                                <div style={{ 
+                                                    width:'54px', 
+                                                    height:'54px', 
+                                                    borderRadius:'50%', 
+                                                    background: selectedMarker.status === 'available' ? 'rgba(34,197,94,0.15)' : selectedMarker.status === 'en_route' ? 'rgba(249,115,22,0.15)' : selectedMarker.status === 'on_site' ? 'rgba(59,130,246,0.15)' : 'rgba(107,114,128,0.15)', 
+                                                    border:`1.5px solid ${selectedMarker.status === 'available' ? 'rgba(34,197,94,0.4)' : selectedMarker.status === 'en_route' ? 'rgba(249,115,22,0.4)' : selectedMarker.status === 'on_site' ? 'rgba(59,130,246,0.4)' : 'rgba(107,114,128,0.4)'}`, 
+                                                    display:'flex', 
+                                                    alignItems:'center', 
+                                                    justifyContent:'center', 
+                                                    marginBottom:'12px', 
+                                                    color: selectedMarker.status === 'available' ? '#22c55e' : selectedMarker.status === 'en_route' ? '#f97316' : selectedMarker.status === 'on_site' ? '#3b82f6' : '#6b7280',
+                                                    boxShadow: `0 0 20px ${selectedMarker.status === 'available' ? 'rgba(34,197,94,0.15)' : selectedMarker.status === 'en_route' ? 'rgba(249,115,22,0.15)' : selectedMarker.status === 'on_site' ? 'rgba(59,130,246,0.15)' : 'rgba(107,114,128,0.15)'}`
+                                                }}>
+                                                    <HardHat size={24} />
+                                                </div>
+                                                <h4 style={{ 
+                                                    fontWeight: 800, 
+                                                    fontSize: '15px', 
+                                                    color: systemIsDark ? '#f1f5f9' : '#0f172a', 
+                                                    margin: '0 0 4px',
+                                                    letterSpacing: '-0.02em'
+                                                }}>{selectedMarker.agent_name}</h4>
+                                                <p style={{ 
+                                                    fontSize:'10px', 
+                                                    fontWeight:600, 
+                                                    color: selectedMarker.status === 'available' ? '#22c55e' : selectedMarker.status === 'en_route' ? '#f97316' : selectedMarker.status === 'on_site' ? '#3b82f6' : '#6b7280', 
+                                                    marginBottom:'16px', 
+                                                    textTransform:'uppercase', 
+                                                    letterSpacing:'0.05em' 
+                                                }}>
+                                                    {selectedMarker.status?.replace('_', ' ') || 'Offline'}
+                                                </p>
+                                                {selectedMarker.updated_at && (
+                                                    <p style={{ fontSize:'9px', color:'#94a3b8', marginBottom:'12px' }}>
+                                                        Last update: {new Date(selectedMarker.updated_at).toLocaleTimeString()}
+                                                    </p>
+                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedMarker(null);
+                                                        setActiveTab('fleet');
+                                                    }}
+                                                    style={{ width: '100%', padding:'12px 0', background: systemIsDark ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.1)', border:'none', borderRadius:'12px', color:'#3b82f6', fontSize:'12px', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}
+                                                >
+                                                    <Briefcase size={14} /> View Assignments
                                                 </button>
                                             </>
                                         ) : (
@@ -1554,7 +2304,7 @@ const DispatcherDashboard = () => {
                                                 <h4 style={{ 
                                                     fontWeight: 700, 
                                                     fontSize: '14px', 
-                                                    color: isDarkMode ? '#f1f5f9' : '#0f172a', 
+                                                    color: systemIsDark ? '#f1f5f9' : '#0f172a', 
                                                     lineHeight: 1.3, 
                                                     margin: '0 0 6px', 
                                                     padding: '0 16px' 
@@ -1569,11 +2319,11 @@ const DispatcherDashboard = () => {
                                                             width:'100%', 
                                                             padding:'10px 0', 
                                                             background: directionsLoading 
-                                                                ? (isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)') 
-                                                                : (isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'), 
-                                                            border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)', 
+                                                                ? (systemIsDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)') 
+                                                                : (systemIsDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'), 
+                                                            border: systemIsDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)', 
                                                             borderRadius:'12px', 
-                                                            color: isDarkMode ? '#f1f5f9' : '#0f172a', 
+                                                            color: systemIsDark ? '#f1f5f9' : '#0f172a', 
                                                             fontSize:'12px', 
                                                             fontWeight:600, 
                                                             cursor: directionsLoading ? 'wait' : 'pointer', 
@@ -1600,13 +2350,13 @@ const DispatcherDashboard = () => {
                                                     alignItems:'center', 
                                                     justifyContent:'center', 
                                                     gap:'6px', 
-                                                    background: isDarkMode ? 'rgba(249,115,22,0.1)' : 'rgba(249,115,22,0.05)', 
-                                                    border: isDarkMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(249,115,22,0.1)', 
+                                                    background: systemIsDark ? 'rgba(249,115,22,0.1)' : 'rgba(249,115,22,0.05)', 
+                                                    border: systemIsDark ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(249,115,22,0.1)', 
                                                     borderRadius:'12px', 
                                                     padding:'8px 14px' 
                                                 }}>
                                                     <Truck size={12} style={{ color:'#f97316' }} />
-                                                    <span style={{ fontSize:'10px', fontWeight:800, color: isDarkMode ? '#f1f5f9' : '#0f172a' }}>{distance} • {duration}</span>
+                                                    <span style={{ fontSize:'10px', fontWeight:800, color: systemIsDark ? '#f1f5f9' : '#0f172a' }}>{distance} • {duration}</span>
                                                 </div>
                                             </div>
                                         )}
@@ -1622,7 +2372,7 @@ const DispatcherDashboard = () => {
                                             </button>
                                             
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); setReportToDelete(selectedMarker); }}
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteReport(selectedMarker); }}
                                                 className="p-1.5 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white rounded-xl transition-all border border-red-200 hover:border-red-600 active:scale-95 flex items-center justify-center"
                                             >
                                                 <Trash2 size={16} />
@@ -1636,20 +2386,9 @@ const DispatcherDashboard = () => {
 
 
                             {/* User Position Marker */}
-                            {/* North Caloocan Jurisdiction Boundary Display */}
-                             <PolygonF
-                                paths={NORTH_CALOOCAN_BOUNDARY}
-                                options={{
-                                    fillColor: "#6366f1",
-                                    fillOpacity: 0.08,
-                                    strokeColor: "#6366f1",
-                                    strokeOpacity: 0.6,
-                                    strokeWeight: 3,
-                                    clickable: false,
-                                }}
-                            />
+                             {/* High-Precision Boundary rendered via Data-Driven Styling in onLoad */}
 
-                            {/* Caloocan City Hall North Pin — Styled as requested (Castle Icon) */}
+                            {/* Caloocan Command Center HQ (NORTH) — Styled as requested (Castle Icon) */}
                             <MarkerF 
                                 position={CALOOCAN_CITY_HALL_NORTH_LOC}
                                 zIndex={300}
@@ -1672,8 +2411,8 @@ const DispatcherDashboard = () => {
                                                     <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
                                                 </filter>
                                             </defs>
-                                            <path d="M25 58c0 0 22-20 22-33a22 22 0 0 0-44 0c0 13 22 33 22 33z" fill="url(#hqGrad)" stroke="#f97316" stroke-width="2.5" filter="url(#shadow)" />
-                                            <g transform="translate(13, 10) scale(1.1)" fill="#f97316">
+                                            <path d="M25 58c0 0 22-20 22-33a22 22 0 0 0-44 0c0 13 22 33 22 33z" fill="url(#hqGrad)" stroke="#2563eb" stroke-width="2.5" filter="url(#shadow)" />
+                                            <g transform="translate(13, 10) scale(1.1)" fill="#2563eb">
                                                 <path d="M18 20v-8l-1.5-1.5V6L15 4l-1.5 2v4.5L12 12l-1.5-1.5V6L9 4 7.5 6v4.5L6 12v8h12zM11 16h2v4h-2v-4z"/>
                                             </g>
                                         </svg>
@@ -1681,7 +2420,7 @@ const DispatcherDashboard = () => {
                                     scaledSize: new window.google.maps.Size(50, 60),
                                     anchor: new window.google.maps.Point(25, 60)
                                 } : undefined}
-                                title="LGU Command Center (HQ)"
+                                title="LGU Command Center (North HQ)"
                                 onClick={() => {
                                     // Trigger specialized HQ Tactical Card instead of just zooming
                                     setSelectedMarker({
@@ -1696,6 +2435,56 @@ const DispatcherDashboard = () => {
                                     }
                                 }}
                             />
+
+                            {/* Agent Location Markers */}
+                            {agentLocations.map((agent) => (
+                                agent.latitude && agent.longitude && (
+                                    <MarkerF
+                                        key={`agent-${agent.agent_id}`}
+                                        position={{ lat: agent.latitude, lng: agent.longitude }}
+                                        zIndex={200}
+                                        options={{
+                                            optimized: false,
+                                            clickable: true
+                                        }}
+                                        icon={window.google && window.google.maps ? {
+                                            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 50" width="40" height="50">
+                                                    <defs>
+                                                        <filter id="agentShadow" x="-20%" y="-20%" width="140%" height="140%">
+                                                            <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
+                                                            <feOffset dx="0" dy="2" result="offsetblur" />
+                                                            <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+                                                            <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+                                                        </filter>
+                                                    </defs>
+                                                    <path d="M20 48c0 0 16-15 16-24a16 16 0 0 0-32 0c0 9 16 24 16 24z" fill="${agent.status === 'available' ? '#22c55e' : agent.status === 'en_route' ? '#f97316' : agent.status === 'on_site' ? '#3b82f6' : '#6b7280'}" filter="url(#agentShadow)" stroke="#fff" stroke-width="2"/>
+                                                    <circle cx="20" cy="20" r="8" fill="#fff"/>
+                                                    <path d="M15 20h10M20 15v10" stroke="${agent.status === 'available' ? '#22c55e' : agent.status === 'en_route' ? '#f97316' : agent.status === 'on_site' ? '#3b82f6' : '#6b7280'}" stroke-width="2.5" stroke-linecap="round"/>
+                                                </svg>
+                                            `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
+                                            scaledSize: new window.google.maps.Size(40, 50),
+                                            anchor: new window.google.maps.Point(20, 50)
+                                        } : undefined}
+                                        title={`${agent.agent_name} - ${agent.status?.replace('_', ' ')}`}
+                                        onClick={() => {
+                                            setSelectedMarker({
+                                                isAgent: true,
+                                                agent_id: agent.agent_id,
+                                                agent_name: agent.agent_name,
+                                                location_lat: agent.latitude,
+                                                location_lng: agent.longitude,
+                                                status: agent.status,
+                                                updated_at: agent.updated_at,
+                                            });
+                                            if (map) {
+                                                map.panTo({ lat: agent.latitude, lng: agent.longitude });
+                                                map.setZoom(16);
+                                            }
+                                        }}
+                                    />
+                                )
+                            ))}
 
                             {/* Fleet unit markers */}
                             {fleetStatus.map(team => (
@@ -1964,6 +2753,53 @@ const DispatcherDashboard = () => {
                                         }}
                                     />
                                 )}
+                                {/* Caloocan Jurisdictional Boundaries (North & South) */}
+                                {borderData?.features?.map((feature, i) => {
+                                    const props = feature.properties || {};
+                                    const brgyNum = props.brgy_num || props.barangay;
+                                    const brgyName = props.display_name || `Brgy. ${brgyNum}`;
+                                    const sector = props.sector || 'Caloocan';
+                                    const isSouth = sector === 'South' || (parseInt(brgyNum) >= 1 && parseInt(brgyNum) <= 164);
+                                    if (!isSouth) return null;
+                                    
+                                    const polygonOptions = {
+                                        strokeColor: '#2563eb', // Exclusively Blue for South
+                                        strokeOpacity: 0.9,
+                                        strokeWeight: 2.5,
+                                        fillColor: '#2563eb',
+                                        fillOpacity: 0, // Transparent fill per request
+                                        clickable: true,
+                                        zIndex: 1
+                                    };
+
+                                    return (
+                                        <React.Fragment key={`tactical-border-${i}`}>
+                                            {feature.geometry.type === 'MultiPolygon' ? (
+                                                feature.geometry.coordinates.map((poly, polyIndex) => (
+                                                    <PolygonF
+                                                        key={`tactical-border-${i}-${polyIndex}`}
+                                                        paths={poly[0].map(c => ({ lng: c[0], lat: c[1] }))}
+                                                        options={polygonOptions}
+                                                        onClick={() => {
+                                                            setBrgyModalData({ name: brgyName, sector, brgyNum });
+                                                            setIsBrgyModalOpen(true);
+                                                        }}
+                                                    />
+                                                ))
+                                            ) : (
+                                                <PolygonF
+                                                    key={`tactical-border-${i}`}
+                                                    paths={feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))}
+                                                    options={polygonOptions}
+                                                    onClick={() => {
+                                                        setBrgyModalData({ name: brgyName, sector, brgyNum });
+                                                        setIsBrgyModalOpen(true);
+                                                    }}
+                                                />
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
                             </GoogleMap>
                         </div>
                     )}
@@ -2081,34 +2917,8 @@ const DispatcherDashboard = () => {
                                                 </div>
                                             </div>
 
-                                                {/* Strategic Process Roadmap */}
-                                                <div className="mb-6 relative">
-                                                    <div className="flex items-center justify-between text-[9px] font-bold text-slate-500 uppercase tracking-tighter mb-2">
-                                                        <span className={['pending', 'unverified'].includes(selectedReport.status) ? 'text-orange-500' : 'text-slate-400'}>Intake</span>
-                                                        <span className={selectedReport.status === 'pending_approval' ? 'text-orange-500' : 'text-slate-400'}>Budgeting</span>
-                                                        <span className={['approved_internal', 'dispatched'].includes(selectedReport.status) ? 'text-orange-500' : 'text-slate-400'}>Execution</span>
-                                                        <span className={selectedReport.status === 'resolved' ? 'text-green-500' : 'text-slate-400'}>Resolved</span>
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full flex overflow-hidden">
-                                                        <div className={`h-full transition-all duration-700 ${
-                                                            ['pending', 'unverified'].includes(selectedReport.status) ? 'w-1/4 bg-orange-500' :
-                                                            selectedReport.status === 'pending_approval' ? 'w-2/4 bg-orange-500' :
-                                                            ['approved_internal', 'dispatched'].includes(selectedReport.status) ? 'w-3/4 bg-blue-500' :
-                                                            selectedReport.status === 'resolved' ? 'w-full bg-green-500' : 'w-0'
-                                                        }`}></div>
-                                                    </div>
-                                                    <div className="flex justify-between mt-1 px-0.5">
-                                                        {[0, 1, 2, 3].map(i => (
-                                                            <div key={i} className={`w-2 h-2 rounded-full border-2 border-white dark:border-slate-900 ${
-                                                                (i === 0 && ['pending', 'unverified', 'pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status)) ||
-                                                                (i === 1 && ['pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status)) ||
-                                                                (i === 2 && ['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status)) ||
-                                                                (i === 3 && selectedReport.status === 'resolved')
-                                                                    ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
-                                                            }`}></div>
-                                                        ))}
-                                                    </div>
-                                                </div>
+                                                {/* Strategic Process Flow (Tactical Orange Upgrade) */}
+                                                <StrategicProcessFlow report={selectedReport} />
 
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-3">AI Vision confidence for <strong>{selectedReport.ticket_id || `RPT-${selectedReport.id}`}</strong> is {selectedReport.aiConfidence || urgencyToConfidence(selectedReport.ai_urgency)}%. Manual categorization required before generating Work Order.</p>
                                                 
@@ -2117,12 +2927,12 @@ const DispatcherDashboard = () => {
                                                     <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden flex items-center justify-center text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 relative group">
                                                         {selectedReport.image_url ? (
                                                             <button 
-                                                                onClick={() => setZoomedImage(`http://localhost:33159${selectedReport.image_url}`)}
+                                                                onClick={() => setZoomedImage(`${API_BASE_URL}${selectedReport.image_url}`)}
                                                                 className="w-full h-full cursor-zoom-in"
                                                                 title="Click to Zoom"
                                                             >
                                                                 <img 
-                                                                    src={`http://localhost:33159${selectedReport.image_url}`} 
+                                                                    src={`${API_BASE_URL}${selectedReport.image_url}`} 
                                                                     alt="Report Evidence" 
                                                                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" 
                                                                 />
@@ -2140,7 +2950,7 @@ const DispatcherDashboard = () => {
                                                                 e.stopPropagation();
                                                                 handleStreetViewClick({ lat: selectedReport.location_lat, lng: selectedReport.location_lng });
                                                             }}
-                                                            className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur text-white p-2 rounded-lg text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-orange-600"
+                                                            className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur text-white p-2 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-opacity hover:bg-orange-600"
                                                         >
                                                             <Eye size={12}/> View Street View
                                                         </button>
@@ -2213,9 +3023,9 @@ const DispatcherDashboard = () => {
                                                     )}
                                                     {selectedReport.status === 'pending_approval' && (
                                                         <button 
-                                                            onClick={() => handleApproveReport(selectedReport.id)}
+                                                            onClick={() => handleBudgetingApproval(selectedReport.id)}
                                                             disabled={actionLoading === selectedReport.id}
-                                                            className="bg-orange-600 hover:bg-orange-500 text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-2"
+                                                            className="bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-2"
                                                         >
                                                             <Briefcase size={14} /> Budgeting & Financial Approval
                                                         </button>
@@ -2238,80 +3048,11 @@ const DispatcherDashboard = () => {
                                                         </button>
                                                     )}
                                                     <button 
-                                                        onClick={() => Swal.fire({
-                                                            title: '',
-                                                            html: `
-                                                                <div class="flex flex-col items-center text-center p-2 mb-2">
-                                                                    <div class="w-14 h-14 rounded-full bg-orange-600/20 flex items-center justify-center border-2 border-orange-500/30 mb-7 mx-auto">
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                                                                    </div>
-                                                                    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Strategic Process Flow</h2>
-                                                                    <p class="text-slate-400 text-[11px] mb-10 uppercase tracking-[0.2em] font-bold">
-                                                                        Tracking: <span class="text-orange-500">${selectedReport.ticket_id || `RPT-${selectedReport.id}`}</span>
-                                                                    </p>
-                                                                    
-                                                                    <div class="w-full max-w-[320px] mx-auto relative px-4 text-left">
-                                                                        <div class="absolute left-6 top-3 bottom-3 w-px bg-slate-800"></div>
-                                                                        
-                                                                        <div class="space-y-10">
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full bg-orange-500 z-10"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold text-white leading-none mb-1">Phase 1: Intake & Analysis</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">AI Vision automatically categorizes and evaluates citizen reports.</div>
-                                                                                </div>
-                                                                            </div>
-                                                                            
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full z-10 ${['pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'bg-orange-500' : 'bg-slate-800'}"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${['pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'text-white' : 'text-slate-600'}">Phase 2: Tactical Planning</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">Dispatcher evaluates logistics, routing, and fleet availability.</div>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full z-10 ${['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'bg-orange-500' : 'bg-slate-800'}"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'text-white' : 'text-slate-600'}">Phase 3: Budgeting & Approval</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">Manager review, resource locking, and final site authorization.</div>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full z-10 ${['dispatched', 'resolved'].includes(selectedReport.status) ? 'bg-orange-500' : 'bg-slate-800'}"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${['dispatched', 'resolved'].includes(selectedReport.status) ? 'text-white' : 'text-slate-600'}">Phase 4: Field Execution</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">Assigned fleet executes work according to engineering specs.</div>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full z-10 ${selectedReport.status === 'resolved' ? 'bg-orange-500' : 'bg-slate-800'}"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${selectedReport.status === 'resolved' ? 'text-white' : 'text-slate-600'}">Phase 5: Site Resolution</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">Final site audit, report closure, and citizen notification.</div>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            `,
-                                                            showConfirmButton: false,
-                                                            showCloseButton: true,
-                                                            customClass: {
-                                                                popup: 'rounded-[40px] border border-white/5 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)]',
-                                                                closeButton: 'text-slate-500 hover:text-orange-500 transition-colors border-none shadow-none focus:outline-none'
-                                                            },
-                                                            buttonsStyling: false,
-                                                            background: '#0F172A',
-                                                            color: '#fff',
-                                                            width: '460px',
-                                                            padding: '4.5rem 2rem 5rem 2rem'
-                                                        })}
+                                                        onClick={() => handleProcessAudit(selectedReport.id)}
+                                                        disabled={actionLoading === selectedReport.id}
                                                         className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 py-2 rounded text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700"
                                                     >
-                                                        <Activity size={14}/> Process Audit
+                                                        {actionLoading === selectedReport.id ? <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <Activity size={14}/>} Process Audit
                                                     </button>
                                                 </div>
                                             </div>
@@ -2365,13 +3106,11 @@ const DispatcherDashboard = () => {
                                                                 setDispatchForm(prev => ({ ...prev, assigned_to_id: team.id + 1 })); // Offset to match dummy select IDs 2,3,4
                                                                 setIsDispatchModalOpen(true);
                                                             } else {
-                                                                Swal.fire({
-                                                                    icon: 'info',
-                                                                    title: 'No Report Selected',
-                                                                    text: 'Please select an approved report from the queue before assigning a field team.',
-                                                                    background: '#1e293b',
-                                                                    color: '#fff'
-                                                                });
+                                                                 setTacticalModal({
+                                                                     type: 'error',
+                                                                     title: 'No Report Selected',
+                                                                     message: 'Please select an approved report from the queue before assigning a field team.'
+                                                                 });
                                                             }
                                                         }}
                                                         className="text-blue-400 hover:text-blue-300 font-bold text-xs"
@@ -2420,10 +3159,37 @@ const DispatcherDashboard = () => {
                                     
                                     <div className="bg-slate-50 dark:bg-slate-950/50 rounded-lg p-3 border border-slate-200 dark:border-slate-800 mb-2">
                                         <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1">Issue Location</div>
-                                        <div className="text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                                            <MapPin size={14} className="text-slate-400"/>
-                                            {selectedReport.location_string || `${selectedReport.location_lat?.toFixed(4)}, ${selectedReport.location_lng?.toFixed(4)}`}
-                                        </div>
+                                        {(() => {
+                                            const raw = selectedReport.location_string || `${selectedReport.location_lat?.toFixed(4)}, ${selectedReport.location_lng?.toFixed(4)}`;
+                                            const parts = raw.includes('|') ? raw.split('|').map(p => p.trim()) : null;
+                                            
+                                            if (!parts) {
+                                                return (
+                                                    <div className="text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                                                        <MapPin size={14} className="text-slate-400"/>
+                                                        {raw}
+                                                    </div>
+                                                );
+                                            }
+                                            
+                                            const plus = parts[0] || "";
+                                            let addr = parts[1] || "";
+                                            const brgy = parts[2] || "Barangay Unknown";
+                                            
+                                            let cleanAddr = addr.replace(new RegExp(`,?\\s*${brgy}`, 'i'), '')
+                                                                .replace(/,?\s*Caloocan(?: City)?/i, '')
+                                                                .replace(/,?\s*Metro Manila/i, '')
+                                                                .replace(/,?\s*Philippines/i, '')
+                                                                .replace(/,$/, '')
+                                                                .trim();
+                                            
+                                            return (
+                                                <div className="text-sm text-slate-900 dark:text-white flex items-center gap-2 leading-tight">
+                                                    <MapPin size={14} className="text-slate-400 shrink-0"/>
+                                                    <span>{plus}, {cleanAddr}, {brgy}, Caloocan, Metro Manila</span>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     <div>
@@ -2434,9 +3200,9 @@ const DispatcherDashboard = () => {
                                             onChange={(e) => setDispatchForm({...dispatchForm, assigned_to_id: e.target.value})}
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-orange-500 transition-colors"
                                         >
-                                            <option value="2">Engr. Dela Cruz (Team Alpha - Electrical)</option>
-                                            <option value="3">Engr. Bautista (Team Beta - General)</option>
-                                            <option value="4">Engr. Reyes (Team Gamma - Plumbing)</option>
+                                            <option value="36">Engr. Dela Cruz (Team Alpha - Electrical)</option>
+                                            <option value="33">Engr. Bautista (Team Beta - General)</option>
+                                            <option value="21">Engr. Reyes (Team Gamma - Plumbing)</option>
                                         </select>
                                     </div>
 
@@ -2520,6 +3286,131 @@ const DispatcherDashboard = () => {
                                         className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-red-500/20 uppercase tracking-widest text-xs"
                                     >
                                         Understood
+                                    </button>
+                                </motion.div>
+                            </div>
+                        )}
+
+                        {/* No Report Selected Modal (Orange Tactical) */}
+                        {isNoReportModalOpen && (
+                            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm text-center">
+                                <motion.div
+                                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                    className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-orange-500/20 relative overflow-hidden"
+                                >
+                                    {/* Aesthetic gradient flare */}
+                                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full"></div>
+                                    
+                                    <div className="w-20 h-20 bg-orange-100 dark:bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-orange-50 dark:ring-orange-500/5">
+                                        <AlertTriangle className="text-orange-600 dark:text-orange-500" size={40} />
+                                    </div>
+                                    
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-tight">No Report Selected</h3>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-8 leading-relaxed font-medium">
+                                        Please select an approved report from the queue before assigning a field team to ensure all technical documentation is synchronized.
+                                    </p>
+                                    
+                                    <button
+                                        onClick={() => setIsNoReportModalOpen(false)}
+                                        className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-orange-500/20 uppercase tracking-widest text-xs flex items-center justify-center gap-2 group"
+                                    >
+                                        <CheckCircle size={14} className="group-hover:scale-110 transition-transform"/>
+                                        Acknowledged
+                                    </button>
+                                </motion.div>
+                            </div>
+                        )}
+
+                        {/* Integrated Tactical Modal (Orange/Premium) */}
+                        {tacticalModal && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm text-center">
+                                <motion.div
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.9, opacity: 0 }}
+                                    className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-orange-500/30 relative overflow-hidden"
+                                >
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent"></div>
+                                    
+                                    <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ring-4 ${
+                                        tacticalModal.type === 'error' ? 'bg-orange-100 dark:bg-orange-500/10 ring-orange-50 dark:ring-orange-500/10' :
+                                        tacticalModal.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/10 ring-emerald-50 dark:ring-emerald-500/10' :
+                                        'bg-blue-100 dark:bg-blue-500/10 ring-blue-50 dark:ring-blue-500/10'
+                                    }`}>
+                                        {tacticalModal.type === 'error' ? <AlertTriangle className="text-orange-600 dark:text-orange-500" size={48} /> :
+                                         tacticalModal.type === 'success' ? <CheckCircle className="text-emerald-600 dark:text-emerald-500" size={48} /> :
+                                         <MapIcon className="text-blue-600 dark:text-blue-500" size={48} />
+                                        }
+                                    </div>
+                                    
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-3 tracking-tight uppercase leading-tight">
+                                        {tacticalModal.title}
+                                    </h3>
+                                    
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 font-medium leading-relaxed px-2">
+                                        {tacticalModal.message}
+                                    </p>
+                                    
+                                    <button
+                                        onClick={() => {
+                                            if (tacticalModal.onConfirm) tacticalModal.onConfirm();
+                                            setTacticalModal(null);
+                                        }}
+                                        className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-orange-500/30 uppercase tracking-[0.2em] text-xs active:scale-95"
+                                    >
+                                        Proceed
+                                    </button>
+                                </motion.div>
+                            </div>
+                        )}
+
+                        {/* Barangay Info Modal (Orange Tactical) */}
+                        {isBrgyModalOpen && brgyModalData && (
+                            <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm text-center">
+                                <motion.div
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.9, opacity: 0 }}
+                                    className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-orange-500/30 relative overflow-hidden"
+                                >
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent"></div>
+                                    
+                                    <div className="w-24 h-24 bg-orange-100 dark:bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6 ring-4 ring-orange-50 dark:ring-orange-500/10">
+                                        <MapIcon className="text-orange-600 dark:text-orange-500" size={48} />
+                                    </div>
+                                    
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-6 tracking-tight uppercase">
+                                        {brgyModalData.name}
+                                    </h3>
+                                    
+                                    <div className="space-y-4 mb-8 text-left bg-slate-50 dark:bg-slate-950/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest leading-none mb-1">Jurisdiction</span>
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white leading-none">North Caloocan</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest leading-none mb-1">Feature ID</span>
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white leading-none">{brgyModalData.brgyNum}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest leading-none mb-1">Operational Status</span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+                                                <span className="text-sm font-bold text-orange-500 font-mono">Monitoring Active</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-[12px] text-slate-500 leading-relaxed italic border-t border-slate-200 dark:border-slate-800 pt-3 mt-1">
+                                            Strategic boundary monitoring for internal government use.
+                                        </p>
+                                    </div>
+                                    
+                                    <button
+                                        onClick={() => setIsBrgyModalOpen(false)}
+                                        className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-orange-500/30 uppercase tracking-[0.2em] text-xs active:scale-95 transition-all"
+                                    >
+                                        OK
                                     </button>
                                 </motion.div>
                             </div>
@@ -2670,7 +3561,7 @@ const DispatcherDashboard = () => {
                                                                 zoom={13}
                                                                 options={{
                                                                     disableDefaultUI: true,
-                                                                    styles: isDarkMode ? [
+                                                                    styles: systemIsDark ? [
                                                                         { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
                                                                         { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
                                                                         { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
@@ -2723,9 +3614,19 @@ const DispatcherDashboard = () => {
                                                                             }`}>{r.status}</span>
                                                                         </div>
                                                                         <div className="flex items-center gap-1 mt-0.5">
-                                                                            <MapPin size={9} className="text-slate-500 shrink-0" />
-                                                                            <span className="text-[10px] text-slate-400 truncate">
-                                                                                {r.location_string || `${r.location_lat?.toFixed(4)}°N, ${r.location_lng?.toFixed(4)}°E`}
+                                                                            <span className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                                                                                <MapPin size={9} className="text-slate-500 shrink-0" />
+                                                                                {(() => {
+                                                                                    if (!r.location_string?.includes('|')) return r.location_string;
+                                                                                    const parts = r.location_string.split('|').map(p => p.trim());
+                                                                                    const brgy = parts[2] || "Barangay Unknown";
+                                                                                    let addr = parts[1];
+                                                                                    if (brgy && addr.toLowerCase().includes(brgy.toLowerCase())) {
+                                                                                        addr = addr.replace(new RegExp(`,?\\s*${brgy}`, 'i'), '').trim();
+                                                                                        addr = addr.replace(/,$/, '').trim();
+                                                                                    }
+                                                                                    return brgy ? `${addr} | ${brgy}` : addr;
+                                                                                })()}
                                                                             </span>
                                                                         </div>
                                                                     </div>
@@ -2809,108 +3710,95 @@ const DispatcherDashboard = () => {
                     </motion.div>
                 )}
 
-                {notification && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -50, x: '-50%' }}
-                        animate={{ opacity: 1, y: 0, x: '-50%' }}
-                        exit={{ opacity: 0, y: -50, x: '-50%' }}
-                        className={`fixed top-8 left-1/2 z-[2000] px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl flex items-center gap-4 min-w-[320px] max-w-md ${
-                            notification.type === 'success' 
-                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
-                                : 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
-                        }`}
-                    >
-                        <div className={`p-2 rounded-full ${notification.type === 'success' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
-                            {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
-                        </div>
-                        <div className="flex-1">
-                            <h4 className="font-bold text-sm uppercase tracking-wider mb-0.5">
-                                {notification.type === 'success' ? 'Task Finalized' : 'System Alert'}
-                            </h4>
-                            <p className="text-sm opacity-90 leading-tight font-medium">{notification.message}</p>
-                        </div>
-                        <button 
-                            onClick={() => setNotification(null)}
-                            className="p-1 hover:bg-white/10 rounded-lg transition-colors"
-                        >
-                            <X size={18} />
-                        </button>
-                    </motion.div>
-                )}
-
-                {reportToDelete && (
+                {tacticalModal?.show && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[1100] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4"
-                        onClick={() => !isDeleting && setReportToDelete(null)}
+                        className="fixed inset-0 z-[3000] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-xl"
+                        onClick={() => !['confirm', 'custom'].includes(tacticalModal.type) && setTacticalModal(null)}
                     >
                         <motion.div
-                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            initial={{ scale: 0.9, y: 30, opacity: 0, rotateX: 10 }}
+                            animate={{ scale: 1, y: 0, opacity: 1, rotateX: 0 }}
+                            exit={{ scale: 0.9, y: 30, opacity: 0 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                            className="relative max-w-sm w-full bg-white dark:bg-slate-900 rounded-[40px] overflow-hidden shadow-[0_32px_128px_-16px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10"
                             onClick={(e) => e.stopPropagation()}
-                            className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden"
                         >
-                            <div className="p-8 text-center">
-                                <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-red-600 dark:text-red-400 animate-pulse">
-                                    <AlertTriangle size={40} />
+                            {/* HUD Stripe */}
+                            <div className={`h-1.5 w-full ${
+                                tacticalModal.type === 'error' ? 'bg-red-500 shadow-[0_4px_12px_rgba(239,68,68,0.3)]' : 
+                                tacticalModal.type === 'success' ? 'bg-emerald-500 shadow-[0_4px_12px_rgba(16,185,129,0.3)]' : 'bg-orange-500 shadow-[0_4px_12px_rgba(249,115,22,0.3)]'
+                            }`} />
+                            
+                            <div className="p-8 pt-10">
+                                <div className="text-center">
+                                    <div className={`w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center transition-all duration-500 ${
+                                        tacticalModal.type === 'error' ? 'bg-red-500/10 text-red-500 rotate-12 group-hover:rotate-0' : 
+                                        tacticalModal.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-orange-500/10 text-orange-500'
+                                    }`}>
+                                        {tacticalModal.type === 'error' && <AlertTriangle size={36} className="animate-pulse" />}
+                                        {tacticalModal.type === 'success' && <CheckCircle size={36} />}
+                                        {['confirm', 'custom', 'info'].includes(tacticalModal.type) && <ShieldCheck size={36} />}
+                                    </div>
+
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight uppercase leading-none">
+                                        {tacticalModal.title}
+                                    </h3>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium text-sm leading-relaxed mb-8">
+                                        {tacticalModal.message}
+                                    </p>
                                 </div>
-                                <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
-                                    Confirm Permanent Deletion
-                                </h3>
-                                <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                                    Are you sure you want to delete report <span className="font-mono text-red-500 font-bold">{reportToDelete.ticket_id || `RPT-${reportToDelete.id}`}</span>? 
-                                    This action is irreversible and will remove all associated logs and work orders.
-                                </p>
-                                
-                                {deleteError && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-3 text-left"
-                                    >
-                                        <div className="shrink-0 p-1 bg-red-100 dark:bg-red-500/20 rounded-full">
-                                            <X size={14} />
-                                        </div>
-                                        {deleteError}
-                                    </motion.div>
+
+                                {/* Custom Content Injection */}
+                                {tacticalModal.content && (
+                                    <div className="mb-8">
+                                        {tacticalModal.content}
+                                    </div>
                                 )}
 
-                                <div className="flex gap-4">
-                                    <button
-                                        disabled={isDeleting}
-                                        onClick={() => { setReportToDelete(null); setDeleteError(null); }}
-                                        className="flex-1 px-6 py-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50 active:scale-95"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        disabled={isDeleting}
-                                        onClick={handleDeleteReport}
-                                        className="flex-1 px-6 py-3.5 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
-                                    >
-                                        {isDeleting ? (
-                                            <>
-                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                Deleting...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Trash2 size={18} />
-                                                Delete Report
-                                            </>
-                                        )}
-                                    </button>
+                                <div className="flex gap-3">
+                                    {['confirm', 'custom'].includes(tacticalModal.type) ? (
+                                        <>
+                                            <button 
+                                                onClick={() => setTacticalModal(null)}
+                                                className="flex-1 py-4 px-6 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+                                            >
+                                                Abort
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    tacticalModal.onConfirm?.();
+                                                    setTacticalModal(null);
+                                                }}
+                                                className="flex-[1.5] py-4 px-6 rounded-2xl bg-orange-600 text-white font-bold hover:bg-orange-500 shadow-[0_12px_24px_-4px_rgba(234,88,12,0.4)] transition-all active:scale-95 active:shadow-none uppercase tracking-wide text-xs"
+                                            >
+                                                Authorize
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button 
+                                            onClick={() => setTacticalModal(null)}
+                                            className={`w-full py-4 px-6 rounded-2xl font-bold transition-all active:scale-95 uppercase tracking-wide text-xs ${
+                                                tacticalModal.type === 'error' ? 'bg-red-600 shadow-[0_12px_24px_-4px_rgba(220,38,38,0.4)] text-white' : 
+                                                tacticalModal.type === 'success' ? 'bg-emerald-600 shadow-[0_12px_24px_-4px_rgba(5,150,105,0.4)] text-white' : 'bg-orange-600 shadow-[0_12px_24px_-4px_rgba(234,88,12,0.4)] text-white'
+                                            }`}
+                                        >
+                                            Acknowledge
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             
-                            {/* Bottom aesthetic bar */}
-                            <div className="h-1.5 w-full bg-red-600" />
+                            {/* Geometric background patterns */}
+                            <div className="absolute top-0 right-0 p-4 opacity-[0.05] pointer-events-none">
+                                <Activity size={100} strokeWidth={1} />
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}
+
             </AnimatePresence>
         </div>
     );

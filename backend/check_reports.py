@@ -1,28 +1,31 @@
-import sys
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import requests
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+BASE_URL = "http://127.0.0.1:33159"
 
-from database import DATABASE_URL
-import models
+def login():
+    data = {"username": "manager@pulso.gov.ph", "password": "password123"}
+    response = requests.post(f"{BASE_URL}/api/auth/login", data=data)
+    if response.status_code == 200:
+        return response.json()['access_token']
+    
+    data = {"username": "dispatcher@pulso.gov.ph", "password": "password123"}
+    response = requests.post(f"{BASE_URL}/api/auth/login", data=data)
+    if response.status_code == 200:
+        return response.json()['access_token']
+        
+    print("Login failed:", response.text)
+    return None
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-def check_reports():
-    db = SessionLocal()
-    print("--- Detailed Report Audit ---")
-    reports = db.query(models.Report).all()
-    for r in reports:
-        print(f"ID: {r.id}")
-        print(f"  Ticket:   {r.ticket_id}")
-        print(f"  Status:   {r.status}")
-        print(f"  Category: {r.category}")
-        print(f"  AI Cat:   {r.ai_category}")
-        print("-" * 20)
-    db.close()
-
-if __name__ == "__main__":
-    check_reports()
+token = login()
+if token:
+    print("Logged in!")
+    headers = {"Authorization": f"Bearer {token}"}
+    r = requests.get(f"{BASE_URL}/api/reports?t=123", headers=headers)
+    print("Reports status code:", r.status_code)
+    try:
+        data = r.json()
+        print("Data type:", type(data), "length:", len(data) if isinstance(data, list) else 0)
+        if len(data) > 0:
+            print(data[0])
+    except Exception as e:
+        print("Error reading json:", r.text[:200])

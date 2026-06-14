@@ -34,19 +34,19 @@
         "status": "SISTEMA ONLINE • CALOOCAN NORTH",
         "title1": "Matalinong Imprastraktura,",
         "title2": "Mas Matalinong Lungsod.",
-        "subtitle": "Sistema sa Pagtukoy ng Pampublikong Utility at Imprastraktura para sa Operasyon ng Inhinyero. Pinagsama sa real-time Geospatial Triage at AI-driven Predictive Maintenance.",
+        "subtitle": "Isang pampublikong plataporma na tumutulong sa mga mamamayan na mag-ulat ng mga panganib sa imprastraktura. Pinapatakbo ang mas mabilis at mas ligtas na Caloocan North gamit ang teknolohiya.",
         "register": "Mag-rehistro",
-        "docs": "Tingnan ang Dokumentasyon"
+        "docs": "Gabay sa Portal"
       },
       "features": {
-        "title": "Inhinyeriya para sa Kahusayan",
-        "subtitle": "Isang pinag-isang dashboard na sadyang idinisenyo para sa Opisina ng Inhinyero upang masubaybayan, asahan, at tumugon sa katayuan ng utility ng lungsod.",
-        "f1_title": "Geospatial Triage",
-        "f1_desc": "Mabilis na pagtukoy at pagbibigay-prayoridad sa mga kritikal na pagkasira ng imprastraktura gamit ang real-time GPS mapping at lokal na sensor networks.",
-        "f2_title": "Predictive Maintenance",
-        "f2_desc": "Paggamit ng mga nakaraang data model upang asahan ang mga pagkukumpuni ng utility bago pa man ito mangyari, para mabawasan ang downtime at mapanatili ang yaman ng LGU.",
-        "f3_title": "AI Optimization",
-        "f3_desc": "Pinapatakbo ng Gemini AI na nakapaloob sa core grid ng lungsod, matalinong sinusuri ang mga strain sa imprastraktura upang ma-optimize ang pag-iskedyul ng routine maintenance."
+        "title": "Optimisado para sa Komunidad",
+        "subtitle": "Isang espesyal na plataporma na nagbibigay-kapangyarihan sa mga residente ng Caloocan North na aktibong lumahok sa pagpapanatili ng imprastraktura at kaligtasan.",
+        "f1_title": "GEOSPATIAL TRIAGE",
+        "f1_desc": "Tumpak na pag-mapa ng mga ulat upang matukoy ang mga isyu sa imprastraktura sa buong lungsod.",
+        "f2_title": "OPISYAL NA PAGPAPATUNAY",
+        "f2_desc": "Pinagsamang pagpapatunay ng tao at AI upang masigurong lehitimo at prayoridad ang bawat ulat.",
+        "f3_title": "PROAKTIBONG PAG-AALAGA",
+        "f3_desc": "Patuloy na pagsusuri sa imprastraktura upang matukoy ang mga isyu bago pa ito maging malaking problema."
       },
       "solutions": {
         "badge": "Pinagsamang Solusyon",
@@ -94,15 +94,15 @@
       "howitworks": {
         "badge": "Paano Gumagana",
         "title": "Mag-ulat ng Isyu sa 5 Simpleng Hakbang.",
-        "subtitle": "Pinasimple ng PULSO ang buong proseso mula sa ulat ng mamamayan hanggang sa napatunayan na resolusyon — pinapagana ng AI triage at real-time dispatch.",
+        "subtitle": "Sinisiguro ng PULSO ang mabilis na proseso mula sa ulat ng mamamayan hangsang sa napatunayang resolusyon — gamit ang AI triage at mabilis na tugon.",
         "s1_title": "Mag-rehistro at I-verify",
         "s1_desc": "Gumawa ng iyong resident account at i-verify ang iyong paninirahan gamit ang isang government-issued ID. Tanging mga na-verify na residente ng Caloocan North lamang ang maaaring magsumite ng mga ulat.",
         "s2_title": "Kumuha ng Litrato sa Lugar",
         "s2_desc": "Kumuha ng malinaw na litrato ng panganib sa imprastraktura sa lugar. Awtomatikong nita-tag ang iyong GPS coordinates para sa tumpak na lokasyon.",
         "s3_title": "AI Triage",
         "s3_desc": "Awtomatikong sinusuri ng Gemini AI ang iyong litrato at paglalarawan, kinakategorya ang isyu, nagtatakda ng urgency score, at gumagawa ng ticket.",
-        "s4_title": "Sinusuri ng Dispatcher",
-        "s4_desc": "Sinusuri ng dispatcher ng city engineering ang AI-verified ticket, kinukumpirma ang priyoridad, at itinatakda ang pinakamalapit na kwalipikadong field crew.",
+        "s4_title": "Opisyal na Pagpapatunay",
+        "s4_desc": "Sinusuri ng opisyal ng lungsod ang AI-verified ticket, kinukumpirma ang priyoridad, at itinatakda ang pinakamalapit na kwalipikadong field crew.",
         "s5_title": "Nireresolba ng Crew",
         "s5_desc": "Kumpleto ng pag-aayos ang field crew at nag-a-upload ng Proof of Repair na litrato. Makakatanggap ka ng notipikasyon kapag naresolba na ang iyong ulat."
       },
@@ -137,6 +137,7 @@
         "p_engineering": "Engineering Dashboard",
         "p_admin": "Administrator ng LGU",
         "p_api": "Mga Pampublikong API",
+        "p_resident_app": "Resident Mobile App",
         "platform": "Plataporma",
         "cityservices": "Mga Serbisyo ng Lungsod",
         "cs_senior": "Senior Citizen ID (OSCA)",

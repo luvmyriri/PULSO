@@ -22,15 +22,17 @@ class HomeProvider extends ChangeNotifier {
       'title': 'Scheduled Road Clearing',
       'dept': 'DPWH & CEO',
       'time': '2 hours ago',
-      'desc': 'Road clearing operations along Rizal Avenue starting tomorrow at 6:00 AM.',
-      'type': 'infrastructure'
+      'desc':
+          'Road clearing operations along Rizal Avenue starting tomorrow at 6:00 AM.',
+      'type': 'infrastructure',
     },
     {
       'title': 'Yellow Rainfall Warning',
       'dept': 'CDRRMO',
       'time': '5 hours ago',
-      'desc': 'Heavy rainfall expected. Low-lying barangays are advised to monitor water levels.',
-      'type': 'alert'
+      'desc':
+          'Heavy rainfall expected. Low-lying barangays are advised to monitor water levels.',
+      'type': 'alert',
     },
   ];
   List<dynamic> get advisories => _advisories;
@@ -52,14 +54,15 @@ class HomeProvider extends ChangeNotifier {
           // Map backend status/category to UI presentation
           final status = r['status']?.toString() ?? 'pending';
           final category = r['ai_category'] ?? r['category'] ?? 'General';
-          
+
           return {
             'id': r['id'],
-            'title': r['description']?.toString().split('\n').first ?? 'No Title',
+            'title':
+                r['description']?.toString().split('\n').first ?? 'No Title',
             'category': category,
             'status': status[0].toUpperCase() + status.substring(1),
-            'date': r['created_at'] != null 
-                ? '\${DateTime.parse(r['created_at']).day}/\${DateTime.parse(r['created_at']).month}/\${DateTime.parse(r['created_at']).year}'
+            'date': r['created_at'] != null
+                ? '${DateTime.parse(r['created_at']).day}/${DateTime.parse(r['created_at']).month}/${DateTime.parse(r['created_at']).year}'
                 : 'Recent',
             'icon': _getIconForCategory(category),
             'color': _getColorForStatus(status),
@@ -95,11 +98,18 @@ class HomeProvider extends ChangeNotifier {
 
   IconData _getIconForCategory(String cat) {
     cat = cat.toLowerCase();
-    if (cat.contains('road')) return Icons.road_rounded;
-    if (cat.contains('water') || cat.contains('drainage')) return Icons.water_drop_rounded;
-    if (cat.contains('electric') || cat.contains('light')) return Icons.bolt_rounded;
-    if (cat.contains('waste')) return Icons.delete_outline_rounded;
-    return Icons.warning_amber_rounded;
+    if (cat.contains('road') || cat.contains('bridge')) return Icons.add_road;
+    if (cat.contains('water') ||
+        cat.contains('drainage') ||
+        cat.contains('flood'))
+      return Icons.water;
+    if (cat.contains('electric') || cat.contains('light'))
+      return Icons.electric_bolt;
+    if (cat.contains('waste') || cat.contains('garbage')) return Icons.delete;
+    if (cat.contains('safety') || cat.contains('hazard'))
+      return Icons.health_and_safety;
+    if (cat.contains('park') || cat.contains('facility')) return Icons.park;
+    return Icons.report_problem;
   }
 
   Color _getColorForStatus(String status) {
@@ -132,10 +142,15 @@ class HomeProvider extends ChangeNotifier {
       });
 
       if (image != null) {
-        formData.files.add(MapEntry(
-          'image',
-          await MultipartFile.fromFile(image.path, filename: 'report_\${DateTime.now().millisecondsSinceEpoch}.jpg'),
-        ));
+        formData.files.add(
+          MapEntry(
+            'image',
+            await MultipartFile.fromFile(
+              image.path,
+              filename: 'report_\${DateTime.now().millisecondsSinceEpoch}.jpg',
+            ),
+          ),
+        );
       }
 
       final response = await _apiClient.post(

@@ -7,6 +7,7 @@ import {
     Eye, EyeOff, Check
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { API_BASE_URL } from '../utils/apiBase';
 
 export default function ResetPassword() {
     const { theme } = useTheme();
@@ -41,7 +42,7 @@ export default function ResetPassword() {
                 return;
             }
             try {
-                const response = await fetch(`http://localhost:33159/api/auth/verify-token/${token}`);
+                const response = await fetch(`${API_BASE_URL}/api/auth/verify-token/${token}`);
                 if (response.ok) {
                     const data = await response.json();
                     setEmailHint(data.email_hint);
@@ -70,7 +71,8 @@ export default function ResetPassword() {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:33159/api/auth/reset-password', {
+            const apiBase = API_BASE_URL;
+            const response = await fetch(`${apiBase}/api/auth/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token, new_password: password })

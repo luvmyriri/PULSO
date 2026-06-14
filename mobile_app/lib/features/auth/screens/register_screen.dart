@@ -27,6 +27,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   int _currentStep = 0;
   bool _isLoading = false;
+  bool _agreedToTerms = false;
+  String? _ageError;
   String? _errorMessage;
 
   // Step 1: ID Data
@@ -578,6 +580,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  void _showTermsModal(bool isTerms) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.8,
+          maxChildSize: 0.95,
+          builder: (_, sc) => Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 20),
+                Row(children: [
+                  Icon(isTerms ? Icons.article_outlined : Icons.privacy_tip_outlined, color: AppTheme.primaryOrange, size: 22),
+                  const SizedBox(width: 8),
+                  Text(isTerms ? 'Terms of Service' : 'Privacy Policy', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900)),
+                ]),
+                const SizedBox(height: 16),
+                Expanded(child: SingleChildScrollView(
+                  controller: sc,
+                  child: Text(
+                    isTerms
+                      ? 'By registering in the PULSO Citizen Platform, you agree to use this service solely for legitimate civic engagement within North Caloocan. You are responsible for the accuracy of information you provide. Misuse, false reporting, or submission of fraudulent identity documents is strictly prohibited and may result in account suspension and legal action under applicable Philippine laws.'
+                      : 'PULSO collects personal data including your name, address, government ID, and contact information for the purpose of verifying your residency and enabling community engagement. Your information is protected under the Philippine Data Privacy Act (RA 10173) and will never be shared with third parties without your explicit consent.',
+                    style: TextStyle(fontSize: 13, height: 1.7, color: (isDark ? Colors.white : const Color(0xFF0F172A)).withOpacity(0.7)),
+                  ),
+                )),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () { Navigator.pop(ctx); setState(() => _agreedToTerms = true); },
+                    style: AppTheme.orangeButtonStyle,
+                    child: const Text('I AGREE', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildStepIdentity(bool isDark, Color onSurface) {
     return FadeInRight(
       child: SingleChildScrollView(
@@ -585,19 +641,120 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Identity Audit", style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w900, color: onSurface)),
-            Text("Verification required for North Caloocan residency.", style: TextStyle(color: onSurface.withOpacity(0.5))),
-            const SizedBox(height: 40),
-            _buildIDUploadBox("FRONT OF ID", _idFront, true),
+            Text("Identity Verification", style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: onSurface)),
+            Text("Upload a valid Philippine government-issued ID to auto-fill your details.", style: TextStyle(color: onSurface.withOpacity(0.5), fontSize: 13)),
+            const SizedBox(height: 28),
+            Row(
+              children: [
+                Expanded(child: _buildIDUploadBox("ID FRONT", _idFront, true)),
+                const SizedBox(width: 12),
+                Expanded(child: _buildIDUploadBox("ID BACK", _idBack, false)),
+              ],
+            ),
             const SizedBox(height: 16),
-            _buildIDUploadBox("BACK OF ID", _idBack, false),
-            const SizedBox(height: 40),
+            // Tips box — mirrors web
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.blue.withOpacity(0.08) : Colors.blue.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.blue.withOpacity(0.15))
+              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(Icons.info_outline_rounded, size: 16, color: Colors.blue[400]),
+                const SizedBox(width: 8),
+                Expanded(child: Text(
+                  'Tips for best results: Lay ID on a flat surface with good lighting. Avoid glare and shadows. Ensure all text is clearly readable.',
+                  style: TextStyle(fontSize: 11, color: Colors.blue[400], fontWeight: FontWeight.w600),
+                )),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            // Verification disclaimer
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: onSurface.withOpacity(0.03),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: onSurface.withOpacity(0.06)),
+              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.info_outline, size: 17, color: AppTheme.primaryOrange),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('VERIFICATION DISCLAIMER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: onSurface)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Please double check all extracted details after the biometric ID scan. You are responsible for ensuring the accuracy of your personal information before final submission.',
+                      style: TextStyle(fontSize: 11, color: onSurface.withOpacity(0.5), height: 1.5),
+                    ),
+                  ],
+                )),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            // Terms checkbox
+            GestureDetector(
+              onTap: () => setState(() => _agreedToTerms = !_agreedToTerms),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 22, height: 22,
+                  decoration: BoxDecoration(
+                    color: _agreedToTerms ? AppTheme.primaryOrange : Colors.transparent,
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(
+                      color: _agreedToTerms ? AppTheme.primaryOrange : onSurface.withOpacity(0.25),
+                      width: 2,
+                    ),
+                  ),
+                  child: _agreedToTerms
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: RichText(
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55), height: 1.5),
+                    children: [
+                      const TextSpan(text: 'I agree to the '),
+                      WidgetSpan(child: GestureDetector(
+                        onTap: () => _showTermsModal(true),
+                        child: const Text('Terms of Service', style: TextStyle(color: AppTheme.primaryOrange, fontWeight: FontWeight.bold, decoration: TextDecoration.underline, fontSize: 12)),
+                      )),
+                      const TextSpan(text: ' and '),
+                      WidgetSpan(child: GestureDetector(
+                        onTap: () => _showTermsModal(false),
+                        child: const Text('Privacy Policy', style: TextStyle(color: AppTheme.primaryOrange, fontWeight: FontWeight.bold, decoration: TextDecoration.underline, fontSize: 12)),
+                      )),
+                    ],
+                  ),
+                )),
+              ]),
+            ),
+            const SizedBox(height: 28),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: (_idFront != null && _idBack != null) ? _handleScanID : null,
+                onPressed: (_idFront != null && _idBack != null && _agreedToTerms) ? _handleScanID : null,
                 style: AppTheme.orangeButtonStyle,
-                child: const Text("CONTINUE TO SCAN", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
+                child: const Text("SCAN DOCUMENTS & CONTINUE", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'BOTH FRONT AND BACK REQUIRED',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2, color: onSurface.withOpacity(0.3)),
               ),
             ),
           ],
@@ -648,20 +805,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             if (_verifiedBadge != null)
               Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.green.withOpacity(0.2))),
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: Colors.green.withOpacity(0.08), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.green.withOpacity(0.2))),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.verified, size: 14, color: Colors.green),
-                    const SizedBox(width: 6),
-                    Text(_verifiedBadge!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: Colors.green.withOpacity(0.15), shape: BoxShape.circle),
+                      child: const Icon(Icons.verified_user_outlined, size: 20, color: Colors.green),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('Identity Verified via AI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 12)),
+                        Text('Intelligence Parse Complete — please review your details.', style: TextStyle(color: Colors.green.withOpacity(0.7), fontSize: 11)),
+                      ]),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.green.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                      child: Text(_verifiedBadge!, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.green, letterSpacing: 1)),
+                    ),
                   ],
                 ),
               ),
-            Text("Personal Information", style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w900, color: onSurface)),
-            Text("Complete your profile and residential details.", style: TextStyle(color: onSurface.withOpacity(0.5))),
+            Text("Personal Information", style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: onSurface)),
+            Text("Review and complete your personal information.", style: TextStyle(color: onSurface.withOpacity(0.5), fontSize: 13)),
             
             const SizedBox(height: 32),
             _buildTextField("FIRST NAME", _firstNameController, Icons.person_outline),
@@ -710,14 +880,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 20),
             _buildTextField("PROVINCE", _provinceController, Icons.map_rounded, readOnly: true),
             
-            const SizedBox(height: 48),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _nextPage,
-                style: AppTheme.orangeButtonStyle,
-                child: const Text("CREDENTIALS SETUP", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
+            // Age error
+            if (_ageError != null) ...[               
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.red.withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.red.withOpacity(0.2))),
+                child: Row(children: [
+                  Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(_ageError!, style: const TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.bold))),
+                ]),
               ),
+            ],
+            const SizedBox(height: 48),
+            Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: ElevatedButton(
+                    onPressed: _prevPage,
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.withOpacity(0.15), foregroundColor: onSurface, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0, padding: const EdgeInsets.symmetric(vertical: 16)),
+                    child: const Text('Back', style: TextStyle(fontWeight: FontWeight.w900)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _ageError != null ? null : _nextPage,
+                    style: AppTheme.orangeButtonStyle,
+                    child: const Text("NEXT STEP", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -732,8 +928,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Credentials", style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w900, color: onSurface)),
-            Text("Secure your account with MFA verified contact.", style: TextStyle(color: onSurface.withOpacity(0.5))),
+            Text("Account Credentials", style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: onSurface)),
+            Text("Set up your login credentials.", style: TextStyle(color: onSurface.withOpacity(0.5), fontSize: 13)),
             const SizedBox(height: 32),
             _buildTextField("EMAIL ADDRESS", _emailController, Icons.alternate_email_rounded),
             const SizedBox(height: 20),
@@ -767,15 +963,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
               toggleObscure: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
             ),
             const SizedBox(height: 48),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _handleRegister,
-                style: AppTheme.orangeButtonStyle,
-                child: _isLoading 
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("COMPLETE REGISTRATION", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
+            if (_errorMessage != null) ...[               
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(color: Colors.red.withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.red.withOpacity(0.2))),
+                child: Row(children: [
+                  Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(_errorMessage!, style: const TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.bold))),
+                ]),
               ),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: ElevatedButton(
+                    onPressed: _prevPage,
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.withOpacity(0.15), foregroundColor: onSurface, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0, padding: const EdgeInsets.symmetric(vertical: 16)),
+                    child: const Text('Back', style: TextStyle(fontWeight: FontWeight.w900)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _handleRegister,
+                    style: AppTheme.orangeButtonStyle,
+                    child: _isLoading
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                      : const Text("CREATE MY ACCOUNT", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -936,7 +1157,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               firstDate: DateTime(1920),
               lastDate: DateTime.now(),
             );
-            if (date != null) setState(() => _dob = date);
+            if (date != null) {
+              setState(() {
+                _dob = date;
+                final age = DateTime.now().year - date.year -
+                    ((DateTime.now().month < date.month || (DateTime.now().month == date.month && DateTime.now().day < date.day)) ? 1 : 0);
+                _ageError = age < 10 ? 'You must be at least 10 years old to register.' : null;
+              });
+            }
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),

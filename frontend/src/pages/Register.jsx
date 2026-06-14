@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown, Calendar, ChevronRight, UserCheck } from 'lucide-react';
 import axios from 'axios';
@@ -8,6 +8,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import Branding from '../components/Branding';
 import IDCameraModal from '../components/IDCameraModal';
+import TermsModal from '../components/TermsModal';
+
+import { API_BASE_URL } from '../utils/apiBase';
 
 // ---------------------------------------------------------------------------
 // OCR Address Parser
@@ -50,7 +53,7 @@ function parseOcrAddress(raw, data) {
 
     // ─── 3. Extract leading House Number (if no Block/Lot found) ────────────
     if (!blockLot) {
-        const houseRe = /^(#?\d+[-–\/]?[A-Za-z]?)\s/;
+        const houseRe = /^(#?\d+[-–/]?[A-Za-z]?)\s/;
         const houseMatch = s.match(houseRe);
         if (houseMatch) {
             houseNo = houseMatch[1].replace(/^#/, '');
@@ -60,7 +63,7 @@ function parseOcrAddress(raw, data) {
 
     // ─── 4. Extract Street (before or after subdivision) ────────────────────
     // Street has suffix: St., Ave., Rd., Blvd., Dr., Lane, Highway, Ext.
-    const streetRe = /\b((?:[A-Za-z0-9#.\-]+\s+)*(?:[A-Za-z0-9#.\-]+)\s+(?:STREET|ST\.?|AVENUE|AVE\.?|ROAD|RD\.?|BOULEVARD|BLVD\.?|DRIVE|DR\.?|LANE|LN\.?|HIGHWAY|HWY\.?|EXTENSION|EXT\.?|LOOP|WALK|WAY|CIRCLE|CIR\.?))\b/i;
+    const streetRe = /\b((?:[A-Za-z0-9#.-]+\s+)*(?:[A-Za-z0-9#.-]+)\s+(?:STREET|ST\.?|AVENUE|AVE\.?|ROAD|RD\.?|BOULEVARD|BLVD\.?|DRIVE|DR\.?|LANE|LN\.?|HIGHWAY|HWY\.?|EXTENSION|EXT\.?|LOOP|WALK|WAY|CIRCLE|CIR\.?))\b/i;
     const streetMatch = s.match(streetRe);
     if (streetMatch) {
         street = streetMatch[1].replace(/\s+/g, ' ').trim();
@@ -70,7 +73,7 @@ function parseOcrAddress(raw, data) {
     }
 
     // ─── 5. Extract Subdivision / Village / Estate ───────────────────────────
-    const subdivRe = /\b((?:[A-Za-z0-9#.\-]+\s+)*(?:[A-Za-z0-9#.\-]+\s+)?(?:HOMES?(?:\s+\d+[A-Z]?)?|VILLAGE|VILL(?:AGE)?\.?|HEIGHTS?|SUBD(?:\.?|IVISION)?|SUBDIVISION|VILLE|ESTATE|PARK(?:\s+\d+)?|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+)?|FAIRVIEW|TOWNVILLE|RESIDENCES?|COMPOUND|ROYALE|VERDE|PALMS?|GARDENS?|GROVE|OAKS?|PINES|HILLS?|VISTAS?))\b/i;
+    const subdivRe = /\b((?:[A-Za-z0-9#.-]+\s+)*(?:[A-Za-z0-9#.-]+\s+)?(?:HOMES?(?:\s+\d+[A-Z]?)?|VILLAGE|VILL(?:AGE)?\.?|HEIGHTS?|SUBD(?:\.?|IVISION)?|SUBDIVISION|VILLE|ESTATE|PARK(?:\s+\d+)?|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+)?|FAIRVIEW|TOWNVILLE|RESIDENCES?|COMPOUND|ROYALE|VERDE|PALMS?|GARDENS?|GROVE|OAKS?|PINES|HILLS?|VISTAS?))\b/i;
     const subdivMatch = s.match(subdivRe);
     if (subdivMatch) {
         subdivision = subdivMatch[1].replace(/\s+/g, ' ').trim();
@@ -85,10 +88,12 @@ function parseOcrAddress(raw, data) {
             // Remove exact barangay name 
             const bn = data.barangay.replace(/^Barangay\s*/i, '').trim();
             if (bn) s = s.replace(new RegExp(`\\b${bn.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`, 'gi'), '');
-        } catch(_) {}
+        } catch {
+            // Ignore barangay name removal errors
+        }
     }
     s = s.replace(/\b(?:CALOOCAN|KALOOKAN|CITY|NCR|METRO\s+MANILA|MANILA|DISTRICT|ZONE|THIRD\s*DISTRICT)\b/gi, '');
-    s = s.replace(/[,\/\s]+$/, '').replace(/^[,\/\s]+/, '').replace(/\s{2,}/g, ' ').trim();
+    s = s.replace(/[,/\s]+$/, '').replace(/^[,/\s]+/, '').replace(/\s{2,}/g, ' ').trim();
 
     // ─── 7. If street still empty, use cleaned remainder ────────────────────
     if (!street && s) {
@@ -593,8 +598,9 @@ export default function Register() {
     const [showPassword, setShowPassword] = React.useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
     const [hasScanned, setHasScanned] = React.useState(false);
-    const [isFaceVerified, setIsFaceVerified] = React.useState(false);
-    const [faceMatchConfidence, setFaceMatchConfidence] = React.useState(''); // 'high', 'medium', 'na'
+    // Face verification state (reserved for future implementation)
+    const [_isFaceVerified, setIsFaceVerified] = React.useState(false);
+    const [_faceMatchConfidence, setFaceMatchConfidence] = React.useState('');
     
     // Verification State
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -604,6 +610,9 @@ export default function Register() {
     const [resending, setResending] = useState(false);
     const [resendTimer, setResendTimer] = useState(0);
     const [canResend, setCanResend] = useState(true);
+    const [agreedToTerms, setAgreedToTerms] = React.useState(false);
+    const [isTermsModalOpen, setIsTermsModalOpen] = React.useState(false);
+    const [termsModalType, setTermsModalType] = React.useState('terms'); // 'terms' | 'privacy'
     const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
     React.useEffect(() => {
@@ -721,7 +730,7 @@ export default function Register() {
             fd.append('idFront', formData.idFront);
             if (formData.idBack) fd.append('idBack', formData.idBack);
 
-            const res = await axios.post('http://localhost:33159/api/verify-residency', fd, {
+            const res = await axios.post(`${API_BASE_URL}/api/verify-residency`, fd, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
 
@@ -786,6 +795,7 @@ export default function Register() {
         }
     };
 
+    // eslint-disable-next-line no-unused-vars
     const handleSkip = () => { 
         // Obsolete: Skipping is no longer allowed for PULSO registration.
         setScanError('Identity verification is required to continue.'); 
@@ -841,7 +851,7 @@ export default function Register() {
         setVerifying(true);
         setVerifyError('');
         try {
-            await axios.post('http://localhost:33159/api/auth/verify-registration', {
+            await axios.post(`${API_BASE_URL}/api/auth/verify-registration`, {
                 email: formData.email,
                 code: code
             });
@@ -859,7 +869,7 @@ export default function Register() {
         setVerifyError('');
         setVerifySuccess('');
         try {
-            await axios.post('http://localhost:33159/api/auth/resend-code', {
+            await axios.post(`${API_BASE_URL}/api/auth/resend-code`, {
                 email: formData.email,
                 code: '000000' // Placeholder for validation
             });
@@ -867,7 +877,7 @@ export default function Register() {
             setResendTimer(60);
             setCanResend(false);
             setTimeout(() => setVerifySuccess(''), 5000);
-        } catch (err) {
+        } catch {
             setVerifyError("Failed to resend code.");
         } finally {
             setResending(false);
@@ -894,7 +904,7 @@ export default function Register() {
                 address: [...addressParts, formData.barangay, formData.municipality].filter(Boolean).join(', '),
                 barangay: formData.barangay,
             };
-            const res = await axios.post('http://localhost:33159/api/auth/register', payload);
+            const res = await axios.post(`${API_BASE_URL}/api/auth/register`, payload);
             if (res.status === 200 || res.status === 201) {
                 localStorage.removeItem('pulso_token');
                 localStorage.removeItem('pulso_user');
@@ -1047,7 +1057,7 @@ export default function Register() {
                                                         <X size={14} />
                                                     </button>
                                                     {!isScanning && (
-                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 cursor-pointer z-10"
+                                                        <div className="absolute inset-0 flex items-center justify-center transition-opacity bg-black/40 cursor-pointer z-10"
                                                              onClick={e => { e.preventDefault(); e.stopPropagation(); setZoomedSide('idFront'); }}>
                                                             <ZoomIn size={28} className="text-white" />
                                                         </div>
@@ -1058,16 +1068,23 @@ export default function Register() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <UploadCloud size={26} className="text-slate-400 group-hover:text-orange-500 mb-2 transition-colors" />
-                                                    <span className="text-sm font-bold text-slate-500 group-hover:text-orange-600 transition-colors">ID Front</span>
-                                                    <div className="flex gap-2 mt-2">
-                                                        <span className="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-500 font-bold uppercase">Upload</span>
-                                                        <button 
-                                                            onClick={(e) => openCamera(e, 'front')}
-                                                            className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase hover:bg-orange-200 transition-colors flex items-center gap-1"
-                                                        >
-                                                            <Camera size={10} /> Camera
-                                                        </button>
+                                                    <div className="flex flex-col items-center justify-center text-center p-4">
+                                                        <div className="relative mb-4">
+                                                            <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                                            <UploadCloud size={32} className="text-slate-400 group-hover:text-orange-500 relative transition-all duration-300 group-hover:scale-110" />
+                                                        </div>
+                                                        <span className="text-[11px] font-black text-slate-500 group-hover:text-slate-900 dark:group-hover:text-white transition-colors uppercase tracking-[0.2em] mb-4">ID Front</span>
+                                                        <div className="flex gap-2">
+                                                            <div className="px-4 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider hover:bg-slate-200 dark:hover:bg-white/10 transition-all shadow-sm">
+                                                                Upload File
+                                                            </div>
+                                                            <button 
+                                                                onClick={(e) => openCamera(e, 'front')}
+                                                                className="px-4 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-wider hover:bg-orange-500 hover:text-white dark:hover:text-white transition-all flex items-center gap-1.5 shadow-sm group/cam"
+                                                            >
+                                                                <Camera size={12} className="group-hover/cam:scale-110 transition-transform" /> Take Photo
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </>
                                             )}
@@ -1101,7 +1118,7 @@ export default function Register() {
                                                         <X size={14} />
                                                     </button>
                                                     {!isScanning && (
-                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 cursor-pointer z-10"
+                                                        <div className="absolute inset-0 flex items-center justify-center transition-opacity bg-black/40 cursor-pointer z-10"
                                                              onClick={e => { e.preventDefault(); e.stopPropagation(); setZoomedSide('idBack'); }}>
                                                             <ZoomIn size={28} className="text-white" />
                                                         </div>
@@ -1112,16 +1129,23 @@ export default function Register() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <UploadCloud size={26} className="text-slate-400 group-hover:text-orange-500 mb-2 transition-colors" />
-                                                    <div className="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-500 font-bold uppercase">Back ID Reqd.</div>
-                                                    <div className="flex gap-2 mt-2">
-                                                        <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase transition-colors">Upload</span>
-                                                        <button 
-                                                            onClick={(e) => openCamera(e, 'back')}
-                                                            className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase hover:bg-orange-200 transition-colors flex items-center gap-1"
-                                                        >
-                                                            <Camera size={10} /> Camera
-                                                        </button>
+                                                    <div className="flex flex-col items-center justify-center text-center p-4">
+                                                        <div className="relative mb-4">
+                                                            <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                                            <UploadCloud size={32} className="text-slate-400 group-hover:text-orange-500 relative transition-all duration-300 group-hover:scale-110" />
+                                                        </div>
+                                                        <span className="text-[11px] font-black text-slate-500 group-hover:text-slate-900 dark:group-hover:text-white transition-colors uppercase tracking-[0.2em] mb-4">ID Back</span>
+                                                        <div className="flex gap-2">
+                                                            <div className="px-4 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider hover:bg-slate-200 dark:hover:bg-white/10 transition-all shadow-sm">
+                                                                Upload File
+                                                            </div>
+                                                            <button 
+                                                                onClick={(e) => openCamera(e, 'back')}
+                                                                className="px-4 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-wider hover:bg-orange-500 hover:text-white dark:hover:text-white transition-all flex items-center gap-1.5 shadow-sm group/cam"
+                                                            >
+                                                                <Camera size={12} className="group-hover/cam:scale-110 transition-transform" /> Take Photo
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </>
                                             )}
@@ -1142,14 +1166,54 @@ export default function Register() {
                                     </div>
                                 )}
 
+                                <div className="space-y-4 mb-4">
+                                    {/* Verification Disclaimer */}
+                                    <div className="flex gap-3 items-start p-3 bg-slate-100/50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors hover:bg-slate-100 dark:hover:bg-white/[0.08]">
+                                        <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
+                                            <Info size={16} className="text-orange-500" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-0.5">Verification Disclaimer</p>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-bold">Please double check all extracted details after the biometric ID scan. You are responsible for ensuring the accuracy of your personal information before final submission.</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Terms and Conditions Checkbox */}
+                                    <label className="flex items-center gap-3 cursor-pointer group select-none px-1">
+                                        <div className="relative">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={agreedToTerms}
+                                                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                                className="sr-only peer" 
+                                            />
+                                            <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white/50 dark:bg-slate-900/50 transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500 flex items-center justify-center peer-focus:ring-2 peer-focus:ring-orange-500/30">
+                                                <div className={`transition-all duration-300 ${agreedToTerms ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
+                                                    <div className="w-1.5 h-3 border-r-2 border-b-2 border-white rotate-45 mb-1" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span className="text-[11px] text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors font-bold leading-tight">
+                                            I agree to the <button type="button" onClick={() => { setTermsModalType('terms'); setIsTermsModalOpen(true); }} className="text-orange-500 hover:text-orange-600 underline">Terms of Service</button> and <button type="button" onClick={() => { setTermsModalType('privacy'); setIsTermsModalOpen(true); }} className="text-orange-500 hover:text-orange-600 underline">Privacy Policy</button>
+                                        </span>
+                                    </label>
+                                </div>
+
                                 <div className="flex flex-col gap-3">
                                     <button
                                         type="button"
                                         onClick={handleScanID}
-                                        disabled={!formData.idFront || !formData.idBack || isScanning}
-                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        disabled={!formData.idFront || !formData.idBack || isScanning || !agreedToTerms}
+                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group/btn"
                                     >
-                                        {isScanning ? <><Loader2 size={18} className="animate-spin" /> Identifying ID Side & Type...</> : <><ShieldCheck size={18} /> Scan Documents & Continue</>}
+                                        {isScanning ? (
+                                            <><Loader2 size={18} className="animate-spin" /> Identifying ID Side & Type...</>
+                                        ) : (
+                                            <>
+                                                <ShieldCheck size={18} className="group-hover/btn:scale-110 transition-transform" /> 
+                                                Scan Documents & Continue
+                                            </>
+                                        )}
                                     </button>
                                     <p className="text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest">Both Front and Back required for maximum AI accuracy</p>
                                 </div>
@@ -1579,6 +1643,16 @@ export default function Register() {
                 onCapture={handleCameraCapture}
                 side={activeCameraSide}
             />
+
+            <AnimatePresence>
+                {isTermsModalOpen && (
+                    <TermsModal 
+                        isOpen={isTermsModalOpen} 
+                        onClose={() => setIsTermsModalOpen(false)} 
+                        type={termsModalType} 
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

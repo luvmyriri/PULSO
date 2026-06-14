@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
 
-const API = 'http://localhost:33159';
+import { API_BASE_URL } from '../utils/apiBase';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Per-role configuration: what they see, what actions they can take
@@ -482,9 +482,28 @@ const ActionCard = ({ action, token }) => {
 
     useEffect(() => {
         if (!action.endpoint || !token) { setLoading(false); return; }
-        fetch(`${API}${action.endpoint}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : [])
-            .then(data => setCount(Array.isArray(data) ? data.length : 0))
+        fetch(`${API_BASE_URL}${action.endpoint}`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.ok ? r.json() : {})
+            .then(data => {
+                // Handle different response formats:
+                // 1. Array: [...items]
+                // 2. Object with items: {items: [...], total: X}
+                // 3. Object with users: {users: [...], total: X}
+                // 4. Object with single value: {total: X} or {count: X}
+                if (Array.isArray(data)) {
+                    setCount(data.length);
+                } else if (data.items) {
+                    setCount(data.total ?? data.items.length);
+                } else if (data.users) {
+                    setCount(data.total ?? data.users.length);
+                } else if (data.total !== undefined) {
+                    setCount(data.total);
+                } else if (data.count !== undefined) {
+                    setCount(data.count);
+                } else {
+                    setCount(0);
+                }
+            })
             .catch(() => setCount(null))
             .finally(() => setLoading(false));
     }, [action.endpoint, token]);
@@ -572,7 +591,7 @@ const StatsBar = ({ token }) => {
     const [stats, setStats] = useState(null);
     useEffect(() => {
         if (!token) return;
-        fetch(`${API}/api/gov/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_BASE_URL}/api/gov/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } })
             .then(r => r.ok ? r.json() : null)
             .then(setStats)
             .catch(() => {});

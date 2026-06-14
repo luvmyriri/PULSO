@@ -70,7 +70,9 @@ import {
     Calendar,
     MicOff,
     Volume2,
-    MessageSquareText
+    MessageSquareText,
+    Filter,
+    LayoutGrid
 } from 'lucide-react';
 
 import { useTheme } from '../contexts/ThemeContext';
@@ -79,20 +81,13 @@ import Branding from '../components/Branding';
 import { useTranslation } from 'react-i18next';
 import IDCameraModal from '../components/IDCameraModal';
 
-const NORTH_CALOOCAN_BOUNDARY = [
-    { lat: 14.825, lng: 121.060 }, // North Tip (Tala Area)
-    { lat: 14.805, lng: 121.140 }, // NE Corner (Boundary with SJDM/Rizal)
-    { lat: 14.745, lng: 121.140 }, // SE Side (Bagong Silang - Brgy 176)
-    { lat: 14.740, lng: 121.100 }, // Under Bagong Silang (Brgy 177 area)
-    { lat: 14.710, lng: 121.070 }, // Southern Edge (Brgy 178/174 Camarin)
-    { lat: 14.675, lng: 121.040 }, // Deep South Extension (To include Brgy 164/169 areas)
-    { lat: 14.680, lng: 120.990 }, // SW Corner (Expansion towards Valenzuela/Meycauayan)
-    { lat: 14.760, lng: 120.970 }, // West Side (Expansion towards Marilao)
-    { lat: 14.820, lng: 120.970 }, // NW Corner (Marilao Border)
-    { lat: 14.825, lng: 121.030 }  // Back to North Tip
-];
+const CALOOCAN_CITY_PLACE_ID = 'ChIJXxuEGbWxlzMRGi0EJeJw5wU';
 
 const LIBRARIES = ['places', 'geometry'];
+
+import { API_BASE_URL } from '../utils/apiBase';
+import { handleApiError } from '../utils/apiFetch';
+import { useInteractionHarden } from '../hooks/useInteractionHarden';
 
 const REPORT_CATEGORIES = (t) => [
     t('landing.solutions.s1_title', { defaultValue: 'Roads & Bridges' }),
@@ -100,6 +95,37 @@ const REPORT_CATEGORIES = (t) => [
     t('landing.solutions.s3_title', { defaultValue: 'Street Lighting' }),
     t('landing.solutions.s4_title', { defaultValue: 'Public Safety & Regulatory' }),
     t('landing.solutions.s5_title', { defaultValue: 'Public Facilities' }),
+];
+
+const DARK_MAP_STYLE = [
+    { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#f97316' }] },
+    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+    { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#334155' }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+    { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#0f172a' }] },
+    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+    { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+    { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#f97316' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#020617' }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#334155' }] },
+    { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#020617' }] }
+];
+
+const LIGHT_MAP_STYLE = [
+    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#f8fafc' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
+    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
 ];
 
 const SIMULATED_HAZARDS = [
@@ -155,7 +181,7 @@ const LeftSidebar = ({ user, handleSetTab, handleSetModal, t }) => (
         <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-4 rounded-xl hover:bg-slate-200/50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group">
             <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative">
                 {user.avatar}
-                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="absolute inset-0 bg-black/10 transition-opacity"></div>
             </div>
             <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-[15px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">{user.name}</h3>
@@ -371,6 +397,7 @@ const LguFeed = ({ lguUpdates, loadingAdvisories, getIconForCategory, setSelecte
 const STATUS_CONFIG = {
     resolved: { label: 'Resolved', bg: '#dcfce7', text: '#15803d', dot: '#22c55e' },
     pending: { label: 'Pending', bg: '#fef3c7', text: '#b45309', dot: '#f59e0b' },
+    unvalidated: { label: 'Verifying', bg: '#fef3c7', text: '#b45309', dot: '#f59e0b' },
     unverified: { label: 'Pending', bg: '#fef3c7', text: '#b45309', dot: '#f59e0b' },
     rejected: { label: 'Rejected', bg: '#fee2e2', text: '#b91c1c', dot: '#ef4444' },
     'in_progress': { label: 'In Progress', bg: '#ffe4c4', text: '#c2410c', dot: '#f97316' },
@@ -419,9 +446,9 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
             if (reportStatusFilter === 'in_progress') {
                 return ['dispatched', 'approved_internal'].includes(r.status);
             }
-            // Fallback for legacy 'unverified' data which should map to pending in UI
+            // Include 'unvalidated' and legacy 'unverified' in pending filter
             if (reportStatusFilter === 'pending') {
-                return ['pending', 'unverified'].includes(r.status);
+                return ['pending', 'unverified', 'unvalidated'].includes(r.status);
             }
             return r.status === reportStatusFilter;
         });
@@ -486,7 +513,7 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
                                     ? userReports.length
                                     : userReports.filter(r => {
                                         if (opt.id === 'in_progress') return ['dispatched', 'approved_internal'].includes(r.status);
-                                        if (opt.id === 'pending') return ['pending', 'unverified'].includes(r.status);
+                                        if (opt.id === 'pending') return ['pending', 'unverified', 'unvalidated'].includes(r.status);
                                         return r.status === opt.id;
                                     }).length}
                             </span>
@@ -527,16 +554,16 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
                         <div className="w-full md:w-40 h-28 shrink-0 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm relative group/img">
                             {report.image_url ? (
                                 <button
-                                    onClick={() => setZoomedImage(`http://localhost:33159${report.image_url}`)}
+                                    onClick={() => setZoomedImage(`${API_BASE_URL}${report.image_url}`)}
                                     className="w-full h-full cursor-zoom-in"
                                 >
                                     <img
-                                        src={`http://localhost:33159${report.image_url}`}
+                                        src={`${API_BASE_URL}${report.image_url}`}
                                         alt="Report Proof"
                                         className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
                                     />
                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                                        <Eye size={20} className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
+                                        <Eye size={20} className="text-white transition-opacity drop-shadow-md" />
                                     </div>
                                 </button>
                             ) : (
@@ -565,7 +592,24 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
                                 </div>
                                 <div className="flex items-center gap-1.5 truncate max-w-[280px]">
                                     <MapPin size={14} className="text-blue-500/70" />
-                                    {report.location_string || 'Location N/A'}
+                                        {(() => {
+                                            if (!report.location_string || !report.location_string.includes('|')) {
+                                                return report.location_string || 'Location N/A';
+                                            }
+                                            const parts = report.location_string.split('|').map(p => p.trim());
+                                            const plus = parts[0] || "";
+                                            let addr = parts[1] || "";
+                                            const brgy = parts[2] || "Barangay Unknown";
+                                            
+                                            let cleanAddr = addr.replace(new RegExp(`,?\\s*${brgy}`, 'i'), '')
+                                                                .replace(/,?\s*Caloocan(?: City)?/i, '')
+                                                                .replace(/,?\s*Metro Manila/i, '')
+                                                                .replace(/,?\s*Philippines/i, '')
+                                                                .replace(/,$/, '')
+                                                                .trim();
+                                            
+                                            return `${plus}, ${cleanAddr}, ${brgy}, Caloocan, Metro Manila`;
+                                        })()}
                                 </div>
                             </div>
 
@@ -581,7 +625,7 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
                         <div className="flex flex-row md:flex-col items-center justify-between md:justify-center gap-4 w-full md:w-32 py-2 md:py-0 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 pl-0 md:pl-6 shrink-0">
                             <StatusBadge status={report.status} />
 
-                            {(report.status === 'pending' || report.status === 'unverified') && (
+                            {(report.status === 'pending' || report.status === 'unverified' || report.status === 'unvalidated') && (
                                 <button
                                     onClick={() => handleCancelReport(report.id)}
                                     className="text-[11px] font-black text-rose-500 hover:text-white bg-rose-50 hover:bg-rose-500 dark:bg-rose-500/10 dark:hover:bg-rose-500 px-4 py-2 rounded-lg transition-all border border-rose-100 dark:border-rose-500/20 active:scale-95 uppercase tracking-wider"
@@ -592,7 +636,7 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, containerVaria
 
                             {report.status === 'resolved' && report.resolution_image_url && (
                                 <button
-                                    onClick={() => setZoomedImage(`http://localhost:33159${report.resolution_image_url}`)}
+                                    onClick={() => setZoomedImage(`${API_BASE_URL}${report.resolution_image_url}`)}
                                     className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 hover:text-white bg-emerald-50 hover:bg-emerald-500 dark:bg-emerald-500/10 dark:hover:bg-emerald-500 px-3 py-1.5 rounded transition-all border border-emerald-100 dark:border-emerald-500/20 active:scale-95 uppercase tracking-wider flex items-center justify-center gap-1 w-full"
                                 >
                                     <ImageIcon size={12} /> View Proof
@@ -658,7 +702,7 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
             <div className="flex flex-col items-center gap-6 shrink-0 w-full md:w-56">
                 <div className="w-40 h-40 rounded-[32px] bg-gradient-to-br from-orange-400 to-orange-600 font-black flex items-center justify-center text-white text-6xl shadow-[0_20px_50px_rgba(249,115,22,0.3)] relative group">
                     {user.avatar}
-                    <div className="absolute inset-0 bg-black/10 rounded-[32px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/10 rounded-[32px] transition-opacity flex items-center justify-center">
                         <Camera size={24} className="text-white/60" />
                     </div>
                 </div>
@@ -796,7 +840,7 @@ const SettingsView = ({ handleLogout, containerVariants, token, showToast, t }) 
         setIsConfirmOpen(false);
         setChanging(true);
         try {
-            const res = await fetch('http://localhost:33159/api/auth/change-password', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1261,16 +1305,152 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, darkM
 };
 
 
+const HazardCard = ({ hazard, getCategoryColor, getIconForCategory, setSelectedHazard, setHazardView, map, t }) => {
+    const clr = getCategoryColor(hazard.category);
+    
+    return (
+        <motion.div 
+            layout
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="group relative bg-white dark:bg-slate-800/40 backdrop-blur-md rounded-3xl border border-slate-200 dark:border-slate-700/50 hover:border-orange-500/50 transition-all p-5 shadow-sm hover:shadow-xl hover:-translate-y-1"
+        >
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg`} style={{ background: `linear-gradient(135deg, ${clr}, ${clr}dd)` }}>
+                        {getIconForCategory(hazard.category)}
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{hazard.title}</h4>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1">{hazard.category}</p>
+                    </div>
+                </div>
+                <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${hazard.status === 'resolved' ? 'bg-green-100 text-green-600 dark:bg-green-500/10' : 'bg-orange-100 text-orange-600 dark:bg-orange-500/10'}`}>
+                    {hazard.status}
+                </div>
+            </div>
+            
+            <div className="flex items-center gap-2 mb-6 text-sm font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <MapPin size={14} className="text-blue-500" />
+                <span>{hazard.dynamicDistance || hazard.distance} away</span>
+            </div>
+            
+            <div className="flex gap-2">
+                <button 
+                    onClick={() => {
+                        setSelectedHazard(hazard);
+                        setHazardView('map');
+                        if (map) map.panTo({ lat: hazard.lat, lng: hazard.lng });
+                    }}
+                    className="flex-1 py-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                >
+                    <Map size={14} /> View on Map
+                </button>
+            </div>
+        </motion.div>
+    );
+};
+
+const HazardBoardView = ({ 
+    displayHazards, hazardSearchQuery, setHazardSearchQuery, hazardFilterStatus, setHazardFilterStatus, 
+    hazardFilterCategory, setHazardFilterCategory, getCategoryColor, getIconForCategory, 
+    setSelectedHazard, setHazardView, map, t 
+}) => {
+    const statuses = ['all', 'pending', 'in-progress', 'resolved'];
+    const categories = ['all', 'Road & Bridge', 'Water & Drainage', 'Street Lighting', 'Public Safety', 'LGU Facility'];
+
+    return (
+        <div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950/50 backdrop-blur-3xl p-6 sm:p-8">
+            {/* Search & Filter Header */}
+            <div className="mb-8 space-y-6">
+                <div className="relative group max-w-2xl mx-auto">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" size={20} />
+                    <input 
+                        type="text" 
+                        placeholder="Search nearby hazards by name or category..."
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-14 pr-6 text-slate-900 dark:text-white font-bold placeholder:text-slate-400 focus:ring-2 focus:ring-orange-500/20 outline-none shadow-sm transition-all"
+                        value={hazardSearchQuery}
+                        onChange={(e) => setHazardSearchQuery(e.target.value)}
+                    />
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-6 items-center justify-center">
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto max-w-full">
+                        {statuses.map(s => (
+                            <button 
+                                key={s} 
+                                onClick={() => setHazardFilterStatus(s)}
+                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${hazardFilterStatus === s ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                            >
+                                {s}
+                            </button>
+                        ))}
+                    </div>
+                    
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto max-w-full">
+                        {categories.map(c => (
+                            <button 
+                                key={c} 
+                                onClick={() => setHazardFilterCategory(c)}
+                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${hazardFilterCategory === c ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                            >
+                                {c}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Grid */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                {displayHazards.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {displayHazards.map(h => (
+                            <HazardCard 
+                                key={h.id} 
+                                hazard={h} 
+                                getCategoryColor={getCategoryColor} 
+                                getIconForCategory={getIconForCategory}
+                                setSelectedHazard={setSelectedHazard}
+                                setHazardView={setHazardView}
+                                map={map}
+                                t={t}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-64 text-center">
+                        <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-400 mb-4 border border-slate-200 dark:border-slate-800">
+                            <WifiOff size={32} />
+                        </div>
+                        <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No Matching Hazards</h4>
+                        <p className="text-slate-500 max-w-xs mx-auto">Try adjusting your filters or search query to see local incidents.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const ResidentModals = ({
     activeModal, setActiveModal, selectedPost, setSelectedPost, isLoaded, map, setMap, panorama, setPanorama, reportLocation, setReportLocation,
     locationAddress, geocodingAddress, reportCategory, setReportCategory, reportNotes, setReportNotes, selectedImage, setSelectedImage,
     submittingReport, handleFileReport, isSelectingLocation, setIsSelectingLocation, isIDCameraOpen, setIsIDCameraOpen, checkJurisdiction,
-    reverseGeocode, mapOptions, pulseRadius, processedHazards, selectedHazard, setSelectedHazard, svLocation, handleStreetViewClick,
+    reverseGeocode, mapOptions, pulseRadius, processedHazards, displayHazards, selectedHazard, setSelectedHazard, 
+    hazardView, setHazardView, hazardSearchQuery, setHazardSearchQuery, hazardFilterStatus, setHazardFilterStatus,
+    hazardFilterCategory, setHazardFilterCategory,
+    svLocation, handleStreetViewClick,
     getIconForCategory, getMarkerSVG, getCategoryColor, mapFilter, setMapFilter,
-    isAnalyzing, aiFeedback, fileInputRef, handleFileSelect,
+    isAnalyzing, aiFeedback, setAiFeedback, fileInputRef, handleFileSelect,
     reportToCancel, setReportToCancel, confirmCancelReport,
     isSubmitConfirmOpen, setIsSubmitConfirmOpen, actuallySubmitReport,
-    t
+    locationDescription, setLocationDescription,
+    isCooldown,
+    selectedReport, setSelectedReport,
+    reportTimeline, loadingTimeline,
+    onLoad,
+    t,
+    currentUser
 }) => {
     return (
         <AnimatePresence>
@@ -1305,7 +1485,7 @@ const ResidentModals = ({
                                          <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mt-0.5 opacity-80 uppercase tracking-widest text-[10px]">{aiFeedback ? `${t('dashboard.quickReport.aiDetected', { defaultValue: 'Assessment Complete' })}: ${aiFeedback.category}` : t('dashboard.quickReport.desc', { defaultValue: 'Snap a priority infrastructure hazard' })}</p>
                                      </div>
                                  </div>
-                                 <button onClick={() => { setActiveModal(null); setAiFeedback(null); setSelectedImage(null); setReportNotes(''); setReportCategory([]); }} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-full transition-all active:scale-90"><X size={24} /></button>
+                                 <button onClick={() => { setActiveModal(null); setAiFeedback(null); setSelectedImage(null); setReportNotes(''); setLocationDescription(''); setReportCategory([]); }} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-full transition-all active:scale-90"><X size={24} /></button>
                              </div>
                                {/* Main Content Area - Scrollable for safety but optimized */}
                              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">
@@ -1315,12 +1495,76 @@ const ResidentModals = ({
                                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm">
                                          <MapPin size={20} />
                                      </div>
-                                     <div className="flex-1 min-w-0">
-                                         <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 mb-0.5 opacity-80">Verified Incident Location</p>
-                                         <h4 className="font-black text-base text-slate-900 dark:text-white truncate tracking-tight">
-                                             {locationAddress || "Locating exact address..."}
-                                         </h4>
-                                     </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div>
+                                                {(() => {
+                                                    // priority: 1. Deduced from 3-part pipe format 2. Regex in address 3. Fallback only if necessary
+                                                    let finalBrgy = null;
+                                                    
+                                                    if (locationAddress) {
+                                                        const parts = locationAddress.split('|').map(s => s.trim());
+                                                        if (parts.length >= 3) {
+                                                            finalBrgy = parts[2];
+                                                        } else {
+                                                            for (const p of parts) {
+                                                                const match = p.match(/(Barangay|Brgy)\s+([A-Z0-9\-\s]+?)(?:,|$)/i);
+                                                                if (match) {
+                                                                    finalBrgy = match[0].replace(/,$/, '').trim();
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    if (!finalBrgy || finalBrgy.toLowerCase().includes('unknown')) {
+                                                        finalBrgy = "Barangay Unknown";
+                                                    }
+                                                    
+                                                    if (finalBrgy && finalBrgy.toLowerCase().startsWith('barangay barangay')) {
+                                                        finalBrgy = finalBrgy.substring(9).trim();
+                                                    }
+                                                    
+                                                })()}
+                                            </div>
+                                            <div className="flex flex-col gap-0.5" title={locationAddress}>
+                                                {locationAddress ? (
+                                                    locationAddress.includes('|') ? (
+                                                        <div className="flex flex-col">
+                                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 opacity-90 mb-1">Verified Incident Location</p>
+                                                            <span className="text-[13px] font-black tracking-tight text-slate-800 dark:text-slate-200 leading-tight">
+                                                                {(() => {
+                                                                    const parts = locationAddress.split('|').map(p => p.trim());
+                                                                    const plus = parts[0] || "";
+                                                                    let addr = parts[1] || "";
+                                                                    const brgy = parts[2] || "Barangay Unknown";
+                                                                    
+                                                                    // Clean redundancy
+                                                                    let cleanAddr = addr.replace(new RegExp(`,?\\s*${brgy}`, 'i'), '')
+                                                                                        .replace(/,?\s*Caloocan(?: City)?/i, '')
+                                                                                        .replace(/,?\s*Metro Manila/i, '')
+                                                                                        .replace(/,?\s*Philippines/i, '')
+                                                                                        .replace(/,$/, '')
+                                                                                        .trim();
+                                                                    
+                                                                    // Add the final parts
+                                                                    return `${plus}, ${cleanAddr}, ${brgy}, Caloocan, Metro Manila`;
+                                                                })()}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col">
+                                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 opacity-90 mb-1">Verified Incident Location</p>
+                                                            <span className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{locationAddress}</span>
+                                                        </div>
+                                                    )
+                                                ) : (
+                                                    <div className="flex flex-col">
+                                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 opacity-90 mb-1">Verified Incident Location</p>
+                                                        <span className="text-[11px] text-slate-400 animate-pulse font-bold tracking-widest uppercase">Resolving precise location...</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                      <div className="px-3 py-1.5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg border border-slate-200/50 dark:border-slate-700/50 shadow-sm shrink-0">
                                          <span className="text-[10px] font-mono font-black text-slate-400 dark:text-slate-500 tracking-wider">
                                              {reportLocation.lat.toFixed(4)}, {reportLocation.lng.toFixed(4)}
@@ -1337,7 +1581,7 @@ const ResidentModals = ({
                                                  ? (
                                                      <div className="relative w-full h-full group bg-slate-950 rounded-[26px] overflow-hidden">
                                                          <img src={selectedImage} alt="Selected Issue" className="w-full h-full object-contain" />
-                                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent transition-opacity" />
                                                          <button
                                                              onClick={(e) => { e.stopPropagation(); setSelectedImage(null); setAiFeedback(null); }}
                                                              className="absolute top-4 right-4 w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-red-500 transition-all shadow-xl border border-white/20 active:scale-90"
@@ -1349,7 +1593,7 @@ const ResidentModals = ({
                                                  )
                                                  : (
                                                      <div className="w-full h-full bg-white dark:bg-slate-800/40 rounded-[26px] flex flex-col items-center justify-center text-white border-2 border-dashed border-slate-200 dark:border-slate-800/60 hover:border-orange-500 dark:hover:border-orange-500/50 transition-all group p-6 text-center relative overflow-hidden">
-                                                         <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                         <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-blue-500/5 transition-opacity" />
                                                          <div className="w-16 h-16 rounded-[24px] bg-orange-500/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
                                                              <Camera size={32} className="text-orange-500" />
                                                          </div>
@@ -1392,51 +1636,79 @@ const ResidentModals = ({
                                                  options={REPORT_CATEGORIES(t)}
                                                  disabled={!selectedImage || isAnalyzing || aiFeedback?.category === 'Undetermined'}
                                              />
-                                             {(!selectedImage || isAnalyzing || aiFeedback?.category === 'Undetermined') && (
+                                             {( !selectedImage || isAnalyzing || aiFeedback?.category === 'Undetermined' || aiFeedback?.category?.toUpperCase().includes('INAPPROPRIATE')) && (
                                                  <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px] rounded-[28px] flex items-center justify-center z-10 border border-white/5 cursor-not-allowed">
                                                      <div className="bg-slate-900/90 px-4 py-2.5 rounded-xl border border-white/10 shadow-2xl flex items-center gap-2.5 active:scale-95 transition-transform">
-                                                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isAnalyzing ? 'bg-blue-500/20' : 'bg-orange-500/20'}`}>
+                                                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isAnalyzing ? 'bg-blue-500/20' : aiFeedback?.category?.toUpperCase().includes('INAPPROPRIATE') ? 'bg-red-500/20' : 'bg-orange-500/20'}`}>
                                                              {isAnalyzing ? (
                                                                  <Zap size={14} className="text-blue-500 animate-pulse" />
+                                                             ) : aiFeedback?.category?.toUpperCase().includes('INAPPROPRIATE') ? (
+                                                                 <ShieldAlert size={14} className="text-red-500" />
                                                              ) : (
                                                                  <Lock size={14} className="text-orange-500" />
                                                              )}
                                                          </div>
                                                          <span className="text-[10px] font-black uppercase tracking-widest text-white/90">
-                                                             {isAnalyzing ? "AI Scanning Image..." : aiFeedback?.category === 'Undetermined' ? "Out of Scope / Undetermined" : "Photo Required to Select Type"}
+                                                             {isAnalyzing 
+                                                                ? "AI Scanning Image..." 
+                                                                : aiFeedback?.category?.toUpperCase().includes('INAPPROPRIATE') 
+                                                                    ? "Inappropriate Content Blocked" 
+                                                                    : aiFeedback?.category === 'Undetermined' 
+                                                                        ? "Out of Scope / Undetermined" 
+                                                                        : "Photo Required to Select Type"}
                                                          </span>
                                                      </div>
                                                  </div>
                                              )}
                                          </div>
-                                         <div className="flex flex-col">
-                                             <div className="flex items-center gap-3 mb-2.5 ml-1">
-                                                 <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-sm border border-slate-200 dark:border-slate-700/50">
-                                                     <MessageSquareText size={14} />
-                                                 </div>
-                                                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Additional Notes</p>
-                                             </div>
-                                             <div className="h-32 sm:h-40 relative group overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 focus-within:border-orange-500/50 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] bg-white dark:bg-slate-800/40">
-                                                 <textarea
-                                                     className="w-full h-full bg-transparent text-slate-900 dark:text-white p-5 outline-none placeholder:text-slate-400/60 text-sm font-semibold tracking-tight resize-none transition-colors"
-                                                     placeholder="Provide technical markers, landmarks, or specific damage details..."
-                                                     value={reportNotes}
-                                                     onChange={e => setReportNotes(e.target.value)}
-                                                 />
-                                                 <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-orange-500/10 to-transparent translate-y-full group-focus-within:translate-y-0 transition-transform" />
-                                             </div>
-                                         </div>
+                                              <div className="flex flex-col">
+                                              <div className="flex items-center gap-3 mb-2.5 ml-1">
+                                                  <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-sm border border-slate-200 dark:border-slate-700/50">
+                                                      <MapPin size={14} />
+                                                  </div>
+                                                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Exact Location Description</p>
+                                              </div>
+                                              <div className="h-20 relative group overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 focus-within:border-orange-500/50 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] bg-white dark:bg-slate-800/40">
+                                                  <textarea
+                                                      className="w-full h-full bg-transparent text-slate-900 dark:text-white p-4 outline-none placeholder:text-slate-400/60 text-sm font-semibold tracking-tight resize-none transition-colors"
+                                                      placeholder="e.g., '3 meters from the yellow street sign at the corner of...'"
+                                                      value={locationDescription}
+                                                      onChange={e => setLocationDescription(e.target.value)}
+                                                  />
+                                              </div>
+                                              <p className="text-[10px] text-orange-500 mt-1 ml-1">
+                                                  ⚠️ Please describe exactly where in the photo the issue is located
+                                              </p>
+                                          </div>
+                                          
+                                          <div className="flex flex-col">
+                                              <div className="flex items-center gap-3 mb-2.5 ml-1">
+                                                  <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-sm border border-slate-200 dark:border-slate-700/50">
+                                                      <MessageSquareText size={14} />
+                                                  </div>
+                                                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Additional Notes</p>
+                                              </div>
+                                              <div className="h-32 sm:h-40 relative group overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 focus-within:border-orange-500/50 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] bg-white dark:bg-slate-800/40">
+                                                  <textarea
+                                                      className="w-full h-full bg-transparent text-slate-900 dark:text-white p-5 outline-none placeholder:text-slate-400/60 text-sm font-semibold tracking-tight resize-none transition-colors"
+                                                      placeholder="Provide technical markers, landmarks, or specific damage details..."
+                                                      value={reportNotes}
+                                                      onChange={e => setReportNotes(e.target.value)}
+                                                  />
+                                                  <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-orange-500/10 to-transparent translate-y-full group-focus-within:translate-y-0 transition-transform" />
+                                              </div>
+                                          </div>
                                      </div>
                                  </div>
                              </div>
 
                              {/* Actions — pinned to bottom */}
                              <div className="flex gap-4 shrink-0 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-                                 <button className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black rounded-xl transition-all hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 text-[10px] uppercase tracking-[0.2em] active:scale-95" onClick={() => { setActiveModal(null); setReportCategory([]); setAiFeedback(null); setSelectedImage(null); setReportNotes(''); }}>Cancel</button>
+                                 <button className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black rounded-xl transition-all hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 text-[10px] uppercase tracking-[0.2em] active:scale-95" onClick={() => { setActiveModal(null); setReportCategory([]); setAiFeedback(null); setSelectedImage(null); setReportNotes(''); setLocationDescription(''); }}>Cancel</button>
                                  <button
                                      className="flex-[2] py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-black rounded-xl hover:shadow-[0_15px_40px_rgba(249,115,22,0.3)] transition-all disabled:opacity-30 disabled:grayscale disabled:pointer-events-none text-[10px] uppercase tracking-[0.2em] shadow-xl active:scale-[0.98] relative overflow-hidden group"
                                      onClick={handleFileReport}
-                                     disabled={submittingReport || (reportCategory.length === 0)}
+                                     disabled={submittingReport || !selectedImage || isAnalyzing || aiFeedback?.category === 'Undetermined' || aiFeedback?.category?.toUpperCase().includes('INAPPROPRIATE') || reportCategory.length === 0}
                                  >
                                      <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-700 skew-x-12" />
                                      <span className="relative z-10">{submittingReport ? 'Encrypting…' : 'Finalize & Submit Report'}</span>
@@ -1448,74 +1720,123 @@ const ResidentModals = ({
                     {activeModal === 'map' && (
                         <div className="flex flex-col h-full bg-white dark:bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800">
                             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
-                                <div><h2 className="text-2xl font-black text-slate-900 dark:text-white">Nearby Hazards</h2><p className="text-slate-500 dark:text-slate-400 font-medium">Live technical incidents board</p></div>
+                                <div>
+                                    <h2 className="text-2xl font-black text-slate-900 dark:text-white">Nearby Hazards</h2>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium">Live technical incidents board</p>
+                                </div>
+                                
+                                {/* View Toggle */}
+                                <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-inner group">
+                                    <button 
+                                        onClick={() => setHazardView('map')}
+                                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${hazardView === 'map' ? 'bg-white dark:bg-slate-700 text-orange-500 shadow-lg shadow-black/5' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                                    >
+                                        <Map size={14} className={hazardView === 'map' ? 'text-orange-500' : ''} /> Map View
+                                    </button>
+                                    <button 
+                                        onClick={() => setHazardView('board')}
+                                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${hazardView === 'board' ? 'bg-white dark:bg-slate-700 text-orange-500 shadow-lg shadow-black/5' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                                    >
+                                        <LayoutGrid size={14} className={hazardView === 'board' ? 'text-orange-500' : ''} /> List Board
+                                    </button>
+                                </div>
+
                                 <button onClick={() => setActiveModal(null)} className="p-2 border border-slate-200 dark:border-slate-700 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"><X size={20} /></button>
                             </div>
-                            <div className="flex-1 relative">
-                                {isLoaded && (
-                                    <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={reportLocation} zoom={13} options={mapOptions}>
-                                        {/* Animated Wave Sonar Overlay for User Location */}
-                                        <OverlayViewF
-                                            position={reportLocation}
-                                            mapPaneName="overlayMouseTarget"
-                                            getPixelPositionOffset={() => ({ x: -24, y: -24 })}
+                            <div className="flex-1 relative overflow-hidden">
+                                {hazardView === 'board' ? (
+                                    <HazardBoardView 
+                                        displayHazards={displayHazards}
+                                        hazardSearchQuery={hazardSearchQuery}
+                                        setHazardSearchQuery={setHazardSearchQuery}
+                                        hazardFilterStatus={hazardFilterStatus}
+                                        setHazardFilterStatus={setHazardFilterStatus}
+                                        hazardFilterCategory={hazardFilterCategory}
+                                        setHazardFilterCategory={setHazardFilterCategory}
+                                        getCategoryColor={getCategoryColor}
+                                        getIconForCategory={getIconForCategory}
+                                        setSelectedHazard={setSelectedHazard}
+                                        setHazardView={setHazardView}
+                                        map={map}
+                                        t={t}
+                                    />
+                                ) : (
+                                    isLoaded && (
+                                        <GoogleMap 
+                                            mapContainerStyle={{ width: '100%', height: '100%' }} 
+                                            center={reportLocation} 
+                                            zoom={13} 
+                                            options={mapOptions}
+                                            onLoad={onLoad}
                                         >
-                                            <div className="relative flex items-center justify-center w-12 h-12">
-                                                {/* Wave Ring 1 */}
-                                                <div className="absolute inset-0 rounded-full bg-blue-500/25 animate-wave-ring" style={{ animationDelay: '0s' }} />
-                                                {/* Wave Ring 2 */}
-                                                <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-wave-ring" style={{ animationDelay: '0.6s' }} />
-                                                {/* Wave Ring 3 */}
-                                                <div className="absolute inset-0 rounded-full bg-blue-500/15 animate-wave-ring" style={{ animationDelay: '1.2s' }} />
-                                                {/* Center Dot */}
-                                                <div className="relative z-10 w-5 h-5 bg-blue-500 rounded-full border-[3px] border-white shadow-lg shadow-blue-500/50" />
-                                            </div>
-                                        </OverlayViewF>
-                                        {processedHazards.map(h => <MarkerF key={h.id} position={{ lat: h.lat, lng: h.lng }} onClick={() => setSelectedHazard(h)} icon={{ url: getMarkerSVG(h.category, h.status), scaledSize: new window.google.maps.Size(40, 46) }} />)}
-                                        {selectedHazard && (
-                                            <InfoWindowF position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }} onCloseClick={() => setSelectedHazard(null)}>
-                                                {(() => {
-                                                    const catColor = getCategoryColor(selectedHazard.category);
-                                                    return (
-                                                        <div style={{ background: 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)', borderRadius: '16px', padding: '18px', minWidth: '230px', border: '1px solid rgba(255,255,255,0.07)', margin: '-10px', boxShadow: '0 25px 50px rgba(0,0,0,0.7)', fontFamily: 'Inter,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
-                                                            <button onClick={() => setSelectedHazard(null)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>×</button>
-                                                            <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: `${catColor}20`, border: `1px solid ${catColor}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px', color: catColor }}><AlertTriangle size={20} /></div>
-                                                            <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.12em', color: selectedHazard.status === 'resolved' ? '#4ade80' : '#fb923c', background: selectedHazard.status === 'resolved' ? 'rgba(74,222,128,0.12)' : 'rgba(251,146,60,0.12)', padding: '3px 12px', borderRadius: '999px', marginBottom: '10px', textTransform: 'uppercase' }}>{selectedHazard.status}</div>
-                                                            <h4 style={{ fontWeight: 700, fontSize: '15px', color: '#f1f5f9', lineHeight: '1.35', margin: '0 0 4px', padding: '0 20px' }}>{selectedHazard.title}</h4>
-                                                            <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.15em', color: catColor, marginBottom: '12px', textTransform: 'uppercase' }}>{selectedHazard.category}</p>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '999px', padding: '5px 14px', marginBottom: '14px' }}>
-                                                                <span style={{ color: catColor, display: 'flex' }}><MapPin size={12} /></span>
-                                                                <span style={{ fontSize: '12px', fontWeight: 700, color: '#cbd5e1' }}>{selectedHazard.dynamicDistance || selectedHazard.distance} away</span>
-                                                            </div>
-                                                            <button onClick={() => handleStreetViewClick({ lat: selectedHazard.lat, lng: selectedHazard.lng })} style={{ width: '100%', padding: '11px 0', background: `linear-gradient(135deg,${catColor},${catColor}dd)`, border: 'none', borderRadius: '12px', color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: `0 4px 20px ${catColor}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                                                <Eye size={14} /> Open Street View
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </InfoWindowF>
-                                        )}
-                                        {/* Street View Overlay */}
-                                        {svLocation && (
-                                            <>
-                                                <StreetViewPanorama
-                                                    position={svLocation}
-                                                    visible={true}
-                                                    options={{ enableCloseButton: false }}
-                                                    onLoad={(pano) => setPanorama(pano)}
-                                                />
-                                                {/* Floating Back Button */}
-                                                <div className="absolute top-4 left-4 z-10">
-                                                    <button
-                                                        onClick={() => handleStreetViewClick(null)}
-                                                        className="flex items-center gap-2 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-[13px] font-bold px-4 py-2.5 rounded-full shadow-xl border border-slate-200 dark:border-slate-700 hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all"
-                                                    >
-                                                        <ArrowRight size={14} className="rotate-180" /> Back to Map
-                                                    </button>
+                                            {/* Animated Wave Sonar Overlay for User Location */}
+                                            <OverlayViewF
+                                                position={reportLocation}
+                                                mapPaneName="overlayMouseTarget"
+                                                getPixelPositionOffset={() => ({ x: -24, y: -24 })}
+                                            >
+                                                <div className="relative flex items-center justify-center w-12 h-12">
+                                                    {/* Wave Ring 1 */}
+                                                    <div className="absolute inset-0 rounded-full bg-blue-500/25 animate-wave-ring" style={{ animationDelay: '0s' }} />
+                                                    {/* Wave Ring 2 */}
+                                                    <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-wave-ring" style={{ animationDelay: '0.6s' }} />
+                                                    {/* Wave Ring 3 */}
+                                                    <div className="absolute inset-0 rounded-full bg-blue-500/15 animate-wave-ring" style={{ animationDelay: '1.2s' }} />
+                                                    {/* Center Dot */}
+                                                    <div className="relative z-10 w-5 h-5 bg-blue-500 rounded-full border-[3px] border-white shadow-lg shadow-blue-500/50" />
                                                 </div>
-                                            </>
-                                        )}
-                                    </GoogleMap>
+                                            </OverlayViewF>
+                                            {processedHazards.map(h => <MarkerF key={h.id} position={{ lat: h.lat, lng: h.lng }} onClick={() => setSelectedHazard(h)} icon={{ url: getMarkerSVG(h.category, h.status), scaledSize: new window.google.maps.Size(40, 46) }} />)}
+                                            {selectedHazard && (
+                                                <InfoWindowF position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }} onCloseClick={() => setSelectedHazard(null)}>
+                                                    {(() => {
+                                                        const catColor = getCategoryColor(selectedHazard.category);
+                                                        return (
+                                                            <div style={{ background: 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)', borderRadius: '16px', padding: '18px', minWidth: '230px', border: '1px solid rgba(255,255,255,0.07)', margin: '-10px', boxShadow: '0 25px 50px rgba(0,0,0,0.7)', fontFamily: 'Inter,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
+                                                                <button onClick={() => setSelectedHazard(null)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>×</button>
+                                                                <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: `${catColor}20`, border: `1px solid ${catColor}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px', color: catColor }}><AlertTriangle size={20} /></div>
+                                                                <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.12em', color: selectedHazard.status === 'resolved' ? '#4ade80' : '#fb923c', background: selectedHazard.status === 'resolved' ? 'rgba(74,222,128,0.12)' : 'rgba(251,146,60,0.12)', padding: '3px 12px', borderRadius: '999px', marginBottom: '10px', textTransform: 'uppercase' }}>{selectedHazard.status}</div>
+                                                                <h4 style={{ fontWeight: 700, fontSize: '15px', color: '#f1f5f9', lineHeight: '1.35', margin: '0 0 4px', padding: '0 20px' }}>{selectedHazard.title}</h4>
+                                                                <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.15em', color: catColor, marginBottom: '12px', textTransform: 'uppercase' }}>{selectedHazard.category}</p>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '999px', padding: '5px 14px', marginBottom: '8px' }}>
+                                                                    <span style={{ color: catColor, display: 'flex' }}><MapPin size={12} /></span>
+                                                                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#cbd5e1' }}>{selectedHazard.dynamicDistance || selectedHazard.distance} away</span>
+                                                                </div>
+                                                                {selectedHazard.displayAddress && selectedHazard.displayAddress !== 'N/A' && (
+                                                                    <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '14px', maxWidth: '200px', fontWeight: 500, lineHeight: '1.4' }}>
+                                                                        {selectedHazard.displayAddress}
+                                                                    </div>
+                                                                )}
+                                                                <button onClick={() => handleStreetViewClick({ lat: selectedHazard.lat, lng: selectedHazard.lng })} style={{ width: '100%', padding: '11px 0', background: `linear-gradient(135deg,${catColor},${catColor}dd)`, border: 'none', borderRadius: '12px', color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: `0 4px 20px ${catColor}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                                    <Eye size={14} /> Open Street View
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </InfoWindowF>
+                                            )}
+                                            {/* Street View Overlay */}
+                                            {svLocation && (
+                                                <>
+                                                    <StreetViewPanorama
+                                                        position={svLocation}
+                                                        visible={true}
+                                                        options={{ enableCloseButton: false }}
+                                                        onLoad={(pano) => setPanorama(pano)}
+                                                    />
+                                                    {/* Floating Back Button */}
+                                                    <div className="absolute top-4 left-4 z-10">
+                                                        <button
+                                                            onClick={() => handleStreetViewClick(null)}
+                                                            className="flex items-center gap-2 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-[13px] font-bold px-4 py-2.5 rounded-full shadow-xl border border-slate-200 dark:border-slate-700 hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all"
+                                                        >
+                                                            <ArrowRight size={14} className="rotate-180" /> Back to Map
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </GoogleMap>
+                                    )
                                 )}
                             </div>
                         </div>
@@ -1698,20 +2019,19 @@ const ResidentModals = ({
                                 </div>
                             </div>
                             <div className="p-8 overflow-y-auto custom-scrollbar space-y-6">
-                                <div>
-                                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">{selectedPost.title}</h2>
-                                    <p className="text-[15px] leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{selectedPost.description}</p>
-                                </div>
-                                {selectedPost.has_image && selectedPost.image_url && (
-                                    <div className="mt-6 rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
-                                        <img src={`http://localhost:33159${selectedPost.image_url}`} alt="Advisory Content" className="w-full object-cover" />
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2 mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-                                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${selectedPost.priority?.toLowerCase() === 'high' ? 'bg-rose-50 text-rose-500 dark:bg-rose-500/10' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>Priority: {selectedPost.priority}</span>
-                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-500 dark:bg-blue-500/10">Category: {selectedPost.category}</span>
+                                <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                                            <Shield size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Issued By</p>
+                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Caloocan Command Center</p>
+                                        </div>
                                 </div>
                             </div>
+                                <button onClick={() => setActiveModal(null)} className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 dark:bg-slate-800/50 dark:hover:bg-slate-800 rounded-full transition-all backdrop-blur-md border border-white/10 z-10">
+                                <X size={20} className="text-white md:text-slate-400" />
+                            </button>
                         </div>
                     )}
 
@@ -1737,6 +2057,173 @@ const ResidentModals = ({
             </motion.div>
         )}
 
+        {/* --- Report Details Modal --- */}
+        {activeModal === 'report-details' && selectedReport && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-xl flex items-center justify-center p-4">
+                <motion.div
+                    initial={{ scale: 0.95, opacity: 0, y: 30 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.95, opacity: 0, y: 30 }}
+                    className="bg-white dark:bg-slate-900 w-full max-w-5xl h-[90vh] rounded-[40px] shadow-[0_32px_128px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="h-2/5 relative bg-slate-100 dark:bg-slate-950">
+                        {selectedReport.image_url ? (
+                            <img src={`${API_BASE_URL}${selectedReport.image_url}`} alt="Report Verification" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-4">
+                                <div className="p-8 rounded-full bg-slate-200 dark:bg-slate-800 translate-y-[-10px]">
+                                    <CameraOff size={48} />
+                                </div>
+                                <p className="font-black uppercase tracking-widest text-xs">No Visual Evidence Attached</p>
+                            </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-8 md:p-12">
+                            <div className="flex flex-wrap items-center gap-4 mb-4">
+                                <span className="px-5 py-2 bg-white text-slate-900 text-[11px] font-black uppercase tracking-widest rounded-full shadow-2xl">
+                                    {selectedReport.ticket_id}
+                                </span>
+                                <div className={`px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest border backdrop-blur-md shadow-2xl ${
+                                    selectedReport.status?.toLowerCase() === 'resolved' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                                    selectedReport.status?.toLowerCase() === 'in_progress' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                                    selectedReport.status?.toLowerCase() === 'validated' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                                    'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                                }`}>
+                                    Status: {selectedReport.status}
+                                </div>
+                            </div>
+                            <h2 className="text-3xl md:text-4xl font-black text-white leading-tight drop-shadow-2xl line-clamp-2">
+                                {selectedReport.description}
+                            </h2>
+                        </div>
+                        <button onClick={() => setActiveModal(null)} className="absolute top-6 right-6 p-4 bg-white/10 hover:bg-white/20 dark:bg-slate-800/50 rounded-full transition-all backdrop-blur-md border border-white/20 z-10 text-white">
+                            <X size={24} />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-8 md:p-12">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                            <div className="lg:col-span-2 space-y-12">
+                                <section>
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="w-10 h-10 rounded-2xl bg-blue-900 flex items-center justify-center text-white shadow-lg shadow-blue-900/40">
+                                            <FileText size={20} />
+                                        </div>
+                                        <h3 className="text-xl font-black text-slate-900 dark:text-white">Report Insight</h3>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[24px] border border-slate-100 dark:border-slate-800/50">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Category</p>
+                                            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold">
+                                                {getIconForCategory(selectedReport.category)}
+                                                {selectedReport.category}
+                                            </div>
+                                        </div>
+                                        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[24px] border border-slate-100 dark:border-slate-800/50">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Location</p>
+                                            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold">
+                                                <MapPin size={16} className="text-rose-500" />
+                                                <span className="truncate">{selectedReport.location_string}</span>
+                                            </div>
+                                        </div>
+                                        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[24px] border border-slate-100 dark:border-slate-800/50">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Reported on</p>
+                                            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold">
+                                                <Calendar size={16} className="text-blue-500" />
+                                                {new Date(selectedReport.created_at).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[24px] border border-slate-100 dark:border-slate-800/50">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Reporter</p>
+                                            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold">
+                                                <User size={16} className="text-slate-400" />
+                                                {selectedReport.reporter_name || 'Anonymous Resident'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {selectedReport.ai_summary && (
+                                    <section className="p-6 bg-blue-50/50 dark:bg-blue-900/10 rounded-[32px] border border-blue-100 dark:border-blue-900/20">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <Brain size={20} className="text-blue-600" />
+                                            <h4 className="text-sm font-black text-blue-900 dark:text-blue-100 uppercase tracking-widest">AI Operational Assessment</h4>
+                                        </div>
+                                        <p className="text-blue-800/80 dark:text-blue-300/80 leading-relaxed text-[14px]">
+                                            {selectedReport.ai_summary}
+                                        </p>
+                                    </section>
+                                )}
+                            </div>
+
+                            <div className="space-y-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-orange-600 flex items-center justify-center text-white shadow-lg shadow-orange-600/40">
+                                        <History size={20} />
+                                    </div>
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Live Tracking</h3>
+                                </div>
+
+                                <div className="relative pl-6 space-y-8">
+                                    <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-slate-200 dark:bg-slate-800" />
+                                    
+                                    {loadingTimeline ? (
+                                        <div className="space-y-8">
+                                            {[1,2,3].map(i => (
+                                                <div key={i} className="animate-pulse flex gap-4">
+                                                    <div className="w-3 h-3 rounded-full bg-slate-200 dark:bg-slate-800 -translate-x-[25px] mt-1.5" />
+                                                    <div className="flex-1 space-y-2">
+                                                        <div className="h-4 w-24 bg-slate-100 dark:bg-slate-800 rounded" />
+                                                        <div className="h-3 w-40 bg-slate-50 dark:bg-slate-800/50 rounded" />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : reportTimeline && reportTimeline.length > 0 ? (
+                                        reportTimeline.map((step, idx) => (
+                                            <div key={idx} className="relative">
+                                                <div className={`absolute left-[-24.5px] top-1.5 w-3 h-3 rounded-full border-2 ${idx === 0 ? 'bg-orange-500 border-orange-200 dark:border-orange-500/50 shadow-lg shadow-orange-500/20' : 'bg-slate-300 dark:bg-slate-700 border-white dark:border-slate-900'}`} />
+                                                <div>
+                                                    <p className={`text-sm font-black uppercase tracking-widest ${idx === 0 ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>
+                                                        {step.status_display || step.status}
+                                                    </p>
+                                                    <p className="text-xs text-slate-400 font-medium mt-1">
+                                                        {new Date(step.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                                    </p>
+                                                    {step.official_notes && (
+                                                        <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800/50">
+                                                            <p className="text-[13px] text-slate-600 dark:text-slate-400 italic">"{step.official_notes}"</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-slate-500 text-xs font-medium italic">Waiting for government validation...</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-8 md:p-12 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                             <div className="px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-800 text-xs font-bold flex items-center gap-2">
+                                <Activity size={16} className="text-blue-500" />
+                                {selectedReport.status === 'resolved' ? 'Resolution Complete' : 'Operational Tracking Active'}
+                             </div>
+                        </div>
+                        <button 
+                            onClick={() => setActiveModal(null)}
+                            className="px-10 py-4 bg-blue-900 hover:bg-blue-800 text-white font-black rounded-2xl shadow-xl shadow-blue-900/20 transition-all active:scale-95 text-sm uppercase tracking-widest"
+                        >
+                            Close Intel
+                        </button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        )}
+
         {/* --- Submit Final Confirmation Modal --- */}
         {isSubmitConfirmOpen && (
             <motion.div
@@ -1751,7 +2238,6 @@ const ResidentModals = ({
                     onClick={(e) => e.stopPropagation()}
                     className="w-full max-w-lg bg-[#0f172a] border border-slate-800 rounded-[40px] shadow-[0_32px_128px_rgba(0,0,0,1)] p-12 flex flex-col items-center text-center relative overflow-hidden"
                 >
-                    {/* Abstract design background */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 blur-3xl rounded-full" />
 
                     <div className="w-24 h-24 rounded-[32px] bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-[0_20px_50px_rgba(249,115,22,0.3)] mb-8 rotate-3">
@@ -1773,10 +2259,11 @@ const ResidentModals = ({
                     <div className="flex flex-col gap-4 w-full">
                         <button
                             onClick={actuallySubmitReport}
-                            className="group relative w-full py-5 bg-white text-[#0f172a] font-black rounded-2xl overflow-hidden active:scale-95 transition-all text-base uppercase tracking-widest shadow-xl"
+                            disabled={isCooldown}
+                            className={`group relative w-full py-5 font-black rounded-2xl overflow-hidden active:scale-95 transition-all text-base uppercase tracking-widest shadow-xl ${isCooldown ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white text-[#0f172a]'}`}
                         >
-                            <span className="relative z-10">Finalize & Submit</span>
-                            <div className="absolute inset-0 bg-gradient-to-r from-white via-slate-100 to-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="relative z-10">{isCooldown ? 'Cooldown Active...' : 'Finalize & Submit'}</span>
+                            {!isCooldown && <div className="absolute inset-0 bg-gradient-to-r from-white via-slate-100 to-white transition-opacity" />}
                         </button>
                         <button
                             onClick={() => setIsSubmitConfirmOpen(false)}
@@ -1835,10 +2322,6 @@ const ResidentModals = ({
     </AnimatePresence>
     );
 };
-
-// --- MAIN COMPONENT ---
-
-// --- SUB-COMPONENTS (Defined outside to prevent re-creation on render) ---
 
 const TopNavigation = ({
     activeTab,
@@ -1996,7 +2479,7 @@ const TopNavigation = ({
                                                         e.stopPropagation();
                                                         setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_hidden: true } : n));
                                                         try {
-                                                            await fetch(`http://localhost:33159/api/notifications/${notification.id}`, {
+                                                            await fetch(`${API_BASE_URL}/api/notifications/${notification.id}`, {
                                                                 method: 'DELETE',
                                                                 headers: { 'Authorization': `Bearer ${token}` }
                                                             });
@@ -2039,6 +2522,7 @@ export default function ResidentDashboard() {
     const { t, i18n } = useTranslation();
     const { theme, changeTheme } = useTheme();
     const navigate = useNavigate();
+    const { throttleAction, isCooldown, startCooldown } = useInteractionHarden();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [activeModal, setActiveModal] = useState(null); // 'file-report', 'post-details'
     const [zoomedImage, setZoomedImage] = useState(null);
@@ -2091,35 +2575,52 @@ export default function ResidentDashboard() {
     }, []);
 
     const checkJurisdiction = (location) => {
-        if (!window.google || !window.google.maps || !window.google.maps.geometry) return true;
-
-        const polygon = new window.google.maps.Polygon({ paths: NORTH_CALOOCAN_BOUNDARY });
-        const latLng = new window.google.maps.LatLng(location.lat, location.lng);
-        const isIn = window.google.maps.geometry.poly.containsLocation(latLng, polygon);
-
-        if (!isIn) {
-            showToast(t('This location is outside North Caloocan City jurisdiction.'));
-        }
-        return isIn;
+        // Legacy manual check preserved for now as a fallback, 
+        // but visual boundary is now managed by Google Maps DDS
+        return true; 
     };
 
     const mapOptions = React.useMemo(() => ({
-        styles: theme === 'dark' ? [
-            { "elementType": "geometry", "stylers": [{ "color": "#121826" }] },
-            { "elementType": "labels.text.fill", "stylers": [{ "color": "#637282" }] },
-            { "elementType": "labels.text.stroke", "stylers": [{ "color": "#121826" }] },
-            { "featureType": "administrative", "elementType": "geometry.stroke", "stylers": [{ "color": "#2c3e50" }] },
-            { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#232b3d" }] },
-            { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0d1117" }] }
-        ] : [],
+        styles: theme === 'dark' ? DARK_MAP_STYLE : LIGHT_MAP_STYLE,
         disableDefaultUI: true,
         zoomControl: true,
         gestureHandling: 'greedy',
+        mapId: theme === 'dark' ? null : (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || '42e0e28462d4a298b3b3eb3f')
     }), [theme]);
 
+    // Map state must be declared BEFORE the onLoad useCallback that closes over setMap
     const [map, setMap] = useState(null);
     const [panorama, setPanorama] = useState(null);
     const [svLocation, setSvLocation] = useState(null);
+
+    const onLoad = React.useCallback((mapInstance) => {
+        setMap(mapInstance);
+        
+        try {
+            // Apply Data-Driven Styling for Caloocan City Boundary
+            // Note: getFeatureLayer requires a valid mapId in mapOptions (disabled in dark mode)
+            const featureLayer = mapInstance.getFeatureLayer('LOCALITY');
+            
+            if (featureLayer) {
+                featureLayer.style = (options) => {
+                    if (options.feature.placeId === CALOOCAN_CITY_PLACE_ID) {
+                        return {
+                            fillColor: '#6366f1',
+                            fillOpacity: 0.15,
+                            strokeColor: '#6366f1',
+                            strokeWeight: 3,
+                            strokeOpacity: 0.8
+                        };
+                    }
+                };
+                console.log("PULSO: DDS Localized styling applied for Caloocan.");
+            } else {
+                console.log("PULSO: Data-Driven Styling boundary layer skipped (expected in dark mode or if mapId is missing)");
+            }
+        } catch (err) {
+            console.warn("PULSO: Error applying map boundary styling:", err);
+        }
+    }, [setMap]);
 
     const handleStreetViewClick = (location) => {
         if (!location) {
@@ -2198,8 +2699,12 @@ export default function ResidentDashboard() {
 
     // New State for User Reports
     const [userReports, setUserReports] = useState([]);
+    const [publicHazards, setPublicHazards] = useState([]);
     const [loadingReports, setLoadingReports] = useState(true);
     const [reportStatusFilter, setReportStatusFilter] = useState('all');
+    const [selectedReport, setSelectedReport] = useState(null);
+    const [loadingTimeline, setLoadingTimeline] = useState(false);
+    const [reportTimeline, setReportTimeline] = useState([]);
 
     const handleLogout = () => {
         sessionStorage.clear();
@@ -2224,17 +2729,52 @@ export default function ResidentDashboard() {
 
     const fetchUserReports = async (userId) => {
         try {
-            const response = await fetch(`http://localhost:33159/api/reports/user/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const response = await fetch(`${API_BASE_URL}/api/reports/user/${userId}`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             });
-            if (response.ok) {
-                const data = await response.json();
-                setUserReports(data);
+            const result = await handleApiError(response);
+            if (result.ok) {
+                setUserReports(result.data);
+                setUser(prev => ({ ...prev, reportsCount: result.data.length }));
+            } else {
+                showToast(result.message);
             }
         } catch (error) {
             console.error("PULSO: Error fetching reports:", error);
+            showToast('Failed to load reports');
         } finally {
             setLoadingReports(false);
+        }
+    };
+
+    const fetchPublicHazards = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/reports/public`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            });
+            const result = await handleApiError(response);
+            if (result.ok) {
+                setPublicHazards(result.data);
+            }
+        } catch (error) {
+            console.error("PULSO: Error fetching public hazards:", error);
+        }
+    };
+
+    const fetchReportTimeline = async (reportId) => {
+        setLoadingTimeline(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/reports/${reportId}/timeline`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await handleApiError(response);
+            if (result.ok) {
+                setReportTimeline(result.data);
+            }
+        } catch (error) {
+            console.error("PULSO: Error fetching timeline:", error);
+        } finally {
+            setLoadingTimeline(false);
         }
     };
 
@@ -2242,31 +2782,44 @@ export default function ResidentDashboard() {
 
     const fetchNotifications = async (userId) => {
         try {
-            const response = await fetch(`http://localhost:33159/api/notifications/user/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userId}`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             });
-            if (response.ok) {
-                const data = await response.json();
-                setNotifications(data);
+            const result = await handleApiError(response);
+            if (result.ok) {
+                setNotifications(result.data);
+            } else {
+                showToast(result.message);
             }
         } catch (error) {
             console.error("PULSO: Error fetching notifications:", error);
+            showToast('Failed to load notifications');
         }
     };
 
     const handleMarkAllRead = async () => {
         if (!currentUser) return;
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         try {
-            const response = await fetch(`http://localhost:33159/api/notifications/user/${currentUser.id}/read`, {
-                method: 'PATCH',
+            await fetch(`${API_BASE_URL}/api/notifications/user/${currentUser.id}/read-all`, {
+                method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (response.ok) {
-                // Optimistically update UI
-                setNotifications(notifications.map(n => ({ ...n, is_read: true })));
-            }
-        } catch (error) {
-            console.error("Error marking notifications as read:", error);
+        } catch (err) {
+            console.error("Mark all read failed:", err);
+        }
+    };
+
+    const handleViewReport = (report) => {
+        setSelectedReport(report);
+        setReportTimeline([]);
+        setActiveModal('report-details');
+        if (report.id) {
+            fetchReportTimeline(report.id);
+        } else if (report.ticket_id) {
+             // If we only have ticket_id (from public hazards)
+             // We'll need to fetch the full report or just show what we have
+             // For now, let's assume we have the ID or can find it
         }
     };
 
@@ -2274,7 +2827,7 @@ export default function ResidentDashboard() {
         // Mark as read if it's currently unread
         if (!notif.is_read) {
             try {
-                await fetch(`http://localhost:33159/api/notifications/${notif.id}/read`, {
+                await fetch(`${API_BASE_URL}/api/notifications/${notif.id}/read`, {
                     method: 'PATCH',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -2309,15 +2862,18 @@ export default function ResidentDashboard() {
         console.log("PULSO: ResidentDashboard useEffect triggered. currentUser:", currentUser?.id);
         const fetchAdvisories = async () => {
             try {
-                const response = await fetch('http://localhost:33159/api/advisories', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const response = await fetch(`${API_BASE_URL}/api/advisories`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
                 });
-                if (response.ok) {
-                    const data = await response.json();
-                    setLguUpdates(data);
+                const result = await handleApiError(response);
+                if (result.ok) {
+                    setLguUpdates(result.data);
+                } else {
+                    showToast(result.message);
                 }
             } catch (error) {
                 console.error("PULSO: Error fetching advisories:", error);
+                showToast('Failed to load advisories');
             } finally {
                 setLoadingAdvisories(false);
             }
@@ -2328,6 +2884,7 @@ export default function ResidentDashboard() {
                     await fetchUser(currentUser.id);
                     await fetchAdvisories();
                     await fetchUserReports(currentUser.id);
+                    await fetchPublicHazards();
                     await fetchNotifications(currentUser.id);
                 } catch (e) {
                     console.error("PULSO: Error in loadData sequence:", e);
@@ -2341,6 +2898,7 @@ export default function ResidentDashboard() {
     }, [currentUser]);
 
     const [reportNotes, setReportNotes] = useState('');
+    const [locationDescription, setLocationDescription] = useState('');
     const [reportCategory, setReportCategory] = useState([]);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [aiFeedback, setAiFeedback] = useState(null);
@@ -2349,6 +2907,11 @@ export default function ResidentDashboard() {
     const [isSelectingLocation, setIsSelectingLocation] = useState(false);
     const [mapFilter, setMapFilter] = useState('Nearby'); // State for new map UI filter
     const [selectedHazard, setSelectedHazard] = useState(null); // Tracks the clicked map marker
+    const [hazardView, setHazardView] = useState('map'); // 'map' | 'board'
+    const [hazardSearchQuery, setHazardSearchQuery] = useState('');
+    const [hazardFilterStatus, setHazardFilterStatus] = useState('all');
+    const [hazardFilterCategory, setHazardFilterCategory] = useState('all');
+    
 
     const getCategoryColor = (category) => {
         const cat = (category || '').toLowerCase();
@@ -2425,30 +2988,68 @@ export default function ResidentDashboard() {
     const processedHazards = React.useMemo(() => {
         if (!isLoaded) return [];
 
-        const myReportMarkers = (userReports || []).map(r => {
-            const lat = parseFloat(r.location_lat || r.lat);
-            const lng = parseFloat(r.location_lng || r.lng);
-            return {
-                id: r.id || `user-report-${r.ticket_id}`,
-                lat,
-                lng,
-                title: r.description || `Resident Report - ${r.ticket_id}`,
-                category: r.category || r.ai_category || 'Resident Report',
-                status: (r.status || 'pending').toLowerCase(),
-                location: r.location_string || 'N/A'
-            };
-        }).filter(r => !isNaN(r.lat) && !isNaN(r.lng));
+        const myReportMarkers = (userReports || []).map(r => ({
+            ...r,
+            lat: parseFloat(r.location_lat || r.lat),
+            lng: parseFloat(r.location_lng || r.lng)
+        })).filter(r => !isNaN(r.lat) && !isNaN(r.lng));
 
-        // Process only actual user reports from the database
-        return myReportMarkers.map(hazard => {
+        const publicMarkers = (publicHazards || []).map(r => ({
+            ...r,
+            lat: parseFloat(r.location_lat || r.lat),
+            lng: parseFloat(r.location_lng || r.lng),
+            isPublic: true
+        })).filter(r => !isNaN(r.lat) && !isNaN(r.lng));
+
+        // Combine and dedup by ticket_id (in case user's own report is also in public)
+        const combined = [...myReportMarkers];
+        publicMarkers.forEach(pm => {
+            if (!combined.some(cm => cm.ticket_id === pm.ticket_id)) {
+                combined.push(pm);
+            }
+        });
+
+        return combined.map(hazard => {
             const meters = getDistance(reportLocation, { lat: hazard.lat, lng: hazard.lng });
+            
+            // Generate a clean title: Use the beginning of description but remove GPS if it exists
+            let displayTitle = hazard.description || `City Hazard - ${hazard.ticket_id}`;
+            const address = hazard.location_string || hazard.address || 'N/A';
+            
+            // If the title contains the GPS string, let's clean it up for the map view
+            if (displayTitle.includes('(GPS:')) {
+                displayTitle = displayTitle.split('(GPS:')[0].trim();
+                // If it's empty now, fallback to something useful
+                if (!displayTitle) displayTitle = "Citizen Report";
+            }
+
             return {
                 ...hazard,
+                id: hazard.id || `hazard-${hazard.ticket_id}`,
+                title: displayTitle,
+                category: hazard.category || hazard.ai_category || 'General Issue',
+                status: (hazard.status || 'pending').toLowerCase(),
+                location: address,
+                displayAddress: address,
                 dynamicDistance: formatDistance(meters),
                 distanceValue: meters || 999999
             };
         }).sort((a, b) => a.distanceValue - b.distanceValue);
-    }, [reportLocation, userReports, isLoaded]);
+    }, [reportLocation, userReports, publicHazards, isLoaded]);
+
+    // Derived state for filtered hazards in the Board view
+    const displayHazards = React.useMemo(() => {
+        return processedHazards.filter(h => {
+            const matchesSearch = !hazardSearchQuery || 
+                h.title.toLowerCase().includes(hazardSearchQuery.toLowerCase()) || 
+                h.category.toLowerCase().includes(hazardSearchQuery.toLowerCase());
+            
+            const matchesStatus = hazardFilterStatus === 'all' || h.status.toLowerCase() === hazardFilterStatus.toLowerCase();
+            const matchesCategory = hazardFilterCategory === 'all' || h.category.toLowerCase() === hazardFilterCategory.toLowerCase();
+            
+            return matchesSearch && matchesStatus && matchesCategory;
+        });
+    }, [processedHazards, hazardSearchQuery, hazardFilterStatus, hazardFilterCategory]);
 
 
     // Auto-fetch location on mount and periodic updates for proximity tracking
@@ -2627,9 +3228,11 @@ export default function ResidentDashboard() {
     };
 
     const handleAIAnalyze = async () => {
-        if (isAnalyzing) return;
-        setIsAnalyzing(true);
-        try {
+        if (isAnalyzing || isCooldown) return;
+
+        throttleAction(async () => {
+            setIsAnalyzing(true);
+            try {
             const formData = new FormData();
             if (reportNotes) formData.append('description', reportNotes);
 
@@ -2639,7 +3242,7 @@ export default function ResidentDashboard() {
                 formData.append('image', blob, 'analysis.jpg');
             }
 
-            const res = await fetch('http://localhost:33159/api/reports/analyze', {
+            const res = await fetch(`${API_BASE_URL}/api/reports/analyze`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
@@ -2670,7 +3273,8 @@ export default function ResidentDashboard() {
         } finally {
             setIsAnalyzing(false);
         }
-    };
+    }, 3000);
+};
 
 
 
@@ -2682,12 +3286,15 @@ export default function ResidentDashboard() {
         setGeocodingAddress(true);
         try {
             const res = await fetch(
-                `http://localhost:33159/api/geocode/reverse?lat=${lat}&lng=${lng}`,
+                `${API_BASE_URL}/api/geocode/reverse?lat=${lat}&lng=${lng}`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
             if (res.ok) {
                 const data = await res.json();
-                setLocationAddress(data.address);
+                // Standardize: Plus Code | Human Address | Barangay extraction
+                let finalAddress = data.address;
+                // No longer appending home barangay here. maps_service now handles 100% accurate extraction.
+                setLocationAddress(finalAddress);
             }
         } catch (_) {
             setLocationAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
@@ -2697,6 +3304,21 @@ export default function ResidentDashboard() {
     };
 
     const handleFileReport = () => {
+        if (!selectedImage) {
+            showToast('A photo is required before submitting a report.', 'error');
+            return;
+        }
+        if (isAnalyzing) {
+            showToast('Please wait for the AI scan to complete.', 'error');
+            return;
+        }
+        if (!aiFeedback || aiFeedback.category === 'Undetermined' || aiFeedback.category?.toUpperCase().includes('INAPPROPRIATE')) {
+            const errorMsg = aiFeedback?.category?.toUpperCase().includes('INAPPROPRIATE') 
+                ? 'Report blocked: the image contains inappropriate content. Please upload a clear photo of an infrastructure issue.'
+                : 'Report blocked: the image was not identified as a valid infrastructure issue. Please upload a clear photo of the problem.';
+            showToast(errorMsg, 'error');
+            return;
+        }
         if (reportCategory.length === 0) {
             showToast('Please select at least one issue category.', 'error');
             return;
@@ -2705,45 +3327,59 @@ export default function ResidentDashboard() {
     };
 
     const actuallySubmitReport = async () => {
-        setIsSubmitConfirmOpen(false);
-        setSubmittingReport(true);
-        try {
-            const formData = new FormData();
-            formData.append('category', Array.isArray(reportCategory) ? reportCategory.join(', ') : reportCategory);
-            formData.append('description', reportNotes || "Citizen report from PULSO app.");
-            formData.append('lat', reportLocation.lat);
-            formData.append('lng', reportLocation.lng);
-            formData.append('location_string', locationAddress || `Lat: ${reportLocation.lat.toFixed(4)}, Lng: ${reportLocation.lng.toFixed(4)}`);
+        if (isCooldown) return;
 
-            if (selectedImage) {
-                const response = await fetch(selectedImage);
-                const blob = await response.blob();
-                formData.append('image', blob, `report-${Date.now()}.jpg`);
+        throttleAction(async () => {
+            setIsSubmitConfirmOpen(false);
+            setSubmittingReport(true);
+            try {
+                // Build description with location details
+                let fullDescription = reportNotes || "Citizen report from PULSO app.";
+                // Standardized location formatting is handled via the separate location_string field.
+                // We keep the description clean and dedicated to the user's specific notes.
+
+                const formData = new FormData();
+                formData.append('category', Array.isArray(reportCategory) ? reportCategory.join(', ') : reportCategory);
+                formData.append('description', fullDescription);
+                formData.append('lat', reportLocation.lat);
+                formData.append('lng', reportLocation.lng);
+                formData.append('location_string', locationAddress || `Lat: ${reportLocation.lat.toFixed(4)}, Lng: ${reportLocation.lng.toFixed(4)}`);
+
+                if (selectedImage) {
+                    const response = await fetch(selectedImage);
+                    const blob = await response.blob();
+                    // Name the file with GPS coordinates
+                    const latStr = reportLocation.lat.toFixed(6).replaceAll('.', 'p');
+                    const lngStr = reportLocation.lng.toFixed(6).replaceAll('.', 'p');
+                    const filename = `report_${latStr}_${lngStr}_${Date.now()}.jpg`;
+                    formData.append('image', blob, filename);
+                }
+
+                const response = await fetch(`${API_BASE_URL}/api/reports`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    showToast('Report verified and submitted!');
+                    setActiveModal(null);
+                    setActiveTab('reports');
+                    setReportNotes('');
+                    setLocationDescription('');
+                    setSelectedImage(null);
+                    fetchUserReports(currentUser.id);
+                } else {
+                    const errorData = await response.json();
+                    showToast(errorData.detail || 'Failed to submit report', 'error');
+                }
+            } catch (error) {
+                console.error("PULSO: Error submitting report:", error);
+                showToast('Error connecting to server.', 'error');
+            } finally {
+                setSubmittingReport(false);
             }
-
-            const response = await fetch('http://localhost:33159/api/reports', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
-            });
-
-            if (response.ok) {
-                showToast('Report verified and submitted!');
-                setActiveModal(null);
-                setActiveTab('reports');
-                setReportNotes('');
-                setSelectedImage(null);
-                fetchUserReports(currentUser.id);
-            } else {
-                const errorData = await response.json();
-                showToast(errorData.detail || 'Failed to submit report', 'error');
-            }
-        } catch (error) {
-            console.error("PULSO: Error submitting report:", error);
-            showToast('Error connecting to server.', 'error');
-        } finally {
-            setSubmittingReport(false);
-        }
+        }, 5000);
     };
 
     const handleCancelReport = (reportId) => {
@@ -2753,7 +3389,7 @@ export default function ResidentDashboard() {
     const confirmCancelReport = async (reportId) => {
         setReportToCancel(null);
         try {
-            const res = await fetch(`http://localhost:33159/api/reports/${reportId}/cancel`, {
+            const res = await fetch(`${API_BASE_URL}/api/reports/${reportId}/cancel`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -2775,36 +3411,51 @@ export default function ResidentDashboard() {
 
 
     // Real User Data State
-    const [user, setUser] = useState({
-        name: 'Resident',
-        fullName: 'Loading...',
-        barangay: 'Loading...',
-        email: '',
-        phone: '',
-        memberSince: 'Loading...',
-        trustScore: 100,
-        avatar: 'R'
+    const [user, setUser] = useState(() => {
+        const storedUser = localStorage.getItem('pulso_user');
+        const userData = storedUser ? JSON.parse(storedUser) : null;
+        return {
+            name: userData?.full_name ? userData.full_name.split(' ')[0] : 'Resident',
+            fullName: userData?.full_name || 'Resident',
+            email: userData?.email || '',
+            barangay: userData?.barangay || 'Caloocan District',
+            trustScore: userData?.trust_score || 0,
+            reportsCount: 0,
+            avatar: userData?.full_name ? userData.full_name.charAt(0).toUpperCase() : 'R',
+            memberSince: userData?.created_at ? new Date(userData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—',
+            address: userData?.address || '',
+            phone: userData?.phone_number || ''
+        };
     });
     const [updatingProfile, setUpdatingProfile] = useState(false);
 
     const fetchUser = async (userId) => {
         try {
-            const response = await fetch(`http://localhost:33159/api/users/${userId}`, {
+            const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
                 const data = await response.json();
-                setUser({
+                const userData = {
                     name: data.full_name ? data.full_name.split(' ')[0] : 'Resident',
                     fullName: data.full_name || '',
-                    address: data.address || '',
-                    barangay: data.barangay || '',
                     email: data.email || '',
-                    phone: data.phone_number || '', // Mapped to phone_number
-                    memberSince: new Date(data.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-                    trustScore: data.trust_score || 100,
-                    avatar: data.full_name ? data.full_name.charAt(0).toUpperCase() : 'R'
-                });
+                    barangay: data.barangay || 'Caloocan District',
+                    trustScore: data.trust_score || 0,
+                    reportsCount: user.reportsCount, // Keep current count, updated in fetchUserReports
+                    avatar: data.full_name ? data.full_name.charAt(0).toUpperCase() : 'R',
+                    memberSince: data.created_at ? new Date(data.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—',
+                    address: data.address || '',
+                    phone: data.phone_number || ''
+                };
+                setUser(userData);
+                
+                // Sync back to currentUser/localStorage if significant update
+                if (data.full_name !== currentUser.full_name || data.barangay !== currentUser.barangay) {
+                    const upUser = { ...currentUser, ...data };
+                    setCurrentUser(upUser);
+                    localStorage.setItem('pulso_user', JSON.stringify(upUser));
+                }
             }
         } catch (error) {
             console.error("PULSO: Error fetching user data:", error);
@@ -2818,7 +3469,7 @@ export default function ResidentDashboard() {
             if (field === 'email') payload.email = value;
             if (field === 'phone') payload.phone_number = value;
 
-            const response = await fetch(`http://localhost:33159/api/users/${currentUser.id}`, {
+            const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2853,16 +3504,17 @@ export default function ResidentDashboard() {
 
     const handleResidentAIChat = async (e) => {
         e.preventDefault();
-        if (!aiQuery.trim() || isAILoading) return;
+        if (!aiQuery.trim() || isAILoading || isCooldown) return;
 
-        const userMsg = { role: 'user', text: aiQuery };
-        setAiMessages(prev => [...prev, userMsg]);
-        const captured = aiQuery;
-        setAiQuery('');
-        setIsAILoading(true);
+        throttleAction(async () => {
+            const captured = aiQuery;
+            const userMsg = { role: 'user', text: captured };
+            setAiMessages(prev => [...prev, userMsg]);
+            setAiQuery('');
+            setIsAILoading(true);
 
         try {
-            const resp = await fetch('http://localhost:33159/api/ai/assistant', {
+            const resp = await fetch(`${API_BASE_URL}/api/ai/assistant`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
@@ -2878,7 +3530,8 @@ export default function ResidentDashboard() {
             setIsAILoading(false);
             setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         }
-    };
+    }, 4000);
+};
 
     useEffect(() => {
         const handleOffline = () => setIsOffline(true);
@@ -2945,56 +3598,24 @@ export default function ResidentDashboard() {
 
             {/* Render Overlay Modals */}
             <ResidentModals
-                activeModal={activeModal}
-                setActiveModal={setActiveModal}
+                activeModal={activeModal} setActiveModal={setActiveModal} selectedPost={selectedPost} setSelectedPost={setSelectedPost} isLoaded={isLoaded} map={map} setMap={setMap} panorama={panorama} setPanorama={setPanorama} reportLocation={reportLocation} setReportLocation={setReportLocation}
+                locationAddress={locationAddress} geocodingAddress={geocodingAddress} reportCategory={reportCategory} setReportCategory={setReportCategory} reportNotes={reportNotes} setReportNotes={setReportNotes} selectedImage={selectedImage} setSelectedImage={setSelectedImage}
+                submittingReport={submittingReport} handleFileReport={handleFileReport} isSelectingLocation={isSelectingLocation} setIsSelectingLocation={setIsSelectingLocation} isIDCameraOpen={isIDCameraOpen} setIsIDCameraOpen={setIsIDCameraOpen} checkJurisdiction={checkJurisdiction}
+                reverseGeocode={reverseGeocode} mapOptions={mapOptions} pulseRadius={pulseRadius} processedHazards={processedHazards} displayHazards={displayHazards} selectedHazard={selectedHazard} setSelectedHazard={setSelectedHazard} 
+                hazardView={hazardView} setHazardView={setHazardView} hazardSearchQuery={hazardSearchQuery} setHazardSearchQuery={setHazardSearchQuery} hazardFilterStatus={hazardFilterStatus} setHazardFilterStatus={setHazardFilterStatus}
+                hazardFilterCategory={hazardFilterCategory} setHazardFilterCategory={setHazardFilterCategory}
+                svLocation={svLocation} handleStreetViewClick={handleStreetViewClick}
+                getIconForCategory={getIconForCategory} getMarkerSVG={getMarkerSVG} getCategoryColor={getCategoryColor} mapFilter={mapFilter} setMapFilter={setMapFilter}
+                isAnalyzing={isAnalyzing} aiFeedback={aiFeedback} setAiFeedback={setAiFeedback} fileInputRef={fileInputRef} handleFileSelect={handleFileSelect}
+                reportToCancel={reportToCancel} setReportToCancel={setReportToCancel} confirmCancelReport={confirmCancelReport}
+                isSubmitConfirmOpen={isSubmitConfirmOpen} setIsSubmitConfirmOpen={setIsSubmitConfirmOpen} actuallySubmitReport={actuallySubmitReport}
+                locationDescription={locationDescription} setLocationDescription={setLocationDescription}
+                isCooldown={isCooldown}
+                selectedReport={selectedReport} setSelectedReport={setSelectedReport}
+                reportTimeline={reportTimeline} loadingTimeline={loadingTimeline}
+                onLoad={onLoad}
                 t={t}
-                selectedPost={selectedPost}
-                setSelectedPost={setSelectedPost}
-                isLoaded={isLoaded}
-                map={map}
-                setMap={setMap}
-                panorama={panorama}
-                setPanorama={setPanorama}
-                reportLocation={reportLocation}
-                setReportLocation={setReportLocation}
-                locationAddress={locationAddress}
-                geocodingAddress={geocodingAddress}
-                reportCategory={reportCategory}
-                setReportCategory={setReportCategory}
-                reportNotes={reportNotes}
-                setReportNotes={setReportNotes}
-                selectedImage={selectedImage}
-                setSelectedImage={setSelectedImage}
-                submittingReport={submittingReport}
-                handleFileReport={handleFileReport}
-                isSelectingLocation={isSelectingLocation}
-                setIsSelectingLocation={setIsSelectingLocation}
-                isIDCameraOpen={isIDCameraOpen}
-                setIsIDCameraOpen={setIsIDCameraOpen}
-                checkJurisdiction={checkJurisdiction}
-                reverseGeocode={reverseGeocode}
-                mapOptions={mapOptions}
-                pulseRadius={pulseRadius}
-                processedHazards={processedHazards}
-                selectedHazard={selectedHazard}
-                setSelectedHazard={setSelectedHazard}
-                svLocation={svLocation}
-                handleStreetViewClick={handleStreetViewClick}
-                getIconForCategory={getIconForCategory}
-                getMarkerSVG={getMarkerSVG}
-                getCategoryColor={getCategoryColor}
-                mapFilter={mapFilter}
-                setMapFilter={setMapFilter}
-                isAnalyzing={isAnalyzing}
-                aiFeedback={aiFeedback}
-                fileInputRef={fileInputRef}
-                handleFileSelect={handleFileSelect}
-                reportToCancel={reportToCancel}
-                setReportToCancel={setReportToCancel}
-                confirmCancelReport={confirmCancelReport}
-                isSubmitConfirmOpen={isSubmitConfirmOpen}
-                setIsSubmitConfirmOpen={setIsSubmitConfirmOpen}
-                actuallySubmitReport={actuallySubmitReport}
+                currentUser={currentUser}
             />
 
             {activeModal === 'all-notifications' && (
@@ -3058,7 +3679,7 @@ export default function ResidentDashboard() {
                                                             e.stopPropagation();
                                                             setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_hidden: true } : n));
                                                             try {
-                                                                await fetch(`http://localhost:33159/api/notifications/${notif.id}`, {
+                                                                await fetch(`${API_BASE_URL}/api/notifications/${notif.id}`, {
                                                                     method: 'DELETE',
                                                                     headers: { 'Authorization': `Bearer ${token}` }
                                                                 });
@@ -3082,7 +3703,7 @@ export default function ResidentDashboard() {
             )}
 
             {/* Top Navigation */}
-            <TopNavigation
+            <TopNavigation 
                 activeTab={activeTab}
                 handleSetTab={handleSetTab}
                 handleSetModal={handleSetModal}
@@ -3134,6 +3755,7 @@ export default function ResidentDashboard() {
                             <aside className="w-[280px] lg:w-[300px] xl:w-[320px] shrink-0 hidden md:block h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar">
                                 <LeftSidebar
                                     user={user}
+                                    activeTab={activeTab}
                                     handleSetTab={handleSetTab}
                                     handleSetModal={handleSetModal}
                                     t={t}
@@ -3348,10 +3970,10 @@ export default function ResidentDashboard() {
                                         />
                                         <button
                                             type="submit"
-                                            disabled={isAILoading}
-                                            className="w-10 h-10 rounded-xl bg-blue-800 hover:bg-blue-700 flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0"
+                                            disabled={isAILoading || isCooldown}
+                                            className={`w-10 h-10 rounded-xl flex items-center justify-center text-white transition-colors shrink-0 ${isCooldown ? 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed' : 'bg-blue-800 hover:bg-blue-700'}`}
                                         >
-                                            <Search size={16} />
+                                            {isCooldown ? <Clock size={16} /> : <Search size={16} />}
                                         </button>
                                     </div>
                                 </form>
@@ -3415,4 +4037,4 @@ export default function ResidentDashboard() {
             </AnimatePresence>
         </div>
     );
-}
+} 

@@ -1,23 +1,23 @@
-import sqlite3
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+import models, database
 import os
 
-db_path = 'pulso.db'
-if not os.path.exists(db_path):
-    print(f"DB not found at {db_path}")
-    exit(1)
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/pulso_db")
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
+db = SessionLocal()
 
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
-
-email = 'tabios.gcncbssis2023@gmail.com'
-cursor.execute("SELECT id, email, is_verified, verification_code FROM users WHERE email = ?", (email,))
-results = cursor.fetchall()
-
-print(f"Checking {email}:")
-if results:
-    for row in results:
-        print(f"ID: {row[0]}, Email: {row[1]}, Verified: {row[2]}, Code: {row[3]}")
+user = db.query(models.Resident).filter(models.Resident.email == 'johnemmanuelnalang1@gmail.com').first()
+if user:
+    print(f"ID: {user.id}")
+    print(f"Full Name: {user.full_name}")
+    print(f"Address: {user.address}")
+    print(f"Barangay ID: {user.barangay_id}")
+    if user.barangay_ref:
+        print(f"Barangay Name: {user.barangay_ref.name}")
+    else:
+        print("Barangay Ref: None")
 else:
-    print("Email not found in database.")
-
-conn.close()
+    print("User not found")
+db.close()

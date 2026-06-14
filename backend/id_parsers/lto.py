@@ -51,10 +51,12 @@ class LTOParser(BaseIDParser):
 
         return result
 
+
     def _extract_lto_names(self, lines: List[str], upper: str) -> Tuple[str, str, str]:
         """
         LTO name format: LASTNAME, FIRSTNAME MIDDLENAME
         Rule: Split on first comma.
+        Falls back to generic label extraction if no comma found.
         """
         # Strategy 1: Look for a line containing a comma that isn't just a label
         for line in lines:
@@ -94,6 +96,12 @@ class LTOParser(BaseIDParser):
                         middle_name = ' '.join(words[1:]).title() if len(words) > 1 else ''
                         if last_name and first_name:
                             return first_name, last_name, middle_name
+
+        # Strategy 2: Fallback to generic label-based extraction
+        # Handles cases where OCR drops the comma or name is on separate lines
+        fn, ln, mn = self._extract_names(lines, upper)
+        if fn and ln:
+            return fn, ln, mn
 
         return '', '', ''
 

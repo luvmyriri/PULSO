@@ -74,7 +74,7 @@ class PhilIDParser(BaseIDParser):
         # ----------------------------------------------------------------
         # 1. PCN — 16-digit PhilSys Card Number
         # ----------------------------------------------------------------
-        pcn_m = re.search(r'\b(\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4})\b', full_upper)
+        pcn_m = re.search(r'\b(\d{4}-\d{4}-\d{4}-\d{4})\b', full_upper)
         if pcn_m:
             result['pcn'] = re.sub(r'\s', '-', pcn_m.group(1))
             

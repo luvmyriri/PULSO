@@ -8,6 +8,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import Branding from '../components/Branding';
 import ErrorBoundary from '../components/ErrorBoundary';
 
+import { API_BASE_URL } from '../utils/apiBase';
+import { useInteractionHarden } from '../hooks/useInteractionHarden';
+
 export default function GovLanding() {
     const { theme, changeTheme } = useTheme();
     const navigate = useNavigate();
@@ -15,7 +18,7 @@ export default function GovLanding() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const { throttleAction, isProcessing: loading } = useInteractionHarden();
     const [view, setView] = useState('login'); // 'login' or 'forgot'
     const [recoverySent, setRecoverySent] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -57,90 +60,89 @@ export default function GovLanding() {
         e.preventDefault();
         if (!captchaToken) {
             setError('Please complete the security puzzle to proceed.');
-            setLoading(false);
             return;
         }
 
-        try {
-            const formData = new URLSearchParams();
-            formData.append('username', email);
-            formData.append('password', password);
-            formData.append('captcha_token', captchaToken || '');
+        await throttleAction(async () => {
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', email);
+                formData.append('password', password);
+                formData.append('captcha_token', captchaToken || '');
 
-            const response = await fetch('http://localhost:33159/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData
-            });
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData
+                });
 
-            if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem('pulso_token', data.access_token);
-                localStorage.setItem('pulso_user', JSON.stringify(data.user));
-                
-                const GOV_ROLES = [
-                    'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
-                    'records_officer','division_chief','design_engineer','estimator',
-                    'cad_operator','project_engineer','construction_foreman','field_worker',
-                    'building_inspector','electrical_inspector','mechanical_inspector',
-                    'dispatcher','manager','system_admin',
-                ];
-                if (GOV_ROLES.includes(data.user.role)) {
-                    navigate('/gov/my-dashboard');
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('pulso_token', data.access_token);
+                    localStorage.setItem('pulso_user', JSON.stringify(data.user));
+                    
+                    const GOV_ROLES = [
+                        'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
+                        'records_officer','division_chief','design_engineer','estimator',
+                        'cad_operator','project_engineer','construction_foreman','field_worker',
+                        'building_inspector','electrical_inspector','mechanical_inspector',
+                        'dispatcher','manager','system_admin',
+                    ];
+                    if (GOV_ROLES.includes(data.user.role)) {
+                        navigate('/gov/my-dashboard');
+                    } else {
+                        setError('Authorized Government Personnel Only. Citizens please use the Citizen Portal.');
+                        localStorage.removeItem('pulso_token');
+                        localStorage.removeItem('pulso_user');
+                        if (recaptchaRef.current) recaptchaRef.current.reset();
+                        setCaptchaToken(null);
+                    }
                 } else {
-                    setError('Authorized Government Personnel Only. Citizens please use the Citizen Portal.');
-                    localStorage.removeItem('pulso_token');
-                    localStorage.removeItem('pulso_user');
-                    setLoading(false);
+                    const errData = await response.json();
+                    const msg = typeof errData.detail === 'object' 
+                        ? (Array.isArray(errData.detail) ? errData.detail[0].msg : JSON.stringify(errData.detail))
+                        : errData.detail;
+                    setError(msg || 'Authentication failed');
                     if (recaptchaRef.current) recaptchaRef.current.reset();
                     setCaptchaToken(null);
                 }
-            } else {
-                const errData = await response.json();
-                const msg = typeof errData.detail === 'object' 
-                    ? (Array.isArray(errData.detail) ? errData.detail[0].msg : JSON.stringify(errData.detail))
-                    : errData.detail;
-                setError(msg || 'Authentication failed');
-                if (recaptchaRef.current) recaptchaRef.current.reset();
-                setCaptchaToken(null);
+            } catch (err) {
+                setError('System Connectivity Error');
+                throw err; // Re-throw to let throttleAction handle isProcessing finally
             }
-        } catch (err) {
-            setError('System Connectivity Error');
-        } finally {
-            setLoading(false);
-        }
+        }, 2000); // 2 second throttle between clicks
     };
 
     const handleRecovery = async (e) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
         
-        try {
-            const response = await fetch('http://localhost:33159/api/auth/forgot-password', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email: recoveryEmail })
-            });
+        await throttleAction(async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email: recoveryEmail })
+                });
 
-            if (response.ok) {
-                setRecoverySent(true);
-            } else {
-                const data = await response.json();
-                const msg = typeof data.detail === 'object' 
-                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
-                    : data.detail;
-                setError(msg || 'Recovery failed. Internal protocol error.');
+                if (response.ok) {
+                    setRecoverySent(true);
+                } else {
+                    const data = await response.json();
+                    const msg = typeof data.detail === 'object' 
+                        ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                        : data.detail;
+                    setError(msg || 'Recovery failed. Internal protocol error.');
+                }
+            } catch (err) {
+                setError('System Connectivity Error');
+                throw err;
             }
-        } catch (err) {
-            setError('System Connectivity Error');
-        } finally {
-            setLoading(false);
-        }
+        }, 3000); // 3 second throttle for recovery requests (DB protection)
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -538,7 +540,7 @@ export default function GovLanding() {
                                                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">{dir.author} • {dir.date}</p>
                                                     </div>
                                                 </div>
-                                                <button className="flex items-center gap-2 text-[10px] font-black text-orange-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button className="flex items-center gap-2 text-[10px] font-black text-orange-600 uppercase tracking-widest transition-opacity">
                                                     View PDF <ExternalLink size={14} />
                                                 </button>
                                             </div>

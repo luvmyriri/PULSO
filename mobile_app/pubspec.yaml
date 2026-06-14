@@ -1,5 +1,5 @@
 name: pulso_mobile
-description: "A new Flutter project."
+description: "PULSO Mobile - Citizen reporting app for Caloocan City residents."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -37,6 +37,7 @@ dependencies:
   google_fonts: ^8.0.2
   http: ^1.6.0
   dio: ^5.7.0
+  flutter_animate: ^4.5.2
   animate_do: ^4.2.0
   flutter_svg: ^2.2.4
   font_awesome_flutter: ^11.0.0
@@ -44,18 +45,30 @@ dependencies:
   url_launcher: ^6.1.14
   provider: ^6.1.2
   image_picker: ^1.1.2
-  camera: ^0.10.6
+  camera: ^0.11.1
+  geolocator: ^13.0.2
+  google_maps_flutter: ^2.10.0
   intl: ^0.20.2
   path_provider: ^2.1.5
   path: ^1.9.1
   flutter_localizations:
     sdk: flutter
+  shared_preferences: ^2.3.5
+  json_annotation: ^4.9.0
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^3.0.0
+  build_runner: ^2.4.15
+  json_serializable: ^6.9.4
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/images/pulso-logo.png"
 
 flutter:
   generate: true

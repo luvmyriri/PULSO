@@ -12,6 +12,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import Branding from '../components/Branding';
 import ErrorBoundary from '../components/ErrorBoundary';
 
+import { API_BASE_URL } from '../utils/apiBase';
+import { useInteractionHarden } from '../hooks/useInteractionHarden';
+
 export default function Login() {
     const { theme, changeTheme } = useTheme();
     const navigate = useNavigate();
@@ -19,7 +22,7 @@ export default function Login() {
     const [password, setPassword]         = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError]               = useState('');
-    const [loading, setLoading]           = useState(false);
+    const { isProcessing, throttleAction } = useInteractionHarden();
     const [captchaValue, setCaptchaValue] = useState(null);
     const [showCaptcha, setShowCaptcha]   = useState(false);
     const [view, setView]                 = useState('login'); // 'login' | 'forgot'
@@ -81,125 +84,123 @@ export default function Login() {
 
     /* ── Auth handlers ──────────────────────────────────────────────────── */
     const handleLogin = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
+        if (e) e.preventDefault();
+        
+        await throttleAction(async () => {
+            setError('');
 
-        if (!captchaValue) {
-            setError('Please complete the security puzzle to proceed.');
-            setLoading(false);
-            return;
-        }
-
-        try {
-            const formData = new URLSearchParams();
-            formData.append('username', email);
-            formData.append('password', password);
-            formData.append('captcha_token', captchaValue);
-
-            const response = await fetch('http://localhost:33159/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData,
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                // If the backend still asks for captcha (edge case), we show error
-                if (data.require_captcha) {
-                    setError('Security challenge required. Please try again.');
-                    setLoading(false);
-                    return;
-                }
-
-                if (data.user.role !== 'resident') {
-                    setError('This portal is for residents only. Authorized personnel please use the Government Gateway.');
-                    setLoading(false);
-                    return;
-                }
-
-                localStorage.setItem('pulso_token', data.access_token);
-                localStorage.setItem('pulso_user', JSON.stringify(data.user));
-                navigate('/dashboard');
-            } else {
-                if (response.status === 403 && data.detail.includes("Account not verified")) {
-                    setVerificationEmail(email);
-                    setVerificationOtp(['', '', '', '', '', '']);
-                    setView('verify');
-                    setResendTimer(60);
-                    setCanResend(false);
-                    return;
-                }
-                const msg = typeof data.detail === 'object' 
-                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
-                    : data.detail;
-                setError(msg || 'Authentication failed');
+            if (!captchaValue) {
+                setError('Please complete the security puzzle to proceed.');
+                return;
             }
-        } catch {
-            setError('Network error. Is the backend running?');
-        } finally {
-            setLoading(false);
-        }
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', email);
+                formData.append('password', password);
+                formData.append('captcha_token', captchaValue);
+
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.require_captcha) {
+                        setError('Security challenge required. Please try again.');
+                        return;
+                    }
+
+                    if (data.user.role !== 'resident') {
+                        setError('This portal is for residents only. Authorized personnel please use the Government Gateway.');
+                        return;
+                    }
+
+                    localStorage.setItem('pulso_token', data.access_token);
+                    localStorage.setItem('pulso_user', JSON.stringify(data.user));
+                    navigate('/dashboard');
+                } else {
+                    if (response.status === 403 && data.detail.includes("Account not verified")) {
+                        setVerificationEmail(email);
+                        setVerificationOtp(['', '', '', '', '', '']);
+                        setView('verify');
+                        setResendTimer(60);
+                        setCanResend(false);
+                        return;
+                    }
+                    const msg = typeof data.detail === 'object' 
+                        ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                        : data.detail;
+                    setError(msg || 'Authentication failed');
+                }
+            } catch {
+                setError('Network error. Is the backend running?');
+                throw new Error('Network error'); // Re-throw for throttleAction to catch if needed
+            }
+        }, 2000);
     };
 
     const handleRecovery = async (e) => {
         if (e) e.preventDefault();
-        setLoading(true);
-        setError('');
-        setRecoveryOtp(['', '', '', '', '', '']); // Clear previous inputs for security synchronization
-        try {
-            const response = await fetch('http://localhost:33159/api/auth/forgot-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: recoveryEmail }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                setRecoveryRefId(data.reference_id);
-                setRecoveryStep(2);
-                setResendTimer(60);
-                setCanResend(false);
-            } else {
-                const msg = typeof data.detail === 'object' 
-                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
-                    : data.detail;
-                setError(msg || 'Recovery request failed.');
+        
+        await throttleAction(async () => {
+            setError('');
+            setRecoveryOtp(['', '', '', '', '', '']); 
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: recoveryEmail }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    setRecoveryRefId(data.reference_id);
+                    setRecoveryStep(2);
+                    setResendTimer(60);
+                    setCanResend(false);
+                } else {
+                    const msg = typeof data.detail === 'object' 
+                        ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                        : data.detail;
+                    setError(msg || 'Recovery request failed.');
+                }
+            } catch {
+                setError('Network error. Please try again.');
+                throw new Error('Network error');
             }
-        } catch {
-            setError('Network error. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+        }, 3000);
     };
 
     const handleVerifyCode = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        setError('');
-        try {
-            const response = await fetch('http://localhost:33159/api/auth/verify-reset-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: recoveryEmail,
-                    code: recoveryOtp.join('')
-                }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                setRecoveryStep(3);
-            } else {
-                const msg = typeof data.detail === 'object' 
-                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
-                    : data.detail;
-                setError(msg || 'Identity verification failed: Invalid code.');
+        await throttleAction(async () => {
+            setError('');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/verify-reset-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: recoveryEmail,
+                        code: recoveryOtp.join('')
+                    }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    setRecoveryStep(3);
+                } else {
+                    const msg = typeof data.detail === 'object' 
+                        ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                        : data.detail;
+                    setError(msg || 'Identity verification failed: Invalid code.');
+                }
+            } catch {
+                setError('System error. Please try again.');
+                throw new Error('System error');
             }
-        } catch {
-            setError('System error. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+        }, 3000);
     };
 
     const handleResetPassword = async (e) => {
@@ -209,85 +210,85 @@ export default function Login() {
             return;
         }
 
-        setLoading(true);
-        setError('');
-        try {
-            const response = await fetch('http://localhost:33159/api/auth/reset-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: recoveryEmail,
-                    code: recoveryOtp.join(''),
-                    new_password: newPassword
-                }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                setRecoverySent(true);
-            } else {
-                const msg = typeof data.detail === 'object' 
-                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
-                    : data.detail;
-                setError(msg || 'Identity verification failed.');
+        await throttleAction(async () => {
+            setError('');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: recoveryEmail,
+                        code: recoveryOtp.join(''),
+                        new_password: newPassword
+                    }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    setRecoverySent(true);
+                } else {
+                    const msg = typeof data.detail === 'object' 
+                        ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                        : data.detail;
+                    setError(msg || 'Identity verification failed.');
+                }
+            } catch (err) {
+                setError('System error. Please try again.');
+                throw err;
             }
-        } catch (err) {
-            setError('System error. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+        }, 3000);
     };
 
     const handleVerifyRegistration = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        setError('');
-        try {
-            const response = await fetch('http://localhost:33159/api/auth/verify-registration', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: verificationEmail,
-                    code: verificationOtp.join('')
-                }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                setVerificationSuccess(true);
-                setError('');
-            } else {
-                const msg = typeof data.detail === 'object' 
-                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
-                    : data.detail;
-                setError(msg || 'Verification failed: Invalid code.');
+        await throttleAction(async () => {
+            setError('');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/verify-registration`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: verificationEmail,
+                        code: verificationOtp.join('')
+                    }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    setVerificationSuccess(true);
+                    setError('');
+                } else {
+                    const msg = typeof data.detail === 'object' 
+                        ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                        : data.detail;
+                    setError(msg || 'Verification failed: Invalid code.');
+                }
+            } catch {
+                setError('System error. Please try again.');
+                throw new Error('System error');
             }
-        } catch {
-            setError('System error. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+        }, 3000);
     };
 
     const handleResendRegistrationCode = async () => {
         if (!canResend) return;
-        setLoading(true);
-        setError('');
-        try {
-            const response = await fetch('http://localhost:33159/api/auth/resend-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: verificationEmail, code: "" }), // code is optional/not-used here in resend
-            });
-            if (response.ok) {
-                setResendTimer(60);
-                setCanResend(false);
-            } else {
-                setError('Failed to resend code.');
+        await throttleAction(async () => {
+            setError('');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/resend-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: verificationEmail, code: "" }), // code is optional/not-used here in resend
+                });
+                if (response.ok) {
+                    setResendTimer(60);
+                    setCanResend(false);
+                } else {
+                    setError('Failed to resend code.');
+                }
+            } catch {
+                setError('Network error.');
+                throw new Error('Network error');
             }
-        } catch {
-            setError('Network error.');
-        } finally {
-            setLoading(false);
-        }
+        }, 5000);
     };
 
     const handleOtpChange = (index, value, isVerification = false) => {
@@ -512,10 +513,10 @@ export default function Login() {
 
                                                 <button
                                                     type="submit"
-                                                    disabled={loading}
+                                                    disabled={isProcessing}
                                                     className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-orange-600/20 flex items-center justify-center gap-3 group disabled:opacity-50"
                                                 >
-                                                    {loading ? (
+                                                    {isProcessing ? (
                                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                                     ) : (
                                                         <>
@@ -608,10 +609,10 @@ export default function Login() {
 
                                                         <button
                                                             type="submit"
-                                                            disabled={loading || verificationOtp.join('').length < 6}
+                                                            disabled={isProcessing || verificationOtp.join('').length < 6}
                                                             className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-orange-600/20 flex items-center justify-center gap-3 group disabled:opacity-50"
                                                         >
-                                                            {loading ? (
+                                                            {isProcessing ? (
                                                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                                             ) : (
                                                                 <>
@@ -630,7 +631,7 @@ export default function Login() {
                                                                 <button 
                                                                     type="button"
                                                                     onClick={handleResendRegistrationCode}
-                                                                    disabled={loading || !canResend}
+                                                                    disabled={isProcessing || !canResend}
                                                                     className="text-[10px] font-black text-orange-600 hover:text-orange-500 uppercase tracking-[0.2em] transition-colors flex items-center gap-2 mx-auto decoration-2 underline-offset-4 hover:underline"
                                                                 >
                                                                     Resend Official Code
@@ -709,8 +710,8 @@ export default function Login() {
                                                                         <input type="email" value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white/5 block pl-12 p-4 transition-all shadow-inner" placeholder="your@email.com" required />
                                                                     </div>
                                                                 </div>
-                                                                <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3 shadow-xl shadow-orange-600/20">
-                                                                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>Verify Email <ChevronRight size={18} /></>}
+                                                                <button type="submit" disabled={isProcessing} className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3 shadow-xl shadow-orange-600/20">
+                                                                    {isProcessing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>Verify Email <ChevronRight size={18} /></>}
                                                                 </button>
                                                             </form>
                                                         </>
@@ -735,8 +736,8 @@ export default function Login() {
                                                                     ))}
                                                                 </div>
 
-                                                                <button type="submit" disabled={loading || recoveryOtp.join('').length < 6} className="w-full bg-orange-600 hover:bg-orange-500 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-orange-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">
-                                                                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Verify Code'}
+                                                                <button type="submit" disabled={isProcessing || recoveryOtp.join('').length < 6} className="w-full bg-orange-600 hover:bg-orange-500 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-orange-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                                                    {isProcessing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Verify Code'}
                                                                 </button>
 
                                                                 <div className="text-center mt-6 min-h-[32px] flex items-center justify-center">
@@ -748,11 +749,11 @@ export default function Login() {
                                                                         <button 
                                                                             type="button"
                                                                             onClick={handleRecovery}
-                                                                            disabled={loading || !canResend}
+                                                                            disabled={isProcessing || !canResend}
                                                                             className="text-[11px] font-black text-orange-600 hover:text-orange-500 uppercase tracking-widest transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
                                                                         >
-                                                                            {loading ? <div className="w-3 h-3 border-2 border-orange-600/30 border-t-orange-600 rounded-full animate-spin" /> : null}
-                                                                            {loading ? 'Sending...' : 'Resend Verification Code'}
+                                                                            {isProcessing ? <div className="w-3 h-3 border-2 border-orange-600/30 border-t-orange-600 rounded-full animate-spin" /> : null}
+                                                                            {isProcessing ? 'Sending...' : 'Resend Verification Code'}
                                                                         </button>
                                                                     )}
                                                                 </div>
@@ -822,8 +823,8 @@ export default function Login() {
                                                                     </div>
                                                                 </div>
 
-                                                                <button type="submit" disabled={loading || newPassword.length < 6} className="w-full bg-orange-600 hover:bg-orange-500 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-orange-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">
-                                                                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Finalize Update'}
+                                                                <button type="submit" disabled={isProcessing || newPassword.length < 6} className="w-full bg-orange-600 hover:bg-orange-500 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-orange-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                                                    {isProcessing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Finalize Update'}
                                                                 </button>
                                                             </form>
                                                         </>

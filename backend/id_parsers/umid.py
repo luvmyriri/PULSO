@@ -44,16 +44,14 @@ class UMIDParser(BaseIDParser):
         sss_match = re.search(r'\b(\d{2}-\d{7}-\d)\b', upper)
         if sss_match: result['sss_no'] = sss_match.group(1)
         
-        gsis_match = re.search(r'\b(\d{11})\b', upper)
-        if gsis_match and not result['crn']: # CRN is priority for 12 digits, but GSIS is 11
+        # Guard: only match 11-digit GSIS number when no CRN (12-digit) was found
+        # Use strict word boundary to avoid matching inside longer digit sequences
+        gsis_match = re.search(r'(?<!\d)(\d{11})(?!\d)', upper)
+        if gsis_match and not result['crn'] and not result['sss_no']:
              result['gsis_no'] = gsis_match.group(1)
 
-        # 4. DOB: MM-DD-YYYY
-        dob_iso = self._extract_dob(upper)
-        if dob_iso:
-             # Convert YYYY-MM-DD to MM-DD-YYYY as requested
-             y, m, d = dob_iso.split('-')
-             result['dob'] = f"{m}-{d}-{y}"
+        # 4. DOB: ISO YYYY-MM-DD
+        result['dob'] = self._extract_dob(upper)
         
         result['sex']      = self._extract_sex(upper)
         result['address']  = self._extract_address(lines, upper)
