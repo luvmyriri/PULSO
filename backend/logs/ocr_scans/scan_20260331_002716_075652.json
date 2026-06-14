@@ -1,0 +1,25 @@
+{
+    "timestamp": "2026-03-31T00:27:16.076649",
+    "raw_text": "REPUBLIKA NG PILIPINAS\nRepublic of the Philippines\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine National ID\n2482-9763-7465-3250\nTIRAHAN/ADDRESS\nAPELYIDO/LAST NAME\nLAMSEN\nMGA PANGALAN/GIVEN NAMES\nVAL JAVEZ\nGITNANG APELYIDO/MIDDLE NAME\nMARQUEZ\nPETSA NG KAPANGANAKAN/DATE OF BIRTH\nApril 28, 2005\nBLDG. D UNIT 224 CAMARIN RESIDENCES I CAMARIN,\nBARANGAY 175, CITY OF CALOOCAN, NCR, THIRD\nDISTRICT, PHILIPPINES, 1422\nDIGITAL ID NUMBER\nBYN5641\nJoe My\nPHL\nKasarian/Sex\nMALE\nUri ng Dugo/Blood Type\nUNKNOWN\nKalagayang Sibil/Marital Status\nSINGLE\nLugar ng Kapanganakan/Place of Birth\nCITY OF MANILA",
+    "parsed_data": {
+        "id_type": "philid",
+        "id_type_label": "Philippine National ID",
+        "first_name": "Val Javez",
+        "last_name": "Lamsen",
+        "middle_name": "Marquez",
+        "dob": "2005-04-28",
+        "sex": "Male",
+        "address": "BLDG. D UNIT 224 CAMARIN RESIDENCES I CAMARIN, BARANGAY 175, CITY OF CALOOCAN, NCR, THIRD DISTRICT, PHILIPPINES, 1422",
+        "house_no": "",
+        "block_lot": "",
+        "subdivision": "Bldg. D Unit 224 Camarin Residences",
+        "street": "I Camarin",
+        "barangay": "Barangay 175",
+        "postal_code": "1422",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 175).",
+        "pcn": "2482-9763-7465-3250",
+        "is_document_mismatch": false,
+        "mismatch_reason": ""
+    }
+}

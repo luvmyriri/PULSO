@@ -2,83 +2,83 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Brand Colors (Synced with Web)
-  static const Color primaryOrange = Color(0xFFF97316); // --color-primary
-  static const Color primaryOrangeLight = Color(0xFFFDBA74); // --color-primary-light
-  static const Color primaryOrangeDark = Color(0xFFEA580C); // --color-primary-dark
-  static const Color primaryDark = Color(0xFF0F172A); // --color-dark
-  static const Color secondaryDark = Color(0xFF1E293B); // --color-dark-light
-  static const Color accentBlue = Color(0xFF38BDF8);
+  static const Color primaryOrange = Color(0xFFFF6600);
+  static const Color primaryLight = Color(0xFFFFA366);
+  static const Color primaryDark = Color(0xFFCC5200);
+  static const Color primaryOrangeLight = Color(0xFFFFAA80);
+
+  static const Color darkSlate = Color(0xFF0F172A);
+  static const Color darkSlateLight = Color(0xFF1E293B);
+
+  static const Color lightGray = Color(0xFFF8FAFC);
+
   static const Color errorRed = Color(0xFFEF4444);
+  static const Color successGreen = Color(0xFF22C55E);
+  static const Color warningYellow = Color(0xFFEAB308);
+  static const Color infoBlue = Color(0xFF3B82F6);
 
-  static ThemeData get darkTheme {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: primaryDark,
-      colorScheme: const ColorScheme.dark(
-        primary: primaryOrange,
-        secondary: accentBlue,
-        surface: secondaryDark,
-        error: errorRed,
-      ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
-        displayLarge: GoogleFonts.oswald(
-          fontSize: 32,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-          letterSpacing: 2.0,
-        ),
-        displayMedium: GoogleFonts.oswald(
-          fontSize: 24,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-        ),
-        titleLarge: GoogleFonts.oswald(
-          fontSize: 20,
-          fontWeight: FontWeight.w500,
-          color: Colors.white,
-        ),
-        bodyLarge: GoogleFonts.inter(
-          fontSize: 16,
-          color: Colors.white,
-        ),
-        bodyMedium: GoogleFonts.inter(
-          fontSize: 14,
-          color: Colors.white70,
-        ),
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: false,
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryOrange,
-          foregroundColor: Colors.white,
-          minimumSize: const Size(double.infinity, 56),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          textStyle: GoogleFonts.oswald(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.2,
-          ),
-        ),
-      ),
-    );
-  }
-
-  static BoxDecoration glassDecoration({double opacity = 0.6, double blur = 12.0}) {
+  static BoxDecoration glassDecoration({
+    Color? color,
+    double borderRadius = 20,
+    double opacity = 0.05,
+  }) {
     return BoxDecoration(
-      color: secondaryDark.withOpacity(opacity),
-      borderRadius: BorderRadius.circular(24),
-      border: Border.all(
-        color: Colors.white.withOpacity(0.1),
-        width: 1,
-      ),
+      color: (color ?? Colors.white).withValues(alpha: opacity),
+      borderRadius: BorderRadius.circular(borderRadius),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
     );
   }
+
+  static ThemeData lightTheme = ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.light,
+    primaryColor: primaryOrange,
+    scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+    textTheme: GoogleFonts.outfitTextTheme(),
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: primaryOrange,
+      brightness: Brightness.light,
+      primary: primaryOrange,
+      onPrimary: Colors.white,
+      secondary: primaryLight,
+      surface: Colors.white,
+      onSurface: const Color(0xFF0F172A),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      iconTheme: IconThemeData(color: Color(0xFF0F172A)),
+    ),
+  );
+
+  static ThemeData darkTheme = ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    primaryColor: primaryOrange,
+    scaffoldBackgroundColor: const Color(0xFF020617),
+    textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: primaryOrange,
+      brightness: Brightness.dark,
+      primary: primaryOrange,
+      onPrimary: Colors.white,
+      secondary: primaryDark,
+      surface: const Color(0xFF0F172A),
+      onSurface: Colors.white,
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      iconTheme: IconThemeData(color: Colors.white),
+    ),
+  );
+
+  static ButtonStyle orangeButtonStyle = ElevatedButton.styleFrom(
+    backgroundColor: primaryOrange,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(vertical: 20),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    elevation: 8,
+    shadowColor: primaryOrange.withOpacity(0.3),
+  );
 }

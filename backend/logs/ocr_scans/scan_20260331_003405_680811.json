@@ -1,0 +1,25 @@
+{
+    "timestamp": "2026-03-31T00:34:05.681813",
+    "raw_text": "NO\nCALOOCAN\nRepublic of the Philippines\nPamahalaang Barangay ng 175\nArea A Camarin Zone 15, District 1, Caloocan City\nMetro Manila\nDATE ISSUED: 7/1/2024\nVALID UNTIL: 7/1/2025\n5k\nCALOOCA\nBarangay ID No.: 2021-06-02922\nSurName: LAMSEN\nFirstName: VAL JAVEZ\nMiddleName: M.\nAddress: BLDG D UNIT 224 CAMARIN\nRES. I CAMARIN CALOOCAN CITY\nDOB: 4/28/2005 Age: 19\nGender: MALE Ht: 164CM\nCivil Status: SINGLE Wt: 50KGS\nKasarian/Sex\nMALE\nUri ng Dugo/Blood Type\nUNKNOWN\nKalagayang Sibil/Marital Status\nSINGLE\nLugar ng Kapanganakan/Place of Birth\nCITY OF MANILA",
+    "parsed_data": {
+        "id_type": "philid",
+        "id_type_label": "Philippine National ID",
+        "first_name": "Val Javez",
+        "last_name": "Lamsen",
+        "middle_name": "M.",
+        "dob": "2005-04-28",
+        "sex": "Male",
+        "address": "BLDG D UNIT 224 CAMARIN RES. I CAMARIN CALOOCAN CITY",
+        "house_no": "UNIT 224",
+        "block_lot": "",
+        "subdivision": "BLDG D CAMARIN RES. I",
+        "street": "Bldg D Unit 224 Res. I",
+        "barangay": "CAMARIN",
+        "postal_code": "",
+        "is_north_caloocan": false,
+        "verification_message": "DOCUMENT MISMATCH: The front side is a Barangay ID, while the back side corresponds to a Philippine National ID (PhilID). These are two different types of identification documents.",
+        "pcn": "",
+        "is_document_mismatch": true,
+        "mismatch_reason": "DOCUMENT MISMATCH: The front side is a Barangay ID, while the back side corresponds to a Philippine National ID (PhilID). These are two different types of identification documents."
+    }
+}

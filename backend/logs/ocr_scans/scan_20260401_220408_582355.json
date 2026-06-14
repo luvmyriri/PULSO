@@ -1,0 +1,26 @@
+{
+    "timestamp": "2026-04-01T22:04:08.582355",
+    "raw_text": "REPUBLIC OF THE PHILIPPINES\nDEPARTMENT OF TRANSPORTATION\nLAND TRANSPORTATION OFFICE\nDRIVER'S LICENSE\nLast Name. First Name, Middle Name\nGARCIA, MARC JUSTINE MASMELA\nNationality Sex\nPHL\nM\nDate of Birth\n2005/11/25\nAdamas\nWeight (kg)\n63\nHeight(m)\n1.65\nBLK100 LOT11, NORTHVILLE 2B, BARANGAY 171,\nCALOOCAN CITY, NCR, THIRD DISTRICT, 1421\nLicense No.\nExpiration Date\nAgency Code\nC08\nC08-25-005344 2029/11/25\nBlood Type\nEyes Color\nBLACK\nConditions\nSignature of Licensee\nDL Codes\nA\nNONE\nATTY VIGOR D. MENDOZA II\nAssistant Secretary\nL DL CODES\nA MOTORCYCLE\nA1 TRICYCLE\nB UP TO 5000 KGS GVW/B SEATS\nB1 UP TO 5000 KGS GVW/9 OR MORE SEATS\nB2 GOODS 3500 KGS GVW\nGOODS 3500 KGS GVW\nD BUS 5000 KGS GVW/9 OR MORE SEATS\nBE TRAILERS 3500 KGS\nCE ARTICULATED C>3500 KGS COMBINED GVW\nII. CONDITIONS:\n1.WEAR CORRECTIVE LENSES\nL1,L2 L3-NP-MT/AT\n2. DRIVE ONLY W/SPECIAL EQPT FOR UPPER/LOWER LIMBS\n3. DRIVE CUSTOMIZED MOTOR VEHICLE ONLY\n4. DAYLIGHT DRIVING ONLY\n5. HEARING AID REQUIRED\nSerial Number\n465020709\nLTO DRIVER'S\nSE LTO DRM\nLICENSE LTO\nVER'S LICENSE\nIII ORGAN DONATION:\nIWILINOT DONATE ANY ORGAN\nIV. IN CASE OF EMERGENCY NOTIFY:\nNAME:\nADDRESS:\nTEL. NO.: -",
+    "parsed_data": {
+        "id_type": "lto",
+        "id_type_label": "LTO Driver's License",
+        "first_name": "Marc",
+        "last_name": "Garcia",
+        "middle_name": "Justine Masmela",
+        "dob": "2005-11-25",
+        "sex": "",
+        "address": "REPUBLIC OF THE PHILIPPINES DEPARTMENT OF TRANSPORTATION LAND TRANSPORTATION OFFICE DRIVER'S LICENSE Last Name. First Name, Middle Name GARCIA, MARC JUSTINE MASMELA Nationality Sex PHL M Date of Birth 2005/11/25 Adamas Weight (kg) 63 Height(m) 1.65 BLK100 LOT11, NORTHVILLE 2B, BARANGAY 171, CALOOCAN CITY, NCR, THIRD DISTRICT, 1421 License No. Expiration Date Agency Code C08 C08-25-005344 2029/11/2",
+        "house_no": "",
+        "block_lot": "BLK100 LOT11",
+        "subdivision": "1.65   Northville 2B",
+        "street": "Republic Of The Department Of Transportation Land Transportation Office Driver'S Last Name. First Name Middle Name Garcia Marc Justine Masmela Nationality Phl M Date Of Birth 2005 11 25 Adamas (Kg) 63 (M)",
+        "barangay": "171",
+        "postal_code": "1421",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "city": "",
+        "province": "",
+        "is_document_mismatch": false,
+        "mismatch_reason": ""
+    }
+}

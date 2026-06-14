@@ -1,0 +1,51 @@
+# Root .gitignore for PULSO
+
+# Environment variables
+.env
+*.env
+
+# Python Caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and System Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+ehthumbs.db
+~$*
+
+# Node modules and build files
+node_modules/
+dist/
+dist-ssr/
+build/
+.dart_tool/
+.pub-cache/
+.pub/
+
+# Local databases
+*.db
+*.sqlite3
+
+# Large APK files
+*.apk
+frontend/public/apk/
+
+# Logs and transient text files
+*.log
+*.txt
+backend/logs/
+
+# Uploads
+backend/uploads/
+uploads/
+
+# Scratch & Temporary files
+scratch/
+backend/scratch/
+.agent/
+diag_out.json
+*.pptx

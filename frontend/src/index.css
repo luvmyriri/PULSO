@@ -247,6 +247,30 @@
   .dark .react-datepicker__portal {
     background-color: rgba(0, 0, 0, 0.8) !important;
   }
+
+  /* Hide Google Maps InfoWindow default white bezel/pointer */
+  .gm-style-iw-c {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+  }
+
+  /* Hide the default close button if needed (we use our own logic or maps handles it) */
+  .gm-style-iw-d {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  .gm-style-iw-t::after {
+    display: none !important; /* Hide the default white arrow */
+  }
+
+  .gm-ui-hover-effect {
+    display: none !important; /* Hide default X button to use our clean design */
+  }
 }
 
 @layer utilities {
@@ -301,5 +325,21 @@
 
   .animate-marquee {
     animation: marquee 30s linear infinite;
+  }
+
+  /* Wave sonar animation for the user's location marker */
+  @keyframes wave-ring {
+    0% {
+      transform: scale(0.6);
+      opacity: 0.9;
+    }
+    100% {
+      transform: scale(2.8);
+      opacity: 0;
+    }
+  }
+
+  .animate-wave-ring {
+    animation: wave-ring 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 }

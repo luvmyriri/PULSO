@@ -8,7 +8,7 @@ import requests
 import json
 import sys
 
-BASE = "http://localhost:8000"
+BASE = "http://localhost:33159"
 PASS = "[PASS]"
 FAIL = "[FAIL]"
 

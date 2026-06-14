@@ -1,0 +1,22 @@
+{
+    "timestamp": "2026-03-29T11:16:18.131687",
+    "raw_text": "REPUBLIKA NG PILIPINAS | REPUBLIC OF THE PHILIPPINES FO\nPASAPORTE/\nPASSPORT\nP\nKodigo ng bansal Country code\nPHL\nApelyidal Summe\nPasaporte big\nP0000000A\nDELA CRUZ\nPangaland Gives nomes\nM\u00c1RIA\n(6\nPangitnang apelyido Middie nome\nSANTOS\nPetsa ng kapanganakan Date of birth\n16 MAR 1980\nKasarian/ Sex\nF\nNasyonalida\nFILIPINO\nLugar ng kapanganakan/ Place of b\nMANILA\nPetsa ne phkakaloob Dez of e\n27 JUN 2016\nPella\nwalang bis/Vodune Maykapangyarihang nagkaloob/issuing authority\nCANO PER 26 JUN 2021\nDFA MANILA\nP<PHLDELA<CRUZ<<MARIA<<<<<<<<<<<<<<<<<<<<<<<\nP0000000A0PHL8003166F2106269<<<<<<<<<<<<<<02\n",
+    "parsed_data": {
+        "id_type": "philid",
+        "id_type_label": "Philippine National ID",
+        "first_name": "D Gives Nomes",
+        "last_name": "Pangitnang  Middie Nome",
+        "middle_name": "Pan Middie Nome",
+        "dob": "1980-03-16",
+        "sex": "Female",
+        "address": "REPUBLIKA NG PILIPINAS | REPUBLIC OF THE PHILIPPINES FO PASAPORTE/ PASSPORT P Kodigo ng bansal Country code PHL Apelyidal Summe Pasaporte big P0000000A DELA CRUZ Pangaland Gives nomes M\u00c1RIA (6 Pangitn",
+        "barangay": "",
+        "postal_code": "",
+        "is_north_caloocan": false,
+        "verification_message": "Verification Failed: Address does not appear to be in Caloocan City.",
+        "pcn": "",
+        "block_lot": "",
+        "subdivision": "",
+        "street": ""
+    }
+}

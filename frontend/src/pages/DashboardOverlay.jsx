@@ -2,22 +2,39 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Camera, MapPin, WifiOff, CheckCircle2, AlertTriangle,
-    Send, Clock, Truck, HardHat, Bell, LogOut, Loader2
+    Send, Clock, Truck, HardHat, Bell, LogOut, Loader2, Brain, Search, X
 } from 'lucide-react';
 import Branding from '../components/Branding';
+
+import { useInteractionHarden } from '../hooks/useInteractionHarden';
+import { API_BASE_URL } from '../utils/apiBase';
 
 export default function DashboardOverlay({ onNavigate }) {
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [reports, setReports] = useState([]);
     const [drafts, setDrafts] = useState([]);
+    const [notification, setNotification] = useState(null); // { type: 'success'|'error'|'info', message: string }
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Form State
     const [photo, setPhoto] = useState(null);
     const [photoPreview, setPhotoPreview] = useState(null);
     const [location, setLocation] = useState(null);
+    const [address, setAddress] = useState('');
     const [gettingLocation, setGettingLocation] = useState(false);
     const [description, setDescription] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // AI Omni-Assistant State
+    const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+    const [aiQuery, setAiQuery] = useState('');
+    const [aiMessages, setAiMessages] = useState([
+        { role: 'assistant', text: "Hello! I'm your PULSO Assistant. How can I help you with Caloocan city services today?" }
+    ]);
+    const [isAILoading, setIsAILoading] = useState(false);
+    
+    // Interaction Hardening
+    const { throttleAction, isCooldown, isProcessing: aiProcessing } = useInteractionHarden();
 
     const fileInputRef = useRef(null);
 
@@ -31,7 +48,7 @@ export default function DashboardOverlay({ onNavigate }) {
                 setReports(prev => [...savedDrafts, ...prev]);
                 setDrafts([]);
                 localStorage.removeItem('pulso_drafts');
-                alert("Connectivity restored! Automatically uploaded saved offline drafts.");
+                setNotification({ type: 'success', message: 'Connectivity restored! Automatically uploaded saved offline drafts.' });
             }
         };
         const handleOffline = () => setIsOffline(true);
@@ -41,17 +58,7 @@ export default function DashboardOverlay({ onNavigate }) {
 
         setDrafts(JSON.parse(localStorage.getItem('pulso_drafts') || '[]'));
 
-        // Mock existing reports
-        setReports([
-            {
-                id: 'rpt-8832', type: 'Water Pipe Burst', status: 'in-transit', time: '2 hours ago',
-                location: '14.7571° N, 121.0425° E (Bagong Silang)',
-                updates: [
-                    { time: '10:30 AM', text: 'Report received by Engineering Office.' },
-                    { time: '11:15 AM', text: 'Crew Dispatched: Team Alpha is on the way.', highlight: true }
-                ]
-            }
-        ]);
+        setReports([]);
 
         return () => {
             window.removeEventListener('online', handleOnline);
@@ -74,49 +81,161 @@ export default function DashboardOverlay({ onNavigate }) {
         setGettingLocation(true);
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
-                (position) => {
+                async (position) => {
+                    const lat = position.coords.latitude.toFixed(6);
+                    const lng = position.coords.longitude.toFixed(6);
                     setLocation({
-                        lat: position.coords.latitude.toFixed(4),
-                        lng: position.coords.longitude.toFixed(4),
+                        lat,
+                        lng,
                         accuracy: position.coords.accuracy.toFixed(1)
                     });
+                    
+                    // Reverse geocode via backend proxy
+                    try {
+                        const token = localStorage.getItem('pulso_token');
+                        const resp = await fetch(`${API_BASE_URL}/api/geocode/reverse?lat=${lat}&lng=${lng}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await resp.json();
+                        if (data.address) {
+                            setAddress(data.address);
+                        } else {
+                            setAddress(`${lat}, ${lng}`);
+                        }
+                    } catch (err) {
+                        console.error("Geocoding failed:", err);
+                        setAddress(`${lat}, ${lng}`);
+                    }
+                    
                     setGettingLocation(false);
                 },
                 (error) => {
-                    setLocation({ lat: '14.7571', lng: '121.0425', accuracy: 'Manual Fallback' });
+                    const fallbackLat = '14.7571';
+                    const fallbackLng = '121.0425';
+                    setLocation({ lat: fallbackLat, lng: fallbackLng, accuracy: 'Manual Fallback' });
+                    setAddress("Barangay 176, Bagong Silang, Caloocan");
                     setGettingLocation(false);
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         } else {
             setLocation({ lat: '14.7571', lng: '121.0425', accuracy: 'Browser Not Supported' });
+            setAddress("Location Unavailable");
             setGettingLocation(false);
         }
     };
-
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!photo || !location) return alert("Please snap a photo and ensure GPS is tagged.");
-        setIsSubmitting(true);
+        
+        throttleAction(async () => {
+            setIsSubmitting(true);
+            
+            try {
+                const token = localStorage.getItem('pulso_token');
+                
+                // If offline, save to drafts immediately
+                if (isOffline) {
+                    const newReport = {
+                        id: `rpt-draft-${Date.now()}`,
+                        type: description || "Infrastructure Hazard",
+                        status: 'offline-draft',
+                        location: address || (location ? `${location.lat}, ${location.lng}` : "Unknown"),
+                        time: 'Saved Offline',
+                        updates: [{ time: new Date().toLocaleTimeString(), text: 'Draft saved. Will upload when online.' }]
+                    };
+                    const updatedDrafts = [newReport, ...drafts];
+                    setDrafts(updatedDrafts);
+                    localStorage.setItem('pulso_drafts', JSON.stringify(updatedDrafts));
+                    setNotification({ type: 'info', message: 'Report saved as offline draft.' });
+                } else {
+                    // Prepare multipart form data for image upload
+                    const formData = new FormData();
+                    formData.append('category', 'infrastructure'); // Default or inferred
+                    formData.append('description', description);
+                    if (location) {
+                        formData.append('location_lat', location.lat);
+                        formData.append('location_lng', location.lng);
+                    }
+                    formData.append('location_string', address);
+                    formData.append('location_barangay', ''); // Will be resolved by AI/backend
+                    if (photo) {
+                        formData.append('file', photo);
+                    }
 
-        const newReport = {
-            id: `rpt-${Math.floor(Math.random() * 10000)}`,
-            type: description || "Infrastructure Hazard",
-            status: 'pending', time: 'Just now',
-            location: `${location.lat}° N, ${location.lng}° E`,
-            updates: [{ time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), text: 'Report submitted successfully.' }]
-        };
+                    const resp = await fetch(`${API_BASE_URL}/api/reports`, {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: formData
+                    });
 
-        setTimeout(() => {
-            if (isOffline) {
-                const updatedDrafts = [newReport, ...drafts];
-                setDrafts(updatedDrafts);
-                localStorage.setItem('pulso_drafts', JSON.stringify(updatedDrafts));
-            } else {
-                setReports([newReport, ...reports]);
+                    if (!resp.ok) throw new Error('Failed to submit report');
+                    
+                    const savedReport = await resp.json();
+                    
+                    // Add to local reports list for immediate feedback
+                    const uiReport = {
+                        id: savedReport.id,
+                        type: savedReport.category,
+                        status: savedReport.status,
+                        location: savedReport.location_string || savedReport.location_barangay || "Caloocan City",
+                        time: 'Just now',
+                        updates: [{ time: new Date().toLocaleTimeString(), text: 'Report received by Command Center.' }]
+                    };
+                    
+                    setReports(prev => [uiReport, ...prev]);
+                    setNotification({ type: 'success', message: `Report ${savedReport.ticket_id} submitted successfully!` });
+                }
+
+                // Reset form
+                setPhoto(null);
+                setPhotoPreview(null);
+                setLocation(null);
+                setAddress('');
+                setDescription('');
+            } catch (err) {
+                console.error("Submission Error:", err);
+                setNotification({ type: 'error', message: 'Failed to submit report. Please try again.' });
+            } finally {
+                setIsSubmitting(false);
             }
-            setPhoto(null); setPhotoPreview(null); setLocation(null); setDescription(''); setIsSubmitting(false);
-        }, 800);
+        }, 5000); // 5s throttle
+    };
+
+
+    const handleAIChat = async (e) => {
+        e.preventDefault();
+        if (!aiQuery.trim() || isAILoading || isCooldown) return;
+        
+        await throttleAction(async () => {
+            const currentQuery = aiQuery;
+            const userMsg = { role: 'user', text: currentQuery };
+            setAiMessages(prev => [...prev, userMsg]);
+            setAiQuery('');
+            setIsAILoading(true);
+
+            try {
+                const token = localStorage.getItem('pulso_token');
+                const resp = await fetch(`${API_BASE_URL}/api/ai/assistant`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ 
+                        query: currentQuery,
+                        context: "Resident Dashboard. Main reporting screen."
+                    })
+                });
+                const data = await resp.json();
+                setAiMessages(prev => [...prev, { role: 'assistant', text: data.response || data.error || "No response received." }]);
+            } catch (err) {
+                setAiMessages(prev => [...prev, { role: 'assistant', text: "Service temporarily unavailable." }]);
+            } finally {
+                setIsAILoading(false);
+            }
+        }, 4000); // 4s throttle between messages
     };
 
     return (
@@ -190,12 +309,55 @@ export default function DashboardOverlay({ onNavigate }) {
                         </div>
 
                         <div className={`p-5 rounded-2xl border flex items-center justify-between transition-colors ${location ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
-                            <div className="flex flex-col">
+                            <div className="flex flex-col flex-1 overflow-hidden pr-2">
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">GPS Tagging Status</span>
                                 {gettingLocation ? (
                                     <span className="text-sm font-bold text-orange-500 flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Acquiring Satellites...</span>
                                 ) : location ? (
-                                    <span className="text-sm font-bold text-green-700 flex items-center gap-1.5"><CheckCircle2 size={18} /> {location.lat}°, {location.lng}° Verified</span>
+                                    <span className="text-sm font-bold text-green-700 flex flex-col items-start gap-0.5 min-w-0">
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <CheckCircle2 size={16} className="shrink-0" />
+                                            <span className="text-[10px] font-black tracking-widest uppercase opacity-70">Verified Location</span>
+                                        </div>
+                                        <div className="pl-5 w-full">
+                                            {(() => {
+                                                const rawAddr = address || (location ? `${location.lat}, ${location.lng}` : "");
+                                                if (!rawAddr.includes('|')) {
+                                                    return <span className="text-[13px] font-bold text-slate-800 break-words block">{rawAddr}</span>;
+                                                }
+                                                
+                                                const parts = rawAddr.split('|').map(p => p.trim());
+                                                const plusCode = parts[0] || "";
+                                                let addr = parts[1] || "";
+                                                let detectedBrgy = parts[2] || "Barangay Unknown";
+
+                                                // Clean redundancy and extra fields
+                                                let cleanAddr = addr.replace(new RegExp(`,?\\s*${detectedBrgy}`, 'i'), '')
+                                                                    .replace(/,?\s*Caloocan(?: City)?/i, '')
+                                                                    .replace(/,?\s*Metro Manila/i, '')
+                                                                    .replace(/,?\s*Philippines/i, '')
+                                                                    .replace(/,$/, '')
+                                                                    .trim();
+                                                
+                                                // If still unknown, try regex as a last resort in frontend
+                                                if (detectedBrgy.toLowerCase().includes('unknown')) {
+                                                    const m = addr.match(/,\s*(\d{1,3}[A-Z]?)\s*,/);
+                                                    if (m) detectedBrgy = `Barangay ${m[1]}`;
+                                                }
+
+                                                return (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="text-[13px] font-black text-slate-900 block leading-tight">
+                                                            {plusCode}, {cleanAddr}
+                                                        </span>
+                                                        <span className="text-[11px] font-semibold text-slate-500 block leading-tight">
+                                                            {detectedBrgy}, Caloocan, Metro Manila
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </span>
                                 ) : (
                                     <span className="text-sm font-medium text-slate-400">Waiting for photo capture...</span>
                                 )}
@@ -252,7 +414,43 @@ export default function DashboardOverlay({ onNavigate }) {
                                 <div className="p-5 border-b border-slate-100 flex justify-between items-start bg-white/50">
                                     <div>
                                         <h4 className="font-bold text-slate-900 text-lg">{report.type}</h4>
-                                        <p className="text-xs font-semibold text-slate-500 mt-1 flex items-center gap-1.5"><MapPin size={14} /> {report.location}</p>
+                                        <div className="mt-2 group">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-orange-600/80 mb-1.5 block">Verified Incident Location</span>
+                                            <div className="flex items-start gap-2">
+                                                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                                    <MapPin size={14} className="text-slate-500" />
+                                                </div>
+                                                <div className="flex flex-col gap-0.5">
+                                                    {(() => {
+                                                        const rawLocation = report.location || 'Unknown Location';
+                                                        if (!rawLocation.includes('|')) {
+                                                            return <span className="text-xs font-bold text-slate-700">{rawLocation}</span>;
+                                                        }
+                                                        
+                                                        const parts = rawLocation.split('|').map(p => p.trim());
+                                                        const plusCode = parts[0] || "";
+                                                        let addr = parts[1] || "";
+                                                        const detectedBrgy = parts[2] || "Barangay Unknown";
+                                                        
+                                                        // Clean redundancy
+                                                        let cleanAddr = addr.replace(new RegExp(`,?\\s*${detectedBrgy}`, 'i'), '')
+                                                                            .replace(/,?\s*Caloocan(?: City)?/i, '')
+                                                                            .replace(/,?\s*Metro Manila/i, '')
+                                                                            .replace(/,?\s*Philippines/i, '')
+                                                                            .replace(/,$/, '')
+                                                                            .trim();
+                                                        
+                                                        const fullStr = `${plusCode}, ${cleanAddr}, ${detectedBrgy}, Caloocan, Metro Manila`;
+                                                        
+                                                        return (
+                                                            <span className="text-[11px] font-black text-slate-600 tracking-tight leading-tight">
+                                                                {fullStr}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border ${report.status === 'in-transit' ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-sm' :
                                             'bg-orange-50 text-orange-600 border-orange-200 shadow-sm'
@@ -280,6 +478,125 @@ export default function DashboardOverlay({ onNavigate }) {
                 </section>
 
             </div>
+            {/* AI Assistant Floating Interface */}
+            <div className="fixed bottom-24 right-6 z-[60] flex flex-col items-end gap-3 sm:bottom-24 sm:right-8">
+                <AnimatePresence>
+                    {isAIChatOpen && (
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="w-[calc(100vw-32px)] sm:w-[350px] h-[450px] bg-white shadow-2xl rounded-3xl border border-slate-100 overflow-hidden flex flex-col mb-4"
+                        >
+                            <div className="p-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <Brain size={20} />
+                                    <span className="font-bold text-sm">PULSO Assistant</span>
+                                </div>
+                                <button onClick={() => setIsAIChatOpen(false)}><X size={18} /></button>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {aiMessages.map((msg, i) => (
+                                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] p-3 rounded-2xl text-[11px] font-semibold leading-relaxed ${
+                                            msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-700'
+                                        }`}>
+                                            {msg.text}
+                                        </div>
+                                    </div>
+                                ))}
+                                {isAILoading && (
+                                    <div className="flex justify-center p-2">
+                                        <Loader2 className="animate-spin text-orange-500" size={16} />
+                                    </div>
+                                )}
+                            </div>
+
+                            <form onSubmit={handleAIChat} className="p-3 border-t border-slate-100 flex gap-2 bg-slate-50 relative">
+                                {isCooldown && (
+                                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center text-[10px] font-bold text-orange-600 animate-pulse">
+                                        Cooldown active...
+                                    </div>
+                                )}
+                                <input 
+                                    type="text" 
+                                    value={aiQuery}
+                                    onChange={(e) => setAiQuery(e.target.value)}
+                                    placeholder={isCooldown ? "Please wait..." : "Ask about Caloocan services..."}
+                                    disabled={isCooldown || isAILoading}
+                                    className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-medium outline-none focus:ring-1 focus:ring-orange-500 disabled:bg-slate-50"
+                                />
+                                <button 
+                                    type="submit" 
+                                    disabled={isCooldown || isAILoading || !aiQuery.trim()}
+                                    className="p-2 bg-orange-500 text-white rounded-xl shadow-sm hover:bg-orange-600 transition-colors disabled:bg-slate-300"
+                                >
+                                    {isAILoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                                </button>
+                            </form>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                <button 
+                    onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-orange-500 shadow-xl flex items-center justify-center text-white hover:bg-orange-600 transition-all hover:scale-110 active:scale-95 group"
+                >
+                    <Brain size={28} className="group-hover:animate-pulse" />
+                </button>
+            </div>
+            {/* Notification Modal */}
+            {notification && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        className="absolute inset-0 bg-slate-900/40" 
+                        onClick={() => setNotification(null)}
+                    />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className={`relative p-6 rounded-2xl shadow-2xl border-2 max-w-sm w-full text-center ${
+                            notification.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800' :
+                            notification.type === 'error' ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800' :
+                            'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800'
+                        }`}
+                    >
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                            notification.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600' :
+                            notification.type === 'error' ? 'bg-red-100 dark:bg-red-900 text-red-600' :
+                            'bg-blue-100 dark:bg-blue-900 text-blue-600'
+                        }`}>
+                            {notification.type === 'success' ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            ) : notification.type === 'error' ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            )}
+                        </div>
+                        <p className={`text-sm font-bold ${
+                            notification.type === 'success' ? 'text-emerald-800 dark:text-emerald-200' :
+                            notification.type === 'error' ? 'text-red-800 dark:text-red-200' :
+                            'text-blue-800 dark:text-blue-200'
+                        }`}>
+                            {notification.message}
+                        </p>
+                        <button 
+                            onClick={() => setNotification(null)}
+                            className={`mt-4 px-6 py-2 rounded-xl text-sm font-bold ${
+                                notification.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' :
+                                notification.type === 'error' ? 'bg-red-600 hover:bg-red-700 text-white' :
+                                'bg-blue-600 hover:bg-blue-700 text-white'
+                            }`}
+                        >
+                            OK
+                        </button>
+                    </motion.div>
+                </div>
+            )}
         </motion.div>
     );
 }

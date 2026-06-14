@@ -1,5 +1,12 @@
 {
   "translation": {
+    "auth": {
+      "strength": {
+        "weak": "MAHINA",
+        "medium": "KATAMTAMAN",
+        "strong": "MALAKAS"
+      }
+    },
     "login": {
       "home": "Home",
       "welcome": "Maligayang pagbabalik sa",
@@ -27,36 +34,44 @@
         "status": "SISTEMA ONLINE • CALOOCAN NORTH",
         "title1": "Matalinong Imprastraktura,",
         "title2": "Mas Matalinong Lungsod.",
-        "subtitle": "Sistema sa Pagtukoy ng Pampublikong Utility at Imprastraktura para sa Operasyon ng Inhinyero. Pinagsama sa real-time Geospatial Triage at AI-driven Predictive Maintenance.",
+        "subtitle": "Isang pampublikong plataporma na tumutulong sa mga mamamayan na mag-ulat ng mga panganib sa imprastraktura. Pinapatakbo ang mas mabilis at mas ligtas na Caloocan North gamit ang teknolohiya.",
         "register": "Mag-rehistro",
-        "docs": "Tingnan ang Dokumentasyon"
+        "docs": "Gabay sa Portal"
       },
       "features": {
-        "title": "Inhinyeriya para sa Kahusayan",
-        "subtitle": "Isang pinag-isang dashboard na sadyang idinisenyo para sa Opisina ng Inhinyero upang masubaybayan, asahan, at tumugon sa katayuan ng utility ng lungsod.",
-        "f1_title": "Geospatial Triage",
-        "f1_desc": "Mabilis na pagtukoy at pagbibigay-prayoridad sa mga kritikal na pagkasira ng imprastraktura gamit ang real-time GPS mapping at lokal na sensor networks.",
-        "f2_title": "Predictive Maintenance",
-        "f2_desc": "Paggamit ng mga nakaraang data model upang asahan ang mga pagkukumpuni ng utility bago pa man ito mangyari, para mabawasan ang downtime at mapanatili ang yaman ng LGU.",
-        "f3_title": "AI Optimization",
-        "f3_desc": "Pinapatakbo ng Gemini AI na nakapaloob sa core grid ng lungsod, matalinong sinusuri ang mga strain sa imprastraktura upang ma-optimize ang pag-iskedyul ng routine maintenance."
+        "title": "Optimisado para sa Komunidad",
+        "subtitle": "Isang espesyal na plataporma na nagbibigay-kapangyarihan sa mga residente ng Caloocan North na aktibong lumahok sa pagpapanatili ng imprastraktura at kaligtasan.",
+        "f1_title": "GEOSPATIAL TRIAGE",
+        "f1_desc": "Tumpak na pag-mapa ng mga ulat upang matukoy ang mga isyu sa imprastraktura sa buong lungsod.",
+        "f2_title": "OPISYAL NA PAGPAPATUNAY",
+        "f2_desc": "Pinagsamang pagpapatunay ng tao at AI upang masigurong lehitimo at prayoridad ang bawat ulat.",
+        "f3_title": "PROAKTIBONG PAG-AALAGA",
+        "f3_desc": "Patuloy na pagsusuri sa imprastraktura upang matukoy ang mga isyu bago pa ito maging malaking problema."
       },
       "solutions": {
         "badge": "Pinagsamang Solusyon",
         "title": "Tiyak na Tugon para sa Kritikal na Imprastraktura.",
         "subtitle": "Awtomatikong kinakategorya ng PULSO ang mga ulat, inililipat ang mga partikular na sakuna sa mga dalubhasang pangkat ng inhinyero kaagad.",
-        "s1_title": "Pamamahala ng Basura",
-        "s1_desc": "Awtomatikong pag-dispatch para sa hindi nakolektang basura, iligal na pagtatapon, at paghahakot ng sanitasyon sa opisina ng pamamahala ng kapaligiran ng lungsod.",
-        "s1_l1": "Pagsubaybay sa Koleksyon",
-        "s1_l2": "Iligal na Pagtatapon",
-        "s2_title": "Mga Kalsada & Tulay",
-        "s2_desc": "Pagsubaybay sa lubak, maagang babala sa sinkhole, at pagsubaybay sa integridad ng tulay na imamapa sa pamamagitan ng mga ulat ng residente.",
-        "s2_l1": "Asphalt Triage",
-        "s2_l2": "Paglilipat ng Trapiko",
-        "s3_title": "Kuryente & Utilities",
-        "s3_desc": "Mga nakabagsak na linya, sirang ilaw sa kalsada, at hindi naka-align na poste ng kuryente na inuulat nang direkta sa opisina ng inhinyeriya ng lungsod.",
-        "s3_l1": "Status ng Kaligtasan ng Grid",
-        "s3_l2": "Blackout Mapping"
+        "s1_title": "Mga Daan & Tulay",
+        "s1_desc": "Pag-aayos ng lubak, pagkukumpuni ng bangketa, at pagsusuri sa integridad ng mga kalsada at tulay ng lungsod.",
+        "s1_l1": "Kumpuni ng Lokal na Kalsada",
+        "s1_l2": "Pavement Markings",
+        "s2_title": "Sistema ng Tubig & Baha",
+        "s2_desc": "Paglilinis ng mga baradong kanal, pagpapanatili ng manhole, at flood control para sa drainage system ng lungsod.",
+        "s2_l1": "De-clogging ng Drainage",
+        "s2_l2": "Flood Control",
+        "s3_title": "Mga Ilaw sa Daan",
+        "s3_desc": "Paglalagay at pagkukumpuni ng mga streetlights, electrical wiring, at mga poste upang masiguro ang kaligtasan sa gabi.",
+        "s3_l1": "Pagpapalit ng Bumbilya",
+        "s3_l2": "Kaligtasan ng Grid",
+        "s4_title": "Kaligtasan ng Publiko & Regulasyon",
+        "s4_desc": "Inspeksyon ng mga gusali, paglilinis ng mga debris pagkatapos ng sakuna, at pagsunod sa mga safety regulation.",
+        "s4_l1": "Kaligtasan ng Istruktura",
+        "s4_l2": "Paglilinis ng Debris",
+        "s5_title": "Mga Pampublikong Pasilidad",
+        "s5_desc": "Pagpapanatili ng mga pampublikong paaralan, health centers, mga plaza, at iba pang city-owned buildings.",
+        "s5_l1": "Kumpuni ng Pasilidad",
+        "s5_l2": "Pagpapanatili ng Parke"
       },
       "about": {
         "badge": "Tungkol sa Caloocan LGU",
@@ -79,15 +94,15 @@
       "howitworks": {
         "badge": "Paano Gumagana",
         "title": "Mag-ulat ng Isyu sa 5 Simpleng Hakbang.",
-        "subtitle": "Pinasimple ng PULSO ang buong proseso mula sa ulat ng mamamayan hanggang sa napatunayan na resolusyon — pinapagana ng AI triage at real-time dispatch.",
+        "subtitle": "Sinisiguro ng PULSO ang mabilis na proseso mula sa ulat ng mamamayan hangsang sa napatunayang resolusyon — gamit ang AI triage at mabilis na tugon.",
         "s1_title": "Mag-rehistro at I-verify",
         "s1_desc": "Gumawa ng iyong resident account at i-verify ang iyong paninirahan gamit ang isang government-issued ID. Tanging mga na-verify na residente ng Caloocan North lamang ang maaaring magsumite ng mga ulat.",
         "s2_title": "Kumuha ng Litrato sa Lugar",
         "s2_desc": "Kumuha ng malinaw na litrato ng panganib sa imprastraktura sa lugar. Awtomatikong nita-tag ang iyong GPS coordinates para sa tumpak na lokasyon.",
         "s3_title": "AI Triage",
         "s3_desc": "Awtomatikong sinusuri ng Gemini AI ang iyong litrato at paglalarawan, kinakategorya ang isyu, nagtatakda ng urgency score, at gumagawa ng ticket.",
-        "s4_title": "Sinusuri ng Dispatcher",
-        "s4_desc": "Sinusuri ng dispatcher ng city engineering ang AI-verified ticket, kinukumpirma ang priyoridad, at itinatakda ang pinakamalapit na kwalipikadong field crew.",
+        "s4_title": "Opisyal na Pagpapatunay",
+        "s4_desc": "Sinusuri ng opisyal ng lungsod ang AI-verified ticket, kinukumpirma ang priyoridad, at itinatakda ang pinakamalapit na kwalipikadong field crew.",
         "s5_title": "Nireresolba ng Crew",
         "s5_desc": "Kumpleto ng pag-aayos ang field crew at nag-a-upload ng Proof of Repair na litrato. Makakatanggap ka ng notipikasyon kapag naresolba na ang iyong ulat."
       },
@@ -122,6 +137,7 @@
         "p_engineering": "Engineering Dashboard",
         "p_admin": "Administrator ng LGU",
         "p_api": "Mga Pampublikong API",
+        "p_resident_app": "Resident Mobile App",
         "platform": "Plataporma",
         "cityservices": "Mga Serbisyo ng Lungsod",
         "cs_senior": "Senior Citizen ID (OSCA)",
@@ -180,7 +196,8 @@
         "topReporters": "Nangungunang 5% na Nag-uulat",
         "recentActivity": "Kamakailang Aktibidad",
         "viewAll": "Tingnan Lahat",
-        "latestUpdate": "Pinakabagong Update"
+        "latestUpdate": "Pinakabagong Update",
+        "shortcuts": "Mga Shortcut"
       },
       "quickReport": {
         "title": "Mabilisang Ulat",
@@ -193,8 +210,11 @@
         "requirePhoto": "Kinakailangang kumuha ng litrato",
         "placeholder": "Maikling detalye tungkol sa panganib...",
         "submit": "Isumite ang Pangunahing Ulat",
+        "submitBtn": "Mag-submit ng Ulat",
         "zoneCoverage": "Saklaw ng Zone 15",
-        "gpsAccuracy": "Katumpakan ng GPS:"
+        "gpsAccuracy": "Katumpakan ng GPS:",
+        "scanning": "Sinusuri...",
+        "aiDetected": "Natukoy ng AI"
       },
       "offline": "Offline Mode: Ang mga ulat ay ise-save nang lokal.",
       "reports": {
@@ -211,10 +231,24 @@
         "regName": "Nakarehistrong Pangalan",
         "accountId": "Account ID",
         "regAddress": "Nakarehistrong Address (Barangay)",
+        "barangay": "Barangay",
         "memberSince": "Miyembro Mula Noong",
         "update": "I-update ang Impormasyon"
       },
       "settings": {
+        "portal": "Portal ng Seguridad",
+        "portalDesc": "Pamahalaan ang iyong proteksyon sa account at mga kredensyal",
+        "identity": "Pagpapatunay ng Pagkakakilanlan",
+        "currentPass": "Kasalukuyang Password",
+        "transition": "Paglipat sa Bagong Kredensyal",
+        "newPass": "Bagong Password",
+        "confirmPass": "I-kumpirma ang Bagong Password",
+        "secStrength": "Lakas ng Security",
+        "updatePass": "I-update ang Password",
+        "securing": "Sinisigurado...",
+        "confirmTitle": "Baguhin ang Password?",
+        "confirmText": "Sigurado ka bang gusto mong i-update ang iyong security credentials? Kakailanganin mong gamitin ang iyong bagong password para sa lahat ng susunod na logins.",
+        "confirmBtn": "I-kumpirma ang Pagbabago",
         "alerts": "Mga Anunsyo at Alerto",
         "alertsDesc": "Pamahalaan kung paano nakikipag-ugnayan ang LGU sa iyo para sa mga update.",
         "push": "Mga Push Notification",

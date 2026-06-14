@@ -9,6 +9,13 @@ from datetime import datetime
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# User Management
+# ─────────────────────────────────────────────────────────────────────────────
+
+class UserRoleUpdate(BaseModel):
+    role: str
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Work Order  (FR-11)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -21,6 +28,9 @@ class WorkOrderCreate(BaseModel):
     wo_type: str = "standard"                # "standard" | "preemptive"
     priority: str = "normal"                 # low | normal | high | critical
     scheduled_date: Optional[datetime] = None
+    category: Optional[str] = None
+    estimated_cost: float = 0.0
+    ai_plan_summary: Optional[str] = None
     notes: Optional[str] = None
 
 class WorkOrderUpdate(BaseModel):
@@ -31,7 +41,12 @@ class WorkOrderUpdate(BaseModel):
     priority: Optional[str] = None
     scheduled_date: Optional[datetime] = None
     completed_date: Optional[datetime] = None
+    category: Optional[str] = None
+    estimated_cost: Optional[float] = None
+    actual_cost: Optional[float] = None
+    ai_plan_summary: Optional[str] = None
     notes: Optional[str] = None
+    citizen_feedback: Optional[str] = None
 
 class WorkOrderResponse(BaseModel):
     id: int
@@ -47,12 +62,63 @@ class WorkOrderResponse(BaseModel):
     priority: str
     scheduled_date: Optional[datetime] = None
     completed_date: Optional[datetime] = None
+    
+    # Costing/Predictive
+    category: Optional[str] = None
+    estimated_cost: float = 0.0
+    actual_cost: Optional[float] = None
+    ai_plan_summary: Optional[str] = None
+
     notes: Optional[str] = None
+    citizen_feedback: str
+    
+    # Child relationships
+    updates: List["WorkOrderUpdateResponse"] = []
+
     # Convenience names resolved server-side
     assigned_by_name: Optional[str] = None
     assigned_to_name: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WorkOrderApprovalRequest(BaseModel):
+    action: str  # "approve" or "reject"
+    notes: Optional[str] = None
+
+
+class WorkOrderApprovalResponse(BaseModel):
+    id: int
+    work_order_id: int
+    approver_id: int
+    approver_name: Optional[str] = None
+    action: str  # "approved" or "rejected"
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class WorkOrderUpdateCreate(BaseModel):
+    comment: Optional[str] = None
+    new_status: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+class WorkOrderUpdateResponse(BaseModel):
+    id: int
+    work_order_id: int
+    user_id: int
+    user_name: Optional[str] = None
+    previous_status: Optional[str] = None
+    new_status: Optional[str] = None
+    comment: Optional[str] = None
+    image_url: Optional[str] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -112,7 +178,9 @@ class ProcessTimelineResponse(BaseModel):
     actor_id: Optional[int] = None
     actor_role: Optional[str] = None
     actor_name: Optional[str] = None
+    status_display: Optional[str] = None
     note: Optional[str] = None
+    official_notes: Optional[str] = None
     is_public: bool
     created_at: datetime
 
@@ -160,6 +228,19 @@ class ProcurementStatusUpdate(BaseModel):
     status: str                          # submitted | validated | sent_to_procurement | procured | rejected
     rejection_reason: Optional[str] = None
 
+class ProcurementFundingUpdate(BaseModel):
+    funding_certified: bool
+    obr_number: Optional[str] = None
+
+class ProcurementCashUpdate(BaseModel):
+    cash_released: bool
+
+class ProcurementBACUpdate(BaseModel):
+    bac_meeting_date: datetime
+
+class ProcurementNTPUpdate(BaseModel):
+    ntp_issued: bool
+
 class ProcurementRequestResponse(BaseModel):
     id: int
     pr_number: str
@@ -172,6 +253,11 @@ class ProcurementRequestResponse(BaseModel):
     purpose: str
     status: str
     rejection_reason: Optional[str] = None
+    funding_certified: bool
+    obr_number: Optional[str] = None
+    cash_released: bool = False
+    bac_meeting_date: Optional[datetime] = None
+    ntp_issued: bool
     validated_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
     # Convenience names
@@ -196,9 +282,15 @@ class ProjectRequestCreate(BaseModel):
     description: str
     requesting_party: str
     barangay: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
     location_string: Optional[str] = None
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
+    estimated_cost: float = 0.0
+    is_emergency: bool = False
+    procurement_modality: Optional[str] = "competitive_bidding"
+    category: Optional[str] = "new_construction"
 
 class ProjectRequestUpdate(BaseModel):
     title: Optional[str] = None
@@ -213,20 +305,28 @@ class ProjectRequestUpdate(BaseModel):
     location_string: Optional[str] = None
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
+    estimated_cost: Optional[float] = None
+    is_emergency: Optional[bool] = None
+    procurement_modality: Optional[str] = None
+    category: Optional[str] = None
 
 class ProjectRequestResponse(BaseModel):
     id: int
     proj_number: str
     title: str
     description: str
-    requesting_party: str
+    requesting_party: Optional[str] = None
     barangay: Optional[str] = None
     location_string: Optional[str] = None
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
     status: str
-    current_phase: int
-    created_by_id: int
+    current_phase: Optional[int] = 1
+    estimated_cost: float = 0.0
+    is_emergency: bool = False
+    procurement_modality: str
+    category: str
+    created_by_id: Optional[int] = None
     survey_engineer_id: Optional[int] = None
     design_lead_id: Optional[int] = None
     project_engineer_id: Optional[int] = None
@@ -243,11 +343,21 @@ class ProjectRequestResponse(BaseModel):
     survey_engineer_name: Optional[str] = None
     design_lead_name: Optional[str] = None
     project_engineer_name: Optional[str] = None
+    # FQA / Quality Tracking
+    qa_rejection_count: int = 0
+    fqa_savings: float = 0.0
+    asset_id: Optional[str] = None
+    fqa_results: Optional[dict] = None # Added for real-time audit feedback
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+class ProjectStatusUpdate(BaseModel):
+    """Payload to advance project phase or status (e.g. issuing FQA certificate)."""
+    notes: Optional[str] = None
+
 
 class CertificateOfCompletionIssue(BaseModel):
     """Body for Assistant City Engineer to issue a Certificate of Completion."""
@@ -263,6 +373,8 @@ class OBOInspectionCreate(BaseModel):
     applicant_contact: Optional[str] = None
     property_address: str
     barangay: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
     inspection_type: str = "building"        # building | electrical | mechanical
@@ -275,6 +387,17 @@ class OBOInspectionUpdate(BaseModel):
     findings: Optional[str] = None
     is_compliant: Optional[bool] = None
     violation_details: Optional[str] = None
+    payment_verified: Optional[bool] = None
+
+class OBOTechnicalReviewUpdate(BaseModel):
+    department: str # arch, civil, elec, sani, mech
+    status: str     # approved, rejected
+
+class OBOAppealUpdate(BaseModel):
+    appeal_evidence_url: str
+
+class OBOOrderOfPayment(BaseModel):
+    fee: float
 
 class OBOInspectionResponse(BaseModel):
     id: int
@@ -296,6 +419,18 @@ class OBOInspectionResponse(BaseModel):
     is_compliant: Optional[bool] = None
     violation_details: Optional[str] = None
     source_report_id: Optional[int] = None
+    
+    arch_review: str
+    civil_review: str
+    elec_review: str
+    sani_review: str
+    mech_review: str
+    
+    order_of_payment_fee: Optional[float] = None
+    payment_verified: bool
+    appeal_status: str
+    appeal_evidence_url: Optional[str] = None
+    
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -307,8 +442,48 @@ class OBOInspectionResponse(BaseModel):
 # Dashboard Summary Schemas
 # ─────────────────────────────────────────────────────────────────────────────
 
+class ClassificationStat(BaseModel):
+    label: str
+    total: int
+    resolved: int
+    resolution_rate: float
+    icon: str
+    color: str
+
+class VelocityPoint(BaseModel):
+    date: str
+    label: str
+    count: int
+
+class PredictiveAlert(BaseModel):
+    title: str
+    location: str
+    risk_score: int
+    risk_label: str
+    description: str
+    category: str
+
 class GovDashboardStats(BaseModel):
     """Aggregated KPIs for the LGU Command Center dashboard."""
+    # Citizen Reports (PULSO Core)
+    total_reports: int
+    resolved: int
+    pending_approval: int
+    dispatched: int
+    total_trend: Optional[str] = None
+    resolved_trend: Optional[str] = None
+    
+    # Advanced Intelligence
+    classifications: List[ClassificationStat] = []
+    velocity_series: List[VelocityPoint] = []
+    velocity_label: Optional[str] = None
+    predictive_alerts: List[PredictiveAlert] = []
+    staff_stats: dict = {}
+    total_users: int = 0
+    total_officials: int = 0
+    total_residents: int = 0
+
+    # Departmental KPIs
     total_work_orders: int
     open_work_orders: int
     in_progress_work_orders: int
@@ -328,3 +503,109 @@ class GovDashboardStats(BaseModel):
     non_compliant_obo: int
 
     total_audit_entries: int
+
+
+class ApproveWithBudgetRequest(BaseModel):
+    project_title: str
+    description: Optional[str] = None
+    estimated_cost: float
+    procurement_modality: str = "competitive_bidding"
+    is_emergency: bool = False
+    items: List[BoQItemCreate] = []
+
+
+class FQAResultResponse(BaseModel):
+    status: str
+    issues: List[str]
+    dlp_expiry: Optional[datetime] = None
+    fqa_savings: float = 0.0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# System Document Registry  (DMS)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SystemDocumentResponse(BaseModel):
+    id: int
+    document_type: str
+    file_name: str
+    file_size_bytes: int
+    sha256_hash: str
+    category: str
+    confidentiality: str
+    retention_policy: str
+    expiry_date: Optional[datetime] = None
+    legal_hold: bool
+    target_model: str
+    target_id: int
+    uploader_id: int
+    uploader_name: Optional[str] = None
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class SystemDocumentRegistryResponse(BaseModel):
+    documents: List[SystemDocumentResponse]
+    total: int
+    limit: int
+    offset: int
+
+class LegalHoldUpdate(BaseModel):
+    legal_hold: bool
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dynamic RBAC Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+from typing import Dict
+
+class SystemRoleBase(BaseModel):
+    name: str  # slug
+    label: str
+    capabilities: Dict[str, List[str]]
+    access_level: str = "staff"
+
+class SystemRoleCreate(SystemRoleBase):
+    pass
+
+class SystemRoleResponse(SystemRoleBase):
+    id: int
+    created_at: datetime
+    is_template: bool
+
+    class Config:
+        from_attributes = True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tactical Advisories (Management)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AdvisoryCreate(BaseModel):
+    title: str
+    description: str
+    category: str = "Infrastructure"  # Infrastructure, Security, Emergency, Utility
+    priority: str = "medium"           # low, medium, high, critical
+    department: str = "City Engineering Office"
+    has_image: bool = False
+    image_url: Optional[str] = None
+    stats_affected: Optional[str] = None
+
+class AdvisoryResponse(BaseModel):
+    id: int
+    advisory_id: str
+    title: str
+    description: str
+    category: str
+    priority: str
+    department: str
+    has_image: bool
+    image_url: Optional[str] = None
+    stats_views: int
+    stats_affected: Optional[str] = None
+    author_id: Optional[int] = None
+    author_name: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

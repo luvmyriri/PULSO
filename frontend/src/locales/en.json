@@ -1,5 +1,12 @@
 {
   "translation": {
+    "auth": {
+      "strength": {
+        "weak": "WEAK",
+        "medium": "MEDIUM",
+        "strong": "STRONG"
+      }
+    },
     "login": {
       "home": "Home",
       "welcome": "Welcome back to",
@@ -27,36 +34,44 @@
         "status": "SYSTEM ONLINE • CALOOCAN NORTH",
         "title1": "Smart Infrastructure,",
         "title2": "Smarter City.",
-        "subtitle": "Public Utility and Infrastructure Locator System for Engineering Operations. Integrated with real-time Geospatial Triage and AI-driven Predictive Maintenance.",
+        "subtitle": "A public platform helping citizens report infrastructure hazards in real-time. Powering a faster, safer, and more responsive Caloocan North through technology.",
         "register": "Register",
-        "docs": "View Documentation"
+        "docs": "View Portal Guide"
       },
       "features": {
-        "title": "Engineered for Efficiency",
-        "subtitle": "A unified dashboard designed specifically for the Engineering Office to monitor, anticipate, and respond to city-wide utility statuses.",
-        "f1_title": "Geospatial Triage",
-        "f1_desc": "Instant identification and prioritization of critical infrastructure failures using real-time GPS mapping and localized sensor networks.",
-        "f2_title": "Predictive Maintenance",
-        "f2_desc": "Leveraging historical data models to anticipate utility repairs before they occur, drastically reducing downtime and preserving LGU resources.",
-        "f3_title": "AI Optimization",
-        "f3_desc": "Powered by Gemini AI integrated into the city grid core, intelligently analyzing infrastructure strains to optimize routine maintenance scheduling."
+        "title": "Optimized for the Community",
+        "subtitle": "A specialized platform empowering Caloocan North residents to actively participate in infrastructure maintenance and safety monitoring.",
+        "f1_title": "GEOSPATIAL TRIAGE",
+        "f1_desc": "Precise mapping of reports to pinpoint infrastructure issues across the city.",
+        "f2_title": "OFFICIAL VERIFICATION",
+        "f2_desc": "Integrated human and AI verification ensuring every report is legitimate and prioritized.",
+        "f3_title": "PROACTIVE CARE",
+        "f3_desc": "Continuous infrastructure monitoring to identify issues before they become major failures."
       },
       "solutions": {
         "badge": "Integrated Solutions",
         "title": "Targeted Responses for Critical Infrastructure.",
         "subtitle": "PULSO categorizes reports automatically, routing specific hazards to specialized engineering teams instantly.",
-        "s1_title": "Waste Management",
-        "s1_desc": "Automated dispatch for uncollected garbage, illegal dumping, and sanitation hauling to the city's environmental management office.",
-        "s1_l1": "Collection Tracking",
-        "s1_l2": "Illegal Dumping",
-        "s2_title": "Roadways & Bridges",
-        "s2_desc": "Pothole tracking, sinkhole early warnings, and bridge structural integrity monitoring mapped via resident reports.",
-        "s2_l1": "Asphalt Triage",
-        "s2_l2": "Traffic Rerouting",
-        "s3_title": "Power & Utilities",
-        "s3_desc": "Downed lines, broken streetlights, and unaligned electricity poles reported directly to the city engineering office.",
-        "s3_l1": "Grid Safety Status",
-        "s3_l2": "Blackout Mapping"
+        "s1_title": "Roads & Bridges",
+        "s1_desc": "Pothole patching, sidewalk repairs, and structural monitoring for city and barangay road networks.",
+        "s1_l1": "Local Road Repair",
+        "s1_l2": "Pavement Markings",
+        "s2_title": "Water & Drainage",
+        "s2_desc": "Cleaning of clogged canals, manhole maintenance, and flood control for the city's drainage system.",
+        "s2_l1": "Drainage De-clogging",
+        "s2_l2": "Flood Control",
+        "s3_title": "Street Lighting",
+        "s3_desc": "Installation and repair of streetlights, electrical wiring, and lamp posts to ensure nighttime safety.",
+        "s3_l1": "Bulb Replacement",
+        "s3_l2": "Grid Safety",
+        "s4_title": "Public Safety & Regulatory",
+        "s4_desc": "Building inspections, disaster debris clearing, and safety compliance for city infrastructure.",
+        "s4_l1": "Structural Safety",
+        "s4_l2": "Debris Clearing",
+        "s5_title": "Public Facilities",
+        "s5_desc": "Maintenance of public schools, health centers, recreational plazas, and city-owned buildings.",
+        "s5_l1": "Facility Repair",
+        "s5_l2": "Park Maintenance"
       },
       "about": {
         "badge": "About Caloocan LGU",
@@ -79,15 +94,15 @@
       "howitworks": {
         "badge": "How It Works",
         "title": "Report an Issue in 5 Simple Steps.",
-        "subtitle": "PULSO streamlines the entire process from citizen report to verified resolution — powered by AI triage and real-time dispatch.",
+        "subtitle": "PULSO optimizes the entire process from citizen report to verified resolution — powered by AI triage and real-time response.",
         "s1_title": "Register & Verify",
-        "s1_desc": "Create your resident account and verify residency using a government-issued ID. Only verified Caloocan North residents can submit reports.",
+        "s1_desc": "Create your resident account and verify your residency with a government-issued ID. Only verified Caloocan North residents can submit reports.",
         "s2_title": "Capture at the Scene",
         "s2_desc": "Take a clear photo of the infrastructure hazard on-site. Your GPS coordinates are automatically tagged for pinpoint accuracy.",
         "s3_title": "AI Triage",
         "s3_desc": "Gemini AI instantly analyzes your photo and description, categorizes the issue, assigns an urgency score, and generates a ticket.",
-        "s4_title": "Dispatcher Reviews",
-        "s4_desc": "A city engineering dispatcher reviews the AI-verified ticket, confirms priority, and assigns the nearest qualified field crew.",
+        "s4_title": "Official Verification",
+        "s4_desc": "A city official reviews the AI-verified ticket, confirms priority, and assigns the nearest qualified field crew.",
         "s5_title": "Crew Resolves",
         "s5_desc": "Field crews complete the repair and upload Proof of Repair photos. You get notified once your report is marked resolved."
       },
@@ -122,6 +137,7 @@
         "p_engineering": "Engineering Dashboard",
         "p_admin": "LGU Administrator",
         "p_api": "Public APIs",
+        "p_resident_app": "Resident Mobile App",
         "platform": "Platform",
         "cityservices": "City Services",
         "cs_senior": "Senior Citizen ID (OSCA)",
@@ -180,7 +196,8 @@
         "topReporters": "Top 5% of Reporters",
         "recentActivity": "Recent Activity",
         "viewAll": "View All",
-        "latestUpdate": "Latest Update"
+        "latestUpdate": "Latest Update",
+        "shortcuts": "Shortcuts"
       },
       "quickReport": {
         "title": "Quick Report",
@@ -193,8 +210,11 @@
         "requirePhoto": "Requires photo capture",
         "placeholder": "Brief details about the hazard...",
         "submit": "Submit Priority Report",
+        "submitBtn": "Submit a Report",
         "zoneCoverage": "Zone 15 Coverage",
-        "gpsAccuracy": "GPS accuracy:"
+        "gpsAccuracy": "GPS accuracy:",
+        "scanning": "Scanning...",
+        "aiDetected": "AI Detected"
       },
       "offline": "Offline Mode: Reports will be saved locally.",
       "reports": {
@@ -211,10 +231,24 @@
         "regName": "Registered Name",
         "accountId": "Account ID",
         "regAddress": "Registered Address (Barangay)",
+        "barangay": "Barangay",
         "memberSince": "Member Since",
         "update": "Update Information"
       },
       "settings": {
+        "portal": "Security Portal",
+        "portalDesc": "Manage your account protection and credentials",
+        "identity": "Identity Verification",
+        "currentPass": "Current Password",
+        "transition": "Transition New Credentials",
+        "newPass": "New Password",
+        "confirmPass": "Confirm New Password",
+        "secStrength": "Security Strength",
+        "updatePass": "Update Password",
+        "securing": "Securing...",
+        "confirmTitle": "Change Password?",
+        "confirmText": "Are you sure you want to update your security credentials? You will need to use your new password for all future logins.",
+        "confirmBtn": "Confirm Change",
         "alerts": "Announcements & Alerts",
         "alertsDesc": "Manage how the LGU contacts you for updates.",
         "push": "Push Notifications",

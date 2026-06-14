@@ -13,9 +13,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:mobile_app/core/theme/app_theme.dart';
-import 'package:mobile_app/core/services/location_service.dart';
-import 'package:mobile_app/core/api/api_client.dart';
+import 'package:pulso_mobile/core/theme/app_theme.dart';
+import 'package:pulso_mobile/core/services/location_service.dart';
+import 'package:pulso_mobile/core/api/api_client.dart';
 import 'package:provider/provider.dart';
 
 class MapScreen extends StatefulWidget {

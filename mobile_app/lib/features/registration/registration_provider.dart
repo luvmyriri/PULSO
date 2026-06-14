@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:mobile_app/core/api/api_client.dart';
-import 'package:mobile_app/core/api/api_endpoints.dart';
+import 'package:pulso_mobile/core/api/api_client.dart';
+import 'package:pulso_mobile/core/api/api_endpoints.dart';
 
 class RegistrationProvider extends ChangeNotifier {
   final ApiClient _apiClient;

@@ -1,26 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
+import { 
     MapPinned, Activity, BrainCircuit, ArrowRight, ActivitySquare,
     Menu, X, Trash2, Route as RouteIcon, Zap, Shield, BarChart3,
     Users, CheckCircle2, Sun, Moon, Monitor, ClipboardCheck, Camera,
     Bot, Headphones, Wrench, ExternalLink, Clock, Phone, Mail,
-    UserCheck, Accessibility, Heart, FileText
+    UserCheck, Accessibility, Heart, FileText, Droplets, Lightbulb,
+    Building2, ShieldCheck, User, Smartphone, QrCode, Download
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Branding from '../components/Branding';
 import Hero3D from '../Hero3D';
 import PremiumHeroBackground from '../components/PremiumHeroBackground';
 import ErrorBoundary from '../components/ErrorBoundary';
+import TermsModal from '../components/TermsModal';
 import '../index.css';
 
 // Using unified Branding component instead of inline SVG
 
 function Landing() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [scrolled, setScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    // Modal state for legal content
+    const [modalConfig, setModalConfig] = useState({
+        isOpen: false,
+        type: 'terms'
+    });
+
+    const [downloadUrl, setDownloadUrl] = useState(`http://${window.location.hostname}:33159/api/download/resident-app`);
+
+    useEffect(() => {
+        // Dynamically fetch the actual server IP for cross-device downloads (WiFi compatibility)
+        const fetchServerIp = async () => {
+            try {
+                // We try to fetch from the hostname the user is currently using
+                const baseUrl = `http://${window.location.hostname}:33159`;
+                const response = await fetch(`${baseUrl}/api/system/ip`);
+                const data = await response.json();
+                
+                if (data.ip) {
+                    setDownloadUrl(`http://${data.ip}:33159/api/download/resident-app`);
+                }
+            } catch (error) {
+                console.error("Failed to fetch server IP:", error);
+                // Fallback to current hostname if fetch fails
+                if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                    setDownloadUrl(`http://${window.location.hostname}:33159/api/download/resident-app`);
+                }
+            }
+        };
+
+        fetchServerIp();
+    }, []);
+
+    const openModal = (type) => {
+        setModalConfig({
+            isOpen: true,
+            type: type
+        });
+    };
+
+    const closeModal = () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+    };
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -300,59 +347,59 @@ function Landing() {
                     </motion.div>
 
                     <motion.div
-                        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6"
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
                     >
-                        {/* Solution 1 */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/20">
-                                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center mb-6 shadow-sm">
-                                    <Trash2 size={24} />
-                                </div>
-                                <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t('landing.solutions.s1_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
-                                    {t('landing.solutions.s1_desc')}
-                                </p>
-                                <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> {t('landing.solutions.s1_l1')}</li>
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> {t('landing.solutions.s1_l2')}</li>
-                                </ul>
-                            </div>
-                        </motion.div>
+                        {[
+                            { id: 's1', icon: <RouteIcon size={24} />, color: 'orange' },
+                            { id: 's2', icon: <Droplets size={24} />, color: 'blue' },
+                            { id: 's3', icon: <Lightbulb size={24} />, color: 'yellow' },
+                            { id: 's4', icon: <Shield size={24} />, color: 'red' },
+                            { id: 's5', icon: <Building2 size={24} />, color: 'green' },
+                        ].map((solution, i) => {
+                            const colors = {
+                                orange: 'hover:border-orange-200 dark:hover:border-orange-500/50 group-hover:bg-orange-50/50 dark:group-hover:bg-orange-900/20 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 check:text-orange-500',
+                                blue: 'hover:border-blue-200 dark:hover:border-blue-500/50 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 check:text-blue-500',
+                                yellow: 'hover:border-yellow-200 dark:hover:border-yellow-500/50 group-hover:bg-yellow-50/50 dark:group-hover:bg-yellow-900/20 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 check:text-yellow-600',
+                                red: 'hover:border-red-200 dark:hover:border-red-500/50 group-hover:bg-red-50/50 dark:group-hover:bg-red-900/20 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 check:text-red-500',
+                                green: 'hover:border-emerald-200 dark:hover:border-emerald-500/50 group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/20 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 check:text-emerald-500',
+                            }[solution.color];
 
-                        {/* Solution 2 */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-orange-200 dark:hover:border-orange-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors group-hover:bg-orange-50/50 dark:group-hover:bg-orange-900/20">
-                                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center mb-6 shadow-sm">
-                                    <RouteIcon size={24} />
-                                </div>
-                                <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t('landing.solutions.s2_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
-                                    {t('landing.solutions.s2_desc')}
-                                </p>
-                                <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-orange-500" /> {t('landing.solutions.s2_l1')}</li>
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-orange-500" /> {t('landing.solutions.s2_l2')}</li>
-                                </ul>
-                            </div>
-                        </motion.div>
+                            const colorParts = colors.split(' ');
+                            const hoverBorder = colorParts[0] + ' ' + colorParts[1];
+                            const hoverBg = colorParts[2] + ' ' + colorParts[3];
+                            const iconBg = colorParts[4] + ' ' + colorParts[5];
+                            const iconText = colorParts[6] + ' ' + colorParts[7];
+                            const checkText = colorParts[8].replace('check:', '');
 
-                        {/* Solution 3 */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-yellow-200 dark:hover:border-yellow-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors group-hover:bg-yellow-50/50 dark:group-hover:bg-yellow-900/20">
-                                <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-xl flex items-center justify-center mb-6 shadow-sm">
-                                    <Zap size={24} />
-                                </div>
-                                <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t('landing.solutions.s3_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
-                                    {t('landing.solutions.s3_desc')}
-                                </p>
-                                <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-yellow-600" /> {t('landing.solutions.s3_l1')}</li>
-                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-yellow-600" /> {t('landing.solutions.s3_l2')}</li>
-                                </ul>
-                            </div>
-                        </motion.div>
+                            // Alignment logic: 
+                            // 3 per row on LG (cols 1-2, 3-4, 5-6). 
+                            // Bottom row has 2 cards staggered (col-start-2: cols 2-3, col-start-4: cols 4-5)
+                            const gridClasses = i < 3 
+                                ? "lg:col-span-2" 
+                                : i === 3 ? "lg:col-span-2 lg:col-start-2" : "lg:col-span-2 lg:col-start-4";
+
+                            // Tablet logic: 2 per row. 5th card is centered.
+                            const tabletClasses = i === 4 ? "md:col-span-2 md:max-w-md md:mx-auto" : "";
+
+                            return (
+                                <motion.div key={solution.id} variants={fadeUp} className={`group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 ${hoverBorder} ${gridClasses} ${tabletClasses}`}>
+                                    <div className={`bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors ${hoverBg}`}>
+                                        <div className={`w-12 h-12 ${iconBg} ${iconText} rounded-xl flex items-center justify-center mb-6 shadow-sm`}>
+                                            {solution.icon}
+                                        </div>
+                                        <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t(`landing.solutions.${solution.id}_title`)}</h3>
+                                        <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
+                                            {t(`landing.solutions.${solution.id}_desc`)}
+                                        </p>
+                                        <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                            <li className="flex items-center gap-2"><CheckCircle2 size={14} className={checkText} /> {t(`landing.solutions.${solution.id}_l1`)}</li>
+                                            <li className="flex items-center gap-2"><CheckCircle2 size={14} className={checkText} /> {t(`landing.solutions.${solution.id}_l2`)}</li>
+                                        </ul>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
                     </motion.div>
                 </div>
             </section>
@@ -366,7 +413,7 @@ function Landing() {
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
                     >
                         <div>
-                            <div className="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-sm tracking-widest uppercase mb-3">
+                            <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-500 font-bold text-sm tracking-widest uppercase mb-3">
                                 <ExternalLink size={16} /> {t('landing.services.badge')}
                             </div>
                             <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-tight">
@@ -559,6 +606,67 @@ function Landing() {
                 </div>
             </section>
 
+            {/* Agent Mobile App Download Section */}
+            <section className="relative z-10 py-24 bg-gradient-to-br from-indigo-900 to-slate-900 overflow-hidden">
+                {/* Background Pattern */}
+                <div className="absolute inset-0 opacity-10">
+                    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px]"></div>
+                </div>
+                
+                <div className="max-w-7xl mx-auto px-6 lg:px-8 relative grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                    <motion.div 
+                        initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
+                        className="text-left"
+                    >
+                        <div className="inline-flex items-center gap-2 text-orange-400 font-bold text-sm tracking-[0.2em] uppercase mb-6">
+                            <Smartphone size={16} /> Citizen Services
+                        </div>
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white mb-6 leading-[1.1]">
+                            PULSO Resident App<br/>
+                            <span className="text-orange-500">City in your pocket.</span>
+                        </h2>
+                        <p className="text-indigo-100/70 text-lg mb-10 leading-relaxed max-w-xl font-medium">
+                            Report issues, track community projects, and access city services directly from your mobile device. Stay connected with North Caloocan anywhere, anytime.
+                        </p>
+                        <div className="flex flex-wrap gap-6 items-center">
+                            <a 
+                                href={downloadUrl}
+                                className="flex items-center gap-3 bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-2xl font-black text-lg transition-all hover:scale-105 active:scale-95 shadow-xl shadow-orange-950/20 group"
+                            >
+                                <Download size={24} className="group-hover:bounce" />
+                                Download APK
+                            </a>
+                            <div className="flex flex-col border-l border-white/10 pl-6">
+                                <span className="text-white font-bold text-[10px] uppercase tracking-widest mb-1 opacity-50">Latest Production</span>
+                                <span className="text-white font-black text-sm tracking-tight">v2.5.0-Stable</span>
+                            </div>
+                        </div>
+                    </motion.div>
+                    
+                    <motion.div 
+                        initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
+                        className="flex justify-center lg:justify-end"
+                    >
+                        <div className="bg-white p-8 rounded-[3rem] shadow-2xl relative group transition-all duration-700 hover:rotate-2 hover:scale-[1.02]">
+                            <div className="absolute -top-6 -right-6 w-24 h-24 bg-orange-500 rounded-full flex flex-col items-center justify-center text-white font-black text-[10px] rotate-12 shadow-2xl border-4 border-white">
+                                <QrCode size={24} className="mb-1" />
+                                SCAN ME
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-[2rem] border border-slate-100">
+                                <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(downloadUrl)}`}
+                                    alt="App QR Code"
+                                    className="w-64 h-64 md:w-72 md:h-72"
+                                />
+                            </div>
+                            <p className="mt-8 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">
+                                Point camera to install
+                            </p>
+                        </div>
+                    </motion.div>
+                </div>
+            </section>
+
             {/* Comprehensive Professional Footer */}
             <footer className="relative z-10 bg-slate-900 pt-24 pb-12 text-slate-300">
                 <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-slate-800 to-transparent"></div>
@@ -583,14 +691,12 @@ function Landing() {
                             </div>
                         </div>
 
-                        {/* Quick Portals */}
                         <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">Access Portals</h4>
+                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.portals')}</h4>
                             <ul className="flex flex-col gap-3 font-medium text-sm">
                                 <li><a href="/login" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Resident Login</a></li>
                                 <li><a href="/gov" className="hover:text-orange-400 transition-colors flex items-center gap-2 font-bold text-white bg-white/5 p-2 rounded-lg border border-white/10 hover:bg-orange-500/20 transition-all"><Shield size={14} className="text-orange-500" /> Internal Gateway (Staff)</a></li>
-                                <li><a href="/dispatcher" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Engineering Dispatch</a></li>
-                                <li><a href="/management" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Command Management</a></li>
+                                <li><a href={downloadUrl} className="hover:text-orange-400 transition-colors flex items-center gap-2"><Smartphone size={14} className="text-orange-500" /> {t('landing.footer.p_resident_app')}</a></li>
                             </ul>
                         </div>
 
@@ -616,11 +722,11 @@ function Landing() {
                             </ul>
                         </div>
 
-                        {/* Contact Info */}
-                        <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.contact')}</h4>
-                            <ul className="flex flex-col gap-4 text-sm">
-                                <li className="flex items-start gap-3">
+                        {/* Contact Info - Full Width Horizontal */}
+                        <div className="lg:col-span-4 mt-8 pt-12 border-t border-slate-800/30">
+                            <h4 className="text-white font-bold text-lg mb-8 tracking-tight">{t('landing.footer.contact')}</h4>
+                            <ul className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 text-sm">
+                                <li className="flex items-start gap-3 max-w-xs">
                                     <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0"><MapPinned size={16} /></div>
                                     <span className="text-slate-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('landing.footer.address') }} />
                                 </li>
@@ -628,7 +734,7 @@ function Landing() {
                                     <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
                                         <Phone size={16} />
                                     </div>
-                                    <span className="text-slate-400">(02) 336-5576</span>
+                                    <span className="text-slate-400 font-bold">(02) 336-5576</span>
                                 </li>
                                 <li className="flex items-center gap-3">
                                     <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
@@ -643,27 +749,53 @@ function Landing() {
                                     <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
                                         <Mail size={16} />
                                     </div>
-                                    <span className="text-slate-400">engineering@caloocancity.gov.ph</span>
+                                    <span className="text-slate-400 font-medium">engineering@caloocancity.gov.ph</span>
                                 </li>
                             </ul>
                         </div>
                     </div>
 
                     {/* Footer Bottom Sheet */}
-                    <div className="pt-8 relative flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-800/80 dark:to-transparent pointer-events-none"></div>
-                        <div className="text-slate-500 text-sm font-medium">
-                            &copy; {new Date().getFullYear()} {t('landing.footer.copyright')}
+                    <div className="mt-12 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 text-slate-400 text-xs tracking-wide">
+                            <span className="opacity-80">&copy; {new Date().getFullYear()} PULSO Infrastructure Network.</span>
+                            <div className="hidden md:block w-px h-3 bg-white/10"></div>
+                            <span className="text-slate-500 font-medium">Designed for Caloocan LGU</span>
                         </div>
-                        <div className="flex gap-6 text-sm font-medium text-slate-500">
-                            <a href="#" className="hover:text-orange-400 transition-colors">{t('landing.footer.privacy')}</a>
-                            <a href="#" className="hover:text-orange-400 transition-colors">{t('landing.footer.terms')}</a>
-                            <a href="#" className="hover:text-orange-400 transition-colors">{t('landing.footer.cookie')}</a>
+                        
+                        <div className="flex items-center gap-8 text-[10px] font-bold uppercase tracking-[0.2em]">
+                            <button 
+                                onClick={() => openModal('privacy')} 
+                                className="text-slate-400 hover:text-orange-400 transition-all duration-300 flex items-center gap-2 group ring-offset-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 rounded-sm"
+                            >
+                                <div className="w-1 h-1 rounded-full bg-orange-500/20 group-hover:bg-orange-500 transition-colors"></div>
+                                {t('landing.footer.privacy')}
+                            </button>
+                            <button 
+                                onClick={() => openModal('terms')} 
+                                className="text-slate-400 hover:text-orange-400 transition-all duration-300 flex items-center gap-2 group ring-offset-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 rounded-sm"
+                            >
+                                <div className="w-1 h-1 rounded-full bg-orange-500/20 group-hover:bg-orange-500 transition-colors"></div>
+                                {t('landing.footer.terms')}
+                            </button>
+                            <button 
+                                onClick={() => openModal('cookies')} 
+                                className="text-slate-400 hover:text-orange-400 transition-all duration-300 flex items-center gap-2 group ring-offset-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 rounded-sm"
+                            >
+                                <div className="w-1 h-1 rounded-full bg-orange-500/20 group-hover:bg-orange-500 transition-colors"></div>
+                                {t('landing.footer.cookie')}
+                            </button>
                         </div>
                     </div>
                 </div>
             </footer>
 
+            {/* Legal Modals */}
+            <TermsModal 
+                isOpen={modalConfig.isOpen} 
+                onClose={closeModal} 
+                type={modalConfig.type} 
+            />
         </div>
     );
 }

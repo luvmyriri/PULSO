@@ -1,0 +1,25 @@
+{
+    "timestamp": "2026-03-30T22:01:00.014061",
+    "raw_text": "REPUBLIKA\nNG\nPILIPINAS\nMAKAKALIKASAN AT MAKABANSA\nMAKADIYOS, MAKATAO\nREPUBLIC OF THE PHILIPPINES\nUnified Multi-Purpose ID\nSURNAME\nSANTOS\nGIVEN NAME\nJOSE\nUMID\nCRN-0028-1215160-9\nCater\nMIDDLE NAME\nCRUZ\nSEX M DATE OF BIRTH 1960/01/28\nADDRESS\n28 PAYAPA ST BAGONG DIWA\nSTO CRISTOBAL CALOOCAN CITY\nMETRO MANILA\nPHILIPPINES 1800\nI WILL NOT DONATE ANY ORGAN\nIII. ORGAN DONATION:\nIV. IN CASE OF EMERGENCY NOTIFY:\nName: EMILY G. TABIOS\nAddress: BLK 9 LOT 30 RUBY ST. CELINA HOMES 3 BAGUMBONG CALOOCAN CITY\nTel. No.: 0999884665\nIVER'S LICENSE LTO DRIVER'S LICENSE LTO-DRIVER'S L\nI. DL CODES:\nA\nMOTORCYCLE\nA1 TRICYCLE\nB UP TO 5000 KGS GVW/8 SEATS\nB1 UP TO 5000 KGS GVW/9 OR MORE SEATS\nC\nB2 GOODS\nGOODS\n3500 KGS GVW\n3500 KGS GVW\nD BUS > 5000 KGS GVW/9 OR MORE SEATS\nBE TRAILERS \u2264 3500 KGS\nCE ARTICULATED C> 3500 KGS COMBINED GVW\nM1-NP-MT/AT\nII. CONDITIONS:\n1. WEAR CORRECTIVE LENSES\n2. DRIVE ONLY W/SPECIAL EQPT FOR UPPER/LOWER LIMBS\n3. DRIVE CUSTOMIZED MOTOR VEHICLE ONLY\n4. DAYLIGHT DRIVING ONLY\n5. HEARING AID REQUIRED\nSerial Number\n461537862",
+    "parsed_data": {
+        "id_type": "umid",
+        "id_type_label": "UMID / SSS Card",
+        "first_name": "Jose",
+        "last_name": "Santos",
+        "middle_name": "Cruz",
+        "dob": "01-28-1960",
+        "sex": "Male",
+        "address": "28 Payapa St Bagong Diwa Sto Cristobal Caloocan City Metro Manila Philippines",
+        "barangay": "",
+        "postal_code": "1800",
+        "is_north_caloocan": false,
+        "verification_message": "Verification Failed: Caloocan City detected but could not determine barangay number.",
+        "crn": "0028-1215160-9",
+        "sss_no": "",
+        "gsis_no": "",
+        "pcn": "CRN-0028-1215160-9",
+        "license_no": "461537862",
+        "is_document_mismatch": true,
+        "mismatch_reason": "Front is UMID, back contains Driver's License information."
+    }
+}

@@ -36,38 +36,63 @@ class PostalIDParser(BaseIDParser):
         if id_match:
             result['postal_id_no'] = id_match.group(1)
 
-        # 3. DOB: MM/DD/YYYY
-        dob_iso = self._extract_dob(upper)
-        if dob_iso:
-             y, m, d = dob_iso.split('-')
-             result['dob'] = f"{m}/{d}/{y}"
+        # 3. DOB: ISO YYYY-MM-DD
+        result['dob'] = self._extract_dob(upper)
 
-        result['sex']      = self._extract_sex(upper)
-        
-        # 4. Structured Address
-        addr_raw = self._extract_address(lines, upper)
+        result['sex'] = self._extract_sex(upper)
+
+        # 4. Structured Address — extract directly from raw lines to preserve commas
+        # base._extract_address() strips commas (prevents comma-split from working)
+        addr_raw = self._extract_postal_address(lines, upper)
         result['address'] = addr_raw
-        
-        # Smart split for Postal IDs
-        # Format: House No, Street, Barangay, City, Province, Zip
-        parts = [p.strip() for p in addr_raw.split(',') if p.strip()]
-        if len(parts) >= 4:
-             result['house_no'] = parts[0]
-             result['street'] = parts[1]
-             result['barangay'] = parts[2].replace('Barangay', '').strip()
-             result['city'] = parts[3]
-             if len(parts) > 4:
-                  result['province'] = parts[4]
-             
-             # Zip code (4 digits at end)
-             zip_match = re.search(r'\b(\d{4})\b', addr_raw)
-             if zip_match:
-                  result['postal_code'] = zip_match.group(1)
-        
+
+        if addr_raw:
+            # Smart split: House No, Street, Barangay, City, Province, Zip
+            parts = [p.strip() for p in addr_raw.split(',') if p.strip()]
+            if len(parts) >= 3:
+                result['house_no'] = parts[0]
+                result['street']   = parts[1]
+                # Parts[2] might be "Barangay 123" or just the barangay name
+                brgy_raw = parts[2].upper().replace('BARANGAY', '').replace('BGY.', '').replace('BRY.', '').strip()
+                result['barangay'] = brgy_raw.title()
+                if len(parts) > 3:
+                    result['city'] = parts[3].strip().title()
+                if len(parts) > 4:
+                    result['province'] = parts[4].strip().title()
+                # Zip code from any 4-digit token
+                zip_match = re.search(r'\b(\d{4})\b', addr_raw)
+                if zip_match:
+                    result['postal_code'] = zip_match.group(1)
+
         if not result['barangay']:
-             result['barangay'] = self._extract_barangay(upper)
+            result['barangay'] = self._extract_barangay(upper)
 
         return result
+
+    def _extract_postal_address(self, lines: List[str], upper: str) -> str:
+        """
+        Extract address from raw lines, preserving commas.
+        Postal ID format: ADDRESS: [addr line 1], [street], [barangay], [city], [zip]
+        or address on the next line(s) after the ADDRESS: label.
+        """
+        for i, line in enumerate(lines):
+            ul = line.upper().strip()
+            if ul.startswith('ADDRESS') and ':' in ul:
+                inline = line.split(':', 1)[1].strip()
+                if inline:
+                    return inline
+                # Address might be on the next line(s)
+                if i + 1 < len(lines):
+                    # Collect continuation lines (until next label or blank)
+                    addr_parts = []
+                    for j in range(i + 1, min(i + 4, len(lines))):
+                        nxt = lines[j].strip()
+                        if not nxt or re.match(r'^(DATE|DOB|SEX|POSTAL|SIGN|EXPIRY)', nxt.upper()):
+                            break
+                        addr_parts.append(nxt)
+                    return ', '.join(addr_parts)
+        # Fallback to base parser for generic label matching
+        return self._extract_address(lines, upper)
 
     def _extract_postal_names(self, lines: List[str], upper: str) -> Tuple[str, str, str]:
         """

@@ -1,0 +1,28 @@
+{
+    "timestamp": "2026-03-31T00:14:57.026224",
+    "raw_text": "REPUBLIC OF THE PHILIPPINES\nDEPARTMENT OF TRANSPORTATION\nLAND TRANSPORTATION OFFICE\nDRIVER'S LICENSE\nLast Name, First Name, Middle Name\nTABIOS, GENE GANGE\n2025/05/20\nSene Jovorit\nSignature of Licensee\nNationality\nPHL\nAddress\nLAND TRA\nof\nOFFICE\nSex\nM\nDate of Birth\n2005/06/13\nWeight (kg) Height (m)\n60\n1.65\nBLK 9 LOT 30, RUBY ST CELINA HOMES 3 BAGUMBONG,\nBARANGAY 171, CALOOCAN CITY, NCR, THIRD DISTRICT, 1421\nLicense No.\nC08-25-006312\nExpiration Date\n2029/06/13\nAgency Code\nC08\nBlood Type\nO+\nEyes Color\nDL Codes\nB\nBLACK\nConditions\nNONE\nATTY VIGOR D. MENDOZA II\nAssistant Secretary\nI WILL NOT DONATE ANY ORGAN\nIII. ORGAN DONATION:\nIV. IN CASE OF EMERGENCY NOTIFY:\nName: EMILY G. TABIOS\nAddress: BLK 9 LOT 30 RUBY ST. CELINA HOMES 3 BAGUMBONG CALOOCAN CITY\nTel. No.: 0999884665\nIVER'S LICENSE LTO DRIVER'S LICENSE LTO-DRIVER'S L\nI. DL CODES:\nA\nMOTORCYCLE\nA1 TRICYCLE\nB UP TO 5000 KGS GVW/8 SEATS\nB1 UP TO 5000 KGS GVW/9 OR MORE SEATS\nC\nB2 GOODS\nGOODS\n3500 KGS GVW\n3500 KGS GVW\nD BUS > 5000 KGS GVW/9 OR MORE SEATS\nBE TRAILERS \u2264 3500 KGS\nCE ARTICULATED C> 3500 KGS COMBINED GVW\nM1-NP-MT/AT\nII. CONDITIONS:\n1. WEAR CORRECTIVE LENSES\n2. DRIVE ONLY W/SPECIAL EQPT FOR UPPER/LOWER LIMBS\n3. DRIVE CUSTOMIZED MOTOR VEHICLE ONLY\n4. DAYLIGHT DRIVING ONLY\n5. HEARING AID REQUIRED\nSerial Number\n461537862",
+    "parsed_data": {
+        "id_type": "lto",
+        "id_type_label": "LTO Driver's License",
+        "first_name": "Gene",
+        "last_name": "Tabios",
+        "middle_name": "Gange",
+        "dob": "2005-06-13",
+        "sex": "Male",
+        "address": "BLK 9 LOT 30, RUBY ST CELINA HOMES 3 BAGUMBONG, BARANGAY 171, CALOOCAN CITY, NCR, THIRD DISTRICT",
+        "house_no": "",
+        "block_lot": "BLK 9 LOT 30",
+        "subdivision": "Celina Homes 3",
+        "street": "Ruby St",
+        "barangay": "BAGUMBONG, BARANGAY 171",
+        "postal_code": "1421",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "city": "",
+        "province": "",
+        "pcn": "CALOOCAN CITY",
+        "license_no": "C08-25-006312",
+        "is_document_mismatch": false,
+        "mismatch_reason": ""
+    }
+}

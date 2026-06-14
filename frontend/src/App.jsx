@@ -10,7 +10,12 @@ import ResidentDashboard from './pages/ResidentDashboard';
 import DispatcherDashboard from './pages/DispatcherDashboard';
 import ManagementDashboard from './pages/ManagementDashboard';
 import GovDivisionPage   from './pages/GovDivisionPage';
+import GovAnalyticsPage  from './pages/GovAnalyticsPage';
+import PredictiveMaintenancePage from './pages/PredictiveMaintenancePage';
 import PositionDashboard from './pages/PositionDashboard';
+import DocumentRegistryPage from './pages/DocumentRegistryPage';
+import GovernmentUserManagementPage from './pages/GovernmentUserManagementPage';
+import ResidentAccountManagementPage from './pages/ResidentAccountManagementPage';
 import ResetPassword     from './pages/ResetPassword';
 import LanguageSwitcher  from './components/LanguageSwitcher';
 import ProtectedRoute, {
@@ -26,16 +31,17 @@ import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
 // Convenience wrappers so the JSX below stays readable
+// Convenience wrappers so the JSX below stays readable
 const AnyAuth    = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>;
 const GovOnly    = ({ children }) => <ProtectedRoute allowedRoles={GOV_ROLES}>{children}</ProtectedRoute>;
-const ExecOnly   = ({ children }) => <ProtectedRoute allowedRoles={EXECUTIVE_ROLES}>{children}</ProtectedRoute>;
-const SeniorOnly = ({ children }) => <ProtectedRoute allowedRoles={SENIOR_ROLES}>{children}</ProtectedRoute>;
-const InspOnly   = ({ children }) => <ProtectedRoute allowedRoles={INSPECTOR_ROLES}>{children}</ProtectedRoute>;
-const FieldOnly  = ({ children }) => <ProtectedRoute allowedRoles={FIELD_ROLES}>{children}</ProtectedRoute>;
-const ProcOnly   = ({ children }) => <ProtectedRoute allowedRoles={PROCUREMENT_ROLES}>{children}</ProtectedRoute>;
-const AdminOnly  = ({ children }) => <ProtectedRoute allowedRoles={[...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer']}>{children}</ProtectedRoute>;
-const DispatchOp  = ({ children }) => <ProtectedRoute allowedRoles={['admin_clerk', 'dispatcher', ...SENIOR_ROLES]}>{children}</ProtectedRoute>;
-const OBOOnly    = ({ children }) => <ProtectedRoute allowedRoles={['admin_clerk', 'records_officer', ...INSPECTOR_ROLES]}>{children}</ProtectedRoute>;
+const ExecOnly   = ({ children }) => <ProtectedRoute requiredPermission={{ module: 'admin', action: 'audit' }}>{children}</ProtectedRoute>;
+const SeniorOnly = ({ children }) => <ProtectedRoute requiredPermission={{ module: 'ops', action: 'manage' }}>{children}</ProtectedRoute>;
+const InspOnly   = ({ children }) => <ProtectedRoute requiredPermission={{ module: 'inspections', action: 'view' }}>{children}</ProtectedRoute>;
+const FieldOnly  = ({ children }) => <ProtectedRoute requiredPermission={{ module: 'reports', action: 'view' }}>{children}</ProtectedRoute>;
+const ProcOnly   = ({ children }) => <ProtectedRoute requiredPermission={{ module: 'procurement', action: 'view' }}>{children}</ProtectedRoute>;
+const AdminOnly  = ({ children }) => <ProtectedRoute requiredPermission={{ module: 'admin', action: 'manage' }}>{children}</ProtectedRoute>;
+const DispatchOp = ({ children }) => <ProtectedRoute requiredPermission={{ module: 'ops', action: 'manage' }}>{children}</ProtectedRoute>;
+const OBOOnly    = ({ children }) => <ProtectedRoute requiredPermission={{ module: 'inspections', action: 'manage' }}>{children}</ProtectedRoute>;
 
 // Resident = non-gov account
 const ResidentOnly = ({ children }) => (
@@ -56,9 +62,9 @@ function App() {
                         <Route path="/reset-password" element={<ResetPassword />} />
 
                         {/* ── RESIDENT PORTAL ────────────────────────────────── */}
-                        {/*   Residents & gov staff can see the citizen dashboard  */}
+                        {/* Residents ONLY portal access */}
                         <Route path="/dashboard" element={
-                            <AnyAuth><ResidentDashboard /></AnyAuth>
+                            <ResidentOnly><ResidentDashboard /></ResidentOnly>
                         } />
 
                         {/* ── GOVERNMENT — UNIVERSAL LANDING ─────────────────── */}
@@ -117,6 +123,16 @@ function App() {
                             </ProtectedRoute>
                         } />
 
+                        {/* Document Registry — all gov staff */}
+                        <Route path="/gov/document-registry" element={
+                            <GovOnly><DocumentRegistryPage /></GovOnly>
+                        } />
+
+                        {/* Incoming Citizen Reports - all gov staff can view triage */}
+                        <Route path="/gov/reports" element={
+                            <GovOnly><GovDivisionPage /></GovOnly>
+                        } />
+
                         {/* Reports Archive — admin staff + exec */}
                         <Route path="/gov/reports-archive" element={
                             <SeniorOnly><GovDivisionPage /></SeniorOnly>
@@ -157,12 +173,40 @@ function App() {
 
                         {/* User / Role Management — admin + exec only */}
                         <Route path="/gov/users" element={
-                            <AdminOnly><GovDivisionPage /></AdminOnly>
+                            <AdminOnly><GovernmentUserManagementPage /></AdminOnly>
+                        } />
+
+                        {/* Resident Account Management — admin + exec only */}
+                        <Route path="/gov/residents" element={
+                            <AdminOnly><ResidentAccountManagementPage /></AdminOnly>
                         } />
 
                         {/* System Settings — admin + exec only */}
                         <Route path="/gov/settings" element={
                             <AdminOnly><GovDivisionPage /></AdminOnly>
+                        } />
+
+                        {/* Analytics Intelligence Engine — admin + exec only */}
+                        <Route path="/gov/analytics" element={
+                            <AdminOnly><GovAnalyticsPage /></AdminOnly>
+                        } />
+
+                        {/* Predictive Maintenance Engine — all gov staff */}
+                        <Route path="/gov/predictive" element={
+                            <GovOnly>
+                                <PredictiveMaintenancePage />
+                            </GovOnly>
+                        } />
+
+
+                        {/* Agent App Download — all gov staff */}
+                        <Route path="/gov/agent-app" element={
+                            <GovOnly><GovDivisionPage /></GovOnly>
+                        } />
+
+                        {/* Tactical Advisories — all gov staff */}
+                        <Route path="/gov/advisories" element={
+                            <GovOnly><GovDivisionPage /></GovOnly>
                         } />
 
                         {/* ── 404 FALLBACK ────────────────────────────────────── */}

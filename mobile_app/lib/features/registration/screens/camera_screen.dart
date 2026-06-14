@@ -1,6 +1,8 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:mobile_app/core/theme/app_theme.dart';
+import 'package:pulso_mobile/core/theme/app_theme.dart';
+import 'package:pulso_mobile/core/services/location_service.dart';
+import 'package:pulso_mobile/core/api/api_client.dart';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -18,11 +20,18 @@ class _CameraScreenState extends State<CameraScreen> {
   List<CameraDescription>? _cameras;
   bool _isReady = false;
   String? _error;
+  double? _capturedLat;
+  double? _capturedLng;
+  bool _isGettingLocation = false;
+  LocationService? _locationService;
 
   @override
   void initState() {
     super.initState();
     _initializeCamera();
+    if (widget.side == 'incident_report') {
+      _locationService = LocationService(ApiClient());
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -55,19 +64,84 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
+  Future<void> _getCurrentLocation() async {
+    if (_locationService == null) return;
+
+    setState(() => _isGettingLocation = true);
+    try {
+      final position = await _locationService!.getCurrentPosition();
+      setState(() {
+        _capturedLat = position.latitude;
+        _capturedLng = position.longitude;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not get location: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGettingLocation = false);
+      }
+    }
+  }
+
+  String _generateFilename() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    if (_capturedLat != null && _capturedLng != null) {
+      final latStr = _capturedLat!.toStringAsFixed(6).replaceAll('.', 'p');
+      final lngStr = _capturedLng!.toStringAsFixed(6).replaceAll('.', 'p');
+      return 'report_${latStr}_${lngStr}_$timestamp.jpg';
+    }
+    return 'report_$timestamp.jpg';
   }
 
   Future<void> _takePicture() async {
     if (_controller == null || !_controller!.value.isInitialized) return;
 
+    if (widget.side == 'incident_report') {
+      await _getCurrentLocation();
+      if (_capturedLat == null && _capturedLng == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Location required for incident reports. Please enable GPS.',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
     try {
       final image = await _controller!.takePicture();
+      final filename = _generateFilename();
+
+      // Create a new file with the GPS-based filename
+      final newPath = image.path.replaceAll(
+        image.path.split('/').last,
+        filename,
+      );
+      final originalFile = File(image.path);
+      await originalFile.rename(newPath);
+
       if (mounted) {
-        Navigator.of(context).pop(File(image.path));
+        // Return both file and location data
+        Navigator.of(context).pop({
+          'file': File(newPath),
+          'lat': _capturedLat,
+          'lng': _capturedLng,
+          'address': _capturedLat != null
+              ? '${_capturedLat!.toStringAsFixed(5)}, ${_capturedLng!.toStringAsFixed(5)}'
+              : null,
+        });
       }
     } catch (e) {
       print('Error taking picture: $e');
@@ -83,7 +157,11 @@ class _CameraScreenState extends State<CameraScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 64, color: AppTheme.errorRed),
+              const Icon(
+                Icons.error_outline,
+                size: 64,
+                color: AppTheme.errorRed,
+              ),
               const SizedBox(height: 16),
               Text(_error!, style: const TextStyle(color: Colors.white)),
               const SizedBox(height: 24),
@@ -112,29 +190,33 @@ class _CameraScreenState extends State<CameraScreen> {
         fit: StackFit.expand,
         children: [
           CameraPreview(_controller!),
-          
-          // ID Guide Overlay
-          Center(
-            child: AspectRatio(
-              aspectRatio: 1.586 / 1,
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.85,
-                margin: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white30, width: 2),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Stack(
-                  children: [
-                    _buildCorner(const Offset(0, 0), true, true),
-                    _buildCorner(const Offset(1, 0), true, false),
-                    _buildCorner(const Offset(0, 1), false, true),
-                    _buildCorner(const Offset(1, 1), false, false),
-                  ],
-                ),
-              ),
-            ),
-          ).animate().fadeIn(duration: 1.seconds).scale(begin: const Offset(1.1, 1.1)),
+
+          // ID Guide Overlay (Only if not field operation)
+          if (widget.side != 'field_operation' && widget.side != 'incident_report')
+            Center(
+                  child: AspectRatio(
+                    aspectRatio: 1.586 / 1,
+                    child: Container(
+                      width: MediaQuery.of(context).size.width * 0.85,
+                      margin: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white30, width: 2),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Stack(
+                        children: [
+                          _buildCorner(const Offset(0, 0), true, true),
+                          _buildCorner(const Offset(1, 0), true, false),
+                          _buildCorner(const Offset(0, 1), false, true),
+                          _buildCorner(const Offset(1, 1), false, false),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+                .animate()
+                .fadeIn(duration: 1.seconds)
+                .scale(begin: const Offset(1.1, 1.1)),
 
           // Controls & Instructions
           Positioned(
@@ -148,14 +230,19 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black45,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white10),
                       ),
                       child: Text(
-                        'ALIGN THE ${widget.side.toUpperCase()} OF YOUR ID',
+                        widget.side == 'field_operation' || widget.side == 'incident_report'
+                            ? 'CAPTURE CLEAR PHOTO EVIDENCE'
+                            : 'ALIGN THE ${widget.side.toUpperCase()} OF YOUR ID',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -171,10 +258,16 @@ class _CameraScreenState extends State<CameraScreen> {
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded, color: Colors.white, size: 36),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                        size: 36,
+                      ),
                     ).animate().fadeIn(delay: 800.ms),
                     const SizedBox(width: 40),
-                    _CaptureButton(onPressed: _takePicture).animate().fadeIn(delay: 1.seconds).scale(),
+                    _CaptureButton(
+                      onPressed: _takePicture,
+                    ).animate().fadeIn(delay: 1.seconds).scale(),
                     const SizedBox(width: 40),
                     const SizedBox(width: 48), // Spacer
                   ],
@@ -198,16 +291,30 @@ class _CameraScreenState extends State<CameraScreen> {
         height: 50,
         decoration: BoxDecoration(
           border: Border(
-            top: isTop ? const BorderSide(color: AppTheme.primaryOrange, width: 5) : BorderSide.none,
-            bottom: !isTop ? const BorderSide(color: AppTheme.primaryOrange, width: 5) : BorderSide.none,
-            left: isLeft ? const BorderSide(color: AppTheme.primaryOrange, width: 5) : BorderSide.none,
-            right: !isLeft ? const BorderSide(color: AppTheme.primaryOrange, width: 5) : BorderSide.none,
+            top: isTop
+                ? const BorderSide(color: AppTheme.primaryOrange, width: 5)
+                : BorderSide.none,
+            bottom: !isTop
+                ? const BorderSide(color: AppTheme.primaryOrange, width: 5)
+                : BorderSide.none,
+            left: isLeft
+                ? const BorderSide(color: AppTheme.primaryOrange, width: 5)
+                : BorderSide.none,
+            right: !isLeft
+                ? const BorderSide(color: AppTheme.primaryOrange, width: 5)
+                : BorderSide.none,
           ),
           borderRadius: BorderRadius.only(
             topLeft: isTop && isLeft ? const Radius.circular(24) : Radius.zero,
-            topRight: isTop && !isLeft ? const Radius.circular(24) : Radius.zero,
-            bottomLeft: !isTop && isLeft ? const Radius.circular(24) : Radius.zero,
-            bottomRight: !isTop && !isLeft ? const Radius.circular(24) : Radius.zero,
+            topRight: isTop && !isLeft
+                ? const Radius.circular(24)
+                : Radius.zero,
+            bottomLeft: !isTop && isLeft
+                ? const Radius.circular(24)
+                : Radius.zero,
+            bottomRight: !isTop && !isLeft
+                ? const Radius.circular(24)
+                : Radius.zero,
           ),
         ),
       ),

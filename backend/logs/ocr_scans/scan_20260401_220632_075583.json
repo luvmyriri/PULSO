@@ -1,0 +1,28 @@
+{
+    "timestamp": "2026-04-01T22:06:32.075583",
+    "raw_text": "COMMISSION\nSPUBLIC OF\nON\nELECTION\nTHE PHILIPPINES\nRepublic of the Philippines\nCOMMISSION ON ELECTIONS\nCALOOCAN CITY NCR THIRD DISTRICT\nVIN: 7501-0726A-D1886LBG10000\nGARCIA\nLEONARD PHILLIP\nBERNABE\nDate of Birth\nCivil Status\nApril 18, 1986\nMarried\nFilipino\nCitizenship\nAddress\nBLK100 L11 NORTH VILLE 2B BAGUMBONG\nBARANGAY 171\nPrecinct No.\n0726A\nsplie\nSignature of Voter\nSIXTO S. BRILLANTES, JR.\nChairman\nCOMMISSION\nON\nELECTIONS\nREPUBLIC\nOF THE PHILIPPINES\nVOTER'S ID",
+    "parsed_data": {
+        "id_type": "comelec",
+        "id_type_label": "COMELEC Voter's ID",
+        "first_name": "Jr.",
+        "last_name": "Sixto S. Brillantes",
+        "middle_name": "",
+        "dob": "04/18/1986",
+        "sex": "",
+        "address": "Blk100 L11 North Ville 2B Bagumbong Barangay 171",
+        "house_no": "",
+        "block_lot": "BLK100",
+        "subdivision": "L11 North Ville",
+        "street": "2B Bagumbong Barangay",
+        "barangay": "171",
+        "postal_code": "1421",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "vin": "7501-0726A-D1886LBG10000",
+        "precinct_no": "0726A",
+        "city": "",
+        "province": "",
+        "is_document_mismatch": false,
+        "mismatch_reason": ""
+    }
+}

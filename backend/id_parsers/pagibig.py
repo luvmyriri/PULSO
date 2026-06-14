@@ -11,7 +11,7 @@ Card format:
 
 import re
 from .base import BaseIDParser, ParsedIDData
-from typing import List, Tuple
+from typing import List
 
 
 class PagIBIGParser(BaseIDParser):
@@ -39,11 +39,8 @@ class PagIBIGParser(BaseIDParser):
         else:
             result['mid_no'] = mid_match.group(1)
 
-        # 3. DOB: MM/DD/YYYY
-        dob_iso = self._extract_dob(upper)
-        if dob_iso:
-             y, m, d = dob_iso.split('-')
-             result['dob'] = f"{m}/{d}/{y}"
+        # 3. DOB: ISO YYYY-MM-DD
+        result['dob'] = self._extract_dob(upper)
 
         result['sex']      = self._extract_sex(upper)
         

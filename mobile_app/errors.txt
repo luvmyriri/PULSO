@@ -1,0 +1,476 @@
+﻿Analyzing mobile_app...                                         
+
+   info - The imported package 'dio' isn't a dependency of the importing package - lib\core\api\api_client.dart:2:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:dio/dio.dart' - lib\core\api\api_client.dart:2:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\core\api\api_client.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/api/api_endpoints.dart' - lib\core\api\api_client.dart:3:8 - uri_does_not_exist
+  error - Undefined class 'Dio' - lib\core\api\api_client.dart:7:9 - undefined_class
+  error - The method 'Dio' isn't defined for the type 'ApiClient' - lib\core\api\api_client.dart:7:20 - undefined_method
+  error - The method 'LogInterceptor' isn't defined for the type 'ApiClient' - lib\core\api\api_client.dart:20:27 - undefined_method
+  error - Undefined class 'Options' - lib\core\api\api_client.dart:31:3 - undefined_class
+  error - The method 'Options' isn't defined for the type 'ApiClient' - lib\core\api\api_client.dart:31:35 - undefined_method
+  error - The name 'Response' isn't a type, so it can't be used as a type argument - lib\core\api\api_client.dart:35:10 - non_type_as_type_argument
+  error - The name 'DioException' isn't a type and can't be used in an on-catch clause - lib\core\api\api_client.dart:48:10 - non_type_in_catch_clause
+warning - The exception variable 'e' isn't used, so the 'catch' clause can be removed - lib\core\api\api_client.dart:48:30 - unused_catch_clause
+  error - The name 'Response' isn't a type, so it can't be used as a type argument - lib\core\api\api_client.dart:53:10 - non_type_as_type_argument
+  error - The name 'DioException' isn't a type and can't be used in an on-catch clause - lib\core\api\api_client.dart:64:10 - non_type_in_catch_clause
+warning - The exception variable 'e' isn't used, so the 'catch' clause can be removed - lib\core\api\api_client.dart:64:30 - unused_catch_clause
+  error - The name 'Response' isn't a type, so it can't be used as a type argument - lib\core\api\api_client.dart:70:10 - non_type_as_type_argument
+  error - Undefined class 'FormData' - lib\core\api\api_client.dart:71:5 - undefined_class
+  error - Undefined name 'FormData' - lib\core\api\api_client.dart:71:25 - undefined_identifier
+  error - Undefined name 'MultipartFile' - lib\core\api\api_client.dart:72:43 - undefined_identifier
+  error - Undefined name 'MultipartFile' - lib\core\api\api_client.dart:73:41 - undefined_identifier
+  error - Undefined name 'ApiEndpoints' - lib\core\api\api_client.dart:76:23 - undefined_identifier
+   info - Dangling library doc comment - lib\core\services\location_service.dart:1:1 - dangling_library_doc_comments
+   info - The imported package 'geolocator' isn't a dependency of the importing package - lib\core\services\location_service.dart:7:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:geolocator/geolocator.dart' - lib\core\services\location_service.dart:7:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\core\services\location_service.dart:8:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/api/api_client.dart' - lib\core\services\location_service.dart:8:8 - uri_does_not_exist
+  error - Undefined class 'ApiClient' - lib\core\services\location_service.dart:11:9 - undefined_class
+  error - The name 'Position' isn't a type, so it can't be used as a type argument - lib\core\services\location_service.dart:19:10 - non_type_as_type_argument
+  error - Undefined name 'Geolocator' - lib\core\services\location_service.dart:20:33 - undefined_identifier
+  error - Undefined class 'LocationPermission' - lib\core\services\location_service.dart:25:5 - undefined_class
+  error - Undefined name 'Geolocator' - lib\core\services\location_service.dart:25:43 - undefined_identifier
+  error - Undefined name 'LocationPermission' - lib\core\services\location_service.dart:26:23 - undefined_identifier
+  error - Undefined name 'Geolocator' - lib\core\services\location_service.dart:27:26 - undefined_identifier
+  error - Undefined name 'LocationPermission' - lib\core\services\location_service.dart:28:25 - undefined_identifier
+  error - Undefined name 'LocationPermission' - lib\core\services\location_service.dart:33:23 - undefined_identifier
+  error - Undefined name 'Geolocator' - lib\core\services\location_service.dart:37:12 - undefined_identifier
+  error - Undefined name 'LocationAccuracy' - lib\core\services\location_service.dart:38:24 - undefined_identifier
+  error - The name 'Position' isn't a type, so it can't be used as a type argument - lib\core\services\location_service.dart:44:10 - non_type_as_type_argument
+  error - Const variables must be initialized with a constant value - lib\core\services\location_service.dart:45:22 - const_initialized_with_non_constant_value
+  error - The method 'LocationSettings' isn't defined for the type 'LocationService' - lib\core\services\location_service.dart:45:22 - undefined_method
+  error - Undefined name 'LocationAccuracy' - lib\core\services\location_service.dart:46:17 - undefined_identifier
+  error - Undefined name 'Geolocator' - lib\core\services\location_service.dart:49:12 - undefined_identifier
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\screens\login_screen.dart:45:30 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\login_screen.dart:102:55 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\login_screen.dart:104:74 - deprecated_member_use
+  error - The class 'EdgeInsets' doesn't have a constant constructor 'bottom' - lib\features\auth\screens\login_screen.dart:140:56 - const_with_undefined_constructor
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\login_screen.dart:142:51 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\login_screen.dart:144:70 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\login_screen.dart:171:64 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\login_screen.dart:171:97 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\login_screen.dart:191:64 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\login_screen.dart:191:97 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\login_screen.dart:211:69 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\register_screen.dart:57:55 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\register_screen.dart:59:74 - deprecated_member_use
+  error - The constructor being called isn't a const constructor - lib\features\auth\screens\register_screen.dart:76:19 - const_with_non_const
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\register_screen.dart:99:64 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\register_screen.dart:99:97 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\register_screen.dart:115:64 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\register_screen.dart:115:97 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\register_screen.dart:132:64 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\register_screen.dart:132:97 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\screens\register_screen.dart:147:69 - deprecated_member_use
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\home\home_provider.dart:2:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/api/api_client.dart' - lib\features\home\home_provider.dart:2:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\home\home_provider.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/api/api_endpoints.dart' - lib\features\home\home_provider.dart:3:8 - uri_does_not_exist
+   info - The imported package 'dio' isn't a dependency of the importing package - lib\features\home\home_provider.dart:4:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:dio/dio.dart' - lib\features\home\home_provider.dart:4:8 - uri_does_not_exist
+  error - Undefined class 'ApiClient' - lib\features\home\home_provider.dart:8:9 - undefined_class
+   info - The private field _advisories could be 'final' - lib\features\home\home_provider.dart:20:17 - prefer_final_fields
+  error - Undefined name 'ApiEndpoints' - lib\features\home\home_provider.dart:49:45 - undefined_identifier
+  error - The literal can't be either a map or a set because it contains at least one literal map entry or a spread operator spreading a 'Map', and at least one element which is neither of these - lib\features\home\home_provider.dart:56:18 - ambiguous_set_or_map_literal_both
+  error - Expected to find ':' - lib\features\home\home_provider.dart:62:41 - expected_token
+  error - Undefined name 'created_at' - lib\features\home\home_provider.dart:62:41 - undefined_identifier
+  error - Expected to find ',' - lib\features\home\home_provider.dart:62:51 - expected_token
+  error - Expected to find ',' - lib\features\home\home_provider.dart:62:81 - expected_token
+  error - Undefined name 'created_at' - lib\features\home\home_provider.dart:62:81 - undefined_identifier
+  error - Expected to find ',' - lib\features\home\home_provider.dart:62:91 - expected_token
+  error - Expected to find ',' - lib\features\home\home_provider.dart:62:123 - expected_token
+  error - Undefined name 'created_at' - lib\features\home\home_provider.dart:62:123 - undefined_identifier
+  error - Expected to find ',' - lib\features\home\home_provider.dart:62:133 - expected_token
+   info - Don't invoke 'print' in production code - lib\features\home\home_provider.dart:70:7 - avoid_print
+  error - The getter 'road_rounded' isn't defined for the type 'Icons' - lib\features\home\home_provider.dart:98:44 - undefined_getter
+  error - Undefined name 'FormData' - lib\features\home\home_provider.dart:126:24 - undefined_identifier
+  error - Undefined name 'MultipartFile' - lib\features\home\home_provider.dart:137:17 - undefined_identifier
+  error - Undefined name 'ApiEndpoints' - lib\features\home\home_provider.dart:142:9 - undefined_identifier
+  error - The name 'DioException' isn't defined, so it can't be used in an 'is' expression - lib\features\home\home_provider.dart:153:16 - type_test_with_undefined_name
+  error - The getter 'response' isn't defined for the type 'Object' - lib\features\home\home_provider.dart:154:24 - undefined_getter
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\home\screens\home_screen.dart:2:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/theme/app_theme.dart' - lib\features\home\screens\home_screen.dart:2:8 - uri_does_not_exist
+   info - The imported package 'flutter_animate' isn't a dependency of the importing package - lib\features\home\screens\home_screen.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_animate/flutter_animate.dart' - lib\features\home\screens\home_screen.dart:3:8 - uri_does_not_exist
+   info - The imported package 'provider' isn't a dependency of the importing package - lib\features\home\screens\home_screen.dart:6:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:provider/provider.dart' - lib\features\home\screens\home_screen.dart:6:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\home\screens\home_screen.dart:7:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/home/home_provider.dart' - lib\features\home\screens\home_screen.dart:7:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\home\screens\home_screen.dart:8:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/registration/screens/camera_screen.dart' - lib\features\home\screens\home_screen.dart:8:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\home\screens\home_screen.dart:9:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/home/screens/map_screen.dart' - lib\features\home\screens\home_screen.dart:9:8 - uri_does_not_exist
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:23:78 - undefined_identifier
+  error - The method 'watch' isn't defined for the type 'BuildContext' - lib\features\home\screens\home_screen.dart:31:30 - undefined_method
+  error - The name 'HomeProvider' isn't a type, so it can't be used as a type argument - lib\features\home\screens\home_screen.dart:31:36 - non_type_as_type_argument
+  error - The name 'MapScreen' isn't a class - lib\features\home\screens\home_screen.dart:36:13 - creation_with_non_type
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:42:24 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:57:28 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:66:26 - undefined_identifier
+  error - Undefined class 'File' - lib\features\home\screens\home_screen.dart:69:29 - undefined_class
+  error - The name 'File' isn't a type, so it can't be used as a type argument - lib\features\home\screens\home_screen.dart:69:80 - non_type_as_type_argument
+  error - The name 'CameraScreen' isn't a class - lib\features\home\screens\home_screen.dart:71:49 - creation_with_non_type
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\home\screens\home_screen.dart:81:27 - use_build_context_synchronously
+  error - Invalid constant value - lib\features\home\screens\home_screen.dart:88:40 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:88:40 - undefined_identifier
+  error - There's no constant named 'fill' in 'BoxShape' - lib\features\home\screens\home_screen.dart:111:117 - undefined_enum_constant
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:119:59 - deprecated_member_use
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:125:54 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:145:63 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\home\screens\home_screen.dart:167:64 - use_build_context_synchronously
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:177:58 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Container' - lib\features\home\screens\home_screen.dart:208:15 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\home\screens\home_screen.dart:208:85 - undefined_getter
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:217:33 - deprecated_member_use
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:224:34 - undefined_identifier
+  error - Undefined class 'HomeProvider' - lib\features\home\screens\home_screen.dart:255:9 - undefined_class
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:275:19 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Positioned' - lib\features\home\screens\home_screen.dart:281:11 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\home\screens\home_screen.dart:281:40 - undefined_getter
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:294:37 - deprecated_member_use
+  error - The method 'animate' isn't defined for the type 'Positioned' - lib\features\home\screens\home_screen.dart:300:11 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\home\screens\home_screen.dart:300:40 - undefined_getter
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\home\screens\home_screen.dart:300:60 - undefined_getter
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:305:20 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:306:30 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:356:34 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:391:33 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:393:52 - deprecated_member_use
+  error - The method 'animate' isn't defined for the type 'Column' - lib\features\home\screens\home_screen.dart:418:7 - undefined_method
+  error - Invalid constant value - lib\features\home\screens\home_screen.dart:434:43 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:434:43 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:452:24 - undefined_identifier
+  error - Invalid constant value - lib\features\home\screens\home_screen.dart:492:32 - invalid_constant
+  error - The values in a const list literal must be constants - lib\features\home\screens\home_screen.dart:492:32 - non_constant_list_element
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:492:32 - undefined_identifier
+  error - The values in a const list literal must be constants - lib\features\home\screens\home_screen.dart:492:56 - non_constant_list_element
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:492:56 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:506:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:508:68 - deprecated_member_use
+  error - Invalid constant value - lib\features\home\screens\home_screen.dart:537:32 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:537:32 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:549:45 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Row' - lib\features\home\screens\home_screen.dart:556:7 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\home\screens\home_screen.dart:556:38 - undefined_getter
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:570:29 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:572:48 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:582:40 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:583:41 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:658:29 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:660:48 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:668:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:700:40 - deprecated_member_use
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:701:21 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\home_screen.dart:705:42 - deprecated_member_use
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:706:23 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\home\screens\home_screen.dart:712:60 - undefined_identifier
+   info - Dangling library doc comment - lib\features\home\screens\map_screen.dart:1:1 - dangling_library_doc_comments
+   info - The imported package 'google_maps_flutter' isn't a dependency of the importing package - lib\features\home\screens\map_screen.dart:13:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:google_maps_flutter/google_maps_flutter.dart' - lib\features\home\screens\map_screen.dart:13:8 - uri_does_not_exist
+   info - The imported package 'geolocator' isn't a dependency of the importing package - lib\features\home\screens\map_screen.dart:14:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:geolocator/geolocator.dart' - lib\features\home\screens\map_screen.dart:14:8 - uri_does_not_exist
+   info - The imported package 'flutter_animate' isn't a dependency of the importing package - lib\features\home\screens\map_screen.dart:15:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_animate/flutter_animate.dart' - lib\features\home\screens\map_screen.dart:15:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\home\screens\map_screen.dart:16:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/theme/app_theme.dart' - lib\features\home\screens\map_screen.dart:16:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\home\screens\map_screen.dart:17:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/services/location_service.dart' - lib\features\home\screens\map_screen.dart:17:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\home\screens\map_screen.dart:18:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/api/api_client.dart' - lib\features\home\screens\map_screen.dart:18:8 - uri_does_not_exist
+   info - The imported package 'provider' isn't a dependency of the importing package - lib\features\home\screens\map_screen.dart:19:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:provider/provider.dart' - lib\features\home\screens\map_screen.dart:19:8 - uri_does_not_exist
+  error - Undefined class 'GoogleMapController' - lib\features\home\screens\map_screen.dart:30:3 - undefined_class
+  error - Undefined class 'Position' - lib\features\home\screens\map_screen.dart:31:3 - undefined_class
+  error - Undefined class 'LatLng' - lib\features\home\screens\map_screen.dart:34:16 - undefined_class
+  error - Const variables must be initialized with a constant value - lib\features\home\screens\map_screen.dart:34:41 - const_initialized_with_non_constant_value
+  error - The method 'LatLng' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:34:41 - undefined_method
+  error - Undefined class 'LocationService' - lib\features\home\screens\map_screen.dart:46:14 - undefined_class
+  error - The method 'read' isn't defined for the type 'BuildContext' - lib\features\home\screens\map_screen.dart:67:25 - undefined_method
+  error - The name 'ApiClient' isn't a type, so it can't be used as a type argument - lib\features\home\screens\map_screen.dart:67:30 - non_type_as_type_argument
+  error - The method 'LocationService' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:68:24 - undefined_method
+  error - Undefined name 'CameraUpdate' - lib\features\home\screens\map_screen.dart:79:11 - undefined_identifier
+  error - The method 'LatLng' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:79:38 - undefined_method
+  error - The method 'read' isn't defined for the type 'BuildContext' - lib\features\home\screens\map_screen.dart:136:38 - undefined_method
+  error - The name 'ApiClient' isn't a type, so it can't be used as a type argument - lib\features\home\screens\map_screen.dart:136:43 - non_type_as_type_argument
+  error - Undefined class 'BitmapDescriptor' - lib\features\home\screens\map_screen.dart:169:3 - undefined_class
+  error - Undefined name 'BitmapDescriptor' - lib\features\home\screens\map_screen.dart:171:12 - undefined_identifier
+  error - The name 'Marker' isn't a type, so it can't be used as a type argument - lib\features\home\screens\map_screen.dart:174:7 - non_type_as_type_argument
+  error - The name 'Marker' isn't a type, so it can't be used as a type argument - lib\features\home\screens\map_screen.dart:175:22 - non_type_as_type_argument
+  error - The method 'Marker' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:179:19 - undefined_method
+  error - The name 'MarkerId' isn't a class - lib\features\home\screens\map_screen.dart:180:25 - creation_with_non_type
+  error - The method 'LatLng' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:181:19 - undefined_method
+  error - Undefined name 'BitmapDescriptor' - lib\features\home\screens\map_screen.dart:182:15 - undefined_identifier
+  error - Undefined name 'BitmapDescriptor' - lib\features\home\screens\map_screen.dart:182:53 - undefined_identifier
+  error - The name 'InfoWindow' isn't a class - lib\features\home\screens\map_screen.dart:183:27 - creation_with_non_type
+  error - The method 'Marker' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:197:19 - undefined_method
+  error - The method 'MarkerId' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:198:19 - undefined_method
+  error - The method 'LatLng' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:199:19 - undefined_method
+  error - The method 'GoogleMap' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:223:11 - undefined_method
+  error - The method 'CameraPosition' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:224:36 - undefined_method
+  error - The method 'LatLng' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:226:21 - undefined_method
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:256:54 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:258:62 - deprecated_member_use
+  error - Invalid constant value - lib\features\home\screens\map_screen.dart:262:62 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\home\screens\map_screen.dart:262:62 - undefined_identifier
+  error - Invalid constant value - lib\features\home\screens\map_screen.dart:287:38 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\home\screens\map_screen.dart:287:38 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Container' - lib\features\home\screens\map_screen.dart:292:21 - undefined_method
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:299:54 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:301:62 - deprecated_member_use
+  error - The method 'animate' isn't defined for the type 'Container' - lib\features\home\screens\map_screen.dart:328:21 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\home\screens\map_screen.dart:328:49 - undefined_getter
+  error - The method 'animate' isn't defined for the type '_ReportPopup' - lib\features\home\screens\map_screen.dart:363:17 - undefined_method
+  error - Undefined name 'CameraUpdate' - lib\features\home\screens\map_screen.dart:390:9 - undefined_identifier
+  error - The method 'LatLng' isn't defined for the type '_MapScreenState' - lib\features\home\screens\map_screen.dart:391:11 - undefined_method
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:430:33 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:430:65 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:433:35 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:433:67 - deprecated_member_use
+  error - Undefined name 'AppTheme' - lib\features\home\screens\map_screen.dart:477:37 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\home\screens\map_screen.dart:480:22 - undefined_identifier
+  error - Invalid constant value - lib\features\home\screens\map_screen.dart:486:20 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\home\screens\map_screen.dart:486:20 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:519:41 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:522:33 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:537:32 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\screens\map_screen.dart:539:51 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\landing\screens\landing_screen.dart:42:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\landing\screens\landing_screen.dart:181:69 - deprecated_member_use
+   info - The imported package 'flutter_animate' isn't a dependency of the importing package - lib\features\onboarding\onboarding_screen.dart:2:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_animate/flutter_animate.dart' - lib\features\onboarding\onboarding_screen.dart:2:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\onboarding\onboarding_screen.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/theme/app_theme.dart' - lib\features\onboarding\onboarding_screen.dart:3:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\onboarding\onboarding_screen.dart:4:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/registration/screens/id_verification_screen.dart' - lib\features\onboarding\onboarding_screen.dart:4:8 - uri_does_not_exist
+  error - Undefined name 'AppTheme' - lib\features\onboarding\onboarding_screen.dart:24:24 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Positioned' - lib\features\onboarding\onboarding_screen.dart:27:13 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:27:42 - undefined_getter
+  error - Invalid constant value - lib\features\onboarding\onboarding_screen.dart:36:19 - invalid_constant
+  error - The values in a const list literal must be constants - lib\features\onboarding\onboarding_screen.dart:36:19 - non_constant_list_element
+  error - Undefined name 'AppTheme' - lib\features\onboarding\onboarding_screen.dart:36:19 - undefined_identifier
+  error - Invalid constant value - lib\features\onboarding\onboarding_screen.dart:52:30 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\onboarding\onboarding_screen.dart:52:30 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Icon' - lib\features\onboarding\onboarding_screen.dart:53:23 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:54:45 - undefined_getter
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:55:41 - undefined_getter
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:56:44 - undefined_getter
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:56:63 - undefined_getter
+  error - Invalid constant value - lib\features\onboarding\onboarding_screen.dart:60:34 - invalid_constant
+  error - The values in a const list literal must be constants - lib\features\onboarding\onboarding_screen.dart:60:34 - non_constant_list_element
+  error - Undefined name 'AppTheme' - lib\features\onboarding\onboarding_screen.dart:60:34 - undefined_identifier
+  error - The values in a const list literal must be constants - lib\features\onboarding\onboarding_screen.dart:60:58 - non_constant_list_element
+  error - Undefined name 'AppTheme' - lib\features\onboarding\onboarding_screen.dart:60:58 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'ShaderMask' - lib\features\onboarding\onboarding_screen.dart:69:23 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:69:51 - undefined_getter
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\onboarding\onboarding_screen.dart:80:23 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:80:51 - undefined_getter
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\onboarding\onboarding_screen.dart:88:23 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:88:51 - undefined_getter
+  error - The name 'IDVerificationScreen' isn't a class - lib\features\onboarding\onboarding_screen.dart:94:51 - creation_with_non_type
+  error - The method 'animate' isn't defined for the type 'ElevatedButton' - lib\features\onboarding\onboarding_screen.dart:99:23 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:99:52 - undefined_getter
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\onboarding\onboarding_screen.dart:108:47 - deprecated_member_use
+  error - The method 'animate' isn't defined for the type 'TextButton' - lib\features\onboarding\onboarding_screen.dart:113:23 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\onboarding\onboarding_screen.dart:113:52 - undefined_getter
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\registration_provider.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/api/api_client.dart' - lib\features\registration\registration_provider.dart:3:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\registration_provider.dart:4:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/api/api_endpoints.dart' - lib\features\registration\registration_provider.dart:4:8 - uri_does_not_exist
+  error - Undefined class 'ApiClient' - lib\features\registration\registration_provider.dart:7:9 - undefined_class
+   info - Don't invoke 'print' in production code - lib\features\registration\registration_provider.dart:113:7 - avoid_print
+  error - Undefined name 'ApiEndpoints' - lib\features\registration\registration_provider.dart:133:9 - undefined_identifier
+   info - Don't invoke 'print' in production code - lib\features\registration\registration_provider.dart:151:7 - avoid_print
+   info - The imported package 'provider' isn't a dependency of the importing package - lib\features\registration\screens\account_setup_screen.dart:2:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:provider/provider.dart' - lib\features\registration\screens\account_setup_screen.dart:2:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\account_setup_screen.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/theme/app_theme.dart' - lib\features\registration\screens\account_setup_screen.dart:3:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\account_setup_screen.dart:4:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/registration/registration_provider.dart' - lib\features\registration\screens\account_setup_screen.dart:4:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\account_setup_screen.dart:5:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/registration/screens/registration_success_screen.dart' - lib\features\registration\screens\account_setup_screen.dart:5:8 - uri_does_not_exist
+   info - The imported package 'flutter_animate' isn't a dependency of the importing package - lib\features\registration\screens\account_setup_screen.dart:6:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_animate/flutter_animate.dart' - lib\features\registration\screens\account_setup_screen.dart:6:8 - uri_does_not_exist
+  error - The method 'watch' isn't defined for the type 'BuildContext' - lib\features\registration\screens\account_setup_screen.dart:27:30 - undefined_method
+  error - The name 'RegistrationProvider' isn't a type, so it can't be used as a type argument - lib\features\registration\screens\account_setup_screen.dart:27:36 - non_type_as_type_argument
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:30:24 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:48:24 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Positioned' - lib\features\registration\screens\account_setup_screen.dart:51:13 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\registration\screens\account_setup_screen.dart:51:42 - undefined_getter
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:61:28 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\account_setup_screen.dart:66:19 - undefined_method
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\account_setup_screen.dart:71:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\account_setup_screen.dart:71:47 - undefined_getter
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\account_setup_screen.dart:76:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\account_setup_screen.dart:76:47 - undefined_getter
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:119:32 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:121:51 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\account_setup_screen.dart:125:74 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:125:74 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\account_setup_screen.dart:130:61 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:130:61 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Padding' - lib\features\registration\screens\account_setup_screen.dart:136:21 - undefined_method
+  error - The name 'RegistrationSuccessScreen' isn't a class - lib\features\registration\screens\account_setup_screen.dart:149:73 - creation_with_non_type
+  error - The method 'animate' isn't defined for the type 'ElevatedButton' - lib\features\registration\screens\account_setup_screen.dart:175:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\account_setup_screen.dart:175:47 - undefined_getter
+  error - Invalid constant value - lib\features\registration\screens\account_setup_screen.dart:202:22 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:202:22 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\registration\screens\account_setup_screen.dart:220:43 - deprecated_member_use
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:221:64 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\registration\screens\account_setup_screen.dart:225:64 - deprecated_member_use
+  error - Invalid constant value - lib\features\registration\screens\account_setup_screen.dart:229:57 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\account_setup_screen.dart:229:57 - undefined_identifier
+   info - The imported package 'camera' isn't a dependency of the importing package - lib\features\registration\screens\camera_screen.dart:1:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:camera/camera.dart' - lib\features\registration\screens\camera_screen.dart:1:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\camera_screen.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/theme/app_theme.dart' - lib\features\registration\screens\camera_screen.dart:3:8 - uri_does_not_exist
+   info - The imported package 'flutter_animate' isn't a dependency of the importing package - lib\features\registration\screens\camera_screen.dart:6:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_animate/flutter_animate.dart' - lib\features\registration\screens\camera_screen.dart:6:8 - uri_does_not_exist
+  error - Undefined class 'CameraController' - lib\features\registration\screens\camera_screen.dart:17:3 - undefined_class
+  error - The name 'CameraDescription' isn't a type, so it can't be used as a type argument - lib\features\registration\screens\camera_screen.dart:18:8 - non_type_as_type_argument
+  error - The method 'availableCameras' isn't defined for the type '_CameraScreenState' - lib\features\registration\screens\camera_screen.dart:30:24 - undefined_method
+  error - The property 'lensDirection' can't be unconditionally accessed because the receiver can be 'null' - lib\features\registration\screens\camera_screen.dart:37:18 - unchecked_use_of_nullable_value
+  error - Undefined name 'CameraLensDirection' - lib\features\registration\screens\camera_screen.dart:37:35 - undefined_identifier
+  error - The method 'CameraController' isn't defined for the type '_CameraScreenState' - lib\features\registration\screens\camera_screen.dart:41:21 - undefined_method
+  error - Undefined name 'ResolutionPreset' - lib\features\registration\screens\camera_screen.dart:43:9 - undefined_identifier
+   info - Don't invoke 'print' in production code - lib\features\registration\screens\camera_screen.dart:73:7 - avoid_print
+  error - Invalid constant value - lib\features\registration\screens\camera_screen.dart:86:64 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\camera_screen.dart:86:64 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\camera_screen.dart:104:51 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\camera_screen.dart:104:51 - undefined_identifier
+  error - The method 'CameraPreview' isn't defined for the type '_CameraScreenState' - lib\features\registration\screens\camera_screen.dart:114:11 - undefined_method
+  error - The method 'animate' isn't defined for the type 'Center' - lib\features\registration\screens\camera_screen.dart:137:13 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\registration\screens\camera_screen.dart:137:42 - undefined_getter
+  error - The method 'animate' isn't defined for the type 'ClipRRect' - lib\features\registration\screens\camera_screen.dart:167:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\camera_screen.dart:167:47 - undefined_getter
+  error - The method 'animate' isn't defined for the type 'IconButton' - lib\features\registration\screens\camera_screen.dart:175:23 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\camera_screen.dart:175:51 - undefined_getter
+  error - The method 'animate' isn't defined for the type '_CaptureButton' - lib\features\registration\screens\camera_screen.dart:177:61 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\registration\screens\camera_screen.dart:177:87 - undefined_getter
+  error - Invalid constant value - lib\features\registration\screens\camera_screen.dart:201:50 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\camera_screen.dart:201:50 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\camera_screen.dart:202:54 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\camera_screen.dart:202:54 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\camera_screen.dart:203:52 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\camera_screen.dart:203:52 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\camera_screen.dart:204:54 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\camera_screen.dart:204:54 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\camera_screen.dart:239:22 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\camera_screen.dart:239:22 - undefined_identifier
+   info - The imported package 'provider' isn't a dependency of the importing package - lib\features\registration\screens\id_verification_screen.dart:2:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:provider/provider.dart' - lib\features\registration\screens\id_verification_screen.dart:2:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\id_verification_screen.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/theme/app_theme.dart' - lib\features\registration\screens\id_verification_screen.dart:3:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\id_verification_screen.dart:4:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/registration/registration_provider.dart' - lib\features\registration\screens\id_verification_screen.dart:4:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\id_verification_screen.dart:5:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/registration/screens/camera_screen.dart' - lib\features\registration\screens\id_verification_screen.dart:5:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\id_verification_screen.dart:6:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/registration/screens/registration_form_screen.dart' - lib\features\registration\screens\id_verification_screen.dart:6:8 - uri_does_not_exist
+   info - The imported package 'image_picker' isn't a dependency of the importing package - lib\features\registration\screens\id_verification_screen.dart:7:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:image_picker/image_picker.dart' - lib\features\registration\screens\id_verification_screen.dart:7:8 - uri_does_not_exist
+   info - The imported package 'flutter_animate' isn't a dependency of the importing package - lib\features\registration\screens\id_verification_screen.dart:10:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_animate/flutter_animate.dart' - lib\features\registration\screens\id_verification_screen.dart:10:8 - uri_does_not_exist
+  error - The method 'watch' isn't defined for the type 'BuildContext' - lib\features\registration\screens\id_verification_screen.dart:17:30 - undefined_method
+  error - The name 'RegistrationProvider' isn't a type, so it can't be used as a type argument - lib\features\registration\screens\id_verification_screen.dart:17:36 - non_type_as_type_argument
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:19:24 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:37:24 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Positioned' - lib\features\registration\screens\id_verification_screen.dart:40:13 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\registration\screens\id_verification_screen.dart:40:42 - undefined_getter
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:50:28 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\id_verification_screen.dart:55:19 - undefined_method
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\id_verification_screen.dart:62:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\id_verification_screen.dart:62:47 - undefined_getter
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\id_verification_screen.dart:67:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\id_verification_screen.dart:67:47 - undefined_getter
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:89:32 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:91:51 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\id_verification_screen.dart:95:74 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:95:74 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\id_verification_screen.dart:100:61 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:100:61 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Padding' - lib\features\registration\screens\id_verification_screen.dart:106:21 - undefined_method
+  error - The name 'RegistrationFormScreen' isn't a class - lib\features\registration\screens\id_verification_screen.dart:114:71 - creation_with_non_type
+  error - The method 'animate' isn't defined for the type 'ElevatedButton' - lib\features\registration\screens\id_verification_screen.dart:138:19 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\registration\screens\id_verification_screen.dart:138:45 - undefined_getter
+  error - The method 'watch' isn't defined for the type 'BuildContext' - lib\features\registration\screens\id_verification_screen.dart:164:30 - undefined_method
+  error - The name 'RegistrationProvider' isn't a type, so it can't be used as a type argument - lib\features\registration\screens\id_verification_screen.dart:164:36 - non_type_as_type_argument
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:174:23 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:178:37 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\registration\screens\id_verification_screen.dart:178:92 - deprecated_member_use
+  error - The method 'CameraScreen' isn't defined for the type '_IDCardSlot' - lib\features\registration\screens\id_verification_screen.dart:217:49 - undefined_method
+  error - The method 'ImagePicker' isn't defined for the type '_IDCardSlot' - lib\features\registration\screens\id_verification_screen.dart:234:44 - undefined_method
+  error - Undefined name 'ImageSource' - lib\features\registration\screens\id_verification_screen.dart:235:74 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'ClipRRect' - lib\features\registration\screens\id_verification_screen.dart:283:7 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\id_verification_screen.dart:283:37 - undefined_getter
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\registration\screens\id_verification_screen.dart:307:43 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\registration\screens\id_verification_screen.dart:309:50 - deprecated_member_use
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\id_verification_screen.dart:314:45 - undefined_identifier
+   info - The imported package 'provider' isn't a dependency of the importing package - lib\features\registration\screens\registration_form_screen.dart:2:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:provider/provider.dart' - lib\features\registration\screens\registration_form_screen.dart:2:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\registration_form_screen.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/theme/app_theme.dart' - lib\features\registration\screens\registration_form_screen.dart:3:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\registration_form_screen.dart:4:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/registration/registration_provider.dart' - lib\features\registration\screens\registration_form_screen.dart:4:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\registration_form_screen.dart:5:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/registration/screens/account_setup_screen.dart' - lib\features\registration\screens\registration_form_screen.dart:5:8 - uri_does_not_exist
+   info - The imported package 'flutter_animate' isn't a dependency of the importing package - lib\features\registration\screens\registration_form_screen.dart:6:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_animate/flutter_animate.dart' - lib\features\registration\screens\registration_form_screen.dart:6:8 - uri_does_not_exist
+  error - The method 'read' isn't defined for the type 'BuildContext' - lib\features\registration\screens\registration_form_screen.dart:35:26 - undefined_method
+  error - The name 'RegistrationProvider' isn't a type, so it can't be used as a type argument - lib\features\registration\screens\registration_form_screen.dart:35:31 - non_type_as_type_argument
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_form_screen.dart:50:24 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_form_screen.dart:68:24 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Positioned' - lib\features\registration\screens\registration_form_screen.dart:71:13 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\registration\screens\registration_form_screen.dart:71:42 - undefined_getter
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_form_screen.dart:81:28 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\registration_form_screen.dart:86:19 - undefined_method
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\registration_form_screen.dart:91:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\registration_form_screen.dart:91:47 - undefined_getter
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\registration_form_screen.dart:96:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\registration_form_screen.dart:96:47 - undefined_getter
+  error - The method 'read' isn't defined for the type 'BuildContext' - lib\features\registration\screens\registration_form_screen.dart:118:48 - undefined_method
+  error - The name 'RegistrationProvider' isn't a type, so it can't be used as a type argument - lib\features\registration\screens\registration_form_screen.dart:118:53 - non_type_as_type_argument
+  error - The name 'AccountSetupScreen' isn't a class - lib\features\registration\screens\registration_form_screen.dart:124:65 - creation_with_non_type
+  error - The method 'animate' isn't defined for the type 'ElevatedButton' - lib\features\registration\screens\registration_form_screen.dart:129:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\registration_form_screen.dart:129:47 - undefined_getter
+  error - Invalid constant value - lib\features\registration\screens\registration_form_screen.dart:148:22 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_form_screen.dart:148:22 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\registration\screens\registration_form_screen.dart:165:43 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\registration\screens\registration_form_screen.dart:168:64 - deprecated_member_use
+  error - Invalid constant value - lib\features\registration\screens\registration_form_screen.dart:172:57 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_form_screen.dart:172:57 - undefined_identifier
+   info - The imported package 'flutter_animate' isn't a dependency of the importing package - lib\features\registration\screens\registration_success_screen.dart:2:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_animate/flutter_animate.dart' - lib\features\registration\screens\registration_success_screen.dart:2:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\registration_success_screen.dart:3:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/core/theme/app_theme.dart' - lib\features\registration\screens\registration_success_screen.dart:3:8 - uri_does_not_exist
+   info - The imported package 'mobile_app' isn't a dependency of the importing package - lib\features\registration\screens\registration_success_screen.dart:4:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:mobile_app/features/home/screens/home_screen.dart' - lib\features\registration\screens\registration_success_screen.dart:4:8 - uri_does_not_exist
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_success_screen.dart:13:24 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_success_screen.dart:25:24 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Positioned' - lib\features\registration\screens\registration_success_screen.dart:28:13 - undefined_method
+  error - The getter 'seconds' isn't defined for the type 'int' - lib\features\registration\screens\registration_success_screen.dart:28:42 - undefined_getter
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_success_screen.dart:40:28 - undefined_identifier
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_success_screen.dart:42:47 - undefined_identifier
+  error - Invalid constant value - lib\features\registration\screens\registration_success_screen.dart:45:71 - invalid_constant
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_success_screen.dart:45:71 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'Container' - lib\features\registration\screens\registration_success_screen.dart:47:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\registration_success_screen.dart:48:40 - undefined_getter
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\registration_success_screen.dart:49:39 - undefined_getter
+  error - The getter 'seconds' isn't defined for the type 'double' - lib\features\registration\screens\registration_success_screen.dart:49:57 - undefined_getter
+  error - Invalid constant value - lib\features\registration\screens\registration_success_screen.dart:53:30 - invalid_constant
+  error - The values in a const list literal must be constants - lib\features\registration\screens\registration_success_screen.dart:53:30 - non_constant_list_element
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_success_screen.dart:53:30 - undefined_identifier
+  error - The values in a const list literal must be constants - lib\features\registration\screens\registration_success_screen.dart:53:54 - non_constant_list_element
+  error - Undefined name 'AppTheme' - lib\features\registration\screens\registration_success_screen.dart:53:54 - undefined_identifier
+  error - The method 'animate' isn't defined for the type 'ShaderMask' - lib\features\registration\screens\registration_success_screen.dart:60:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\registration_success_screen.dart:60:47 - undefined_getter
+  error - The method 'animate' isn't defined for the type 'Text' - lib\features\registration\screens\registration_success_screen.dart:66:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\registration_success_screen.dart:66:47 - undefined_getter
+  error - The name 'HomeScreen' isn't a class - lib\features\registration\screens\registration_success_screen.dart:71:63 - creation_with_non_type
+  error - The method 'animate' isn't defined for the type 'ElevatedButton' - lib\features\registration\screens\registration_success_screen.dart:76:19 - undefined_method
+  error - The getter 'ms' isn't defined for the type 'int' - lib\features\registration\screens\registration_success_screen.dart:76:47 - undefined_getter
+   info - Parameter 'key' could be a super parameter - lib\widgets\glass_card.dart:14:9 - use_super_parameters
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\widgets\glass_card.dart:40:18 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\widgets\glass_card.dart:43:61 - deprecated_member_use
+warning - Unused import: 'package:flutter/material.dart' - test\widget_test.dart:8:8 - unused_import
+

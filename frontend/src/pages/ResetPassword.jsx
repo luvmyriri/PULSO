@@ -7,6 +7,7 @@ import {
     Eye, EyeOff, Check
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { API_BASE_URL } from '../utils/apiBase';
 
 export default function ResetPassword() {
     const { theme } = useTheme();
@@ -41,7 +42,7 @@ export default function ResetPassword() {
                 return;
             }
             try {
-                const response = await fetch(`http://localhost:8000/api/auth/verify-token/${token}`);
+                const response = await fetch(`${API_BASE_URL}/api/auth/verify-token/${token}`);
                 if (response.ok) {
                     const data = await response.json();
                     setEmailHint(data.email_hint);
@@ -70,7 +71,8 @@ export default function ResetPassword() {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:8000/api/auth/reset-password', {
+            const apiBase = API_BASE_URL;
+            const response = await fetch(`${apiBase}/api/auth/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token, new_password: password })
@@ -78,7 +80,7 @@ export default function ResetPassword() {
 
             if (response.ok) {
                 setSuccess(true);
-                setTimeout(() => navigate('/gov'), 3000);
+                setTimeout(() => navigate('/login'), 3000);
             } else {
                 const data = await response.json();
                 setError(data.detail || 'Reset failed. Access denied.');
@@ -137,7 +139,7 @@ export default function ResetPassword() {
                                     <h2 className="text-3xl font-black tracking-tight leading-none text-red-500">Access Restricted</h2>
                                     <p className="text-slate-500 dark:text-slate-400 text-sm font-bold leading-relaxed">{error}</p>
                                 </div>
-                                <button onClick={() => navigate('/gov')} className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">Return to Portal</button>
+                                <button onClick={() => navigate('/login')} className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95">Return to Login</button>
                             </motion.div>
                         ) : success ? (
                             <motion.div 
@@ -229,7 +231,7 @@ export default function ResetPassword() {
                                                 </button>
                                             </div>
 
-                                            <button type="button" onClick={() => navigate('/gov')} className="w-full font-black text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 uppercase tracking-[0.2em] transition-colors">Abort Procedure</button>
+                                            <button type="button" onClick={() => navigate('/login')} className="w-full font-black text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 uppercase tracking-[0.2em] transition-colors">Abort Procedure</button>
                                         </form>
                                     </div>
                                 </div>

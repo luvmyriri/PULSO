@@ -1,0 +1,26 @@
+{
+    "timestamp": "2026-03-30T22:11:25.429271",
+    "raw_text": "I WILL NOT DONATE ANY ORGAN\nIII. ORGAN DONATION:\nIV. IN CASE OF EMERGENCY NOTIFY:\nName: EMILY G. TABIOS\nAddress: BLK 9 LOT 30 RUBY ST. CELINA HOMES 3 BAGUMBONG CALOOCAN CITY\nTel. No.: 0999884665\nIVER'S LICENSE LTO DRIVER'S LICENSE LTO-DRIVER'S L\nI. DL CODES:\nA\nMOTORCYCLE\nA1 TRICYCLE\nB UP TO 5000 KGS GVW/8 SEATS\nB1 UP TO 5000 KGS GVW/9 OR MORE SEATS\nC\nB2 GOODS\nGOODS\n3500 KGS GVW\n3500 KGS GVW\nD BUS > 5000 KGS GVW/9 OR MORE SEATS\nBE TRAILERS \u2264 3500 KGS\nCE ARTICULATED C> 3500 KGS COMBINED GVW\nM1-NP-MT/AT\nII. CONDITIONS:\n1. WEAR CORRECTIVE LENSES\n2. DRIVE ONLY W/SPECIAL EQPT FOR UPPER/LOWER LIMBS\n3. DRIVE CUSTOMIZED MOTOR VEHICLE ONLY\n4. DAYLIGHT DRIVING ONLY\n5. HEARING AID REQUIRED\nSerial Number\n461537862\n",
+    "parsed_data": {
+        "id_type": "lto",
+        "id_type_label": "LTO Driver's License",
+        "first_name": "",
+        "last_name": "",
+        "middle_name": "",
+        "dob": "",
+        "sex": "",
+        "address": "Blk 9 Lot 30, Blk 9 Lot 30 Ruby St, Celina Homes 3 Bagumbong Caloocan, Celina Homes 3 Bagumbong Caloocan City",
+        "barangay": "",
+        "postal_code": "1421",
+        "is_north_caloocan": false,
+        "verification_message": "Front ID scan error: The image uploaded as 'Front' appears to be the back of the document.",
+        "block_lot": "Blk 9 Lot 30",
+        "street": "Blk 9 Lot 30 Ruby St",
+        "subdivision": "Celina Homes 3 Bagumbong Caloocan",
+        "city": "Celina Homes 3 Bagumbong Caloocan City",
+        "province": "",
+        "license_no": "461537862",
+        "is_document_mismatch": true,
+        "mismatch_reason": "Front ID scan error: The image uploaded as 'Front' appears to be the back of the document."
+    }
+}

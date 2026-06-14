@@ -1,129 +1,274 @@
 """
-id_parsers/philid.py — Philippine National ID (PhilSys)
+id_parsers/philid.py — Philippine National ID (PhilSys / Pambansang Pagkakakilanlan)
 
-Card layout (front):
-  - Card header: "PHILIPPINE IDENTIFICATION SYSTEM"
-  - PCN (PhilSys Card Number) — 16-digit barcode / printed
-  - Full Name: Last Name / First Name / Middle Name (labeled fields)
-  - Date of Birth
-  - Sex
-  - Blood Type
+BILINGUAL LABEL MAP (Tagalog/English as printed on the National ID):
+  APELYIDO / LAST NAME          → last name
+  MGA PANGALAN / GIVEN NAMES    → given (first) names
+  GITNANG APELYIDO / MIDDLE NAME → middle name
+  PETSA NG KAPANGANAKAN / DATE OF BIRTH → date of birth
+  KASARIAN / SEX                → sex
+  TIRAHAN / ADDRESS             → address
 
-Card layout (back):
-  - Address: [BLK] [LOT] [SUBDIVISION] [STREET] BARANGAY [N] [CITY] NCR THIRD DISTRICT
-  - Philippines, [ZIP]
+The OCR engine reads each label and value on separate lines:
+  Line N:   APELYIDO/LAST NAME
+  Line N+1: EVANGELISTA
 """
 
 import re
-from .base import BaseIDParser, ParsedIDData
-from typing import List, Tuple
+from .base import BaseIDParser, ParsedIDData, MONTH_MAP
+from typing import List, Optional
+
+
+# All Tagalog + English label variants per field (uppercase for matching)
+_LN_LABELS  = {'APELYIDO', 'LAST NAME', 'SURNAME', 'FAMILY NAME', 'APELLIDO'}
+_FN_LABELS  = {'MGA PANGALAN', 'GIVEN NAMES', 'GIVEN NAME', 'PANGALAN', 'FIRST NAME'}
+_MN_LABELS  = {'GITNANG APELYIDO', 'MIDDLE NAME', 'GITNANG PANGALAN', 'MIDDLE INITIAL'}
+_DOB_LABELS = {'PETSA NG KAPANGANAKAN', 'DATE OF BIRTH', 'DOB', 'BIRTH DATE'}
+_SEX_LABELS = {'KASARIAN', 'SEX', 'GENDER'}
+_ADDR_LABELS = {'TIRAHAN', 'ADDRESS', 'HOME ADDRESS', 'RESIDENCE'}
+_ALL_LABELS = _LN_LABELS | _FN_LABELS | _MN_LABELS | _DOB_LABELS | _SEX_LABELS | _ADDR_LABELS
+
+# Month names for DOB parsing
+_MONTH_RE = '|'.join(MONTH_MAP.keys())
+
+
+def _normalize_line(line: str) -> str:
+    """Strip slash-separated label variants: 'APELYIDO/LAST NAME' → 'APELYIDO'"""
+    return re.sub(r'\s*/\s*\S.*', '', line).strip()
+
+
+def _is_label(line: str) -> bool:
+    """Return True if this line is a field label, not a value."""
+    u = line.upper().strip()
+    return any(lbl in u for lbl in _ALL_LABELS)
+
+
+def _find_next_value(upper_lines: List[str], label_idx: int) -> str:
+    """
+    Given the index of a label line, find the next non-empty non-label line.
+    Returns the raw uppercase value string, or ''.
+    """
+    for j in range(label_idx + 1, min(label_idx + 4, len(upper_lines))):
+        candidate = upper_lines[j].strip()
+        if not candidate:
+            continue
+        if _is_label(candidate):
+            break
+        return candidate
+    return ''
 
 
 class PhilIDParser(BaseIDParser):
     ID_TYPE = 'philid'
 
     def extract(self, text: str, lines: List[str]) -> ParsedIDData:
-        upper = text.upper()
-        result = {
+        upper_lines = [l.strip().upper() for l in text.split('\n') if l.strip()]
+        full_upper  = '\n'.join(upper_lines)
+
+        result: ParsedIDData = {
             'first_name': '', 'last_name': '', 'middle_name': '',
-            'dob': '', 'sex': '', 'address': '', 'barangay': '',
-            'pcn': '',
+            'dob': '', 'sex': '', 'address': '', 'barangay': '', 'pcn': '',
+            'block_lot': '', 'subdivision': '', 'street': '', 'postal_code': '',
         }
 
-        # 1. Name: Natural Order (First, Middle, Last)
-        # PhilID often labels: Last Name / First Name / Middle Name
-        fn, ln, mn = self._extract_names(lines, upper)
-        result['first_name'] = fn
-        result['last_name'] = ln
-        result['middle_name'] = mn
+        # ----------------------------------------------------------------
+        # 1. PCN — 16-digit PhilSys Card Number
+        # ----------------------------------------------------------------
+        pcn_m = re.search(r'\b(\d{4}-\d{4}-\d{4}-\d{4})\b', full_upper)
+        if pcn_m:
+            result['pcn'] = re.sub(r'\s', '-', pcn_m.group(1))
+            
+        # Extract postal code (usually 1421, 1420, etc. at end)
+        pc_m = re.search(r'\b(14\d{2})\b', full_upper)
+        if pc_m:
+            result['postal_code'] = pc_m.group(1)
 
-        # 2. 16-digit PCN (####-####-####-####)
-        pcn_match = re.search(r'\b(\d{4}-\d{4}-\d{4}-\d{4})\b', upper)
-        if not pcn_match:
-            # Try unformatted 16-digit
-            pcn_raw = re.search(r'\b(\d{16})\b', upper)
-            if pcn_raw:
-                p = pcn_raw.group(1)
-                result['pcn'] = f"{p[:4]}-{p[4:8]}-{p[8:12]}-{p[12:16]}"
-        else:
-            result['pcn'] = pcn_match.group(1)
+        # ----------------------------------------------------------------
+        # 2. Scan every line for bilingual field labels
+        #    The label and value are on SEPARATE consecutive lines.
+        # ----------------------------------------------------------------
+        for i, ul in enumerate(upper_lines):
+            # Strip slash-separated English translation from combined labels
+            # e.g. "APELYIDO/LAST NAME" → we still match on full line
+            line_norm = _normalize_line(ul)
 
-        # 3. DOB: YYYY-MM-DD
-        result['dob'] = self._extract_dob(upper)
-        
-        # 4. Sex: M or F
-        sex_raw = self._extract_sex(upper)
-        if sex_raw == 'Male': result['sex'] = 'M'
-        elif sex_raw == 'Female': result['sex'] = 'F'
-        else: result['sex'] = sex_raw
+            # --- LAST NAME ---
+            if not result['last_name'] and any(lbl in ul for lbl in _LN_LABELS):
+                val = self._inline_or_next(ul, upper_lines, i, _LN_LABELS)
+                if val:
+                    result['last_name'] = val.title()
 
-        # 5. Address (Standard PH format ending in postal code)
-        result['address'] = self._extract_philid_address(lines, upper)
-        result['barangay'] = self._extract_barangay(upper)
-        
+            # --- GIVEN NAMES (first name) ---
+            if not result['first_name'] and any(lbl in ul for lbl in _FN_LABELS):
+                val = self._inline_or_next(ul, upper_lines, i, _FN_LABELS)
+                if val:
+                    result['first_name'] = val.title()
+
+            # --- MIDDLE NAME ---
+            if not result['middle_name'] and any(lbl in ul for lbl in _MN_LABELS):
+                val = self._inline_or_next(ul, upper_lines, i, _MN_LABELS)
+                if val:
+                    result['middle_name'] = val.title()
+
+            # --- DATE OF BIRTH ---
+            if not result['dob'] and any(lbl in ul for lbl in _DOB_LABELS):
+                val = self._inline_or_next(ul, upper_lines, i, _DOB_LABELS, allow_digits=True)
+                if val:
+                    result['dob'] = self._parse_philid_date(val)
+
+            # --- SEX ---
+            if not result['sex'] and any(lbl in ul for lbl in _SEX_LABELS):
+                val = self._inline_or_next(ul, upper_lines, i, _SEX_LABELS, allow_digits=False)
+                if val:
+                    if val in ('M', 'MALE', 'LALAKI'):
+                        result['sex'] = 'Male'
+                    elif val in ('F', 'FEMALE', 'BABAE'):
+                        result['sex'] = 'Female'
+
+            # --- ADDRESS ---
+            if not result['address'] and any(lbl in ul for lbl in _ADDR_LABELS):
+                addr_data = self._extract_philid_address_structured(upper_lines, i)
+                result.update(addr_data)
+
+        # Fallbacks for any still-missing fields
+        if not result['dob']:
+            result['dob'] = self._extract_dob(full_upper)
+        if not result['sex']:
+            result['sex'] = self._extract_sex(full_upper)
+        if not result['address']:
+            addr_data_fb = self._extract_philid_address_fallback_structured(upper_lines, full_upper)
+            result.update(addr_data_fb)
+        result['barangay'] = self._extract_barangay(full_upper)
+
         return result
 
-    def _extract_philid_address(self, lines: List[str], upper: str) -> str:
+    # ----------------------------------------------------------------
+    # Helper: extract value from same line (after label) or next line
+    # ----------------------------------------------------------------
+    def _inline_or_next(
+        self, label_line: str, upper_lines: List[str], idx: int,
+        label_set, allow_digits: bool = False
+    ) -> str:
         """
-        PhilSys National ID address is on the BACK of the card in this format:
-        BLK 40 LOT 3 NORTHVILLE 2B BAGUMBONG, BARANGAY 171,
-        CITY OF CALOOCAN, NCR, THIRD DISTRICT, PHILIPPINES, 1421
-
-        Strategy: Find the line containing BLK/LOT or BARANGAY, then reconstruct
-        the physical street/subd portion only.
+        Strip ALL known label text from label_line and check if there's
+        a real value remaining on the same line.  If not, look at the next line.
         """
-        # Look for address block anchors
-        addr_line = None
-        for i, line in enumerate(lines):
-            ul = line.upper()
-            if re.search(r'\bBLK\b|\bLOT\b|\bNORTHVILLE\b|\bPHASE\b|\bSITIO\b|\bPURO?K\b', ul):
-                addr_line = i
-                break
+        remainder = label_line
+        # Remove each label variant (sorted longest first to avoid partial match)
+        for lbl in sorted(label_set, key=len, reverse=True):
+            remainder = remainder.replace(lbl, '').strip()
+        # Remove slash separator and anything that follows an all-caps label pattern
+        remainder = re.sub(r'\s*/\s*[A-Z][\w\s]*', '', remainder).strip()
+        # Remove colons and leading junk
+        remainder = re.sub(r'^[\s/:,|]+', '', remainder).strip()
 
-        if addr_line is None:
-            # Fallback: search for BARANGAY as anchor
-            for i, line in enumerate(lines):
-                if 'BARANGAY' in line.upper() or 'CALOOCAN' in line.upper():
-                    addr_line = max(0, i - 1)
-                    break
+        # Reject if remainder has non-name characters (when not expecting digits or date words)
+        if remainder and len(remainder) > 1:
+            if allow_digits or re.match(r'^[A-Z0-9\s,./\-]+$', remainder):
+                # Make sure it's not still a label
+                if not _is_label(remainder):
+                    return remainder
 
-        if addr_line is None:
-            return self._extract_address(lines, upper)  # generic fallback
+        # Try next non-empty, non-label line
+        return _find_next_value(upper_lines, idx)
 
-        # Collect lines starting from the address anchor
-        raw_parts = []
-        stop_at = {'PHILIPPINE', 'REPUBLIC', 'NCR', 'THIRD', 'DATE', 'BLOOD', 'SEX', 'KASARIAN'}
+    # ----------------------------------------------------------------
+    # PhilID-specific date parser (handles "January 05, 2005")
+    # ----------------------------------------------------------------
+    def _parse_philid_date(self, text: str) -> str:
+        u = text.upper().strip()
+        # "JANUARY 05, 2005" or "JANUARY 05 2005"
+        m = re.search(rf'({_MONTH_RE})\s+(\d{{1,2}})[,\s]+(\d{{4}})', u)
+        if m:
+            mon_str, d, y = m.group(1), int(m.group(2)), int(m.group(3))
+            mo = MONTH_MAP.get(mon_str, 0)
+            if mo and 1900 < y < 2030 and 1 <= d <= 31:
+                return f'{y:04d}-{mo:02d}-{d:02d}'
+        # "05 JANUARY 2005"
+        m = re.search(rf'(\d{{1,2}})\s+({_MONTH_RE})\s+(\d{{4}})', u)
+        if m:
+            d, mon_str, y = int(m.group(1)), m.group(2), int(m.group(3))
+            mo = MONTH_MAP.get(mon_str, 0)
+            if mo and 1900 < y < 2030 and 1 <= d <= 31:
+                return f'{y:04d}-{mo:02d}-{d:02d}'
+        # Numeric formats
+        return self._extract_dob(u)
+
+    # ----------------------------------------------------------------
+    # Address extraction (from the address label line onward)
+    # ----------------------------------------------------------------
+    def _extract_philid_address_structured(self, upper_lines: List[str], label_idx: int) -> dict:
+        STOP = {'BARANGAY', 'BRGY', 'CITY', 'PHILIPPINES', 'NCR', 'THIRD DISTRICT', 'DISTRICT',
+                'BLOOD', 'DATE', 'PETSA', 'KASARIAN', 'SIGNATURE', 'DIGITAL ID', 'PCN', '1421'}
         
-        for j in range(addr_line, min(addr_line + 3, len(lines))):
-            line_u = lines[j].upper().strip()
+        raw_parts = []
+        for j in range(label_idx + 1, min(label_idx + 6, len(upper_lines))):
+            line = upper_lines[j].strip()
+            if not line: continue
+            if _is_label(line): break
             
-            # If the line contains a stop word, truncate it there and stop collecting
+            # Stop immediately if we hit a known metadata anchor
             found_stop = False
-            for s in stop_at:
-                if s in line_u:
-                    # Capture everything BEFORE the stop word
-                    idx = line_u.find(s)
+            for sk in STOP:
+                if sk in line:
+                    idx = line.find(sk)
                     if idx > 0:
-                        raw_parts.append(line_u[:idx])
+                        raw_parts.append(line[:idx].strip())
                     found_stop = True
                     break
-            
             if found_stop:
                 break
-            
-            raw_parts.append(line_u)
+            raw_parts.append(line)
 
-        raw = ' '.join(raw_parts)
+        full_addr = ' '.join(raw_parts).replace(',', ' ').strip()
+        # Clean up double spaces
+        full_addr = re.sub(r'\s+', ' ', full_addr)
+        
+        data = {'address': full_addr, 'block_lot': '', 'subdivision': '', 'street': ''}
+        
+        # 1. Block and Lot (e.g. BLK 40 LOT 3)
+        blk_m = re.search(r'\b(BLK\s*\d+\s*LOT\s*\d+)\b', full_addr, re.I)
+        if blk_m:
+            data['block_lot'] = blk_m.group(1).title()
+            full_addr = full_addr.replace(blk_m.group(1), '').strip()
+        else:
+            b_m = re.search(r'\b(BLK\s*\d+)\b', full_addr, re.I)
+            l_m = re.search(r'\b(LOT\s*\d+)\b', full_addr, re.I)
+            if b_m and l_m:
+                data['block_lot'] = f"{b_m.group(1)} {l_m.group(1)}".title()
+                full_addr = full_addr.replace(b_m.group(1), '').replace(l_m.group(1), '').strip()
 
-        # Strip barangay + city suffix — those go into separate fields
-        raw = re.sub(r',?\s*BARANGAY\s+\d+[A-Z]?\b.*', '', raw, flags=re.I)
-        raw = re.sub(r',?\s*BRGY\.?\s*\d+[A-Z]?\b.*', '', raw, flags=re.I)
-        raw = re.sub(r',?\s*(CITY OF\s+)?CALOOCAN\b.*', '', raw, flags=re.I)
+        # 2. Subdivision (Handle Northville 2B Bagumbong as one unit)
+        # Search for common subdivision keywords and the specific Bagumbong anchor
+        sub_m = re.search(r'\b(NORTHVILLE\s*[A-Z0-9]*\s*(?:BAGUMBONG|TALIPAPA|VILLAGE|HOMES)?|CELINA\s*HOMES\s*\d*|VILLAGE|SUBD|PHASE\s*\d+)\b', full_addr, re.I)
+        if sub_m:
+            data['subdivision'] = sub_m.group(1).title()
+            full_addr = full_addr.replace(sub_m.group(1), '').strip()
 
-        # Strip inline metadata bleed
-        for noise in ('KASARIAN', 'SEX', 'PHILIPPINE', 'REPUBLIC'):
-            idx = raw.upper().find(noise)
-            if idx != -1:
-                raw = raw[:idx]
+        # 3. Street / Remaining
+        # Explicit search for St/Street patterns as requested
+        st_m = re.search(r'\b(\w+)\s+(ST|STREET|STRT|AVE|AVENUE|RD|ROAD|WAY|DR|DRIVE)\b', full_addr, re.I)
+        if st_m:
+            data['street'] = st_m.group(0).title()
+            full_addr = full_addr.replace(st_m.group(0), '').strip()
+        else:
+            # If no explicit "Street" keyword, check what's left
+            rem = re.sub(r'[,.\s]+$', '', full_addr.strip()).title()
+            if not rem or len(rem) < 2:
+                data['street'] = 'None'
+            else:
+                data['street'] = rem
+        
+        # Re-join for the full 'address' field
+        data['address'] = f"{data['block_lot']} {data['subdivision']} {data['street']}".strip().replace('  ', ' ')
+        return data
 
-        return re.sub(r'[,.\s]+$', '', raw.strip()).title()
+    def _extract_philid_address_fallback_structured(self, upper_lines: List[str], full_upper: str) -> dict:
+        """Fallback: find BLK/LOT anchor and collect address from there."""
+        for i, ul in enumerate(upper_lines):
+            if re.search(r'\bBLK\b.*\bLOT\b|\bBLOCK\b.*\bLOT\b', ul):
+                return self._extract_philid_address_structured(upper_lines, i - 1)
+        
+        # Generic fallback
+        raw = self._extract_address([l for l in full_upper.split('\n') if l.strip()], full_upper)
+        return {'address': raw, 'block_lot': '', 'subdivision': '', 'street': ''}

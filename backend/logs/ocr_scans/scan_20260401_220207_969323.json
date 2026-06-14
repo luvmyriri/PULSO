@@ -1,0 +1,25 @@
+{
+    "timestamp": "2026-04-01T22:02:07.969323",
+    "raw_text": "REPUBLIKA NG PILIPINAS\nRepublic of the Philippines\nPAMBANSANG PAGKAKAKILANLAN\nPhilippine Identification Card\n3249-0527-8102-6394\nApelyido/Last Name\nGARCIA\nMga Pangalan/Given Names\nMARC JUSTINE\nGitnang Apelyido/Middle Name\nMASMELA\nPetsa ng Kapanganakan/Date of Birth\nNOVEMBER 25, 2005\nTirahan/Address\nB100 L11 NORTH VILL 2B BAGUMBONG, BARANGAY 171, CITY\nOF CALOOCAN, NCR, THIRD DISTRICT\nPHL\nAraw ng pagkakaloob/Date of issue\n27 APRIL 2023\nKasarian/Sex\nMALE\nUri ng Dugo/Blood Type\nUNKNOWN\nKalagayang Sibil/Marital Status\nSINGLE\nLugar ng Kapanganakan/Place of Birth\nCITY OF CALOOCAN NCR\nTHIRD DISTRICT\nIf found, please return to the nearest\nPSA Office\nwww.psa.gov.ph\n22L2044297",
+    "parsed_data": {
+        "id_type": "philid",
+        "id_type_label": "Philippine National ID",
+        "first_name": "Marc Justine",
+        "last_name": "Garcia",
+        "middle_name": "Masmela",
+        "dob": "2005-11-25",
+        "sex": "Male",
+        "address": "B100 L11 North Vill 2B Bagumbong",
+        "house_no": "",
+        "block_lot": "",
+        "subdivision": "B100 L11 North Vill",
+        "street": "2B Bagumbong",
+        "barangay": "171",
+        "postal_code": "1421",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 171).",
+        "pcn": "3249-0527-8102-6394",
+        "is_document_mismatch": false,
+        "mismatch_reason": ""
+    }
+}

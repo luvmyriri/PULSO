@@ -19,6 +19,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { ShieldX, LogOut, ChevronLeft } from 'lucide-react';
+import { checkPermission } from '../utils/rbac_utils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Role groups (mirroring backend)
@@ -138,7 +139,7 @@ const UnauthorizedPage = ({ userRole, allowedRoles }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // ProtectedRoute gate
 // ─────────────────────────────────────────────────────────────────────────────
-const ProtectedRoute = ({ children, allowedRoles = null }) => {
+const ProtectedRoute = ({ children, allowedRoles = null, requiredPermission = null }) => {
     const location = useLocation();
 
     // Read auth state
@@ -146,14 +147,21 @@ const ProtectedRoute = ({ children, allowedRoles = null }) => {
     let user = null;
     try { user = JSON.parse(localStorage.getItem('pulso_user')); } catch {}
 
-    // Not authenticated → to login
+    // Not authenticated → to login or gov portal depending on allowedRoles
     if (!token || !user) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
+        const isGovRoute = allowedRoles !== null && !allowedRoles.includes('resident');
+        const redirectPath = isGovRoute ? '/gov' : '/login';
+        return <Navigate to={redirectPath} state={{ from: location }} replace />;
     }
 
     // Role check — if allowedRoles is null, any authenticated user is OK
     if (allowedRoles !== null && !allowedRoles.includes(user.role)) {
         return <UnauthorizedPage userRole={user.role} allowedRoles={allowedRoles} />;
+    }
+
+    // Dynamic Permission check
+    if (requiredPermission && !checkPermission(user, requiredPermission.module, requiredPermission.action)) {
+        return <UnauthorizedPage userRole={user.role} allowedRoles={null} />; // Or a specialized "No Capability" page
     }
 
     return children;

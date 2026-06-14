@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:mobile_app/core/theme/app_theme.dart';
-import 'package:mobile_app/features/home/screens/home_screen.dart';
+import 'package:pulso_mobile/core/theme/app_theme.dart';
+import 'package:pulso_mobile/features/home/screens/home_screen.dart';
 import 'dart:ui';
 
 class RegistrationSuccessScreen extends StatelessWidget {

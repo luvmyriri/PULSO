@@ -19,11 +19,11 @@ import {
     Users, Wrench, HardHat, Ruler, Eye, Activity, Megaphone,
     ClipboardList, ArrowRight, Plus, Bell, Map, FileCheck,
     TrendingUp, UserCog, BookOpen, Truck, RefreshCw, XCircle,
-    CircleDot, AlertCircle, CheckSquare
+    CircleDot, AlertCircle, CheckSquare, Brain
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
 
-const API = 'http://localhost:8000';
+import { API_BASE_URL } from '../utils/apiBase';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Per-role configuration: what they see, what actions they can take
@@ -49,10 +49,10 @@ const ROLE_CONFIG = {
             { step: 'Sign Certificates of Completion', color: 'green' },
         ],
         quickActions: [
+            { label: 'Intelligence Analytics', to: '/gov/analytics', icon: Brain },
             { label: 'View All Projects', to: '/gov/projects', icon: Map },
             { label: 'Post Advisory', to: '/management', tab: 'advisories', icon: Megaphone },
             { label: 'Audit Logs', to: '/gov/audit-logs', icon: BarChart2 },
-            { label: 'View All Users', to: '/management', tab: 'users', icon: Users },
         ],
     },
 
@@ -75,6 +75,7 @@ const ROLE_CONFIG = {
             { step: 'Issue Certificate of Completion (CoC, Phase 6)', color: 'green' },
         ],
         quickActions: [
+            { label: 'Intelligence Analytics', to: '/gov/analytics', icon: Brain },
             { label: 'All Projects', to: '/gov/projects', icon: Map },
             { label: 'Work Orders', to: '/gov/work-orders', icon: GitBranch },
             { label: 'Exec Overview', to: '/management', icon: TrendingUp },
@@ -477,12 +478,32 @@ const COLOR_MAP = {
 const ActionCard = ({ action, token }) => {
     const [count, setCount] = useState(null);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (!action.endpoint || !token) { setLoading(false); return; }
-        fetch(`${API}${action.endpoint}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : [])
-            .then(data => setCount(Array.isArray(data) ? data.length : 0))
+        fetch(`${API_BASE_URL}${action.endpoint}`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.ok ? r.json() : {})
+            .then(data => {
+                // Handle different response formats:
+                // 1. Array: [...items]
+                // 2. Object with items: {items: [...], total: X}
+                // 3. Object with users: {users: [...], total: X}
+                // 4. Object with single value: {total: X} or {count: X}
+                if (Array.isArray(data)) {
+                    setCount(data.length);
+                } else if (data.items) {
+                    setCount(data.total ?? data.items.length);
+                } else if (data.users) {
+                    setCount(data.total ?? data.users.length);
+                } else if (data.total !== undefined) {
+                    setCount(data.total);
+                } else if (data.count !== undefined) {
+                    setCount(data.count);
+                } else {
+                    setCount(0);
+                }
+            })
             .catch(() => setCount(null))
             .finally(() => setLoading(false));
     }, [action.endpoint, token]);
@@ -490,11 +511,27 @@ const ActionCard = ({ action, token }) => {
     const Icon = action.icon;
     const hasItems = count !== null && count > 0;
 
+    // Derive navigation target from endpoint pattern
+    const getNavTarget = () => {
+        if (!action.endpoint) return null;
+        if (action.endpoint.includes('/reports')) return '/dispatcher';
+        if (action.endpoint.includes('/work-orders')) return '/gov/work-orders';
+        if (action.endpoint.includes('/projects')) return '/gov/projects';
+        if (action.endpoint.includes('/procurement')) return '/gov/procurement';
+        if (action.endpoint.includes('/obo')) return '/gov/obo';
+        if (action.endpoint.includes('/users')) return '/gov/users';
+        if (action.endpoint.includes('/audit-logs')) return '/gov/audit-logs';
+        return null;
+    };
+
+    const navTarget = getNavTarget();
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`rounded-2xl border p-4 flex items-center justify-between gap-4 transition-all hover:shadow-md ${URGENCY_COLORS[action.urgency]} ${hasItems ? 'cursor-pointer' : ''}`}
+            onClick={() => navTarget && navigate(navTarget)}
+            className={`rounded-2xl border p-4 flex items-center justify-between gap-4 transition-all hover:shadow-md ${URGENCY_COLORS[action.urgency]} ${navTarget ? 'cursor-pointer' : ''}`}
         >
             <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-white/60 dark:bg-slate-800/60 flex items-center justify-center shrink-0 shadow-sm">
@@ -515,7 +552,7 @@ const ActionCard = ({ action, token }) => {
                 ) : (
                     <span className="text-xs text-slate-400">—</span>
                 )}
-                {hasItems && <ChevronRight size={16} className="text-slate-400" />}
+                {navTarget && <ChevronRight size={16} className="text-slate-400" />}
             </div>
         </motion.div>
     );
@@ -554,7 +591,7 @@ const StatsBar = ({ token }) => {
     const [stats, setStats] = useState(null);
     useEffect(() => {
         if (!token) return;
-        fetch(`${API}/api/gov/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_BASE_URL}/api/gov/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } })
             .then(r => r.ok ? r.json() : null)
             .then(setStats)
             .catch(() => {});
@@ -598,7 +635,7 @@ const PositionDashboard = () => {
     });
 
     useEffect(() => {
-        if (!token || !currentUser) navigate('/login');
+        if (!token || !currentUser) navigate('/gov');
     }, [token, currentUser, navigate]);
 
     const role = currentUser?.role || 'dispatcher';

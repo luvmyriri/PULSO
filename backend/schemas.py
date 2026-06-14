@@ -1,32 +1,130 @@
-from pydantic import BaseModel
-from typing import Optional, List
+import json
+from pydantic import BaseModel, field_validator
+from typing import Optional, List, Any, Dict
 from datetime import datetime
 
-class UserBase(BaseModel):
+# ─────────────────────────────────────────────────────────────────────────────
+# Citizen / Resident Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Citizen / Resident Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ResidentBase(BaseModel):
     full_name: str
     email: str
     phone_number: Optional[str] = None
-    role: Optional[str] = "resident"
     address: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
+
+class ResidentCreate(ResidentBase):
+    password: str
+
+class ResidentUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
+
+class ResidentResponse(ResidentBase):
+    id: int
+    trust_score: int
+    is_verified: bool
+    kyc_level: str
+    created_at: datetime
+    role: str = "resident"
+
+    class Config:
+        from_attributes = True
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Government Official Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class OfficialBase(BaseModel):
+    full_name: str
+    email: str
+    display_name: Optional[str] = None
+    role_id: Optional[int] = None
+    account_type: Optional[str] = "staff"
+    primary_jurisdiction: Optional[List[str]] = None
     barangay: Optional[str] = None
+    address: Optional[str] = None
+    phone_number: Optional[str] = None
+
+class OfficialCreate(OfficialBase):
+    password: str
+
+class OfficialUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    display_name: Optional[str] = None
+    role_id: Optional[int] = None
+    account_type: Optional[str] = None
+    primary_jurisdiction: Optional[List[str]] = None
+    barangay: Optional[str] = None
+    address: Optional[str] = None
+    phone_number: Optional[str] = None
+    is_suspended: Optional[bool] = None
+    suspension_reason: Optional[str] = None
+
+class OfficialResponse(OfficialBase):
+    id: int
+    is_active: bool
+    is_suspended: bool
+    created_at: datetime
+    role: str
+    capabilities: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared / Polymorphic Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class UserResponse(BaseModel):
+    """
+    Polymorphic response for /api/me and shared user lookup.
+    Exposes fields common to both tables.
+    """
+    id: int
+    full_name: str
+    email: str
+    role: str
+    phone_number: Optional[str] = None
+    is_active: bool = True
+    is_verified: bool = True # Officials are True by property
+    is_suspended: bool = False
+    trust_score: int = 100
+    created_at: datetime
+    display_name: Optional[str] = None # Mainly for officials
+    kyc_level: Optional[str] = None # Mainly for residents
+    capabilities: Optional[Dict[str, Any]] = None
+
+    # Location fields (Normalized vs Legacy)
+    barangay: Optional[str] = None
+    address: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
 
 class UserUpdate(BaseModel):
+    """Legacy/Shared update schema - redirects to ResidentUpdate or OfficialUpdate in CRUD."""
     full_name: Optional[str] = None
     email: Optional[str] = None
     phone_number: Optional[str] = None
     address: Optional[str] = None
     barangay: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
 
-class UserCreate(UserBase):
-    password: str
-
-class UserResponse(UserBase):
-    id: int
-    trust_score: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 class ReportBase(BaseModel):
     category: str
@@ -34,15 +132,35 @@ class ReportBase(BaseModel):
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
     location_string: Optional[str] = None
+    location_barangay: Optional[str] = None
+    barangay_id: Optional[int] = None
     image_url: Optional[str] = None
+    resolution_image_url: Optional[str] = None
+    ai_metadata: Optional[Any] = None
+    budget: Optional[float] = None
+    deployment_date: Optional[datetime] = None
+
+    @field_validator('ai_metadata', mode='before')
+    @classmethod
+    def parse_ai_metadata(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except:
+                return v
+        return v
 
 class ReportCreate(ReportBase):
     pass
 
+class ReportResolutionConfirm(BaseModel):
+    rating: int # 1-5
+    note: Optional[str] = None
+
 class ReportResponse(ReportBase):
     id: int
     ticket_id: str
-    user_id: int
+    resident_id: Optional[int] = None
     status: str
     ai_category: Optional[str] = None
     ai_urgency: Optional[str] = None
@@ -88,8 +206,11 @@ class NotificationCreate(NotificationBase):
 
 class NotificationResponse(NotificationBase):
     id: int
-    user_id: int
+    resident_id: Optional[int] = None
+    official_id: Optional[int] = None
+    user_id: Optional[int] = None
     is_read: bool
+    is_hidden: bool = False
     created_at: datetime
 
     class Config:
@@ -158,6 +279,15 @@ class ProcessTimelineResponse(BaseModel):
     note: Optional[str] = None
     is_public: bool
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+class KYCStatusResponse(BaseModel):
+    is_verified: bool
+    kyc_level: str
+    trust_score: int
+    last_verification: Optional[datetime] = None
+    registration_date: datetime
 
     class Config:
         from_attributes = True

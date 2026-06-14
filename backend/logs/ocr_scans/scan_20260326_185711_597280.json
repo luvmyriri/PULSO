@@ -1,0 +1,23 @@
+{
+    "timestamp": "2026-03-26T18:57:11.597280",
+    "raw_text": "REPUBLIC OF THE PHILIPPINES\nDEPARTMENT OF TRANSPORTATION\nLAND TRANSPORTATION OFFICE\nDRIVER'S LICENSE\nLast Name. First Name. Middle Name\nESTIOKO, GREGORY JR REYES\nAND TRANSPORTATION OF\nportation\nof Transpor\n2024/05\nSignature of Licenses\nNationality Sex\nPHL\nM\nDate of Birth\n2002/07/23\nAddress\nWeight (kg)\n62\nHeight(m)\n1.75\n2680, MAGNOLIA, BARANGAY 174, CALOOCAN\nTY, NCR, THIRD DISTRICT, 1423\nTATIONo.\nC53-24-003279 2028/07/23\nExpiration Date\nEyes Color\nAgency Code\nC53\nBLACK\nConditions\nNONE\nATTY VIGOR\nMENDOZA\nAssistant Secretary\n",
+    "parsed_data": {
+        "id_type": "lto",
+        "id_type_label": "LTO Driver's License",
+        "first_name": "Gregory",
+        "last_name": "Estioko",
+        "middle_name": "Jr Reyes",
+        "dob": "2002-07-23",
+        "sex": "",
+        "address": "REPUBLIC OF THE PHILIPPINES DEPARTMENT OF TRANSPORTATION LAND TRANSPORTATION OFFICE DRIVER'S LICENSE Last Name. First Name. Middle Name ESTIOKO, GREGORY JR REYES AND TRANSPORTATION OF portation of Tra",
+        "barangay": "174",
+        "is_north_caloocan": true,
+        "verification_message": "North Caloocan Resident Verified (Barangay 174).",
+        "block_lot": "",
+        "street": "",
+        "subdivision": "",
+        "city": "",
+        "province": "Metro Manila",
+        "postal_code": "1423"
+    }
+}

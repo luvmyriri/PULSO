@@ -13,7 +13,7 @@ Card format:
 
 import re
 from .base import BaseIDParser, ParsedIDData
-from typing import List, Tuple
+from typing import List
 
 
 class PRCParser(BaseIDParser):
@@ -45,11 +45,23 @@ class PRCParser(BaseIDParser):
 
         # 3. Profession / Title
         # Often after registration number or near top
+        _PROFESSIONS = (
+            'NURSE', 'ENGINEER', 'TEACHER', 'COORDINATOR', 'ACCOUNTANT', 'PHYSICIAN',
+            'DENTIST', 'ARCHITECT', 'PHARMACIST', 'LAWYER', 'ATTORNEY',
+            'MIDWIFE', 'PHYSICAL THERAPIST', 'OCCUPATIONAL THERAPIST',
+            'NUTRITIONIST', 'DIETITIAN', 'MEDICAL TECHNOLOGIST', 'RADIOLOGIC TECHNOLOGIST',
+            'RESPIRATORY THERAPIST', 'VETERINARIAN', 'AGRONOMIST', 'FORESTER',
+            'GEODETIC ENGINEER', 'METALLURGICAL ENGINEER', 'SANITARY ENGINEER',
+            'CHEMICAL ENGINEER', 'ELECTRONICS', 'ELECTRICAL ENGINEER', 'MECHANICAL ENGINEER',
+            'INDUSTRIAL ENGINEER', 'MINING ENGINEER', 'CIVIL ENGINEER',
+            'PSYCHOLOGIST', 'SOCIAL WORKER', 'CRIMINOLOGIST', 'GUIDANCE COUNSELOR',
+            'OPTOMETRIST', 'REAL ESTATE', 'INTERIOR DESIGNER', 'LANDSCAPE ARCHITECT'
+        )
         for line in lines:
             ul = line.upper()
-            if any(p in ul for p in ('NURSE', 'ENGINEER', 'TEACHER', 'COORDINATOR', 'ACCOUNTANT', 'PHYSICIAN')):
+            if any(p in ul for p in _PROFESSIONS):
                 if not any(noise in ul for noise in ('REGISTRATION', 'COMMISSION', 'REGULATION')):
-                    result['profession'] = ul.title()
+                    result['profession'] = ul.strip().title()
                     break
 
         # 4. Dates: MM/DD/YYYY
@@ -73,16 +85,7 @@ class PRCParser(BaseIDParser):
         elif len(all_matches) == 1:
              result['expiry_date'] = all_matches[0]
 
-        # Reg Date & Expiry
-        all_dates = []
-        for d_iso in re.findall(r'(\d{4}-\d{2}-\d{2})', re.sub(r'\d{4}-\d{2}-\d{2}', '', self._extract_dob(upper))): # This is wrong, self._extract_dob returns one.
-             pass
-             
-        # Use regex directly for MM/DD/YYYY candidates
-        candidates = re.findall(r'\b(\d{2}/\d{2}/\d{4})\b', upper)
-        if len(candidates) >= 2:
-             result['reg_date'] = candidates[0]
-             result['expiry_date'] = candidates[1]
+        # Dates found in first pass above are final — no duplicate search needed
 
         result['sex']      = self._extract_sex(upper)
         result['address']  = ''   # PRC IDs do not have printed address
