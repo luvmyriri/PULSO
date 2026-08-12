@@ -6,7 +6,8 @@ import {
     Search, 
     CheckCircle, 
     Clock, 
-    ChevronRight, 
+    ChevronRight,
+    ChevronLeft, 
     Map as MapIcon, 
     Filter, 
     MoreHorizontal,
@@ -103,6 +104,7 @@ const DispatcherDashboard = () => {
     });
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
     const [activeTab, setActiveTab] = useState('queue'); // 'queue', 'fleet'
     const [dashboardMode, setDashboardMode] = useState('triage'); // 'triage', 'active'
     const [showHeatmap, setShowHeatmap] = useState(false);
@@ -1049,7 +1051,7 @@ const DispatcherDashboard = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-300 font-sans flex text-sm overflow-hidden">
+        <div className="min-h-screen bg-neutral-bg text-neutral-text font-sans flex text-sm overflow-hidden">
             
             {/* Unified Left Sidebar Navigation */}
             <GovSidebar currentUser={currentUser} />
@@ -1102,28 +1104,28 @@ const DispatcherDashboard = () => {
                 )}
                 
                 {/* Top Header */}
-                <header className="h-16 bg-white dark:bg-slate-900/50 flex items-center justify-between px-8 shrink-0 z-40 relative">
+                <header className="h-16 bg-white flex items-center justify-between px-8 shrink-0 z-40 relative border-b border-neutral-border">
                     {/* Removed bottom header shadow */}
                     <div className="flex items-center gap-6">
-                        <h1 className="text-xl font-display font-bold text-slate-900 dark:text-white">
+                        <h1 className="text-xl font-display font-bold text-neutral-text">
                             LGU Command Center
                         </h1>
-                        <div className="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
+                        <div className="h-6 w-px bg-slate-200"></div>
                         
                         {/* Dashboard Mode Toggle */}
-                        <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                        <div className="flex bg-neutral-bg dark:bg-slate-950 p-1 rounded-lg border border-neutral-border dark:border-slate-800">
                             <button
                                 onClick={() => { setDashboardMode('triage'); setActiveTab('queue'); setSelectedReport(null); }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${dashboardMode === 'triage' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${dashboardMode === 'triage' ? 'bg-white dark:bg-slate-800 text-primary dark:text-white shadow-sm border border-neutral-border/50' : 'text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
                             >
-                                <AlertTriangle size={16} className={dashboardMode === 'triage' ? 'text-orange-500' : ''}/>
+                                <AlertTriangle size={16} className={dashboardMode === 'triage' ? 'text-primary' : 'text-neutral-muted'}/>
                                 Triage Mode
                             </button>
                             <button
                                 onClick={() => { setDashboardMode('active'); setActiveTab('fleet'); setSelectedReport(null); }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${dashboardMode === 'active' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${dashboardMode === 'active' ? 'bg-white dark:bg-slate-800 text-secondary dark:text-white shadow-sm border border-neutral-border/50' : 'text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
                             >
-                                <Radio size={16} className={dashboardMode === 'active' ? 'text-blue-500' : ''} />
+                                <Radio size={16} className={dashboardMode === 'active' ? 'text-secondary' : 'text-neutral-muted'} />
                                 Active Operations
                             </button>
                         </div>
@@ -1148,27 +1150,27 @@ const DispatcherDashboard = () => {
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: -320, opacity: 0 }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative"
+                            className="w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative border-r border-neutral-border"
                         >
                             {/* Removed right subtle shadow */}
                             <div className="p-4 relative flex flex-col gap-3">
                                 {/* Removed bottom shadow */}
-                                <h2 className="font-bold text-slate-900 dark:text-white text-lg flex items-center gap-2">
+                                <h2 className="font-bold text-neutral-text dark:text-white text-lg flex items-center gap-2">
                                     {dashboardMode === 'triage' ? (
-                                        <><AlertTriangle size={18} className="text-orange-500"/> Incoming Reports</>
+                                        <><AlertTriangle size={18} className="text-primary"/> Incoming Reports</>
                                     ) : (
-                                        <><Radio size={18} className="text-blue-500"/> Dispatched Work</>
+                                        <><Radio size={18} className="text-secondary"/> Dispatched Work</>
                                     )}
                                 </h2>
                                 <div className="flex flex-col gap-2">
                                     <div className="relative">
-                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-muted dark:text-slate-400" />
                                         <input 
                                             type="text" 
                                             placeholder="Search by RPT ID, Category, or Location..." 
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 transition-colors" 
+                                            className="w-full bg-neutral-bg dark:bg-slate-950 border border-neutral-border dark:border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-neutral-text dark:text-white placeholder-neutral-muted focus:outline-none focus:border-primary transition-colors" 
                                         />
                                     </div>
                                     <div className="flex flex-col gap-2.5">
@@ -1248,20 +1250,20 @@ const DispatcherDashboard = () => {
                                         const isSelected = selectedReport?.id === report.id;
                                         const selectionClass = isSelected 
                                             ? ({
-                                                orange: 'bg-orange-500/10 dark:bg-orange-950/30 border-orange-500/50 ring-1 ring-orange-500/20 shadow-sm',
-                                                blue: 'bg-blue-500/10 dark:bg-blue-950/30 border-blue-500/50 ring-1 ring-blue-500/20 shadow-sm',
-                                                green: 'bg-green-500/10 dark:bg-green-950/30 border-green-500/50 ring-1 ring-green-500/20 shadow-sm',
-                                                red: 'bg-red-500/10 dark:bg-red-950/30 border-red-500/50 ring-1 ring-red-500/20 shadow-sm',
-                                                slate: 'bg-slate-500/10 dark:bg-slate-800/40 border-slate-500/50 ring-1 ring-slate-500/20 shadow-sm'
-                                            }[color] || 'bg-slate-100 dark:bg-slate-800 border-blue-500/50')
+                                                orange: 'bg-primary/5 dark:bg-orange-950/30 border-primary ring-1 ring-primary/20 shadow-sm',
+                                                blue: 'bg-secondary/5 dark:bg-blue-950/30 border-secondary ring-1 ring-secondary/20 shadow-sm',
+                                                green: 'bg-secondary/5 dark:bg-green-950/30 border-secondary ring-1 ring-secondary/20 shadow-sm',
+                                                red: 'bg-red-500/5 dark:bg-red-950/30 border-red-500/50 ring-1 ring-red-500/20 shadow-sm',
+                                                slate: 'bg-neutral-bg dark:bg-slate-800/40 border-neutral-border ring-1 ring-neutral-border/20 shadow-sm'
+                                            }[color] || 'bg-neutral-bg dark:bg-slate-800 border-primary/50')
                                             : isTacticalMatch
                                             ? 'bg-yellow-500/5 border-yellow-500/50 ring-1 ring-yellow-500/30 shadow-sm shadow-yellow-500/10'
-                                            : `bg-white dark:bg-slate-950/50 border-slate-200 dark:border-slate-800/50 shadow-sm transition-all duration-200 ${
-                                                color === 'green' ? 'hover:border-green-400/50 dark:hover:border-green-500/30 hover:bg-green-50/30 dark:hover:bg-green-900/5' :
-                                                color === 'blue' ? 'hover:border-blue-400/50 dark:hover:border-blue-500/30 hover:bg-blue-50/30 dark:hover:bg-blue-900/5' :
-                                                color === 'orange' ? 'hover:border-orange-400/50 dark:hover:border-orange-700 hover:bg-orange-50/30 dark:hover:bg-orange-900/5' :
+                                            : `bg-white dark:bg-slate-950/50 border-neutral-border dark:border-slate-800/50 shadow-sm transition-all duration-200 ${
+                                                color === 'green' ? 'hover:border-secondary dark:hover:border-green-500/30 hover:bg-secondary-light/30 dark:hover:bg-green-900/5' :
+                                                color === 'blue' ? 'hover:border-secondary dark:hover:border-blue-500/30 hover:bg-secondary-light/30 dark:hover:bg-blue-900/5' :
+                                                color === 'orange' ? 'hover:border-primary dark:hover:border-orange-700 hover:bg-primary-light/30 dark:hover:bg-orange-900/5' :
                                                 color === 'red' ? 'hover:border-red-400/50 dark:hover:border-red-700 hover:bg-red-50/30 dark:hover:bg-red-900/5' :
-                                                'hover:border-slate-300 dark:hover:border-slate-700'
+                                                'hover:border-primary-hover dark:hover:border-slate-700'
                                             }`;
 
                                         return (
@@ -1340,13 +1342,13 @@ const DispatcherDashboard = () => {
                                                     {(report.status === 'unverified' || report.status === 'pending') && (
                                                         <span 
                                                             onClick={(e) => { e.stopPropagation(); handleVerifyReport(report.id); }}
-                                                            className="text-[10px] bg-orange-600 hover:bg-orange-500 text-white px-2.5 py-1 rounded-md uppercase font-black tracking-wider transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-95"
+                                                            className="text-[10px] bg-primary hover:bg-primary-hover text-white px-2.5 py-1 rounded-md uppercase font-black tracking-wider transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-95"
                                                         >
                                                             {actionLoading === report.id ? '...' : 'Verify'}
                                                         </span>
                                                     )}
                                                     {report.status === 'pending_approval' && (
-                                                        <span className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-1 rounded uppercase font-bold tracking-wider flex items-center gap-1"><Clock size={10}/> Pending Eng</span>
+                                                        <span className="text-[10px] bg-primary-light text-primary border border-primary/20 px-2 py-1 rounded uppercase font-bold tracking-wider flex items-center gap-1"><Clock size={10}/> Pending Eng</span>
                                                     )}
                                                     {report.status === 'approved_internal' && (
                                                         <span 
@@ -1355,7 +1357,7 @@ const DispatcherDashboard = () => {
                                                                 setSelectedReport({...report, aiConfidence, color, icon});
                                                                 setIsDispatchModalOpen(true); 
                                                             }}
-                                                            className="text-[10px] bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-blue-600 hover:text-white dark:hover:bg-blue-500 transition-colors cursor-pointer"
+                                                            className="text-[10px] bg-primary-light text-primary border border-primary/20 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-primary hover:text-white transition-colors cursor-pointer"
                                                         >
                                                             {actionLoading === report.id ? '...' : 'Create W.O.'}
                                                         </span>
@@ -1363,7 +1365,7 @@ const DispatcherDashboard = () => {
                                                     {report.status === 'dispatched' && (
                                                         <span 
                                                             onClick={(e) => { e.stopPropagation(); handleResolveReport(report.id); }}
-                                                            className="text-[10px] bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-green-600 hover:text-white dark:hover:bg-green-500 transition-colors cursor-pointer"
+                                                            className="text-[10px] bg-secondary-light text-secondary border border-secondary/20 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-secondary hover:text-white transition-colors cursor-pointer"
                                                         >
                                                             {actionLoading === report.id ? '...' : 'Resolve'}
                                                         </span>
@@ -1387,6 +1389,24 @@ const DispatcherDashboard = () => {
 
                 {/* Map Area (Center) */}
                 <div className="flex-1 bg-slate-100 dark:bg-slate-950 relative">
+                    {/* Toggle Left Sidebar Button */}
+                    <button
+                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        className="absolute top-4 left-4 z-40 bg-white dark:bg-slate-900 shadow-xl border border-neutral-border p-2.5 rounded-full text-neutral-text dark:text-neutral-muted hover:bg-primary-light transition-all flex items-center justify-center pointer-events-auto"
+                        title={isSidebarOpen ? "Hide Incoming Reports" : "Show Incoming Reports"}
+                    >
+                        {isSidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                    </button>
+
+                    {/* Toggle Right Sidebar Button */}
+                    <button
+                        onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+                        className="absolute top-4 right-4 z-40 bg-white dark:bg-slate-900 shadow-xl border border-neutral-border p-2.5 rounded-full text-neutral-text dark:text-neutral-muted hover:bg-primary-light transition-all flex items-center justify-center pointer-events-auto"
+                        title={isRightSidebarOpen ? "Hide Triage Details" : "Show Triage Details"}
+                    >
+                        {isRightSidebarOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                    </button>
+
                     {isLoaded ? (
                         <>
                             <GoogleMap
@@ -2047,22 +2067,29 @@ const DispatcherDashboard = () => {
                     )}
                 </div>
 
-                {/* Right Sidebar - Selected Details or AI Validation Queue */}
-                <div className="w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative">
-                    {/* Removed left sidebar inner shadow */}
-                    <div className="flex relative">
+            <AnimatePresence>
+                {isRightSidebarOpen && (
+                    <motion.div
+                        initial={{ x: 320, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: 320, opacity: 0 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        className="w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative border-l border-neutral-border"
+                    >
+                        {/* Removed left sidebar inner shadow */}
+                    <div className="flex relative border-b border-neutral-border">
                         {/* Removed lower shadow */}
                         {dashboardMode === 'triage' && (
                             <button 
                                 onClick={() => setActiveTab('queue')}
-                                className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'queue' ? 'border-orange-500 text-orange-600 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'queue' ? 'border-primary text-primary dark:text-white' : 'border-transparent text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
                             >
                                 Triage Queue
                             </button>
                         )}
                         <button 
                             onClick={() => setActiveTab('fleet')}
-                            className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'fleet' ? 'border-orange-500 text-orange-600 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'fleet' ? 'border-secondary text-secondary dark:text-white' : 'border-transparent text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
                         >
                             Field Fleets
                         </button>
@@ -2072,11 +2099,11 @@ const DispatcherDashboard = () => {
                         {activeTab === 'queue' && dashboardMode === 'triage' && (
                             <div className="space-y-4">
                                 {selectedReport ? (
-                                    <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+                                    <div className="bg-white dark:bg-slate-950/50 border border-neutral-border dark:border-slate-800 rounded-xl p-4">
                                         <div className="flex flex-col gap-4">
                                             <div>
                                                 <div className="flex items-center gap-1.5 mb-2">
-                                                    <ShieldAlert className="text-orange-500 shrink-0" size={18}/>
+                                                    <ShieldAlert className="text-primary shrink-0" size={18}/>
                                                     <h3 className="font-bold text-slate-900 dark:text-white text-sm">Human-in-the-Loop Required</h3>
                                                 </div>
                                             </div>
@@ -2206,7 +2233,7 @@ const DispatcherDashboard = () => {
                                                         <button 
                                                             onClick={() => handleVerifyReport(selectedReport.id)}
                                                             disabled={actionLoading === selectedReport.id}
-                                                            className="bg-orange-600 hover:bg-orange-500 text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50"
+                                                            className="bg-primary hover:bg-primary-hover text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50"
                                                         >
                                                             {actionLoading === selectedReport.id ? '...' : 'Verify to Manager'}
                                                         </button>
@@ -2215,7 +2242,7 @@ const DispatcherDashboard = () => {
                                                         <button 
                                                             onClick={() => handleApproveReport(selectedReport.id)}
                                                             disabled={actionLoading === selectedReport.id}
-                                                            className="bg-orange-600 hover:bg-orange-500 text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-2"
+                                                            className="bg-primary hover:bg-primary-hover text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-2"
                                                         >
                                                             <Briefcase size={14} /> Budgeting & Financial Approval
                                                         </button>
@@ -2223,7 +2250,7 @@ const DispatcherDashboard = () => {
                                                     {selectedReport.status === 'approved_internal' && (
                                                         <button 
                                                             onClick={() => setIsDispatchModalOpen(true)}
-                                                            className="bg-blue-600 hover:bg-blue-500 text-white py-2 rounded text-xs font-bold transition-colors shadow flex items-center justify-center gap-2"
+                                                            className="bg-primary hover:bg-primary-hover text-white py-2 rounded text-xs font-bold transition-colors shadow flex items-center justify-center gap-2"
                                                         >
                                                             <Briefcase size={14} /> Generate Work Order
                                                         </button>
@@ -2232,7 +2259,7 @@ const DispatcherDashboard = () => {
                                                         <button 
                                                             onClick={() => handleResolveReport(selectedReport.id)}
                                                             disabled={actionLoading === selectedReport.id}
-                                                            className="bg-green-600 hover:bg-green-500 text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50"
+                                                            className="bg-secondary hover:bg-secondary-hover text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50"
                                                         >
                                                             {actionLoading === selectedReport.id ? '...' : 'Mark Resolved'}
                                                         </button>
@@ -2327,35 +2354,42 @@ const DispatcherDashboard = () => {
                         {activeTab === 'fleet' && (
                             <div className="space-y-3">
                                 {fleetStatus.map(team => (
-                                    <div key={team.id} className="bg-slate-950/50 border border-slate-800 rounded-xl p-3">
+                                    <div 
+                                        key={team.id} 
+                                        className={`bg-white dark:bg-slate-950/50 border border-neutral-border dark:border-slate-800 rounded-xl p-3 shadow-sm transition-all duration-200 ${
+                                            team.status === 'Available' 
+                                                ? 'hover:border-secondary hover:bg-secondary-light/30' 
+                                                : 'hover:border-primary hover:bg-primary-light/30'
+                                        }`}
+                                    >
                                         <div className="flex justify-between items-center mb-2">
-                                            <h4 className="font-bold text-sm text-white flex items-center gap-2"><Truck size={14} className="text-slate-400"/> {team.name}</h4>
-                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                                                team.status === 'Available' ? 'bg-green-900/30 text-green-400' :
-                                                team.status === 'En Route' ? 'bg-blue-900/30 text-blue-400' :
-                                                'bg-orange-900/30 text-orange-400'
+                                            <h4 className="font-bold text-sm text-neutral-text dark:text-white flex items-center gap-2"><Truck size={14} className="text-primary"/> {team.name}</h4>
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border shadow-sm ${
+                                                team.status === 'Available' ? 'bg-secondary-light text-secondary border-secondary/20' :
+                                                team.status === 'En Route' ? 'bg-primary-light text-primary border-primary/20' :
+                                                'bg-orange-500/10 text-orange-600 border-orange-500/20'
                                             }`}>
                                                 {team.status}
                                             </span>
                                         </div>
-                                        <div className="text-xs text-slate-400 mb-1">Lead: <span className="text-slate-300 font-bold">{team.lead}</span></div>
-                                        <div className="text-xs text-slate-400 mb-1">Specialization: <span className="text-slate-300">{team.type}</span></div>
-                                        <div className="text-xs text-slate-400 flex justify-between items-center">
-                                            <span>Loc: <span className="text-slate-300">{team.location}</span></span>
-                                            <div className="flex gap-2">
+                                        <div className="text-xs text-neutral-muted dark:text-slate-400 mb-1">Lead: <span className="text-neutral-text dark:text-slate-300 font-bold">{team.lead}</span></div>
+                                        <div className="text-xs text-neutral-muted dark:text-slate-400 mb-1">Specialization: <span className="text-neutral-text dark:text-slate-300 font-medium">{team.type}</span></div>
+                                        <div className="text-xs text-neutral-muted dark:text-slate-400 flex justify-between items-center mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                                            <span>Loc: <span className="text-neutral-text dark:text-slate-300 font-medium">{team.location}</span></span>
+                                            <div className="flex items-center gap-2">
                                                 <button 
                                                     onClick={() => map?.panTo({ lat: team.lat, lng: team.lng })}
-                                                    className="text-slate-400 hover:text-white"
+                                                    className="p-1.5 rounded bg-neutral-bg hover:bg-primary-light text-neutral-muted hover:text-primary transition-all border border-neutral-border shadow-sm active:scale-95 flex items-center justify-center cursor-pointer"
                                                     title="Locate Team"
                                                 >
-                                                    <MapPin size={14}/>
+                                                    <MapPin size={12}/>
                                                 </button>
                                                 {selectedReport && (
                                                     <button 
                                                         onClick={() => handleGetDirections(selectedReport, { lat: team.lat, lng: team.lng })}
-                                                        className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1"
+                                                        className="text-[10px] bg-primary-light text-primary border border-primary/20 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-primary hover:text-white transition-colors cursor-pointer flex items-center gap-1 active:scale-95"
                                                     >
-                                                        <Navigation size={12}/> Route
+                                                        <Navigation size={10}/> Route
                                                     </button>
                                                 )}
                                                 {team.status === 'Available' && (
@@ -2374,7 +2408,7 @@ const DispatcherDashboard = () => {
                                                                 });
                                                             }
                                                         }}
-                                                        className="text-blue-400 hover:text-blue-300 font-bold text-xs"
+                                                        className="text-[10px] bg-primary hover:bg-primary-hover text-white px-2.5 py-1 rounded uppercase font-black tracking-wider transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-95 flex items-center gap-1"
                                                     >
                                                         Assign Task
                                                     </button>
@@ -2386,7 +2420,9 @@ const DispatcherDashboard = () => {
                             </div>
                         )}
                     </div>
-                </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
                 {/* Dispatch / Generate Work Order Modal */}
                 <AnimatePresence>

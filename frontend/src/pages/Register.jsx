@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown, Calendar, ChevronRight, UserCheck } from 'lucide-react';
+import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown, Calendar, ChevronRight, UserCheck, Bell, FileCheck, MapPin } from 'lucide-react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
-import Spline from '@splinetool/react-spline';
 import { useTheme } from '../contexts/ThemeContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import Branding from '../components/Branding';
 import IDCameraModal from '../components/IDCameraModal';
+import LegalModal from '../components/LegalModal';
 
 // ---------------------------------------------------------------------------
 // OCR Address Parser
@@ -209,7 +209,19 @@ function mapOcrToForm(data) {
         mapped.barangay = '';
     }
 
-    mapped.municipality = 'Caloocan City - North';
+    if (mapped.barangay) {
+        const numMatch = mapped.barangay.match(/\d+/);
+        if (numMatch) {
+            const num = parseInt(numMatch[0], 10);
+            if (num >= 1 && num <= 164) mapped.municipality = 'Caloocan City - South';
+            else if (num >= 165 && num <= 188) mapped.municipality = 'Caloocan City - North';
+            else mapped.municipality = 'Caloocan City';
+        } else {
+            mapped.municipality = 'Caloocan City';
+        }
+    } else {
+        mapped.municipality = 'Caloocan City';
+    }
     mapped.province = 'Metro Manila';
     mapped.postalCode = data.postal_code || getPostalCodeForBarangay(mapped.barangay) || '1421'; // Default to 1421 for North Caloocan if detection fails
     return mapped;
@@ -522,30 +534,6 @@ export default function Register() {
     const navigate = useNavigate();
     const { theme, changeTheme } = useTheme();
 
-    const DARK_SCENE  = 'https://prod.spline.design/us1Y6xfaQLiI2cim/scene.splinecode';
-    const LIGHT_SCENE = 'https://prod.spline.design/nrFjYzbJnF7GU92z/scene.splinecode';
-    const [currentScene, setCurrentScene] = React.useState(DARK_SCENE);
-
-    React.useEffect(() => {
-        const updateScene = () => {
-            if (theme === 'dark') {
-                setCurrentScene(DARK_SCENE);
-            } else if (theme === 'light') {
-                setCurrentScene(LIGHT_SCENE);
-            } else {
-                const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                setCurrentScene(isSystemDark ? DARK_SCENE : LIGHT_SCENE);
-            }
-        };
-        updateScene();
-
-        if (theme === 'system') {
-            const mq = window.matchMedia('(prefers-color-scheme: dark)');
-            const listener = (e) => setCurrentScene(e.matches ? DARK_SCENE : LIGHT_SCENE);
-            mq.addEventListener('change', listener);
-            return () => mq.removeEventListener('change', listener);
-        }
-    }, [theme]);
     const [step, setStep] = React.useState(1);
     const [isScanning, setIsScanning] = React.useState(false);
     const [scanError, setScanError] = React.useState('');
@@ -554,6 +542,7 @@ export default function Register() {
     // Camera state
     const [cameraOpen, setCameraOpen] = React.useState(false);
     const [activeCameraSide, setActiveCameraSide] = React.useState('front');
+    const [legalModal, setLegalModal] = React.useState({ isOpen: false, tab: 'privacy' });
 
     const [formData, setFormData] = React.useState({
         idFront: null,
@@ -571,7 +560,7 @@ export default function Register() {
         subdivision: '',
         street: '',
         barangay: '',
-        municipality: 'Caloocan City - North',
+        municipality: 'Caloocan City',
         province: 'Metro Manila',
         district: '',
         postalCode: '',
@@ -679,11 +668,18 @@ export default function Register() {
                     setAgeError("");
                 }
             }
-            // Auto-fill postal code when barangay changes
+            // Auto-fill postal code and municipality when barangay changes
             if (name === 'barangay' && value) {
                 const postal = getPostalCodeForBarangay(value);
                 if (postal) {
                     next.postalCode = postal;
+                }
+                const numMatch = value.match(/\d+/);
+                if (numMatch) {
+                    const num = parseInt(numMatch[0], 10);
+                    if (num >= 1 && num <= 164) next.municipality = 'Caloocan City - South';
+                    else if (num >= 165 && num <= 188) next.municipality = 'Caloocan City - North';
+                    else next.municipality = 'Caloocan City';
                 }
             }
             return next;
@@ -760,18 +756,24 @@ export default function Register() {
             }
 
             if (!data.is_north_caloocan) {
-                setScanError(data.verification_message || 'Verification Failed: You must be a resident of North Caloocan (Barangay 165–188) to register.');
+                setScanError(data.verification_message || 'Verification Failed: You must be a resident of Caloocan City to register.');
                 return;
             }
 
-            // Map OCR data → form fields
+            // Map OCR data → form fields (only auto-fill idType, barangay, postalCode, and municipality)
             const mapped = mapOcrToForm(data);
-            setFormData(prev => ({ ...prev, ...mapped }));
+            setFormData(prev => ({
+                ...prev,
+                idType: mapped.idType,
+                barangay: mapped.barangay,
+                postalCode: mapped.postalCode,
+                municipality: mapped.municipality
+            }));
             
             if (result.engine === 'mock') {
                 setVerifiedBadge(`DEV MOCK — ${data.id_type.toUpperCase()} Verified`);
             } else {
-                setVerifiedBadge(`${data.id_type ? data.id_type.toUpperCase() : 'ID'} — North Caloocan Verified`);
+                setVerifiedBadge(`${data.id_type ? data.id_type.toUpperCase() : 'ID'} — Caloocan City Verified`);
             }
             setHasScanned(true); // lock the scan button — scan complete
             if (autoNext) setStep(2);
@@ -913,77 +915,103 @@ export default function Register() {
     const step2Valid = formData.firstName && formData.lastName && formData.dob && formData.barangay && !ageError;
 
     return (
-        <div className="relative min-h-screen w-full bg-slate-50 dark:bg-[#020617] overflow-hidden font-sans text-slate-800 dark:text-slate-200 transition-colors duration-700">
+        <div className="relative min-h-screen w-full bg-[#fffbf9] dark:bg-[#070a12] font-sans text-slate-900 dark:text-white flex flex-col justify-between transition-colors duration-500 overflow-x-hidden">
 
-            {/* ── 3D Background System ──────────── */}
-            <div className="absolute inset-0 z-0 pointer-events-auto">
-                {/* Light scene */}
-                <div className={`absolute inset-0 transition-opacity duration-1000 ${currentScene === LIGHT_SCENE ? 'opacity-100 z-10 scale-[0.85] lg:scale-100 origin-center' : 'opacity-0 z-0'}`}>
-                    <ErrorBoundary fallback={<div className="w-full h-full bg-slate-100 dark:bg-slate-900" />}>
-                        <Spline scene={LIGHT_SCENE} />
-                    </ErrorBoundary>
-                </div>
-                {/* Dark scene */}
-                <div className={`absolute inset-0 transition-opacity duration-1000 ${currentScene === DARK_SCENE ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
-                    <ErrorBoundary fallback={<div className="w-full h-full bg-slate-100 dark:bg-slate-900" />}>
-                        <Spline scene={DARK_SCENE} />
-                    </ErrorBoundary>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-white/60 via-transparent to-transparent dark:from-[#020617]/80 dark:via-transparent dark:to-transparent pointer-events-none z-20" />
-                <div className="absolute inset-0 bg-gradient-to-t from-white/40 via-transparent to-transparent dark:from-[#020617]/40 dark:via-transparent dark:to-transparent pointer-events-none z-20" />
+            {/* ── High-Performance Ambient Mesh Backdrop ──────────── */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[850px] sm:w-[1000px] h-[450px] bg-gradient-to-tr from-orange-500/15 via-amber-500/10 to-transparent rounded-full blur-[130px]" />
+                <div className="absolute top-1/3 -right-32 w-[400px] h-[400px] bg-orange-500/10 dark:bg-orange-500/15 rounded-full blur-[110px]" />
+                <div className="absolute bottom-10 -left-32 w-[400px] h-[400px] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[110px]" />
+                <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 dark:opacity-20" />
             </div>
 
             {/* ── Navigation Header ────── */}
-            <nav className="absolute top-0 left-0 w-full p-8 flex justify-between items-center z-50">
+            <header className="relative z-50 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 w-full flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <Branding size="h-10" showText={false} />
-                    <div>
-                        <span className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white">PULSO</span>
-                        <span className="ml-2 px-2 py-0.5 bg-slate-900/5 dark:bg-white/10 backdrop-blur-md rounded text-[10px] font-bold tracking-widest text-orange-600 dark:text-orange-400 uppercase border border-slate-900/5 dark:border-white/10">
-                            New Resident
+                    <Branding size="h-9 sm:h-10" showText={false} />
+                    <div className="flex items-center gap-2">
+                        <span className="text-xl sm:text-2xl font-black tracking-tighter text-slate-900 dark:text-white">PULSO</span>
+                        <span className="px-2.5 py-0.5 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-full text-[10px] font-bold tracking-wider uppercase border border-orange-500/20">
+                            Resident Registration
                         </span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6">
-                    <div className="hidden md:flex items-center gap-6 text-sm font-medium pr-6 border-r border-slate-200 dark:border-white/10">
-                        <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors font-semibold">
-                            <Home size={15} /> Home
-                        </button>
+                <div className="flex items-center gap-3 sm:gap-4">
+                    {/* Theme Toggle Button Bar */}
+                    <div className="flex bg-white/70 dark:bg-slate-800/70 backdrop-blur-md rounded-full p-1 border border-slate-200 dark:border-slate-700/60 shadow-sm">
+                        <button onClick={() => changeTheme('light')} title="Light Theme" className={`p-1.5 rounded-full transition-all ${theme === 'light' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Sun size={14} /></button>
+                        <button onClick={() => changeTheme('system')} title="System Theme" className={`p-1.5 rounded-full transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-700 text-orange-500 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Monitor size={14} /></button>
+                        <button onClick={() => changeTheme('dark')} title="Dark Theme" className={`p-1.5 rounded-full transition-all ${theme === 'dark' ? 'bg-slate-700 text-orange-500 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Moon size={14} /></button>
                     </div>
-                    <div className="flex bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-full p-1 border border-slate-200 dark:border-white/10 shadow-sm">
-                        <button onClick={() => changeTheme('light')} className={`p-2 rounded-full transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Sun size={14} /></button>
-                        <button onClick={() => changeTheme('system')} className={`p-2 rounded-full transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Monitor size={14} /></button>
-                        <button onClick={() => changeTheme('dark')} className={`p-2 rounded-full transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Moon size={14} /></button>
-                    </div>
+
+                    <button 
+                        onClick={() => navigate('/')} 
+                        className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 transition-colors uppercase tracking-wider bg-white/80 dark:bg-slate-800/80 backdrop-blur-md px-3.5 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm"
+                    >
+                        <Home size={14} /> <span className="hidden sm:inline">Home</span>
+                    </button>
                 </div>
-            </nav>
+            </header>
 
             {/* ── Main Content Grid ─────── */}
-            <main className="relative z-10 grid lg:grid-cols-12 min-h-screen items-center pt-28 pb-32 px-6 lg:px-12 xl:px-24 w-full gap-8">
-                
-                {/* Left: Hero Text */}
-                <div className="lg:col-span-5 text-center lg:text-left mb-8 lg:mb-0 max-w-2xl mx-auto lg:mx-0">
-                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8 }}>
-                        <div className="flex items-center justify-center lg:justify-start gap-2 mb-4 text-orange-600 dark:text-orange-500">
-                            <User size={18} />
-                            <span className="text-sm font-bold tracking-[0.3em] uppercase">Join The Network</span>
-                        </div>
-                        <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 dark:text-white leading-[1.1] mb-6 tracking-tighter">
-                            BECOME THE <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-orange-600">EYES & EARS</span>
-                        </h1>
-                        <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 font-medium max-w-lg mx-auto lg:mx-0">
-                            Sign up to gain access to the resident dashboard. Report incidents, track local hazards, and collaborate with your community.
-                        </p>
-                    </motion.div>
-                </div>
+            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-4 lg:py-8 flex-1 flex flex-col justify-center">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+                    
+                    {/* Left: Professional Community Spotlight Panel */}
+                    <div className="lg:col-span-5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
+                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-full text-xs font-bold tracking-wider uppercase mb-4 border border-orange-500/20">
+                                <ShieldCheck size={14} /> Caloocan City Resident
+                            </div>
+                            
+                            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-[1.1] mb-4 tracking-tight">
+                                Become the <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-orange-600">Eyes &amp; Ears</span> of Your Community
+                            </h1>
+                            
+                            <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 font-medium mb-8 leading-relaxed">
+                                Join PULSO to report public utility issues, track ongoing maintenance, and collaborate with City Engineers to keep Caloocan City safe.
+                            </p>
 
-                {/* Right: Registration Panel (Landscape-oriented form) */}
-                <div className="lg:col-span-7 w-full max-w-2xl lg:max-w-none mx-auto lg:pl-4">
-                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }}>
-                        <div className="relative group">
-                            <div className="absolute -inset-1 bg-gradient-to-r from-orange-600/20 to-blue-600/20 rounded-[2rem] blur-xl opacity-30 dark:opacity-40 group-hover:opacity-60 transition duration-1000" />
-                            <div className="relative bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 lg:p-10 shadow-2xl min-h-[400px] flex flex-col justify-center">
+                            {/* Benefit Feature List */}
+                            <div className="space-y-4 text-left mb-8 hidden sm:block">
+                                <div className="flex items-start gap-3 p-3.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm">
+                                    <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                                        <Bell size={18} />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Instant Incident Reporting</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Report utility issues and infrastructure concerns directly to local dispatchers.</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3 p-3.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm">
+                                    <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                                        <FileCheck size={18} />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Automated AI Document Audit</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Upload any valid Philippine ID to instantly verify residency and authenticate your account.</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3 p-3.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm">
+                                    <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                                        <MapPin size={18} />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">All Caloocan Barangays Covered</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Tailored for all Caloocan City neighborhoods with precise barangay mapping.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+
+                    {/* Right: Registration Form Wizard Panel */}
+                    <div className="lg:col-span-7 w-full max-w-2xl lg:max-w-none mx-auto">
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
+                            <div className="relative bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl transition-colors duration-500">
                     {/* Stepper */}
                     <div className="flex items-center mb-6 relative px-1">
                         <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 dark:bg-slate-700 -translate-y-1/2 z-0 rounded-full" />
@@ -991,7 +1019,7 @@ export default function Register() {
                         {[1, 2, 3, 4].map(s => (
                             <div key={s} className={`relative z-10 flex items-center justify-center w-9 h-9 rounded-full font-bold text-sm border-2 transition-all duration-300 mr-auto last:mr-0
                                 ${step > s ? 'bg-orange-500 border-orange-500 text-white shadow-md' :
-                                  step === s ? 'bg-orange-500 border-orange-500 text-white shadow-lg ring-4 ring-orange-200 dark:ring-orange-900' :
+                                  step === s ? 'bg-orange-500 border-orange-500 text-white shadow-lg ring-4 ring-orange-200 dark:ring-orange-950' :
                                   'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-400'}`}>
                                 {step > s ? <CheckCircle size={16} /> : s}
                             </div>
@@ -1008,7 +1036,7 @@ export default function Register() {
                             {step === 5 && 'Registration Complete!'}
                         </h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                            {step === 1 && 'Upload a valid Philippine government-issued ID to auto-fill your details.'}
+                            {step === 1 && 'Upload a valid Philippine government-issued ID to verify your identity.'}
                             {step === 2 && 'Review and complete your personal information.'}
                             {step === 3 && 'Set up your login credentials.'}
                             {step === 4 && 'Enter the 6-digit code sent to your email.'}
@@ -1019,139 +1047,232 @@ export default function Register() {
                         {/* ── STEP 1: ID Upload ── */}
                         {step === 1 && (
                             <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
-                                <div className="grid grid-cols-2 gap-3 mb-4">
-                                    {/* Front */}
-                                    <div className="relative group aspect-[1.58/1] w-full rounded-2xl overflow-hidden bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 shadow-inner">
+                                
+                                {/* ID Cards Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                                    
+                                    {/* ID Front Card */}
+                                    <div className={`relative group rounded-2xl border transition-all duration-300 overflow-hidden ${
+                                        formData.idFront 
+                                            ? 'bg-green-500/5 dark:bg-green-500/10 border-green-500/40 shadow-sm' 
+                                            : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/80 hover:border-orange-500/50'
+                                    }`}>
                                         <input type="file" id="idFront" accept="image/*" onChange={e => handleFileUpload(e, 'idFront')} className="hidden" />
-                                        <label htmlFor="idFront" className={`flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-2xl cursor-pointer transition-all relative
-                                            ${formData.idFront ? 'border-green-400 bg-green-50/30 dark:bg-green-900/10' : 'border-slate-300 dark:border-slate-600 hover:border-orange-400 bg-transparent'}`}>
+                                        
+                                        {/* Card Header */}
+                                        <div className="flex items-center justify-between p-3.5 border-b border-slate-200/60 dark:border-slate-700/50 bg-white/40 dark:bg-slate-900/40">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${formData.idFront ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'}`}>
+                                                    {formData.idFront ? <CheckCircle size={15} /> : <FileCheck size={15} />}
+                                                </div>
+                                                <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">ID Front</span>
+                                            </div>
+                                            
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                                formData.idFront ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                            }`}>
+                                                {formData.idFront ? 'Ready' : 'Required'}
+                                            </span>
+                                        </div>
+
+                                        {/* Card Content Area */}
+                                        <div className="p-4 flex flex-col items-center justify-center min-h-[160px] relative">
                                             {previews.front ? (
-                                                <>
-                                                    <motion.div 
-                                                        animate={isScanning ? { rotateY: [0, 180, 360], rotateZ: formData.idFrontRotation } : { rotateZ: formData.idFrontRotation }} 
-                                                        transition={isScanning ? { rotateY: { duration: 3, repeat: Infinity, ease: "linear" }, rotateZ: { duration: 0.3 } } : { duration: 0.3 }}
-                                                        className="absolute inset-0 w-full h-full transform-gpu flex items-center justify-center p-3" 
-                                                        style={{ perspective: 1000, transformStyle: 'preserve-3d' }}
-                                                    >
-                                                        <img src={previews.front} alt="Front" className="max-w-full max-h-full object-contain opacity-90 group-hover:opacity-60 transition-opacity rounded-lg shadow-sm" />
-                                                        {isScanning && <div className="absolute inset-2 bg-orange-500/10 mix-blend-overlay rounded-lg" />}
-                                                    </motion.div>
+                                                <div className="relative w-full h-36 rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center group/preview">
+                                                    <motion.img 
+                                                        src={previews.front} 
+                                                        alt="Front ID" 
+                                                        animate={{ rotate: formData.idFrontRotation }}
+                                                        transition={{ duration: 0.3 }}
+                                                        className="max-w-full max-h-full object-contain" 
+                                                    />
+                                                    
                                                     {isScanning && (
-                                                        <motion.div 
-                                                            className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent shadow-[0_0_20px_rgba(249,115,22,1)] z-30"
-                                                            animate={{ top: ['0%', '100%', '0%'] }}
-                                                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                                        />
-                                                    )}
-                                                    <button type="button" onClick={e => handleRemoveID(e, 'idFront')} className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full z-20 shadow">
-                                                        <X size={14} />
-                                                    </button>
-                                                    {!isScanning && (
-                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 cursor-pointer z-10"
-                                                             onClick={e => { e.preventDefault(); e.stopPropagation(); setZoomedSide('idFront'); }}>
-                                                            <ZoomIn size={28} className="text-white" />
+                                                        <div className="absolute inset-0 bg-orange-500/20 backdrop-blur-[1px] flex items-center justify-center">
+                                                            <div className="w-full h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent absolute top-0 animate-pulse" />
+                                                            <span className="text-xs font-bold text-white bg-slate-900/80 px-3 py-1 rounded-full shadow">Scanning...</span>
                                                         </div>
                                                     )}
-                                                    <div className="absolute bottom-0 left-0 right-0 bg-green-500/90 text-white text-xs font-bold py-1.5 text-center flex items-center justify-center gap-1 z-20">
-                                                        <CheckCircle size={12}/> ID Front ✓
-                                                    </div>
-                                                </>
+
+                                                    {/* Hover Overlay Controls */}
+                                                    {!isScanning && (
+                                                        <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => setZoomedSide('idFront')}
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm"
+                                                                title="Zoom View"
+                                                            >
+                                                                <ZoomIn size={16} />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={e => { e.preventDefault(); setFormData(prev => ({ ...prev, idFrontRotation: (prev.idFrontRotation || 0) + 90 })); }}
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm"
+                                                                title="Rotate Image"
+                                                            >
+                                                                <RotateCw size={16} />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={e => handleRemoveID(e, 'idFront')}
+                                                                className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full transition-all"
+                                                                title="Remove Image"
+                                                            >
+                                                                <X size={16} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ) : (
-                                                <>
-                                                    <UploadCloud size={26} className="text-slate-400 group-hover:text-orange-500 mb-2 transition-colors" />
-                                                    <span className="text-sm font-bold text-slate-500 group-hover:text-orange-600 transition-colors">ID Front</span>
-                                                    <div className="flex gap-2 mt-2">
-                                                        <span className="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-500 font-bold uppercase">Upload</span>
+                                                <div className="flex flex-col items-center text-center py-2">
+                                                    <UploadCloud size={32} className="text-slate-400 dark:text-slate-500 mb-2" />
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3">Upload a clear photo of your ID Front</p>
+                                                    
+                                                    <div className="flex gap-2 w-full justify-center">
+                                                        <label htmlFor="idFront" className="flex-1 max-w-[120px] cursor-pointer bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm">
+                                                            <UploadCloud size={13} className="text-orange-500" /> Upload
+                                                        </label>
                                                         <button 
+                                                            type="button"
                                                             onClick={(e) => openCamera(e, 'front')}
-                                                            className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase hover:bg-orange-200 transition-colors flex items-center gap-1"
+                                                            className="flex-1 max-w-[120px] bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/20 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
                                                         >
-                                                            <Camera size={10} /> Camera
+                                                            <Camera size={13} /> Camera
                                                         </button>
                                                     </div>
-                                                </>
+                                                </div>
                                             )}
-                                        </label>
+                                        </div>
                                     </div>
 
-                                    {/* Back */}
-                                    <div className="relative group aspect-[1.58/1] w-full rounded-2xl overflow-hidden bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 shadow-inner">
+                                    {/* ID Back Card */}
+                                    <div className={`relative group rounded-2xl border transition-all duration-300 overflow-hidden ${
+                                        formData.idBack 
+                                            ? 'bg-green-500/5 dark:bg-green-500/10 border-green-500/40 shadow-sm' 
+                                            : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/80 hover:border-orange-500/50'
+                                    }`}>
                                         <input type="file" id="idBack" accept="image/*" onChange={e => handleFileUpload(e, 'idBack')} className="hidden" />
-                                        <label htmlFor="idBack" className={`flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-2xl cursor-pointer transition-all relative
-                                            ${formData.idBack ? 'border-green-400 bg-green-50/30 dark:bg-green-900/10' : 'border-slate-300 dark:border-slate-600 hover:border-orange-400 bg-transparent'}`}>
+                                        
+                                        {/* Card Header */}
+                                        <div className="flex items-center justify-between p-3.5 border-b border-slate-200/60 dark:border-slate-700/50 bg-white/40 dark:bg-slate-900/40">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${formData.idBack ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'}`}>
+                                                    {formData.idBack ? <CheckCircle size={15} /> : <FileCheck size={15} />}
+                                                </div>
+                                                <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">ID Back</span>
+                                            </div>
+                                            
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                                formData.idBack ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                            }`}>
+                                                {formData.idBack ? 'Ready' : 'Required'}
+                                            </span>
+                                        </div>
+
+                                        {/* Card Content Area */}
+                                        <div className="p-4 flex flex-col items-center justify-center min-h-[160px] relative">
                                             {previews.back ? (
-                                                <>
-                                                    <motion.div 
-                                                        animate={isScanning ? { rotateY: [0, 180, 360], rotateZ: formData.idBackRotation } : { rotateZ: formData.idBackRotation }} 
-                                                        transition={isScanning ? { rotateY: { duration: 3, repeat: Infinity, ease: "linear" }, rotateZ: { duration: 0.3 } } : { duration: 0.3 }}
-                                                        className="absolute inset-0 w-full h-full transform-gpu flex items-center justify-center p-3" 
-                                                        style={{ perspective: 1000, transformStyle: 'preserve-3d' }}
-                                                    >
-                                                        <img src={previews.back} alt="Back" className="max-w-full max-h-full object-contain opacity-90 group-hover:opacity-60 transition-opacity rounded-lg shadow-sm" />
-                                                        {isScanning && <div className="absolute inset-2 bg-orange-500/10 mix-blend-overlay rounded-lg" />}
-                                                    </motion.div>
+                                                <div className="relative w-full h-36 rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center group/preview">
+                                                    <motion.img 
+                                                        src={previews.back} 
+                                                        alt="Back ID" 
+                                                        animate={{ rotate: formData.idBackRotation }}
+                                                        transition={{ duration: 0.3 }}
+                                                        className="max-w-full max-h-full object-contain" 
+                                                    />
+                                                    
                                                     {isScanning && (
-                                                        <motion.div 
-                                                            className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent shadow-[0_0_20px_rgba(249,115,22,1)] z-30"
-                                                            animate={{ top: ['0%', '100%', '0%'] }}
-                                                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                                        />
-                                                    )}
-                                                    <button type="button" onClick={e => handleRemoveID(e, 'idBack')} className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full z-20 shadow">
-                                                        <X size={14} />
-                                                    </button>
-                                                    {!isScanning && (
-                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 cursor-pointer z-10"
-                                                             onClick={e => { e.preventDefault(); e.stopPropagation(); setZoomedSide('idBack'); }}>
-                                                            <ZoomIn size={28} className="text-white" />
+                                                        <div className="absolute inset-0 bg-orange-500/20 backdrop-blur-[1px] flex items-center justify-center">
+                                                            <div className="w-full h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent absolute top-0 animate-pulse" />
+                                                            <span className="text-xs font-bold text-white bg-slate-900/80 px-3 py-1 rounded-full shadow">Scanning...</span>
                                                         </div>
                                                     )}
-                                                    <div className="absolute bottom-0 left-0 right-0 bg-green-500/90 text-white text-xs font-bold py-1.5 text-center flex items-center justify-center gap-1 z-20">
-                                                        <CheckCircle size={12}/> ID Back ✓
-                                                    </div>
-                                                </>
+
+                                                    {/* Hover Overlay Controls */}
+                                                    {!isScanning && (
+                                                        <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => setZoomedSide('idBack')}
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm"
+                                                                title="Zoom View"
+                                                            >
+                                                                <ZoomIn size={16} />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={e => { e.preventDefault(); setFormData(prev => ({ ...prev, idBackRotation: (prev.idBackRotation || 0) + 90 })); }}
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm"
+                                                                title="Rotate Image"
+                                                            >
+                                                                <RotateCw size={16} />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={e => handleRemoveID(e, 'idBack')}
+                                                                className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full transition-all"
+                                                                title="Remove Image"
+                                                            >
+                                                                <X size={16} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ) : (
-                                                <>
-                                                    <UploadCloud size={26} className="text-slate-400 group-hover:text-orange-500 mb-2 transition-colors" />
-                                                    <div className="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-500 font-bold uppercase">Back ID Reqd.</div>
-                                                    <div className="flex gap-2 mt-2">
-                                                        <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase transition-colors">Upload</span>
+                                                <div className="flex flex-col items-center text-center py-2">
+                                                    <UploadCloud size={32} className="text-slate-400 dark:text-slate-500 mb-2" />
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3">Upload a clear photo of your ID Back</p>
+                                                    
+                                                    <div className="flex gap-2 w-full justify-center">
+                                                        <label htmlFor="idBack" className="flex-1 max-w-[120px] cursor-pointer bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm">
+                                                            <UploadCloud size={13} className="text-orange-500" /> Upload
+                                                        </label>
                                                         <button 
+                                                            type="button"
                                                             onClick={(e) => openCamera(e, 'back')}
-                                                            className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase hover:bg-orange-200 transition-colors flex items-center gap-1"
+                                                            className="flex-1 max-w-[120px] bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/20 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
                                                         >
-                                                            <Camera size={10} /> Camera
+                                                            <Camera size={13} /> Camera
                                                         </button>
                                                     </div>
-                                                </>
+                                                </div>
                                             )}
-                                        </label>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Tips */}
-                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl p-3 mb-4 text-xs text-blue-700 dark:text-blue-400">
-                                    <strong>Tips for best results:</strong> Lay ID on a flat surface with good lighting. Avoid glare and shadows. Ensure all text is clearly readable.
+                                {/* Tips Box Callout */}
+                                <div className="bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 dark:border-amber-500/30 rounded-2xl p-3.5 mb-5 flex gap-3 items-start text-xs text-amber-800 dark:text-amber-300 font-medium">
+                                    <Info size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="font-bold">Tips for best results:</span> Lay ID flat under bright lighting. Avoid glare, shadows, or covering text. Ensure all details are clearly legible.
+                                    </div>
                                 </div>
 
-                                {/* Error */}
+                                {/* Error Banner */}
                                 {scanError && (
-                                    <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 flex gap-2 items-start text-sm text-red-700 dark:text-red-400">
-                                        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                                    <div className="mb-5 bg-red-500/10 border border-red-500/20 rounded-2xl p-3.5 flex gap-3 items-start text-xs text-red-600 dark:text-red-400 font-medium">
+                                        <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-500" />
                                         <span>{scanError}</span>
                                     </div>
                                 )}
 
-                                <div className="flex flex-col gap-3">
+                                {/* Action Buttons */}
+                                <div className="flex flex-col gap-2.5">
                                     <button
                                         type="button"
                                         onClick={handleScanID}
                                         disabled={!formData.idFront || !formData.idBack || isScanning}
-                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        className="w-full bg-gradient-to-r from-orange-500 via-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-lg shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                                     >
-                                        {isScanning ? <><Loader2 size={18} className="animate-spin" /> Identifying ID Side & Type...</> : <><ShieldCheck size={18} /> Scan Documents & Continue</>}
+                                        {isScanning ? (
+                                            <><Loader2 size={18} className="animate-spin" /> {scanStatus}</>
+                                        ) : (
+                                            <><ShieldCheck size={18} /> Scan Documents &amp; Continue</>
+                                        )}
                                     </button>
-                                    <p className="text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest">Both Front and Back required for maximum AI accuracy</p>
+                                    <p className="text-[10px] text-center font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Both Front and Back images are required for verification</p>
                                 </div>
                             </motion.div>
                         )}
@@ -1228,7 +1349,7 @@ export default function Register() {
                                     <InputField label="Block & Lot" name="blockLot" value={formData.blockLot} onChange={handleChange} />
                                     <InputField label="Building / Subdivision / Village" name="subdivision" value={formData.subdivision} onChange={handleChange} className="col-span-2 md:col-span-1" />
                                     <InputField label="Street / Avenue / Corner / Road" name="street" value={formData.street} onChange={handleChange} className="col-span-2" />
-                                    <CustomSelect label="Barangay" name="barangay" value={formData.barangay} onChange={handleChange} options={Array.from({ length: 24 }, (_, i) => `Barangay ${165 + i}`)} required />
+                                    <CustomSelect label="Barangay" name="barangay" value={formData.barangay} onChange={handleChange} options={Array.from({ length: 188 }, (_, i) => `Barangay ${1 + i}`)} required />
                                     <InputField label="City" name="municipality" value={formData.municipality} onChange={handleChange} readOnly />
                                     <InputField label="Province" name="province" value={formData.province} onChange={handleChange} readOnly />
                                     <div className="relative">
@@ -1469,28 +1590,27 @@ export default function Register() {
                                 Already have an account?{' '}
                                 <Link to="/login" className="text-orange-600 dark:text-orange-400 font-bold hover:underline decoration-2 underline-offset-4">Sign In</Link>
                             </p>
+                            <div className="flex justify-center gap-4 text-xs text-slate-400 dark:text-slate-500 font-medium mt-3">
+                                <button type="button" onClick={() => setLegalModal({ isOpen: true, tab: 'privacy' })} className="hover:text-orange-500 transition-colors cursor-pointer">Privacy Policy</button>
+                                <span>•</span>
+                                <button type="button" onClick={() => setLegalModal({ isOpen: true, tab: 'terms' })} className="hover:text-orange-500 transition-colors cursor-pointer">Terms of Service</button>
+                            </div>
                         </div>
                     )}
                 </div>
-            </div>
-        </motion.div>
+            </motion.div>
+        </div>
     </div>
 </main>
 
-            {/* ── Bottom Info Bar ───────────────── */}
-            <div className="absolute bottom-0 left-0 w-full bg-white/60 dark:bg-[#020617]/70 backdrop-blur-md border-t border-slate-200 dark:border-white/5 py-4 px-8 flex flex-col md:flex-row justify-between items-center gap-4 z-50 transition-colors">
-                <div className="flex items-center gap-6 overflow-hidden max-w-4xl">
-                    <span className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-[0.2em] whitespace-nowrap">Notice:</span>
-                    <div className="text-[10px] font-bold text-slate-500 dark:text-slate-600 uppercase tracking-[0.3em] whitespace-nowrap animate-marquee">
-                        YOUR PRIVACY IS PROTECTED UNDER THE PHILIPPINE DATA PRIVACY ACT (RA 10173) • AUTHORIZED RESIDENTS ONLY • PULSO CITIZEN PLATFORM • CITY OF CALOOCAN
-                    </div>
-                </div>
-                <div className="flex items-center gap-6 text-[10px] font-black text-slate-400 dark:text-slate-500 tracking-[0.2em]">
-                    <span>CALOOCAN NORTH DISTRICT • PHILIPPINES</span>
-                    <div className="h-3 w-[1px] bg-slate-200 dark:bg-white/10" />
-                    <span className="text-orange-600/50 dark:text-orange-500/50">v4.2.1</span>
-                </div>
-            </div>
+            {/* Legal Modal */}
+            <LegalModal
+                isOpen={legalModal.isOpen}
+                onClose={() => setLegalModal(prev => ({ ...prev, isOpen: false }))}
+                initialTab={legalModal.tab}
+            />
+
+
 
             {/* Zoom modal */}
             <AnimatePresence>

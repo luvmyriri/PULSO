@@ -95,11 +95,11 @@ const NORTH_CALOOCAN_BOUNDARY = [
 const LIBRARIES = ['places', 'geometry'];
 
 const REPORT_CATEGORIES = (t) => [
-    t('landing.solutions.s1_title', { defaultValue: 'Roads & Bridges' }),
-    t('landing.solutions.s2_title', { defaultValue: 'Water & Drainage' }),
-    t('landing.solutions.s3_title', { defaultValue: 'Street Lighting' }),
-    t('landing.solutions.s4_title', { defaultValue: 'Public Safety & Regulatory' }),
-    t('landing.solutions.s5_title', { defaultValue: 'Public Facilities' }),
+    { value: 'Roads & Bridges', label: t('landing.solutions.s1_title', { defaultValue: 'Roads & Bridges' }) },
+    { value: 'Water & Drainage', label: t('landing.solutions.s2_title', { defaultValue: 'Water & Drainage' }) },
+    { value: 'Street Lighting', label: t('landing.solutions.s3_title', { defaultValue: 'Street Lighting' }) },
+    { value: 'Public Safety & Regulatory', label: t('landing.solutions.s4_title', { defaultValue: 'Public Safety & Regulatory' }) },
+    { value: 'Public Facilities', label: t('landing.solutions.s5_title', { defaultValue: 'Public Facilities' }) },
 ];
 
 const SIMULATED_HAZARDS = [
@@ -1123,9 +1123,11 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, darkM
                 </div>
             )}
             <div className="grid grid-cols-1 gap-1.5" ref={tooltipRef}>
-                {options.map(opt => {
-                    const meta = CATEGORY_META[opt];
-                    const clr = COLOR_MAP[meta.color];
+                {options.map(optObj => {
+                    const opt = typeof optObj === 'string' ? optObj : optObj.value;
+                    const label = typeof optObj === 'string' ? optObj : optObj.label;
+                    const meta = CATEGORY_META[opt] || CATEGORY_META['Roads & Bridges'];
+                    const clr = COLOR_MAP[meta.color] || COLOR_MAP.orange;
                     const selected = selectedOptions.includes(opt);
                     const infoOpen = tooltip === opt;
                     const atCapacity = !selected && selectedOptions.length >= 3;
@@ -1160,7 +1162,7 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, darkM
                                         <span
                                             className="text-[13px] font-semibold leading-tight"
                                             style={{ color: selected ? '#a5b4fc' : '#94a3b8' }}
-                                        >{opt}</span>
+                                        >{label}</span>
                                     </button>
                                     <button
                                         type="button"
@@ -1180,7 +1182,7 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, darkM
                                         style={{ background: '#0f1825', border: '1px solid rgba(255,255,255,0.1)' }}>
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="text-lg">{meta.icon}</span>
-                                            <span className={`text-[10px] font-black uppercase tracking-widest ${clr.text}`}>{opt}</span>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${clr.text}`}>{label}</span>
                                         </div>
                                         <p className="text-[9px] font-black uppercase tracking-widest mb-2" style={{ color: '#475569' }}>Scope of Service</p>
                                         <ul className="space-y-1">
@@ -1218,7 +1220,7 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, darkM
                                         {selected && <span className={`w-2 h-2 rounded-[2px] ${clr.dot}`} />}
                                     </span>
                                     <span className={`text-sm font-bold leading-tight ${selected ? clr.text : 'text-slate-700 dark:text-slate-200'
-                                        }`}>{opt}</span>
+                                        }`}>{label}</span>
                                 </button>
                                 {/* Info button */}
                                 <button
@@ -1239,7 +1241,7 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, darkM
                                     <div className={`h-0.5 w-full rounded-full ${clr.badge} mb-3 -mt-1 opacity-70`} />
                                     <div className="flex items-center gap-2 mb-2.5">
                                         <span className="text-xl">{meta.icon}</span>
-                                        <span className={`text-xs font-black uppercase tracking-widest ${clr.text}`}>{opt}</span>
+                                        <span className={`text-xs font-black uppercase tracking-widest ${clr.text}`}>{label}</span>
                                     </div>
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Scope of Service</p>
                                     <ul className="space-y-1.5">

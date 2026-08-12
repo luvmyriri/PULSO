@@ -1,670 +1,713 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import {
-    MapPinned, Activity, BrainCircuit, ArrowRight, ActivitySquare,
-    Menu, X, Trash2, Route as RouteIcon, Zap, Shield, BarChart3,
-    Users, CheckCircle2, Sun, Moon, Monitor, ClipboardCheck, Camera,
-    Bot, Headphones, Wrench, ExternalLink, Clock, Phone, Mail,
-    UserCheck, Accessibility, Heart, FileText, Droplets, Lightbulb,
-    Building2, ShieldCheck
+    MapPinned, Activity, BrainCircuit, ArrowRight,
+    Menu, X, Route as RouteIcon, Shield, BarChart3,
+    Users, CheckCircle2, ClipboardCheck, Camera,
+    Bot, Headphones, Wrench, ExternalLink,
+    UserCheck, Droplets, Lightbulb, ChevronDown, Building2,
+    Zap, Radio, Sparkles, HelpCircle, PhoneCall, Plus, Minus, ShieldAlert
 } from 'lucide-react';
-import { useTheme } from '../contexts/ThemeContext';
 import Branding from '../components/Branding';
-import Hero3D from '../Hero3D';
-import PremiumHeroBackground from '../components/PremiumHeroBackground';
-import ErrorBoundary from '../components/ErrorBoundary';
+import ThemeToggle from '../components/ThemeToggle';
+import LegalModal from '../components/LegalModal';
 import '../index.css';
-
-// Using unified Branding component instead of inline SVG
 
 function Landing() {
     const { t } = useTranslation();
     const [scrolled, setScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [activeSection, setActiveSection] = useState('home');
+    const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
+    const [openFaq, setOpenFaq] = useState(null);
 
+    // Scroll listener & Scroll-Spy for section switching
     useEffect(() => {
-        const handleScroll = () => setScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', handleScroll);
+        const handleScroll = () => {
+            setScrolled(window.scrollY > 20);
+
+            const sections = ['home', 'features', 'solutions', 'about', 'faq', 'emergency'];
+            const scrollPos = window.scrollY + 200;
+
+            for (const sectionId of sections) {
+                const el = document.getElementById(sectionId);
+                if (el) {
+                    const top = el.offsetTop;
+                    const height = el.offsetHeight;
+                    if (scrollPos >= top && scrollPos < top + height) {
+                        setActiveSection(sectionId);
+                        break;
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    const scrollToSection = (id) => {
+        setMobileMenuOpen(false);
+        setActiveSection(id);
+        if (id === 'home') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+        const element = document.getElementById(id);
+        if (element) {
+            const navbarHeight = 80; // fixed navbar offset
+            const top = element.getBoundingClientRect().top + window.scrollY - navbarHeight;
+            window.scrollTo({ top, behavior: 'smooth' });
+        }
+    };
+
     // Animation variants
     const fadeUp = {
-        hidden: { opacity: 0, y: 30 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
+        hidden: { opacity: 0, y: 35 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } }
+    };
+
+    const sectionTransition = {
+        initial: { opacity: 0, y: 45, scale: 0.98 },
+        whileInView: { opacity: 1, y: 0, scale: 1 },
+        viewport: { once: false, amount: 0.15 },
+        transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] }
     };
 
     const staggerContainer = {
         hidden: { opacity: 0 },
         visible: {
             opacity: 1,
-            transition: { staggerChildren: 0.2 }
+            transition: { staggerChildren: 0.12 }
         }
     };
 
-    const { theme, changeTheme } = useTheme();
-
     return (
-        <div className="min-h-screen flex flex-col font-sans bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative transition-colors duration-500">
-            <PremiumHeroBackground>
-                <div className="absolute inset-0">
-                    <ErrorBoundary fallback={<div className="w-full h-full" />}>
-                        <Hero3D />
-                    </ErrorBoundary>
-                </div>
-                {/* Bottom transition gradient to help text readability */}
-                <div className="absolute bottom-0 left-0 w-full h-[30vh] bg-gradient-to-t from-white dark:from-[#020617] to-transparent z-30 pointer-events-none" />
-            </PremiumHeroBackground>
-
-            {/* Navbar Fixed */}
-
-            {/* Navbar Fixed */}
-            <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? 'glass-nav py-3' : 'bg-transparent py-6'}`}>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
-                    <div className="flex items-center">
-                        <Branding size={scrolled ? "h-9" : "h-11"} />
+        <div className="min-h-screen flex flex-col font-sans bg-[#fffbf9] dark:bg-[#070a12] text-[#2c1d11] dark:text-white relative selection:bg-[#ff6b00] selection:text-white transition-colors duration-300 overflow-x-hidden">
+            
+            {/* Top Fixed Header Navbar */}
+            <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-[#fffbf9]/95 dark:bg-[#070a12]/95 backdrop-blur-xl shadow-md border-b border-[#f3e9e2] dark:border-slate-800/80 py-3' : 'bg-transparent border-transparent shadow-none py-4 sm:py-5'}`}>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                    
+                    {/* Brand Logo & Title with Caloocan Seal */}
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => scrollToSection('home')}>
+                        <Branding size={scrolled ? "h-7 sm:h-8" : "h-8 sm:h-9"} showText={false} />
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[#2c1d11] dark:text-white font-black text-lg sm:text-xl tracking-tight leading-none">PULSO</span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#ff6b00] animate-pulse" />
+                            </div>
+                            <span className="text-[9px] sm:text-[10px] font-extrabold tracking-widest text-[#ff6b00] uppercase mt-0.5">Caloocan City</span>
+                        </div>
                     </div>
-                    <ul className="hidden md:flex gap-8 items-center text-sm font-medium text-slate-600 dark:text-slate-300">
-                        <li><a href="#home" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.home')}</a></li>
-                        <li><a href="#features" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.platform')}</a></li>
-                        <li><a href="#solutions" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.solutions')}</a></li>
-                        <li><a href="#about" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.about')}</a></li>
+
+                    {/* Navigation Links with Active Indicator Pill */}
+                    <ul className="hidden md:flex gap-6 lg:gap-8 items-center text-xs font-bold tracking-wider uppercase">
+                        {[
+                            { id: 'home', labelKey: 'home', defaultText: 'Home' },
+                            { id: 'features', labelKey: 'platform', defaultText: 'Features' },
+                            { id: 'solutions', labelKey: 'solutions', defaultText: 'Solutions' },
+                            { id: 'about', labelKey: 'about', defaultText: 'About Us' },
+                            { id: 'faq', labelKey: 'faq', defaultText: 'FAQ' },
+                            { id: 'emergency', labelKey: 'emergency', defaultText: 'Hotlines' },
+                        ].map((nav) => (
+                            <li key={nav.id} className="relative py-1">
+                                <button
+                                    onClick={() => scrollToSection(nav.id)}
+                                    className={`transition-colors uppercase tracking-wider text-xs font-bold ${activeSection === nav.id ? 'text-[#ff6b00]' : 'text-[#736254] dark:text-slate-300 hover:text-[#ff6b00]'}`}
+                                >
+                                    {t(`landing.nav.${nav.labelKey}`, nav.defaultText)}
+                                </button>
+                                {activeSection === nav.id && (
+                                    <motion.div
+                                        layoutId="activeNavTab"
+                                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#ff6b00] rounded-full"
+                                        transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                                    />
+                                )}
+                            </li>
+                        ))}
                     </ul>
 
-                    <div className="hidden md:flex gap-4 items-center">
-                        {/* Theme Switcher Toggle */}
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
-                            <button onClick={() => changeTheme('light')} className={`p-1.5 rounded-md transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Sun size={14} /></button>
-                            <button onClick={() => changeTheme('system')} className={`p-1.5 rounded-md transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Monitor size={14} /></button>
-                            <button onClick={() => changeTheme('dark')} className={`p-1.5 rounded-md transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Moon size={14} /></button>
-                        </div>
-
-                        <a href="/login" className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
-                            {t('landing.nav.login')} <ArrowRight size={16} />
+                    {/* Action Button & Theme Toggle */}
+                    <div className="hidden md:flex gap-3 lg:gap-4 items-center">
+                        <ThemeToggle />
+                        <a href="/login" className="relative group overflow-hidden flex items-center gap-2 bg-[#ff6b00] hover:bg-[#e65c00] text-white px-5 lg:px-6 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg hover:shadow-[#ff6b00]/25 hover:-translate-y-0.5 whitespace-nowrap">
+                            <span>{t('landing.nav.login', 'Login')}</span>
+                            <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                         </a>
                     </div>
 
                     {/* Mobile Menu Toggle */}
-                    <button className="md:hidden text-orange-500 p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                        {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                    <button className="md:hidden text-[#ff6b00] p-2 focus:outline-none" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle Menu">
+                        {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
                     </button>
                 </div>
 
                 {/* Mobile Navigation Dropdown */}
-                {mobileMenuOpen && (
-                    <div className="absolute top-full left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl py-6 px-6 flex flex-col gap-4 md:hidden transition-colors relative">
-                        <div className="absolute -bottom-8 left-0 w-full h-8 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-800/80 dark:to-transparent pointer-events-none"></div>
-                        <a href="#home" className="text-slate-800 dark:text-slate-200 font-bold py-2 border-b border-slate-200 dark:border-slate-700" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.home')}</a>
-                        <a href="#features" className="text-slate-800 dark:text-slate-200 font-bold py-2 border-b border-slate-200 dark:border-slate-700" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.platform')}</a>
-                        <a href="#solutions" className="text-slate-800 dark:text-slate-200 font-bold py-2 border-b border-slate-200 dark:border-slate-700" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.solutions')}</a>
-                        <a href="#about" className="text-slate-800 dark:text-slate-200 font-bold py-2 mb-4" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.about')}</a>
+                <AnimatePresence>
+                    {mobileMenuOpen && (
+                        <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="absolute top-full left-0 w-full bg-[#fffbf9] dark:bg-[#070a12] border-b border-[#f3e9e2] dark:border-slate-800 shadow-xl py-6 px-6 flex flex-col gap-4 md:hidden z-50"
+                        >
+                            {[
+                                { id: 'home', labelKey: 'home', defaultText: 'Home' },
+                                { id: 'features', labelKey: 'platform', defaultText: 'Features' },
+                                { id: 'solutions', labelKey: 'solutions', defaultText: 'Solutions' },
+                                { id: 'about', labelKey: 'about', defaultText: 'About Us' },
+                                { id: 'faq', labelKey: 'faq', defaultText: 'FAQ' },
+                                { id: 'emergency', labelKey: 'emergency', defaultText: 'Hotlines' },
+                            ].map((nav) => (
+                                <button
+                                    key={nav.id}
+                                    onClick={() => scrollToSection(nav.id)}
+                                    className={`text-left font-bold py-2 border-b border-[#f3e9e2] dark:border-slate-800 uppercase text-xs tracking-wider transition-colors ${activeSection === nav.id ? 'text-[#ff6b00]' : 'text-[#2c1d11] dark:text-white'}`}
+                                >
+                                    {t(`landing.nav.${nav.labelKey}`, nav.defaultText)}
+                                </button>
+                            ))}
 
-                        {/* Mobile Theme Switcher Toggle */}
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 mb-2">
-                            <button onClick={() => { changeTheme('light'); setMobileMenuOpen(false); }} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Sun size={18} /></button>
-                            <button onClick={() => { changeTheme('system'); setMobileMenuOpen(false); }} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Monitor size={18} /></button>
-                            <button onClick={() => { changeTheme('dark'); setMobileMenuOpen(false); }} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Moon size={18} /></button>
-                        </div>
+                            <div className="flex justify-between items-center py-2 border-b border-[#f3e9e2] dark:border-slate-800">
+                                <span className="text-xs font-bold uppercase text-[#736254] dark:text-slate-400">Theme</span>
+                                <ThemeToggle />
+                            </div>
 
-                        <a href="/login" className="w-full justify-center flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white px-5 py-3 rounded-lg font-bold text-base transition-all shadow-md">
-                            {t('landing.nav.login')} <ArrowRight size={18} />
-                        </a>
-                    </div>
-                )}
+                            <a href="/login" className="w-full justify-center flex items-center gap-2 bg-[#ff6b00] hover:bg-[#e65c00] text-white px-5 py-3 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-md">
+                                {t('landing.nav.login', 'Login')} <ArrowRight size={16} />
+                            </a>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </nav>
 
-            {/* Hero Interactivity */}
-            <section id="home" className="relative min-h-[90vh] flex items-center pt-32 pb-20 overflow-hidden transition-colors duration-500">
-                {/* Dark Mode Background */}
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-slate-950 dark:block hidden z-0"></div>
-                
-                {/* Light Mode Aurora Borealis Background */}
-                <div className="absolute inset-0 dark:hidden overflow-hidden z-0">
-                    <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-orange-300/30 rounded-full blur-[120px] mix-blend-multiply opacity-80 animate-blob pointer-events-none"></div>
-                    <div className="absolute top-1/4 left-1/4 w-[700px] h-[700px] bg-emerald-300/20 rounded-full blur-[140px] mix-blend-multiply opacity-80 animate-blob animation-delay-2000 pointer-events-none"></div>
-                    <div className="absolute -bottom-32 left-1/2 w-[800px] h-[800px] bg-teal-200/30 rounded-full blur-[120px] mix-blend-multiply opacity-70 animate-blob animation-delay-4000 pointer-events-none"></div>
+            {/* HERO SECTION - Animated Screen Section */}
+            <motion.section 
+                id="home" 
+                {...sectionTransition}
+                className="relative min-h-screen flex flex-col justify-center items-center pt-20 pb-12 sm:pt-24 sm:pb-16 overflow-hidden bg-[#fffbf9] dark:bg-[#070a12] border-b border-[#f3e9e2] dark:border-slate-800/80"
+            >
+                {/* Ambient Radial Mesh Glow Backdrops */}
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                    <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[750px] sm:w-[900px] h-[450px] bg-gradient-to-tr from-[#ff6b00]/15 via-[#ff6b00]/10 to-transparent rounded-full blur-[130px]" />
+                    <div className="absolute top-1/3 -right-32 w-[350px] h-[350px] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[100px]" />
+                    <div className="absolute top-1/3 -left-32 w-[350px] h-[350px] bg-[#ff6b00]/10 dark:bg-[#ff6b00]/15 rounded-full blur-[100px]" />
                 </div>
 
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 mt-12 items-center relative z-10">
-
-                    {/* Left: Copy & Actions */}
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full text-center relative z-10">
                     <motion.div
-                        className="max-w-xl bg-white/70 dark:bg-slate-950/70 p-8 rounded-3xl backdrop-blur-3xl border border-white/50 dark:border-slate-700/50 shadow-2xl transition-colors duration-500"
+                        className="flex flex-col items-center max-w-4xl mx-auto"
                         initial="hidden"
                         animate="visible"
                         variants={staggerContainer}
                     >
-
-
-                        <motion.h1 variants={fadeUp} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl leading-[1.1] tracking-tight mb-6 text-slate-900 dark:text-white">
-                            {t('landing.hero.title1')}<br /><span className="text-gradient">{t('landing.hero.title2')}</span>
+                        {/* Hero Headline */}
+                        <motion.h1 
+                            variants={fadeUp} 
+                            className="font-display font-black text-3xl sm:text-5xl md:text-6xl lg:text-7xl uppercase tracking-tight text-[#2c1d11] dark:text-white leading-[1.06] mb-5 sm:mb-6"
+                        >
+                            SMART UTILITY <span className="bg-gradient-to-r from-[#ff6b00] via-orange-400 to-[#ff8533] bg-clip-text text-transparent">LOCATOR &amp; MAINTENANCE</span> SYSTEM
                         </motion.h1>
 
-                        <motion.p variants={fadeUp} className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed font-medium">
-                            {t('landing.hero.subtitle')}
+                        {/* Hero Subtitle */}
+                        <motion.p 
+                            variants={fadeUp} 
+                            className="text-sm sm:text-base md:text-lg text-[#736254] dark:text-slate-300 font-medium leading-relaxed mb-8 sm:mb-10 max-w-2xl mx-auto px-2"
+                        >
+                            {t('landing.hero.subtitle', 'Improving everyday life for Caloocan City residents by helping engineers spot utility hazards early, resolve outages faster, and maintain reliable public services.')}
                         </motion.p>
 
-                        <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
-                            <a href="/register" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-2">
-                                {t('landing.hero.register')}
+                        {/* CTA Buttons */}
+                        <motion.div 
+                            variants={fadeUp} 
+                            className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center w-full sm:w-auto"
+                        >
+                            <a href="/register" className="w-full sm:w-auto bg-[#ff6b00] hover:bg-[#e65c00] text-white px-8 sm:px-9 py-3.5 sm:py-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-lg hover:shadow-2xl hover:shadow-[#ff6b00]/30 hover:-translate-y-1 flex items-center justify-center gap-2">
+                                {t('landing.hero.register', 'Register')} <ArrowRight size={16} />
                             </a>
-                            <button className="bg-white/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 px-6 py-3 rounded-lg font-semibold transition-all">
-                                {t('landing.hero.docs')}
+                            <button onClick={() => scrollToSection('features')} className="w-full sm:w-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-md hover:bg-[#ffefe5] dark:hover:bg-slate-800 text-[#2c1d11] dark:text-white border border-[#f3e9e2] dark:border-slate-800 px-7 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm hover:-translate-y-0.5">
+                                {t('landing.hero.exploreFeatures', 'Explore Features')} <ChevronDown size={16} className="text-[#ff6b00] animate-bounce" />
                             </button>
                         </motion.div>
                     </motion.div>
-
-                    {/* Right side is empty to let the background map shine through clearly */}
-                    <div className="hidden lg:block"></div>
                 </div>
-                
-                {/* Clean gradient fade at the bottom of the hero section so it blends into the rest of the page */}
-                <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white dark:from-slate-950 to-transparent pointer-events-none z-20" />
-            </section>
+            </motion.section>
 
-            {/* Features Grid */}
-            <section id="features" className="relative z-10 py-24 bg-white/10 dark:bg-slate-950/40 backdrop-blur-xl transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            {/* KEY FEATURES SECTION - Animated Screen Section */}
+            <motion.section 
+                id="features" 
+                {...sectionTransition}
+                className="py-16 sm:py-24 bg-[#fffbf9] dark:bg-[#070a12] border-b border-[#f3e9e2] dark:border-slate-800"
+            >
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    
                     <motion.div
-                        className="text-center max-w-3xl mx-auto mb-16"
+                        className="text-center max-w-3xl mx-auto mb-10 sm:mb-16"
                         initial="hidden"
                         whileInView="visible"
                         viewport={{ once: true, margin: "-100px" }}
                         variants={fadeUp}
                     >
-                        <h2 className="font-display font-bold text-3xl md:text-4xl tracking-tight mb-4 text-slate-900 dark:text-white">{t('landing.features.title')}</h2>
-                        <p className="text-lg text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
-                            {t('landing.features.subtitle')}
+                        <div className="inline-block bg-[#ffefe5] dark:bg-[#ff6b00]/10 text-[#ff6b00] font-bold text-[10px] sm:text-[11px] tracking-widest uppercase px-3.5 py-1 rounded-full border border-[#f3e9e2] dark:border-[#ff6b00]/20 mb-3">
+                            {t('landing.features.badge', 'Infrastructure Scope')}
+                        </div>
+                        <h2 className="font-display font-extrabold text-2xl sm:text-3xl md:text-4xl uppercase tracking-tight text-[#2c1d11] dark:text-white mb-3 sm:mb-4">
+                            {t('landing.features.title', 'TYPES OF PUBLIC INFRASTRUCTURE')}
+                        </h2>
+                        <p className="text-xs sm:text-sm font-medium text-[#736254] dark:text-slate-300 leading-relaxed max-w-xl mx-auto">
+                            {t('landing.features.subtitle', 'Public infrastructure managed across Caloocan City by the City Engineering Department.')}
                         </p>
                     </motion.div>
 
+                    {/* Features Grid */}
                     <motion.div
-                        className="grid grid-cols-1 md:grid-cols-3 gap-8"
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
                         initial="hidden"
                         whileInView="visible"
                         viewport={{ once: true, margin: "-50px" }}
                         variants={staggerContainer}
                     >
-                        {/* Feature 1 */}
-                        <motion.div variants={fadeUp} className="glass-card p-8 rounded-2xl">
-                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-6">
-                                <MapPinned size={28} />
+                        {/* Horizontal Infrastructure */}
+                        <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900/80 border border-[#f3e9e2] dark:border-slate-800 p-5 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
+                            <div className="w-10 sm:w-12 h-10 sm:h-12 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-4 sm:mb-5">
+                                <RouteIcon size={22} />
                             </div>
-                            <h3 className="font-display font-bold text-xl mb-3 text-slate-800 dark:text-slate-100 uppercase tracking-wide">{t('landing.features.f1_title')}</h3>
-                            <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm">
-                                {t('landing.features.f1_desc')}
+                            <h3 className="font-display font-bold text-sm sm:text-base mb-2 text-[#2c1d11] dark:text-white uppercase tracking-wide">
+                                {t('landing.features.f1_title', 'Horizontal Infrastructure')}
+                            </h3>
+                            <p className="text-[#736254] dark:text-slate-400 leading-relaxed text-xs font-medium">
+                                {t('landing.features.f1_desc', 'Roads, local bridges, alleys, pathways, and parking areas.')}
                             </p>
                         </motion.div>
 
-                        {/* Feature 2 */}
-                        <motion.div variants={fadeUp} className="glass-card p-8 rounded-2xl">
-                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-6">
-                                <Activity size={28} />
+                        {/* Vertical Infrastructure */}
+                        <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900/80 border border-[#f3e9e2] dark:border-slate-800 p-5 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
+                            <div className="w-10 sm:w-12 h-10 sm:h-12 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-4 sm:mb-5">
+                                <Building2 size={22} />
                             </div>
-                            <h3 className="font-display font-bold text-xl mb-3 text-slate-800 dark:text-slate-100 uppercase tracking-wide">{t('landing.features.f2_title')}</h3>
-                            <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm">
-                                {t('landing.features.f2_desc')}
+                            <h3 className="font-display font-bold text-sm sm:text-base mb-2 text-[#2c1d11] dark:text-white uppercase tracking-wide">
+                                {t('landing.features.f2_title', 'Vertical Infrastructure')}
+                            </h3>
+                            <p className="text-[#736254] dark:text-slate-400 leading-relaxed text-xs font-medium">
+                                {t('landing.features.f2_desc', 'City halls, public schools, local health centers, multipurpose gyms, and municipal warehouses.')}
                             </p>
                         </motion.div>
 
-                        {/* Feature 3 */}
-                        <motion.div variants={fadeUp} className="glass-card p-8 rounded-2xl">
-                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-6">
-                                <BrainCircuit size={28} />
+                        {/* Drainage & Water Systems */}
+                        <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900/80 border border-[#f3e9e2] dark:border-slate-800 p-5 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
+                            <div className="w-10 sm:w-12 h-10 sm:h-12 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-4 sm:mb-5">
+                                <Droplets size={22} />
                             </div>
-                            <h3 className="font-display font-bold text-xl mb-3 text-slate-800 dark:text-slate-100 uppercase tracking-wide">{t('landing.features.f3_title')}</h3>
-                            <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm">
-                                {t('landing.features.f3_desc')}
+                            <h3 className="font-display font-bold text-sm sm:text-base mb-2 text-[#2c1d11] dark:text-white uppercase tracking-wide">
+                                {t('landing.features.f3_title', 'Drainage & Water Systems')}
+                            </h3>
+                            <p className="text-[#736254] dark:text-slate-400 leading-relaxed text-xs font-medium">
+                                {t('landing.features.f3_desc', 'Open canals, underground lateral storm drains, sewer lines, and declogging networks.')}
+                            </p>
+                        </motion.div>
+
+                        {/* Public Spaces */}
+                        <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900/80 border border-[#f3e9e2] dark:border-slate-800 p-5 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
+                            <div className="w-10 sm:w-12 h-10 sm:h-12 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-4 sm:mb-5">
+                                <Users size={22} />
+                            </div>
+                            <h3 className="font-display font-bold text-sm sm:text-base mb-2 text-[#2c1d11] dark:text-white uppercase tracking-wide">
+                                {t('landing.features.f4_title', 'Public Spaces')}
+                            </h3>
+                            <p className="text-[#736254] dark:text-slate-400 leading-relaxed text-xs font-medium">
+                                {t('landing.features.f4_desc', 'City parks, plazas, monuments, and open recreational grounds.')}
                             </p>
                         </motion.div>
                     </motion.div>
                 </div>
-            </section>
+            </motion.section>
 
-            {/* How It Works Section */}
-            <section id="howitworks" className="relative z-10 py-24 bg-slate-50 dark:bg-slate-900 transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            {/* HOW IT WORKS SECTION */}
+            <motion.section 
+                {...sectionTransition}
+                className="py-16 sm:py-24 bg-[#ffffff] dark:bg-[#05080e] border-b border-[#f3e9e2] dark:border-slate-800"
+            >
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    
                     <motion.div
-                        className="text-center max-w-3xl mx-auto mb-16"
+                        className="text-center max-w-3xl mx-auto mb-12 sm:mb-16"
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
                     >
-                        <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-400 font-bold text-sm tracking-widest uppercase mb-4">
-                            <ClipboardCheck size={16} /> {t('landing.howitworks.badge')}
+                        <div className="inline-flex items-center gap-2 text-[#ff6b00] font-bold text-xs tracking-widest uppercase mb-3">
+                            <ClipboardCheck size={16} /> {t('landing.howitworks.badge', 'Simple Process')}
                         </div>
-                        <h2 className="font-display font-bold text-3xl md:text-4xl tracking-tight mb-4 text-slate-900 dark:text-white">{t('landing.howitworks.title')}</h2>
-                        <p className="text-lg text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
-                            {t('landing.howitworks.subtitle')}
+                        <h2 className="font-display font-extrabold text-2xl sm:text-3xl md:text-4xl uppercase tracking-tight text-[#2c1d11] dark:text-white mb-3 sm:mb-4">
+                            {t('landing.howitworks.title', 'HOW PULSO WORKS')}
+                        </h2>
+                        <p className="text-xs sm:text-sm font-medium text-[#736254] dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
+                            {t('landing.howitworks.subtitle', 'From reporting a problem to completing repairs in Caloocan City.')}
                         </p>
                     </motion.div>
 
-                    {/* Steps */}
                     <motion.div
-                        className="relative"
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 relative"
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
                     >
-                        {/* Connector line (desktop) */}
-                        <div className="hidden lg:block absolute top-10 left-[10%] right-[10%] h-0.5 bg-gradient-to-r from-orange-200 via-orange-400 to-orange-200 dark:from-orange-500/20 dark:via-orange-500/60 dark:to-orange-500/20" />
 
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-                            {[
-                                { icon: <UserCheck size={22} />, key: 's1', color: 'from-orange-500 to-orange-600' },
-                                { icon: <Camera size={22} />, key: 's2', color: 'from-amber-500 to-orange-500' },
-                                { icon: <Bot size={22} />, key: 's3', color: 'from-violet-500 to-indigo-500' },
-                                { icon: <Headphones size={22} />, key: 's4', color: 'from-blue-500 to-cyan-500' },
-                                { icon: <Wrench size={22} />, key: 's5', color: 'from-emerald-500 to-teal-500' },
-                            ].map((step, i) => (
-                                <motion.div key={step.key} variants={fadeUp} className="flex flex-col items-center text-center group">
-                                    <div className="relative mb-6">
-                                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                                            {step.icon}
-                                        </div>
-                                        <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center text-xs font-extrabold shadow-md border-2 border-white dark:border-slate-900">
-                                            {i + 1}
-                                        </div>
-                                    </div>
-                                    <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 mb-2">
-                                        {t(`landing.howitworks.${step.key}_title`)}
-                                    </h3>
-                                    <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
-                                        {t(`landing.howitworks.${step.key}_desc`)}
-                                    </p>
-                                </motion.div>
-                            ))}
-                        </div>
+                        {[
+                            { icon: <UserCheck size={20} />, step: '01', titleKey: 's1_title', descKey: 's1_desc', defTitle: "Problem Logged", defDesc: "Citizens or sensors report a utility issue on the city map." },
+                            { icon: <Camera size={20} />, step: '02', titleKey: 's2_title', descKey: 's2_desc', defTitle: "Site Inspection", defDesc: "City inspectors verify the location with photos and GPS tags." },
+                            { icon: <Bot size={20} />, step: '03', titleKey: 's3_title', descKey: 's3_desc', defTitle: "Smart Priority", defDesc: "PULSO ranks urgency so critical repairs get fixed first." },
+                            { icon: <Headphones size={20} />, step: '04', titleKey: 's4_title', descKey: 's4_desc', defTitle: "Crew Assigned", defDesc: "Engineers send work orders and materials to field teams." },
+                            { icon: <Wrench size={20} />, step: '05', titleKey: 's5_title', descKey: 's5_desc', defTitle: "Repair Done", defDesc: "Crews complete the repair and update the map status." },
+                        ].map((step, i) => (
+                            <motion.div
+                                key={i}
+                                variants={fadeUp}
+                                className="group relative flex flex-col items-center text-center bg-white dark:bg-slate-900/70 border border-[#f3e9e2] dark:border-slate-800 dark:hover:border-[#ff6b00]/50 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md dark:shadow-none transition-all duration-300"
+                            >
+                                {/* Icon */}
+                                <div className="w-12 h-12 rounded-xl bg-[#ffefe5] dark:bg-[#ff6b00]/10 text-[#ff6b00] border border-[#f3e9e2] dark:border-[#ff6b00]/20 flex items-center justify-center mb-4 group-hover:bg-[#ff6b00] group-hover:text-white group-hover:border-[#ff6b00] transition-all duration-300">
+                                    {step.icon}
+                                </div>
+
+                                <h3 className="font-bold text-xs sm:text-sm text-[#2c1d11] dark:text-white uppercase tracking-wide mb-2">
+                                    {t(`landing.howitworks.${step.titleKey}`, step.defTitle)}
+                                </h3>
+                                <p className="text-[#736254] dark:text-slate-400 text-[11px] sm:text-xs leading-relaxed">
+                                    {t(`landing.howitworks.${step.descKey}`, step.defDesc)}
+                                </p>
+
+                                {/* Bottom accent bar on hover */}
+                                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 group-hover:w-3/4 h-0.5 bg-[#ff6b00] rounded-full transition-all duration-300" />
+                            </motion.div>
+                        ))}
                     </motion.div>
                 </div>
-            </section>
+            </motion.section>
 
-            {/* Solutions Section */}
-            <section id="solutions" className="relative z-10 py-24 bg-white dark:bg-slate-950 transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
 
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            {/* SOLUTIONS SECTION - Animated Screen Section */}
+            <motion.section 
+                id="solutions" 
+                {...sectionTransition}
+                className="py-16 sm:py-24 bg-[#fffbf9] dark:bg-[#070a12] border-b border-[#f3e9e2] dark:border-slate-800"
+            >
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    
                     <motion.div
-                        className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6"
+                        className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 sm:mb-16 gap-4 sm:gap-6"
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
                     >
                         <div className="max-w-2xl">
-                            <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-400 font-bold text-sm tracking-widest uppercase mb-3">
-                                <Shield size={16} /> {t('landing.solutions.badge')}
+                            <div className="inline-flex items-center gap-2 text-[#ff6b00] font-bold text-xs tracking-widest uppercase mb-2 sm:mb-3">
+                                <Shield size={16} /> {t('landing.solutions.badge', 'Utility Sectors')}
                             </div>
-                            <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-tight">
-                                {t('landing.solutions.title')}
+                            <h2 className="font-display font-extrabold text-2xl sm:text-4xl md:text-5xl uppercase tracking-tight text-[#2c1d11] dark:text-white leading-tight">
+                                {t('landing.solutions.title', 'ESSENTIAL CITY SERVICES')}
                             </h2>
                         </div>
-                        <p className="text-slate-500 dark:text-slate-400 font-medium max-w-sm">
-                            {t('landing.solutions.subtitle')}
-                        </p>
                     </motion.div>
 
                     <motion.div
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6"
+                        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 sm:gap-6"
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
                     >
                         {[
-                            { id: 's1', icon: <RouteIcon size={24} />, color: 'orange' },
-                            { id: 's2', icon: <Droplets size={24} />, color: 'blue' },
-                            { id: 's3', icon: <Lightbulb size={24} />, color: 'yellow' },
-                            { id: 's4', icon: <Shield size={24} />, color: 'red' },
-                            { id: 's5', icon: <Building2 size={24} />, color: 'green' },
-                        ].map((solution, i) => {
-                            const colors = {
-                                orange: 'hover:border-orange-200 dark:hover:border-orange-500/50 group-hover:bg-orange-50/50 dark:group-hover:bg-orange-900/20 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 check:text-orange-500',
-                                blue: 'hover:border-blue-200 dark:hover:border-blue-500/50 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 check:text-blue-500',
-                                yellow: 'hover:border-yellow-200 dark:hover:border-yellow-500/50 group-hover:bg-yellow-50/50 dark:group-hover:bg-yellow-900/20 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 check:text-yellow-600',
-                                red: 'hover:border-red-200 dark:hover:border-red-500/50 group-hover:bg-red-50/50 dark:group-hover:bg-red-900/20 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 check:text-red-500',
-                                green: 'hover:border-emerald-200 dark:hover:border-emerald-500/50 group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/20 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 check:text-emerald-500',
-                            }[solution.color];
-
-                            const colorParts = colors.split(' ');
-                            const hoverBorder = colorParts[0] + ' ' + colorParts[1];
-                            const hoverBg = colorParts[2] + ' ' + colorParts[3];
-                            const iconBg = colorParts[4] + ' ' + colorParts[5];
-                            const iconText = colorParts[6] + ' ' + colorParts[7];
-                            const checkText = colorParts[8].replace('check:', '');
-
-                            // Alignment logic: 
-                            // 3 per row on LG (cols 1-2, 3-4, 5-6). 
-                            // Bottom row has 2 cards staggered (col-start-2: cols 2-3, col-start-4: cols 4-5)
-                            const gridClasses = i < 3 
-                                ? "lg:col-span-2" 
-                                : i === 3 ? "lg:col-span-2 lg:col-start-2" : "lg:col-span-2 lg:col-start-4";
-
-                            // Tablet logic: 2 per row. 5th card is centered.
-                            const tabletClasses = i === 4 ? "md:col-span-2 md:max-w-md md:mx-auto" : "";
-
-                            return (
-                                <motion.div key={solution.id} variants={fadeUp} className={`group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 ${hoverBorder} ${gridClasses} ${tabletClasses}`}>
-                                    <div className={`bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors ${hoverBg}`}>
-                                        <div className={`w-12 h-12 ${iconBg} ${iconText} rounded-xl flex items-center justify-center mb-6 shadow-sm`}>
-                                            {solution.icon}
-                                        </div>
-                                        <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t(`landing.solutions.${solution.id}_title`)}</h3>
-                                        <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
-                                            {t(`landing.solutions.${solution.id}_desc`)}
-                                        </p>
-                                        <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                            <li className="flex items-center gap-2"><CheckCircle2 size={14} className={checkText} /> {t(`landing.solutions.${solution.id}_l1`)}</li>
-                                            <li className="flex items-center gap-2"><CheckCircle2 size={14} className={checkText} /> {t(`landing.solutions.${solution.id}_l2`)}</li>
-                                        </ul>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
+                            { key: 's1', icon: <Droplets size={24} />, defTitle: "Water Supply Network", defDesc: "Monitor water pressure, detect pipe leaks, and check main distribution lines." },
+                            { key: 's2', icon: <Lightbulb size={24} />, defTitle: "Power & Street Lighting", defDesc: "Track underground power cables and fix street light outages fast." },
+                            { key: 's3', icon: <RouteIcon size={24} />, defTitle: "Roads & Drainage", defDesc: "Check drainage flow, reduce flood risks, and inspect road pavement conditions." },
+                        ].map((item, i) => (
+                            <motion.div key={i} variants={fadeUp} className="bg-white dark:bg-slate-900/80 p-6 sm:p-8 rounded-2xl border border-[#f3e9e2] dark:border-slate-800 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
+                                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-5 sm:mb-6">
+                                    {item.icon}
+                                </div>
+                                <h3 className="font-bold text-sm sm:text-base mb-2.5 sm:mb-3 text-[#2c1d11] dark:text-white uppercase tracking-wide">{t(`landing.solutions.${item.key}_title`, item.defTitle)}</h3>
+                                <p className="text-[#736254] dark:text-slate-400 leading-relaxed text-xs sm:text-sm mb-4">{t(`landing.solutions.${item.key}_desc`, item.defDesc)}</p>
+                                <ul className="space-y-2 text-xs font-semibold text-[#736254] dark:text-slate-300">
+                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-[#ff6b00]" /> {t('landing.solutions.l1', 'Live System Status')}</li>
+                                    <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-[#ff6b00]" /> {t('landing.solutions.l2', 'Fast Incident Response')}</li>
+                                </ul>
+                            </motion.div>
+                        ))}
                     </motion.div>
                 </div>
-            </section>
+            </motion.section>
 
-            {/* City Services Section */}
-            <section id="cityservices" className="relative z-10 py-24 bg-slate-50 dark:bg-slate-900 transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
-                    <motion.div
-                        className="flex flex-col md:flex-row justify-between items-end mb-14 gap-6"
-                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
-                    >
+            {/* CITY SERVICES GATEWAY */}
+            <motion.section 
+                {...sectionTransition}
+                className="py-16 sm:py-20 bg-[#ffffff] dark:bg-[#05080e] border-b border-[#f3e9e2] dark:border-slate-800"
+            >
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <motion.div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 sm:mb-12 gap-4" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
                         <div>
-                            <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-500 font-bold text-sm tracking-widest uppercase mb-3">
-                                <ExternalLink size={16} /> {t('landing.services.badge')}
+                            <div className="inline-flex items-center gap-2 text-[#ff6b00] font-bold text-xs tracking-widest uppercase mb-2">
+                                <ExternalLink size={15} /> {t('landing.services.badge', 'City Portals')}
                             </div>
-                            <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-tight">
-                                {t('landing.services.title')}
+                            <h2 className="font-display font-extrabold text-2xl sm:text-3xl md:text-4xl uppercase tracking-tight text-[#2c1d11] dark:text-white">
+                                {t('landing.services.title', 'CALOOCAN PUBLIC SERVICES GATEWAY')}
                             </h2>
                         </div>
-                        <p className="text-slate-500 dark:text-slate-400 font-medium max-w-sm">
-                            {t('landing.services.subtitle')}
+                    </motion.div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                        {[
+                            { key: 'senior', link: "https://osca.caloocanservices.online/", defName: "Senior Citizen Portal", defDesc: "Senior ID registration and verification records." },
+                            { key: 'pwd', link: "https://pwd.caloocanservices.online/", defName: "PWD Welfare Portal", defDesc: "Assistance directory for Persons with Disability." },
+                            { key: 'solo', link: "https://soloparent.caloocanservices.online/", defName: "Solo Parent Portal", defDesc: "Benefits tracking and single parent support." },
+                            { key: 'gad', link: "https://gadplan.caloocanservices.online/", defName: "GAD Plan Portal", defDesc: "Gender and Development project directory." },
+                        ].map((srv, i) => (
+                            <a key={i} href={srv.link} target="_blank" rel="noopener noreferrer" className="bg-[#fffbf9] dark:bg-slate-900/60 border border-[#f3e9e2] dark:border-slate-800 p-5 sm:p-6 rounded-2xl hover:border-[#ff6b00] transition-colors group">
+                                <h4 className="font-bold text-xs sm:text-sm text-[#2c1d11] dark:text-white uppercase tracking-wide group-hover:text-[#ff6b00] transition-colors flex items-center justify-between mb-2">
+                                    {t(`landing.services.${srv.key}_title`, srv.defName)} <ExternalLink size={14} className="text-[#736254] dark:text-slate-400 group-hover:text-[#ff6b00]" />
+                                </h4>
+                                <p className="text-[11px] sm:text-xs text-[#736254] dark:text-slate-400 leading-relaxed">{t(`landing.services.${srv.key}_desc`, srv.defDesc)}</p>
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            </motion.section>
+
+            {/* ABOUT LGU / CITY ENGINEERING SECTION - Simplified */}
+            <motion.section 
+                id="about" 
+                {...sectionTransition}
+                className="py-16 sm:py-24 bg-[#fffbf9] dark:bg-[#070a12] border-b border-[#f3e9e2] dark:border-slate-800"
+            >
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                    <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-500/10 text-[#ff6b00] rounded-full text-xs font-bold tracking-widest uppercase mb-5 border border-orange-500/20">
+                            <Users size={14} /> City Engineering Office of Caloocan
+                        </div>
+                        <h2 className="font-display font-extrabold text-2xl sm:text-4xl md:text-5xl uppercase tracking-tight text-[#2c1d11] dark:text-white mb-4 leading-[1.1]">
+                            PROACTIVE INFRASTRUCTURE <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff6b00] to-amber-500">STEWARDSHIP</span>
+                        </h2>
+                        <p className="text-sm sm:text-base text-[#736254] dark:text-slate-300 leading-relaxed mb-10 font-medium max-w-2xl mx-auto">
+                            The City Engineering Office of Caloocan plans, monitors, and maintains public utility infrastructure to prevent outages, spot risks early, and keep communities safe and resilient.
+                        </p>
+
+                        <div className="grid grid-cols-3 gap-4 sm:gap-6">
+                            <div className="bg-white dark:bg-slate-900/60 p-5 sm:p-6 rounded-2xl border border-[#f3e9e2] dark:border-slate-800 shadow-sm">
+                                <span className="text-2xl sm:text-3xl font-display font-black text-[#ff6b00]">100%</span>
+                                <span className="block text-[10px] sm:text-xs font-bold text-[#736254] dark:text-slate-300 uppercase tracking-wider mt-2">Caloocan Coverage</span>
+                            </div>
+                            <div className="bg-white dark:bg-slate-900/60 p-5 sm:p-6 rounded-2xl border border-[#f3e9e2] dark:border-slate-800 shadow-sm">
+                                <span className="text-2xl sm:text-3xl font-display font-black text-[#ff6b00]">24/7</span>
+                                <span className="block text-[10px] sm:text-xs font-bold text-[#736254] dark:text-slate-300 uppercase tracking-wider mt-2">Live Monitoring</span>
+                            </div>
+                            <div className="bg-white dark:bg-slate-900/60 p-5 sm:p-6 rounded-2xl border border-[#f3e9e2] dark:border-slate-800 shadow-sm">
+                                <span className="text-2xl sm:text-3xl font-display font-black text-[#ff6b00]">&lt;15m</span>
+                                <span className="block text-[10px] sm:text-xs font-bold text-[#736254] dark:text-slate-300 uppercase tracking-wider mt-2">Avg. Dispatch</span>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            </motion.section>
+
+            {/* NEW SECTION 1: FREQUENTLY ASKED QUESTIONS (FAQ) */}
+            <motion.section 
+                id="faq" 
+                {...sectionTransition}
+                className="py-16 sm:py-24 bg-[#ffffff] dark:bg-[#05080e] border-b border-[#f3e9e2] dark:border-slate-800"
+            >
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <motion.div
+                        className="text-center mb-12 sm:mb-16"
+                        initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
+                    >
+                        <div className="inline-flex items-center gap-2 text-[#ff6b00] font-bold text-xs tracking-widest uppercase mb-3">
+                            <HelpCircle size={16} /> Help Center &amp; Resident FAQ
+                        </div>
+                        <h2 className="font-display font-extrabold text-2xl sm:text-4xl uppercase tracking-tight text-[#2c1d11] dark:text-white mb-3">
+                            FREQUENTLY ASKED QUESTIONS
+                        </h2>
+                        <p className="text-xs sm:text-sm font-medium text-[#736254] dark:text-slate-400 leading-relaxed">
+                            Everything you need to know about reporting utility hazards, resident verification, and dispatch SLAs in Caloocan City.
+                        </p>
+                    </motion.div>
+
+                    {/* Accordion List */}
+                    <div className="space-y-4">
+                        {[
+                            {
+                                id: 1,
+                                q: "How do I report a public utility hazard in Caloocan City?",
+                                a: "Simply register or sign in to your PULSO resident account. Click 'New Incident Report', upload a photo of the issue (e.g. water leak, power outage, road damage), and PULSO automatically tags your exact GPS coordinates for immediate verification and dispatcher routing."
+                            },
+                            {
+                                id: 2,
+                                q: "How does the Automated AI Document Audit verify residency?",
+                                a: "During registration, you upload any valid Philippine government-issued ID (e.g., PhilID, Driver's License, UMID, Postal ID). PULSO's automated OCR AI parses your ID details to verify residency within Caloocan City under strict Republic Act No. 10173 (Data Privacy Act) compliance."
+                            },
+                            {
+                                id: 3,
+                                q: "What utility networks and areas are covered by PULSO?",
+                                a: "PULSO provides full coverage across all barangays in Caloocan City. The platform monitors water distribution mains, electric power and lighting cables, underground drainage networks, and road pavement conditions."
+                            },
+                            {
+                                id: 4,
+                                q: "How can I track the progress of my reported incident?",
+                                a: "Once submitted, your report appears on your personal Resident Dashboard. You can view live real-time status updates (Received ➔ Dispatched ➔ In Progress ➔ Resolved), along with notes from City Engineering dispatchers."
+                            }
+                        ].map((faq) => (
+                            <div key={faq.id} className="bg-[#fffbf9] dark:bg-slate-900/60 border border-[#f3e9e2] dark:border-slate-800 rounded-2xl overflow-hidden transition-all">
+                                <button
+                                    onClick={() => setOpenFaq(openFaq === faq.id ? null : faq.id)}
+                                    className="w-full p-5 sm:p-6 text-left flex justify-between items-center gap-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                                >
+                                    <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-3">
+                                        <span className="w-7 h-7 rounded-xl bg-orange-500/10 text-[#ff6b00] flex items-center justify-center text-xs font-black shrink-0">0{faq.id}</span>
+                                        {faq.q}
+                                    </span>
+                                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center shrink-0">
+                                        {openFaq === faq.id ? <Minus size={16} /> : <Plus size={16} />}
+                                    </div>
+                                </button>
+                                <AnimatePresence>
+                                    {openFaq === faq.id && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: "auto", opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="p-5 sm:p-6 pt-0 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-slate-800/60">
+                                                {faq.a}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </motion.section>
+
+            {/* NEW SECTION 2: EMERGENCY HOTLINES & CITIZEN SUPPORT */}
+            <motion.section 
+                id="emergency" 
+                {...sectionTransition}
+                className="py-16 sm:py-24 bg-[#ffffff] dark:bg-[#05080e] border-b border-[#f3e9e2] dark:border-slate-800"
+            >
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    
+                    <motion.div className="text-center mb-10 sm:mb-12" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
+                        <div className="inline-flex items-center gap-2 text-[#ff6b00] font-bold text-xs tracking-widest uppercase mb-3">
+                            <ShieldAlert size={16} /> Emergency Directory
+                        </div>
+                        <h2 className="font-display font-extrabold text-2xl sm:text-3xl md:text-4xl uppercase tracking-tight text-[#2c1d11] dark:text-white mb-3">
+                            DIRECT MUNICIPAL &amp; UTILITY HOTLINES
+                        </h2>
+                        <p className="text-xs sm:text-sm font-medium text-[#736254] dark:text-slate-300 leading-relaxed max-w-xl mx-auto">
+                            For life-threatening emergencies or urgent utility disruptions in Caloocan City, contact local dispatch hubs directly.
                         </p>
                     </motion.div>
 
                     <motion.div
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
                     >
-                        {/* Senior ID */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-7 h-full flex flex-col group-hover:bg-indigo-50/50 dark:group-hover:bg-indigo-900/20 transition-colors">
-                                <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center mb-5 shadow-sm">
-                                    <Users size={24} />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">{t('landing.services.senior_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-5 flex-grow">{t('landing.services.senior_desc')}</p>
-                                <ul className="space-y-2 text-sm">
-                                    <li><a href="http://oscanew.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.senior_l1')}</a></li>
-                                    <li><a href="https://osca.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.senior_l2')}</a></li>
-                                    <li><a href="https://oscaverify.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.senior_l3')}</a></li>
-                                </ul>
+                        <motion.a variants={fadeUp} href="tel:0288882256" className="bg-white dark:bg-slate-900/60 border border-[#f3e9e2] dark:border-slate-800 hover:border-[#ff6b00] dark:hover:border-[#ff6b00] p-5 rounded-2xl transition-all group flex items-start gap-4 shadow-sm hover:shadow-md">
+                            <div className="w-10 h-10 rounded-xl bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] flex items-center justify-center shrink-0">
+                                <PhoneCall size={20} />
                             </div>
-                        </motion.div>
-
-                        {/* PWD */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-purple-200 dark:hover:border-purple-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-7 h-full flex flex-col group-hover:bg-purple-50/50 dark:group-hover:bg-purple-900/20 transition-colors">
-                                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl flex items-center justify-center mb-5 shadow-sm">
-                                    <Accessibility size={24} />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">{t('landing.services.pwd_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-5 flex-grow">{t('landing.services.pwd_desc')}</p>
-                                <ul className="space-y-2 text-sm">
-                                    <li><a href="https://pwd.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.pwd_l1')}</a></li>
-                                    <li><a href="https://pwdverify.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.pwd_l2')}</a></li>
-                                    <li><a href="https://pwd.caloocanservices.online/verify" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.pwd_l3')}</a></li>
-                                </ul>
+                            <div>
+                                <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#736254] dark:text-slate-400 mb-1">Caloocan Rescue &amp; Command</h4>
+                                <p className="text-sm sm:text-base font-black text-[#2c1d11] dark:text-white group-hover:text-[#ff6b00] transition-colors">(02) 8888-CALOOCAN</p>
                             </div>
-                        </motion.div>
+                        </motion.a>
 
-                        {/* Solo Parent */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-7 h-full flex flex-col group-hover:bg-rose-50/50 dark:group-hover:bg-rose-900/20 transition-colors">
-                                <div className="w-12 h-12 bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center mb-5 shadow-sm">
-                                    <Heart size={24} />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">{t('landing.services.solo_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-5 flex-grow">{t('landing.services.solo_desc')}</p>
-                                <ul className="space-y-2 text-sm">
-                                    <li><a href="https://soloparent.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.solo_l1')}</a></li>
-                                    <li><a href="https://soloparent.caloocanservices.online/tracker/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.solo_l2')}</a></li>
-                                </ul>
+                        <motion.a variants={fadeUp} href="tel:0283620220" className="bg-white dark:bg-slate-900/60 border border-[#f3e9e2] dark:border-slate-800 hover:border-[#ff6b00] dark:hover:border-[#ff6b00] p-5 rounded-2xl transition-all group flex items-start gap-4 shadow-sm hover:shadow-md">
+                            <div className="w-10 h-10 rounded-xl bg-[#ffefe5] dark:bg-orange-500/15 text-orange-500 flex items-center justify-center shrink-0">
+                                <Wrench size={20} />
                             </div>
-                        </motion.div>
-
-                        {/* GAD */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-teal-200 dark:hover:border-teal-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-7 h-full flex flex-col group-hover:bg-teal-50/50 dark:group-hover:bg-teal-900/20 transition-colors">
-                                <div className="w-12 h-12 bg-teal-100 dark:bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded-xl flex items-center justify-center mb-5 shadow-sm">
-                                    <FileText size={24} />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">{t('landing.services.gad_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-5 flex-grow">{t('landing.services.gad_desc')}</p>
-                                <ul className="space-y-2 text-sm">
-                                    <li><a href="https://gadplan.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.gad_l1')}</a></li>
-                                    <li><a href="https://gadplan.caloocanservices.online/verify.php" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.gad_l2')}</a></li>
-                                </ul>
+                            <div>
+                                <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#736254] dark:text-slate-400 mb-1">City Engineering Dispatch</h4>
+                                <p className="text-sm sm:text-base font-black text-[#2c1d11] dark:text-white group-hover:text-[#ff6b00] transition-colors">(02) 8362-0220</p>
                             </div>
-                        </motion.div>
-                    </motion.div>
+                        </motion.a>
 
-                    {/* Portal CTA */}
-                    <motion.div
-                        className="mt-10 text-center"
-                        initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
-                    >
-                        <a
-                            href="https://caloocanservices.online/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 border-2 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-500 hover:border-indigo-600 dark:hover:border-indigo-500 font-bold px-8 py-3 rounded-xl transition-all duration-300"
-                        >
-                            {t('landing.services.portal_link')} <ExternalLink size={16} />
-                        </a>
+                        <motion.a variants={fadeUp} href="tel:1626" className="bg-white dark:bg-slate-900/60 border border-[#f3e9e2] dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-400 p-5 rounded-2xl transition-all group flex items-start gap-4 shadow-sm hover:shadow-md">
+                            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0">
+                                <Droplets size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#736254] dark:text-slate-400 mb-1">Maynilad Water Hotline</h4>
+                                <p className="text-sm sm:text-base font-black text-[#2c1d11] dark:text-white group-hover:text-blue-500 transition-colors">1626</p>
+                            </div>
+                        </motion.a>
+
+                        <motion.a variants={fadeUp} href="tel:16211" className="bg-white dark:bg-slate-900/60 border border-[#f3e9e2] dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-400 p-5 rounded-2xl transition-all group flex items-start gap-4 shadow-sm hover:shadow-md">
+                            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
+                                <Zap size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#736254] dark:text-slate-400 mb-1">Meralco Power Outages</h4>
+                                <p className="text-sm sm:text-base font-black text-[#2c1d11] dark:text-white group-hover:text-amber-500 transition-colors">16211</p>
+                            </div>
+                        </motion.a>
                     </motion.div>
                 </div>
-            </section>
+            </motion.section>
 
-            {/* About LGU Section */}
-            <section id="about" className="relative z-10 py-32 bg-white dark:bg-slate-950 overflow-hidden transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
-                <div className="absolute top-1/2 left-0 w-[800px] h-[800px] bg-orange-50 dark:bg-orange-500/5 rounded-full blur-[120px] -translate-y-1/2 -translate-x-1/2 opacity-50 pointer-events-none"></div>
-
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 relative grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-
-                    {/* Left: Content */}
-                    <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}>
-                        <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-400 font-bold text-sm tracking-widest uppercase mb-4">
-                            <Users size={16} /> {t('landing.about.badge')}
-                        </div>
-                        <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-[1.15] mb-6">
-                            {t('landing.about.title')}
-                        </h2>
-                        <div className="space-y-6 text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
-                            <p dangerouslySetInnerHTML={{ __html: t('landing.about.p1').replace('<1>', '<strong>').replace('</1>', '</strong>') }} />
-                            <p>
-                                {t('landing.about.p2')}
+            {/* FOOTER */}
+            <footer className="bg-[#fffbf9] dark:bg-[#05080e] border-t border-[#f3e9e2] dark:border-slate-800 text-[#2c1d11] dark:text-white pt-12 sm:pt-16 pb-12 transition-colors duration-300">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 pb-10 sm:pb-12 border-b border-[#f3e9e2] dark:border-slate-800">
+                        
+                        <div className="flex flex-col gap-3">
+                            <div className="flex items-center gap-3">
+                                <Branding size="h-8 sm:h-9" showText={false} />
+                                <span className="text-[#2c1d11] dark:text-white font-extrabold text-lg sm:text-xl tracking-tight">PULSO</span>
+                            </div>
+                            <p className="text-xs text-[#736254] dark:text-slate-400 leading-relaxed font-medium">
+                                {t('landing.footer.desc', 'Smart Utility Locator & Monitoring Platform for Caloocan City.')}
                             </p>
                         </div>
 
-                        <div className="mt-10 pt-10 flex flex-col sm:flex-row items-center gap-8 relative">
-                            <div className="absolute top-0 left-0 w-full h-8 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-800/50 dark:to-transparent pointer-events-none"></div>
-                            <div className="flex flex-col">
-                                <span className="text-4xl font-display font-bold text-slate-900 dark:text-white">{t('landing.about.stat1_val')}</span>
-                                <span className="text-sm font-bold text-orange-500 uppercase tracking-widest mt-1">{t('landing.about.stat1_lbl')}</span>
-                            </div>
-                            <div className="hidden sm:block w-px h-12 bg-gradient-to-b from-slate-200 dark:from-slate-800 to-transparent pointer-events-none"></div>
-                            <div className="flex flex-col">
-                                <span className="text-4xl font-display font-bold text-slate-900 dark:text-white">{t('landing.about.stat2_val')}</span>
-                                <span className="text-sm font-bold text-orange-500 uppercase tracking-widest mt-1">{t('landing.about.stat2_lbl')}</span>
-                            </div>
-                            <div className="hidden sm:block w-px h-12 bg-gradient-to-b from-slate-200 dark:from-slate-800 to-transparent pointer-events-none"></div>
-                            <div className="flex flex-col">
-                                <span className="text-4xl font-display font-bold text-slate-900 dark:text-white">{t('landing.about.stat3_val')}</span>
-                                <span className="text-sm font-bold text-orange-500 uppercase tracking-widest mt-1">{t('landing.about.stat3_lbl')}</span>
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    {/* Right: Graphic / Stats Box */}
-                    <motion.div
-                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
-                        className="relative"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-tr from-orange-200 to-orange-50 dark:from-orange-500/20 dark:to-orange-500/5 rounded-3xl transform rotate-3 scale-105 opacity-50"></div>
-                        <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-3xl p-10 overflow-hidden transition-colors">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-100 dark:bg-orange-500/20 rounded-bl-[100px] -mr-8 -mt-8 flex items-end pb-6 pl-6">
-                                <BarChart3 size={32} className="text-orange-500 dark:text-orange-400" />
-                            </div>
-
-                            <h3 className="font-display font-bold text-2xl text-slate-900 dark:text-white mb-2">{t('landing.about.analytics')}</h3>
-                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8">{t('landing.about.analytics_desc')}</p>
-
-                            <div className="space-y-6">
-                                <div>
-                                    <div className="flex justify-between text-sm font-bold mb-2">
-                                        <span className="text-slate-700 dark:text-slate-300">{t('landing.about.metric1')}</span>
-                                        <span className="text-orange-600 dark:text-orange-400">87%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                        <div className="bg-orange-500 h-full rounded-full w-[87%] relative overflow-hidden">
-                                            <div className="absolute top-0 left-0 w-full h-full bg-white/20 -skew-x-12 translate-x-[-100%] animate-[shimmer_2s_infinite]"></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between text-sm font-bold mb-2">
-                                        <span className="text-slate-700 dark:text-slate-300">{t('landing.about.metric2')}</span>
-                                        <span className="text-slate-900 dark:text-white">92%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                        <div className="bg-slate-800 dark:bg-slate-400 h-full rounded-full w-[92%]"></div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between text-sm font-bold mb-2">
-                                        <span className="text-slate-700 dark:text-slate-300">{t('landing.about.metric3')}</span>
-                                        <span className="text-slate-900 dark:text-white">64%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                        <div className="bg-slate-300 dark:bg-slate-600 h-full rounded-full w-[64%]"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button className="w-full mt-10 border-2 border-slate-200 dark:border-slate-700 hover:border-orange-500 dark:hover:border-orange-500 text-slate-700 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 font-bold p-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-                                {t('landing.about.portal_btn')} <ArrowRight size={16} />
-                            </button>
-                        </div>
-                    </motion.div>
-                </div>
-            </section>
-
-            {/* Comprehensive Professional Footer */}
-            <footer className="relative z-10 bg-slate-900 pt-24 pb-12 text-slate-300">
-                <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-slate-800 to-transparent"></div>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
-
-                        <div className="flex flex-col gap-6">
-                            <Branding size="h-10" />
-                            <p className="text-slate-400 text-sm leading-relaxed pr-4">
-                                {t('landing.footer.desc')}
-                            </p>
-                            <div className="flex items-center gap-4 mt-2">
-                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors cursor-pointer text-slate-400">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
-                                </div>
-                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors cursor-pointer text-slate-400">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" /></svg>
-                                </div>
-                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors cursor-pointer text-slate-400">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Quick Portals */}
                         <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">Access Portals</h4>
-                            <ul className="flex flex-col gap-3 font-medium text-sm">
-                                <li><a href="/login" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Resident Login</a></li>
-                                <li><a href="/gov" className="hover:text-orange-400 transition-colors flex items-center gap-2 font-bold text-white bg-white/5 p-2 rounded-lg border border-white/10 hover:bg-orange-500/20 transition-all"><Shield size={14} className="text-orange-500" /> Internal Gateway (Staff)</a></li>
-                                <li><a href="/dispatcher" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Engineering Dispatch</a></li>
-                                <li><a href="/management" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Command Management</a></li>
+                            <h4 className="text-[#2c1d11] dark:text-white font-bold text-xs uppercase tracking-wider mb-3 sm:mb-4">{t('landing.footer.portals_header', 'Portals')}</h4>
+                            <ul className="space-y-2 text-xs font-medium text-[#736254] dark:text-slate-400">
+                                <li><a href="/login" className="hover:text-[#ff6b00] transition-colors">{t('landing.footer.resident_portal', 'Resident Portal')}</a></li>
+                                <li><a href="/gov" className="hover:text-[#ff6b00] transition-colors font-bold text-[#2c1d11] dark:text-white">{t('landing.footer.gov_gateway', 'Government Gateway')}</a></li>
+                                <li><a href="/dispatcher" className="hover:text-[#ff6b00] transition-colors">{t('landing.footer.dispatch_ops', 'Dispatch Operations')}</a></li>
                             </ul>
                         </div>
 
-                        {/* City Services */}
                         <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.cityservices')}</h4>
-                            <ul className="flex flex-col gap-3 font-medium text-sm">
-                                <li><a href="http://oscanew.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ExternalLink size={13} className="text-slate-500" /> {t('landing.footer.cs_senior')}</a></li>
-                                <li><a href="https://pwd.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ExternalLink size={13} className="text-slate-500" /> {t('landing.footer.cs_pwd')}</a></li>
-                                <li><a href="https://soloparent.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ExternalLink size={13} className="text-slate-500" /> {t('landing.footer.cs_solo')}</a></li>
-                                <li><a href="https://gadplan.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ExternalLink size={13} className="text-slate-500" /> {t('landing.footer.cs_gad')}</a></li>
+                            <h4 className="text-[#2c1d11] dark:text-white font-bold text-xs uppercase tracking-wider mb-3 sm:mb-4">{t('landing.footer.office_header', 'Office')}</h4>
+                            <ul className="space-y-2 text-xs font-medium text-[#736254] dark:text-slate-400">
+                                <li>{t('landing.footer.office_dept', 'City Engineering Department')}</li>
+                                <li>{t('landing.footer.office_hall', 'Caloocan City Hall')}</li>
+                                <li>{t('landing.footer.office_road', 'Camarin Road, Caloocan City')}</li>
                             </ul>
                         </div>
 
-                        {/* Platform Features */}
                         <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.platform')}</h4>
-                            <ul className="flex flex-col gap-3 font-medium text-sm">
-                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ActivitySquare size={14} className="text-slate-500" /> {t('landing.features.f1_title')}</a></li>
-                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><Activity size={14} className="text-slate-500" /> {t('landing.features.f2_title')}</a></li>
-                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><BrainCircuit size={14} className="text-slate-500" /> {t('landing.features.f3_title')}</a></li>
-                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><MapPinned size={14} className="text-slate-500" /> Caloocan North Grid</a></li>
-                            </ul>
-                        </div>
-
-                        {/* Contact Info - Full Width Horizontal */}
-                        <div className="lg:col-span-4 mt-8 pt-12 border-t border-slate-800/30">
-                            <h4 className="text-white font-bold text-lg mb-8 tracking-tight">{t('landing.footer.contact')}</h4>
-                            <ul className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 text-sm">
-                                <li className="flex items-start gap-3 max-w-xs">
-                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0"><MapPinned size={16} /></div>
-                                    <span className="text-slate-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('landing.footer.address') }} />
-                                </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
-                                        <Phone size={16} />
-                                    </div>
-                                    <span className="text-slate-400 font-bold">(02) 336-5576</span>
-                                </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
-                                        <Clock size={16} />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">{t('landing.footer.hours_label')}</span>
-                                        <span className="text-slate-400">{t('landing.footer.hours')}</span>
-                                    </div>
-                                </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
-                                        <Mail size={16} />
-                                    </div>
-                                    <span className="text-slate-400 font-medium">engineering@caloocancity.gov.ph</span>
-                                </li>
+                            <h4 className="text-[#2c1d11] dark:text-white font-bold text-xs uppercase tracking-wider mb-3 sm:mb-4">{t('landing.footer.contact_header', 'Contact')}</h4>
+                            <ul className="space-y-2 text-xs font-medium text-[#736254] dark:text-slate-400">
+                                <li>Phone: (02) 8888-CALOOCAN</li>
+                                <li>Email: engineering@caloocan.gov.ph</li>
                             </ul>
                         </div>
                     </div>
 
-                    {/* Footer Bottom Sheet */}
-                    <div className="pt-8 relative flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-800/80 dark:to-transparent pointer-events-none"></div>
-                        <div className="text-slate-500 text-sm font-medium">
-                            &copy; {new Date().getFullYear()} {t('landing.footer.copyright')}
-                        </div>
-                        <div className="flex gap-6 text-sm font-medium text-slate-500">
-                            <a href="#" className="hover:text-orange-400 transition-colors">{t('landing.footer.privacy')}</a>
-                            <a href="#" className="hover:text-orange-400 transition-colors">{t('landing.footer.terms')}</a>
-                            <a href="#" className="hover:text-orange-400 transition-colors">{t('landing.footer.cookie')}</a>
+                    <div className="pt-6 sm:pt-8 flex flex-col sm:flex-row justify-between items-center text-xs font-medium text-[#736254] dark:text-slate-400 gap-4 text-center sm:text-left">
+                        <span>&copy; {new Date().getFullYear()} {t('landing.footer.rights', 'LGU Caloocan City. All rights reserved.')}</span>
+                        <div className="flex gap-6">
+                            <button type="button" onClick={() => setLegalModal({ isOpen: true, tab: 'privacy' })} className="hover:text-[#ff6b00] transition-colors cursor-pointer">{t('landing.footer.privacy', 'Privacy Policy')}</button>
+                            <button type="button" onClick={() => setLegalModal({ isOpen: true, tab: 'terms' })} className="hover:text-[#ff6b00] transition-colors cursor-pointer">{t('landing.footer.terms', 'Terms of Service')}</button>
                         </div>
                     </div>
                 </div>
             </footer>
 
+            <LegalModal
+                isOpen={legalModal.isOpen}
+                onClose={() => setLegalModal(prev => ({ ...prev, isOpen: false }))}
+                initialTab={legalModal.tab}
+            />
         </div>
     );
 }

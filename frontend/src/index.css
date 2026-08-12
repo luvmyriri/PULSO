@@ -1,17 +1,59 @@
 @import "tailwindcss";
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* Enforce manual dark mode toggling alongside system preferring */
 @variant dark (&:is(.dark *));
 
 @theme {
-  --color-primary-light: #fdba74;
-  --color-primary: #f97316;
-  --color-primary-dark: #ea580c;
+  /* Brand Primary (Orange Palette) */
+  --color-primary: #ff6b00;
+  --color-primary-light: #ffefe5;
+  --color-primary-dark: #cc5200;
+  --color-primary-hover: #e65c00;
 
-  --color-dark-light: #1e293b;
-  --color-dark: #0f172a;
+  /* Brand Secondary (Green Accent) */
+  --color-secondary: #10b981;
+  --color-secondary-light: #ecfdf5;
+  --color-secondary-dark: #047857;
+  --color-secondary-hover: #059669;
 
-  --color-light-offset: #f8fafc;
+  /* Brand Neutrals */
+  --color-neutral-bg: #fffbf9;
+  --color-neutral-card: #ffffff;
+  --color-neutral-border: #f3e9e2;
+  --color-neutral-text: #2c1d11;
+  --color-neutral-muted: #736254;
+
+  /* Override standard tailwind theme color mappings for backward compatibility with existing indigo/blue components */
+  --color-indigo-50: #ffefe5;
+  --color-indigo-100: #ffd9c2;
+  --color-indigo-200: #ffb48a;
+  --color-indigo-300: #ff8e52;
+  --color-indigo-400: #ff7524;
+  --color-indigo-500: #e65c00;
+  --color-indigo-600: #ff6b00;
+  --color-indigo-700: #cc5200;
+  --color-indigo-800: #a34100;
+  --color-indigo-900: #7a3100;
+
+  --color-blue-50: #ecfdf5;
+  --color-blue-100: #d1fae5;
+  --color-blue-200: #a7f3d0;
+  --color-blue-300: #6ee7b7;
+  --color-blue-400: #34d399;
+  --color-blue-500: #10b981;
+  --color-blue-600: #059669;
+  --color-blue-700: #047857;
+  --color-blue-800: #065f46;
+  --color-blue-900: #064e3b;
+
+  --color-dark-light: #2c1d11;
+  --color-dark: #2c1d11;
+
+  --color-light-offset: #f3e9e2;
   --color-light: #ffffff;
 
   --font-sans: "Inter", sans-serif;
@@ -342,4 +384,35 @@
   .animate-wave-ring {
     animation: wave-ring 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
+
+  @keyframes gradient-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .animate-gradient-flow {
+    background-size: 200% auto !important;
+    animation: gradient-flow 6s ease infinite !important;
+  }
+
+  .hero-grid-bg {
+    background-color: transparent;
+    background-image: none !important;
+  }
+
+  .hero-grid-perspective {
+    background-color: transparent;
+    background-image: none !important;
+  }
+}
+
+/* Hide Spline Watermark globally */
+#logo,
+.spline-watermark,
+a[href*="spline.design"],
+canvas + div {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }

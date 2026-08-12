@@ -9,7 +9,7 @@ System Admin has a unique password.
 | Role | Email | Password |
 |---|---|---|
 | **City Engineer** | `city.engineer@caloocan.gov.ph` | `CEO@pulso2025!` |
-| **Asst. City Engineer** | `asst.engineer@caloocan.gov.ph` | `CEO@pulso2025!` |
+| **Asst. City Engineer** | `asst.engineer@caloocan.gov.ph` | ``CEO@pulso2025!`` |
 | **Admin Officer** | `admin.officer@caloocan.gov.ph` | `CEO@pulso2025!` |
 | **Admin Clerk** | `admin.clerk@caloocan.gov.ph` | `CEO@pulso2025!` |
 | **Records Officer** | `records.officer@caloocan.gov.ph` | `CEO@pulso2025!` |
@@ -23,8 +23,6 @@ System Admin has a unique password.
 | **Electrical Inspector**| `electrical.inspector@caloocan.gov.ph` | `CEO@pulso2025!` |
 | **Mechanical Inspector**| `mechanical.inspector@caloocan.gov.ph` | `CEO@pulso2025!` |
 | **System Administrator**| `admin@pulso.system` | `SysAdmin@pulso2025!` |
-
----
 
 ## 🙋 Resident Portal (`/login`)
 These accounts are used for general testing of the citizen-facing features and legacy generic testing. Ensure you run `python create_test_accounts.py` if these don't work.

@@ -1,57 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import ReCAPTCHA from "react-google-recaptcha";
-import Spline from '@splinetool/react-spline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Lock, User, Eye, EyeOff, ChevronRight, Activity, Sun, Moon, Monitor, Mail, ArrowLeft, CheckCircle, FileCheck, BookOpen, ExternalLink, Map, ShieldCheck, Home } from 'lucide-react';
-import { useTheme } from '../contexts/ThemeContext';
+import {
+    Shield, Lock, User, Eye, EyeOff, ChevronRight, Activity,
+    Mail, ArrowLeft, CheckCircle, FileCheck, BookOpen, ExternalLink,
+    Map, ShieldCheck, Home, FileText, Users
+} from 'lucide-react';
 import Branding from '../components/Branding';
-import ErrorBoundary from '../components/ErrorBoundary';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function GovLanding() {
-    const { theme, changeTheme } = useTheme();
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [view, setView] = useState('login'); // 'login' or 'forgot'
+    const [view, setView] = useState('login'); // 'login' | 'forgot'
     const [recoverySent, setRecoverySent] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');
     const [captchaToken, setCaptchaToken] = useState(null);
     const recaptchaRef = useRef(null);
-    
-    // Portal Information Modals
     const [activeModal, setActiveModal] = useState(null); // 'directives' | 'resources' | null
-
-    // Spline Scenes
-    const DARK_SCENE = "https://prod.spline.design/us1Y6xfaQLiI2cim/scene.splinecode";
-    const LIGHT_SCENE = "https://prod.spline.design/nrFjYzbJnF7GU92z/scene.splinecode";
-
-    const [currentScene, setCurrentScene] = useState(DARK_SCENE);
-
-    useEffect(() => {
-        const updateScene = () => {
-            if (theme === 'dark') {
-                setCurrentScene(DARK_SCENE);
-            } else if (theme === 'light') {
-                setCurrentScene(LIGHT_SCENE);
-            } else {
-                const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                setCurrentScene(isSystemDark ? DARK_SCENE : LIGHT_SCENE);
-            }
-        };
-
-        updateScene();
-        
-        if (theme === 'system') {
-            const mq = window.matchMedia('(prefers-color-scheme: dark)');
-            const listener = (e) => setCurrentScene(e.matches ? DARK_SCENE : LIGHT_SCENE);
-            mq.addEventListener('change', listener);
-            return () => mq.removeEventListener('change', listener);
-        }
-    }, [theme]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -60,7 +31,6 @@ export default function GovLanding() {
             setLoading(false);
             return;
         }
-
         try {
             const formData = new URLSearchParams();
             formData.append('username', email);
@@ -69,9 +39,7 @@ export default function GovLanding() {
 
             const response = await fetch('http://localhost:33159/api/auth/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData
             });
 
@@ -79,7 +47,6 @@ export default function GovLanding() {
                 const data = await response.json();
                 localStorage.setItem('pulso_token', data.access_token);
                 localStorage.setItem('pulso_user', JSON.stringify(data.user));
-                
                 const GOV_ROLES = [
                     'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
                     'records_officer','division_chief','design_engineer','estimator',
@@ -99,7 +66,7 @@ export default function GovLanding() {
                 }
             } else {
                 const errData = await response.json();
-                const msg = typeof errData.detail === 'object' 
+                const msg = typeof errData.detail === 'object'
                     ? (Array.isArray(errData.detail) ? errData.detail[0].msg : JSON.stringify(errData.detail))
                     : errData.detail;
                 setError(msg || 'Authentication failed');
@@ -117,21 +84,17 @@ export default function GovLanding() {
         e.preventDefault();
         setLoading(true);
         setError('');
-        
         try {
             const response = await fetch('http://localhost:33159/api/auth/forgot-password', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: recoveryEmail })
             });
-
             if (response.ok) {
                 setRecoverySent(true);
             } else {
                 const data = await response.json();
-                const msg = typeof data.detail === 'object' 
+                const msg = typeof data.detail === 'object'
                     ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
                     : data.detail;
                 setError(msg || 'Recovery failed. Internal protocol error.');
@@ -143,9 +106,6 @@ export default function GovLanding() {
         }
     };
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Directives & Resources Data
-    // ─────────────────────────────────────────────────────────────────────────────
     const DIRECTIVES = [
         { id: 'DIR-2026-004', title: 'Q1 Infrastructure Maintenance Protocol', date: 'March 22, 2026', author: 'City Engineer' },
         { id: 'DIR-2026-003', title: 'Updated Safety Standards for Field Personnel', date: 'March 15, 2026', author: 'Safety Office' },
@@ -157,342 +117,331 @@ export default function GovLanding() {
         { title: 'Civil Engineering Code (v2.4)', type: 'Document', size: '12.4 MB', icon: BookOpen },
         { title: 'Procurement (RA 9184) Handbook', type: 'Legal Reference', size: '4.2 MB', icon: ShieldCheck },
         { title: 'LGU Standard Operating Procedures', type: 'Flowchart', size: '1.8 MB', icon: Activity },
-        { title: 'Caloocan North High-Res Utility Map', type: 'Geospatial Data', size: '88 MB', icon: Map },
+        { title: 'Caloocan Utility Map', type: 'Geospatial Data', size: '88 MB', icon: Map },
     ];
 
     return (
-        <div className="relative min-h-screen w-full bg-slate-50 dark:bg-[#020617] overflow-hidden font-sans text-slate-800 dark:text-slate-200 transition-colors duration-700">
-            {/* Pro Dynamic Background System */}
-            <div className="absolute inset-0 z-0 pointer-events-auto">
-                {/* Light Scene Layer */}
-                <div className={`absolute inset-0 transition-opacity duration-1000 ${currentScene === LIGHT_SCENE ? 'opacity-100 z-10 scale-[0.85] lg:scale-100 origin-center' : 'opacity-0 z-0'}`}>
-                    <ErrorBoundary fallback={<div className="w-full h-full bg-slate-100 dark:bg-slate-900" />}>
-                        <Spline scene={LIGHT_SCENE} />
-                    </ErrorBoundary>
-                </div>
-                {/* Dark Scene Layer */}
-                <div className={`absolute inset-0 transition-opacity duration-1000 ${currentScene === DARK_SCENE ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
-                    <ErrorBoundary fallback={<div className="w-full h-full bg-slate-100 dark:bg-slate-900" />}>
-                        <Spline scene={DARK_SCENE} />
-                    </ErrorBoundary>
-                </div>
-                
-                {/* Refined adaptive Overlay gradients */}
-                <div className="absolute inset-0 bg-gradient-to-r from-white/60 via-transparent to-transparent dark:from-[#020617]/80 dark:via-transparent dark:to-transparent pointer-events-none z-20" />
-                <div className="absolute inset-0 bg-gradient-to-t from-white/40 via-transparent to-transparent dark:from-[#020617]/40 dark:via-transparent dark:to-transparent pointer-events-none z-20" />
-            </div>
+        <div className="relative min-h-screen w-full bg-[#fffbf9] dark:bg-[#0b0f19] overflow-hidden font-sans text-[#2c1d11] dark:text-white transition-colors duration-300 flex flex-col justify-between">
+
+            {/* Ambient Soft Glow Accents */}
+            <div className="hidden sm:block absolute top-1/4 left-10 w-96 h-96 bg-[#ff6b00]/10 dark:bg-[#ff6b00]/15 rounded-full blur-3xl pointer-events-none" />
+            <div className="hidden sm:block absolute bottom-10 right-1/4 w-80 h-80 bg-[#ffefe5]/70 dark:bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="hidden sm:block absolute top-1/2 right-0 w-96 h-96 bg-[#ff6b00]/5 dark:bg-[#ff6b00]/10 rounded-full blur-3xl pointer-events-none" />
 
             {/* Navigation Header */}
-            <nav className="absolute top-0 left-0 w-full p-8 flex justify-between items-center z-50">
-                <div className="flex items-center gap-3">
-                    <Branding size="h-10" showText={false} />
-                    <div>
-                        <span className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white">PULSO</span>
-                        <span className="ml-2 px-2 py-0.5 bg-slate-900/5 dark:bg-white/10 backdrop-blur-md rounded text-[10px] font-bold tracking-widest text-orange-600 dark:text-orange-400 uppercase border border-slate-900/5 dark:border-white/10">Gov Portal</span>
+            <nav className="relative w-full p-4 sm:p-6 lg:p-8 flex justify-between items-center z-50 max-w-7xl mx-auto">
+                <div className="flex items-center gap-3 sm:gap-4">
+                    <button
+                        onClick={() => navigate('/')}
+                        className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-[#f3e9e2] dark:border-slate-800 shadow-sm text-[#736254] dark:text-slate-300 hover:text-[#ff6b00] hover:border-[#ff6b00]/40 transition-all"
+                        title="Back to Home"
+                    >
+                        <Home size={15} />
+                    </button>
+                    <div className="flex items-center gap-2.5 sm:gap-3">
+                        <Branding size="h-8 sm:h-10" showText={false} />
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl sm:text-2xl font-black tracking-tighter text-[#2c1d11] dark:text-white">PULSO</span>
+                            <span className="px-2 sm:px-2.5 py-0.5 bg-[#ffefe5] dark:bg-[#ff6b00]/10 rounded-full text-[9px] sm:text-[10px] font-bold tracking-widest text-[#ff6b00] uppercase border border-[#f3e9e2] dark:border-[#ff6b00]/20">
+                                Gov Portal
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6">
-                    <div className="hidden md:flex items-center gap-6 text-sm font-medium pr-6 border-r border-slate-200 dark:border-white/10">
-                        <button 
-                            onClick={() => navigate('/')} 
-                            className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-orange-600 transition-colors font-semibold"
-                        >
-                            <Home size={15} /> Home
-                        </button>
-                        <button 
+                <div className="flex items-center gap-3 sm:gap-5">
+                    <div className="hidden md:flex items-center gap-5 text-xs font-bold pr-5 border-r border-[#f3e9e2] dark:border-slate-800">
+                        <button
                             onClick={() => setActiveModal('directives')}
-                            className="text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors"
+                            className="text-[#736254] dark:text-slate-300 hover:text-[#ff6b00] transition-colors uppercase tracking-wider"
                         >
                             Directives
                         </button>
-                        <button 
+                        <button
                             onClick={() => setActiveModal('resources')}
-                            className="text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors"
+                            className="text-[#736254] dark:text-slate-300 hover:text-[#ff6b00] transition-colors uppercase tracking-wider"
                         >
                             Resources
                         </button>
                     </div>
-
-                    {/* Pro Theme Switcher */}
-                    <div className="flex bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-full p-1 border border-slate-200 dark:border-white/10 shadow-sm">
-                        <button 
-                            onClick={() => changeTheme('light')} 
-                            className={`p-2 rounded-full transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                        >
-                            <Sun size={14} />
-                        </button>
-                        <button 
-                            onClick={() => changeTheme('system')} 
-                            className={`p-2 rounded-full transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                        >
-                            <Monitor size={14} />
-                        </button>
-                        <button 
-                            onClick={() => changeTheme('dark')} 
-                            className={`p-2 rounded-full transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                        >
-                            <Moon size={14} />
-                        </button>
-                    </div>
+                    <ThemeToggle />
                 </div>
             </nav>
 
             {/* Main Content Grid */}
-            <main className="relative z-10 grid lg:grid-cols-2 min-h-screen items-center px-12 lg:px-32">
-                {/* Text Content */}
-                <div className="pt-20 lg:pt-0 max-w-xl">
-                    <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.8 }}
-                    >
-                        <div className="flex items-center gap-2 mb-6 text-orange-600 dark:text-orange-500">
-                            <Activity size={18} />
-                            <span className="text-sm font-bold tracking-[0.3em] uppercase">Unified Command Center</span>
-                        </div>
-                        <h1 className="text-5xl lg:text-8xl font-black text-slate-900 dark:text-white leading-[0.9] mb-8 tracking-tighter">
-                            THE PULSE OF <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-l dark:bg-gradient-to-r from-orange-500 to-orange-600">INFRASTRUCTURE</span>
-                        </h1>
-                        <p className="text-base lg:text-xl text-slate-600 dark:text-slate-400 leading-relaxed mb-10 max-w-md font-medium">
-                            Official engineering management and public service operations platform for LGU personnel. Authorized access only.
-                        </p>
-                    </motion.div>
-                </div>
+            <main className="relative z-20 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-12 py-4 sm:py-8 flex-1 flex items-center">
+                <div className="grid lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-16 items-center w-full">
 
-                {/* Login Gateway Panel */}
-                <div className="flex justify-center lg:justify-end py-20 lg:py-0">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
-                        className="w-full max-w-md"
-                    >
-                        <div className="relative group">
-                            {/* Decorative glow background */}
-                            <div className="absolute -inset-1 bg-gradient-to-r from-orange-600/20 to-blue-600/20 rounded-[2.5rem] blur-2xl opacity-30 dark:opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
-                            
-                            <div className="relative bg-white/20 dark:bg-slate-900/40 backdrop-blur-md border border-white/30 dark:border-white/5 rounded-[2.5rem] p-8 lg:p-12 shadow-2xl overflow-hidden min-h-[500px] flex flex-col justify-center">
-                                <AnimatePresence mode="wait">
-                                    {view === 'login' ? (
-                                        <motion.div
-                                            key="login-form"
-                                            initial={{ opacity: 0, x: 20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: -20 }}
-                                            transition={{ duration: 0.3 }}
-                                        >
-                                            <div className="mb-10 text-center">
-                                                <div className="w-20 h-20 bg-orange-100 dark:bg-white/5 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 border border-orange-200 dark:border-white/10 shadow-inner">
-                                                    <Lock className="text-orange-600 dark:text-orange-500" size={40} />
-                                                </div>
-                                                <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Internal Gateway</h2>
-                                                <p className="text-slate-600 dark:text-slate-500 text-sm font-medium">Verify credentials for command center access</p>
-                                            </div>
-
-                                            {error && (
-                                                <motion.div 
-                                                    initial={{ opacity: 0, y: -10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold flex items-center gap-3 shadow-lg"
-                                                >
-                                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                                                    {error}
-                                                </motion.div>
-                                            )}
-
-                                            <form onSubmit={handleLogin} className="space-y-6">
-                                                <div className="space-y-2">
-                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Personnel ID / Email</label>
-                                                    <div className="relative group/input">
-                                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within/input:text-orange-500 transition-colors">
-                                                            <User size={18} />
-                                                        </div>
-                                                        <input
-                                                            type="text"
-                                                            value={email}
-                                                            onChange={(e) => setEmail(e.target.value)}
-                                                            className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white/5 block pl-12 p-4 transition-all shadow-inner"
-                                                            placeholder="ID-000000"
-                                                            required
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                    <div className="flex justify-between items-center px-1">
-                                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Access Key</label>
-                                                        <button 
-                                                            type="button" 
-                                                            onClick={() => setView('forgot')}
-                                                            className="text-[10px] font-bold text-orange-600 hover:text-orange-500 transition-colors uppercase tracking-widest"
-                                                        >
-                                                            Forgot Password?
-                                                        </button>
-                                                    </div>
-                                                    <div className="relative group/input">
-                                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within/input:text-orange-500 transition-colors">
-                                                            <Shield size={18} />
-                                                        </div>
-                                                        <input
-                                                            type={showPassword ? "text" : "password"}
-                                                            value={password}
-                                                            onChange={(e) => setPassword(e.target.value)}
-                                                            className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white/5 block pl-12 pr-12 p-4 transition-all shadow-inner"
-                                                            placeholder="••••••••"
-                                                            required
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowPassword(!showPassword)}
-                                                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-orange-500 transition-colors"
-                                                        >
-                                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                
-                                                <AnimatePresence>
-                                                    {email && password && (
-                                                        <motion.div 
-                                                            initial={{ opacity: 0, height: 0 }}
-                                                            animate={{ opacity: 1, height: 'auto' }}
-                                                            exit={{ opacity: 0, height: 0 }}
-                                                            className="flex justify-center w-full mb-4 overflow-hidden"
-                                                        >
-                                                            <div className="relative z-10 scale-95 origin-center py-2">
-                                                                <ReCAPTCHA
-                                                                    ref={recaptchaRef}
-                                                                    sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                                                                    onChange={(token) => setCaptchaToken(token)}
-                                                                    theme={theme === 'dark' ? 'dark' : 'light'}
-                                                                />
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-
-                                                <button
-                                                    type="submit"
-                                                    disabled={loading}
-                                                    className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white p-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-orange-600/20 flex items-center justify-center gap-3 group disabled:opacity-50"
-                                                >
-                                                    {loading ? (
-                                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                    ) : (
-                                                        <>
-                                                            Initialize Session
-                                                            <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </form>
-                                        </motion.div>
-                                    ) : (
-                                        <motion.div
-                                            key="forgot-form"
-                                            initial={{ opacity: 0, x: -20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: 20 }}
-                                            transition={{ duration: 0.3 }}
-                                        >
-                                            {recoverySent ? (
-                                                <div className="text-center py-6">
-                                                    <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                                                        <CheckCircle className="text-emerald-500" size={40} />
-                                                    </div>
-                                                    <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">Recovery Sent</h2>
-                                                    <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-10">
-                                                        An administrative recovery protocol has been initiated for <span className="text-orange-600 font-bold">{recoveryEmail}</span>. Please check your official inbox.
-                                                    </p>
-                                                    <button 
-                                                        onClick={() => { setView('login'); setRecoverySent(false); }}
-                                                        className="flex items-center gap-2 mx-auto text-orange-600 font-bold uppercase tracking-widest text-[10px] hover:text-orange-500 transition-colors"
-                                                    >
-                                                        <ArrowLeft size={16} /> Return to Login
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <div className="mb-10 text-center">
-                                                        <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 border border-slate-200 dark:border-white/10 shadow-inner">
-                                                            <Mail className="text-orange-600 dark:text-orange-500" size={40} />
-                                                        </div>
-                                                        <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Recover Key</h2>
-                                                        <p className="text-slate-600 dark:text-slate-500 text-sm font-medium">Enter your ID to initiate recovery protocol</p>
-                                                    </div>
-
-                                                    <form onSubmit={handleRecovery} className="space-y-6">
-                                                        <div className="space-y-2">
-                                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Personnel Email</label>
-                                                            <div className="relative group/input">
-                                                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within/input:text-orange-500 transition-colors">
-                                                                    <Mail size={18} />
-                                                                </div>
-                                                                <input
-                                                                    type="email"
-                                                                    value={recoveryEmail}
-                                                                    onChange={(e) => setRecoveryEmail(e.target.value)}
-                                                                    className="w-full bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white/5 block pl-12 p-4 transition-all shadow-inner"
-                                                                    placeholder="official@pulso.system"
-                                                                    required
-                                                                />
-                                                            </div>
-                                                        </div>
-
-                                                        <button
-                                                            type="submit"
-                                                            disabled={loading}
-                                                            className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl flex items-center justify-center gap-3 group disabled:opacity-50"
-                                                        >
-                                                            {loading ? (
-                                                                <div className="w-5 h-5 border-2 border-slate-400 border-t-slate-800 rounded-full animate-spin" />
-                                                            ) : (
-                                                                <>
-                                                                    Send Recovery Link
-                                                                    <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                                                                </>
-                                                            )}
-                                                        </button>
-
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => setView('login')}
-                                                            className="flex items-center gap-2 mx-auto text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-slate-900 dark:hover:text-white transition-colors"
-                                                        >
-                                                            Cancel Protocol
-                                                        </button>
-                                                    </form>
-                                                </>
-                                            )}
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                    {/* Left Column: Info Panel */}
+                    <div className="lg:col-span-7 space-y-6 sm:space-y-8 text-center lg:text-left">
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+                            <div className="inline-flex items-center gap-2 mb-3 sm:mb-4 bg-[#ffefe5] dark:bg-[#ff6b00]/10 text-[#ff6b00] px-3.5 sm:px-4 py-1.5 rounded-full border border-[#f3e9e2] dark:border-[#ff6b00]/20 text-[10px] sm:text-xs font-bold tracking-widest uppercase">
+                                <Activity size={15} />
+                                <span>Unified Command Center • Caloocan City</span>
                             </div>
-                        </div>
-                    </motion.div>
+
+                            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-[#2c1d11] dark:text-white uppercase leading-[1.08] mb-3 sm:mb-4 tracking-tight">
+                                THE PULSE OF <br className="hidden sm:inline" />
+                                <span className="text-[#ff6b00]">INFRASTRUCTURE</span>
+                            </h1>
+
+                            <p className="text-xs sm:text-base text-[#736254] dark:text-slate-300 leading-relaxed font-medium max-w-xl mx-auto lg:mx-0">
+                                Official engineering management and public service operations platform for LGU personnel. Authorized access only.
+                            </p>
+                        </motion.div>
+
+                        {/* Feature Cards */}
+                        <motion.div
+                            className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-left"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6, delay: 0.2 }}
+                        >
+                            <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-md border border-[#f3e9e2] dark:border-slate-800 p-4 rounded-2xl shadow-sm">
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-2.5 sm:mb-3">
+                                    <ShieldCheck size={20} />
+                                </div>
+                                <h3 className="font-bold text-xs text-[#2c1d11] dark:text-white uppercase tracking-wide mb-1">Secure Access</h3>
+                                <p className="text-[11px] text-[#736254] dark:text-slate-400 font-medium leading-normal">
+                                    Encrypted government access under Data Privacy Act (RA 10173).
+                                </p>
+                            </div>
+
+                            <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-md border border-[#f3e9e2] dark:border-slate-800 p-4 rounded-2xl shadow-sm">
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-2.5 sm:mb-3">
+                                    <Activity size={20} />
+                                </div>
+                                <h3 className="font-bold text-xs text-[#2c1d11] dark:text-white uppercase tracking-wide mb-1">Live Dispatch</h3>
+                                <p className="text-[11px] text-[#736254] dark:text-slate-400 font-medium leading-normal">
+                                    Direct work order integration with LGU engineering crews.
+                                </p>
+                            </div>
+
+                            <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-md border border-[#f3e9e2] dark:border-slate-800 p-4 rounded-2xl shadow-sm">
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-2.5 sm:mb-3">
+                                    <Users size={20} />
+                                </div>
+                                <h3 className="font-bold text-xs text-[#2c1d11] dark:text-white uppercase tracking-wide mb-1">Personnel Hub</h3>
+                                <p className="text-[11px] text-[#736254] dark:text-slate-400 font-medium leading-normal">
+                                    Manage field teams, track assignments, and monitor progress.
+                                </p>
+                            </div>
+                        </motion.div>
+                    </div>
+
+                    {/* Right Column: Login Card */}
+                    <div className="lg:col-span-5 flex justify-center lg:justify-end">
+                        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="w-full max-w-md">
+                            <div className="relative group">
+                                {/* Card Glow */}
+                                <div className="absolute -inset-1 bg-gradient-to-r from-[#ff6b00]/25 to-[#cc5200]/25 rounded-[2rem] sm:rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-75 transition-opacity" />
+
+                                <div className="relative bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-[#f3e9e2] dark:border-slate-800 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl overflow-hidden min-h-[440px] sm:min-h-[480px] flex flex-col justify-center">
+                                    <AnimatePresence mode="wait">
+                                        {view === 'login' ? (
+                                            <motion.div
+                                                key="login-form"
+                                                initial={{ opacity: 0, x: 20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: -20 }}
+                                                transition={{ duration: 0.3 }}
+                                            >
+                                                {/* Header */}
+                                                <div className="mb-6 sm:mb-8 text-center">
+                                                    <div className="w-14 h-14 sm:w-16 sm:h-16 bg-[#ffefe5] dark:bg-[#ff6b00]/15 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 border border-[#f3e9e2] dark:border-[#ff6b00]/20 shadow-sm">
+                                                        <Lock className="text-[#ff6b00]" size={28} />
+                                                    </div>
+                                                    <h2 className="text-xl sm:text-2xl font-black text-[#2c1d11] dark:text-white mb-1 tracking-tight">Internal Gateway</h2>
+                                                    <p className="text-[#736254] dark:text-slate-400 text-xs font-medium">Verify credentials for command center access</p>
+                                                </div>
+
+                                                {error && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: -10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        className="mb-5 p-3.5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold flex items-center gap-3"
+                                                    >
+                                                        <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shrink-0" />
+                                                        {error}
+                                                    </motion.div>
+                                                )}
+
+                                                <form onSubmit={handleLogin} className="space-y-5" autoComplete="off">
+                                                    <div className="space-y-1.5">
+                                                        <label className="block text-[10px] font-black text-[#736254] dark:text-slate-400 uppercase tracking-widest ml-1">Personnel ID / Email</label>
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#736254] dark:text-slate-400">
+                                                                <User size={16} />
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={email}
+                                                                onChange={(e) => setEmail(e.target.value)}
+                                                                autoComplete="off"
+                                                                className="w-full bg-[#fffbf9] dark:bg-slate-800/60 border border-[#f3e9e2] dark:border-slate-700 text-[#2c1d11] dark:text-white placeholder-[#b8a99a] dark:placeholder-slate-500 text-sm rounded-xl focus:outline-none focus:border-[#ff6b00]/50 focus:ring-2 focus:ring-[#ff6b00]/10 pl-11 p-3.5 transition-all"
+                                                                placeholder="ID-000000 or email"
+                                                                required
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex justify-between items-center px-1">
+                                                            <label className="block text-[10px] font-black text-[#736254] dark:text-slate-400 uppercase tracking-widest">Access Key</label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setView('forgot')}
+                                                                className="text-[10px] font-bold text-[#ff6b00] hover:text-[#e65c00] transition-colors uppercase tracking-widest"
+                                                            >
+                                                                Forgot Password?
+                                                            </button>
+                                                        </div>
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#736254] dark:text-slate-400">
+                                                                <Shield size={16} />
+                                                            </div>
+                                                            <input
+                                                                type={showPassword ? "text" : "password"}
+                                                                value={password}
+                                                                onChange={(e) => setPassword(e.target.value)}
+                                                                autoComplete="new-password"
+                                                                className="w-full bg-[#fffbf9] dark:bg-slate-800/60 border border-[#f3e9e2] dark:border-slate-700 text-[#2c1d11] dark:text-white placeholder-[#b8a99a] dark:placeholder-slate-500 text-sm rounded-xl focus:outline-none focus:border-[#ff6b00]/50 focus:ring-2 focus:ring-[#ff6b00]/10 pl-11 pr-11 p-3.5 transition-all"
+                                                                placeholder="••••••••"
+                                                                required
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowPassword(!showPassword)}
+                                                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#736254] dark:text-slate-400 hover:text-[#ff6b00] transition-colors"
+                                                            >
+                                                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <AnimatePresence>
+                                                        {email && password && (
+                                                            <motion.div
+                                                                initial={{ opacity: 0, height: 0 }}
+                                                                animate={{ opacity: 1, height: 'auto' }}
+                                                                exit={{ opacity: 0, height: 0 }}
+                                                                className="flex justify-center w-full overflow-hidden"
+                                                            >
+                                                                <div className="relative z-10 scale-95 origin-center py-2">
+                                                                    <ReCAPTCHA
+                                                                        ref={recaptchaRef}
+                                                                        sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                                        onChange={(token) => setCaptchaToken(token)}
+                                                                    />
+                                                                </div>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+
+                                                    <button
+                                                        type="submit"
+                                                        disabled={loading}
+                                                        className="w-full bg-[#ff6b00] hover:bg-[#e65c00] text-white p-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-[#ff6b00]/20 hover:shadow-[#ff6b00]/30 hover:-translate-y-0.5 flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        {loading ? (
+                                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                Initialize Session
+                                                                <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </form>
+                                            </motion.div>
+                                        ) : (
+                                            <motion.div
+                                                key="forgot-form"
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: 20 }}
+                                                transition={{ duration: 0.3 }}
+                                            >
+                                                {recoverySent ? (
+                                                    <div className="text-center py-6">
+                                                        <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-emerald-200 dark:border-emerald-500/20">
+                                                            <CheckCircle className="text-emerald-500" size={32} />
+                                                        </div>
+                                                        <h2 className="text-xl font-black text-[#2c1d11] dark:text-white mb-3 tracking-tight">Recovery Sent</h2>
+                                                        <p className="text-[#736254] dark:text-slate-400 text-xs font-medium mb-8 leading-relaxed">
+                                                            An administrative recovery protocol has been initiated for <span className="text-[#ff6b00] font-bold">{recoveryEmail}</span>. Please check your official inbox.
+                                                        </p>
+                                                        <button
+                                                            onClick={() => { setView('login'); setRecoverySent(false); }}
+                                                            className="flex items-center gap-2 mx-auto text-[#ff6b00] font-bold uppercase tracking-widest text-[10px] hover:text-[#e65c00] transition-colors"
+                                                        >
+                                                            <ArrowLeft size={14} /> Return to Login
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="mb-6 text-center">
+                                                            <div className="w-14 h-14 bg-[#ffefe5] dark:bg-[#ff6b00]/15 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[#f3e9e2] dark:border-[#ff6b00]/20">
+                                                                <Mail className="text-[#ff6b00]" size={26} />
+                                                            </div>
+                                                            <h2 className="text-xl font-black text-[#2c1d11] dark:text-white mb-1 tracking-tight">Recover Key</h2>
+                                                            <p className="text-[#736254] dark:text-slate-400 text-xs font-medium">Enter your email to initiate recovery</p>
+                                                        </div>
+
+                                                        <form onSubmit={handleRecovery} className="space-y-5" autoComplete="off">
+                                                            <div className="space-y-1.5">
+                                                                <label className="block text-[10px] font-black text-[#736254] dark:text-slate-400 uppercase tracking-widest ml-1">Personnel Email</label>
+                                                                <div className="relative">
+                                                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#736254] dark:text-slate-400">
+                                                                        <Mail size={16} />
+                                                                    </div>
+                                                                    <input
+                                                                        type="email"
+                                                                        value={recoveryEmail}
+                                                                        onChange={(e) => setRecoveryEmail(e.target.value)}
+                                                                        autoComplete="off"
+                                                                        className="w-full bg-[#fffbf9] dark:bg-slate-800/60 border border-[#f3e9e2] dark:border-slate-700 text-[#2c1d11] dark:text-white placeholder-[#b8a99a] dark:placeholder-slate-500 text-sm rounded-xl focus:outline-none focus:border-[#ff6b00]/50 focus:ring-2 focus:ring-[#ff6b00]/10 pl-11 p-3.5 transition-all"
+                                                                        placeholder="official@pulso.system"
+                                                                        required
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            <button
+                                                                type="submit"
+                                                                disabled={loading}
+                                                                className="w-full bg-[#ff6b00] hover:bg-[#e65c00] text-white p-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3 group disabled:opacity-50"
+                                                            >
+                                                                {loading ? (
+                                                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                                ) : (
+                                                                    <>Send Recovery Link <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" /></>
+                                                                )}
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setView('login')}
+                                                                className="flex items-center gap-2 mx-auto text-[#736254] dark:text-slate-400 font-bold uppercase tracking-widest text-[10px] hover:text-[#ff6b00] transition-colors"
+                                                            >
+                                                                <ArrowLeft size={12} /> Cancel
+                                                            </button>
+                                                        </form>
+                                                    </>
+                                                )}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
                 </div>
             </main>
 
-            {/* Bottom Marquee / Info Bar */}
-            <div className="absolute bottom-0 left-0 w-full bg-white/60 dark:bg-[#020617]/70 backdrop-blur-md border-t border-slate-200 dark:border-white/5 py-4 px-8 flex flex-col md:flex-row justify-between items-center gap-4 z-50 transition-colors">
-                <div className="flex items-center gap-6 overflow-hidden max-w-4xl">
-                    <span className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-[0.2em] whitespace-nowrap">Notice:</span>
-                    <div className="text-[10px] font-bold text-slate-500 dark:text-slate-600 uppercase tracking-[0.3em] whitespace-nowrap animate-marquee">
-                        ALL SYSTEM ACTIVITIES ARE LOGGED AND MONITORED UNDER PHILIPPINE RA 10175 PROTOCOLS • UNAUTHORIZED ACCESS IS STRICTLY PROHIBITED • GOVERNMENT OF THE PHILIPPINES PROPRIETARY SYSTEM • INTERNAL USE ONLY
-                    </div>
-                </div>
-                <div className="flex items-center gap-6 text-[10px] font-black text-slate-400 dark:text-slate-500 tracking-[0.2em]">
-                    <span>CALOOCAN NORTH DISTRICT • PHILIPPINES</span>
-                    <div className="h-3 w-[1px] bg-slate-200 dark:bg-white/10" />
-                    <span className="text-orange-600/50 dark:text-orange-500/50">v4.2.1-E</span>
-                </div>
-            </div>
 
-            {/* ───────────────────────────────────────────────────────────────────────────── */}
-            {/* PORTAL MODALS (Directives / Resources) */}
-            {/* ───────────────────────────────────────────────────────────────────────────── */}
+
+            {/* PORTAL MODALS */}
             <AnimatePresence>
                 {activeModal && (
                     <motion.div
@@ -507,39 +456,37 @@ export default function GovLanding() {
                             animate={{ scale: 1, y: 0, opacity: 1 }}
                             exit={{ scale: 0.9, y: 20, opacity: 0 }}
                             onClick={e => e.stopPropagation()}
-                            className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden shadow-orange-500/10"
+                            className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[2.5rem] border border-[#f3e9e2] dark:border-slate-800 shadow-2xl overflow-hidden"
                         >
-                            {/* Modal Header */}
-                            <div className="px-10 py-8 border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
+                            <div className="px-8 py-6 border-b border-[#f3e9e2] dark:border-slate-800 flex items-center justify-between">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-                                        {activeModal === 'directives' ? <FileCheck className="text-white" size={24} /> : <BookOpen className="text-white" size={24} />}
+                                    <div className="w-11 h-11 bg-[#ff6b00] rounded-2xl flex items-center justify-center shadow-lg shadow-[#ff6b00]/20">
+                                        {activeModal === 'directives' ? <FileCheck className="text-white" size={22} /> : <BookOpen className="text-white" size={22} />}
                                     </div>
                                     <div>
-                                        <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight capitalize">{activeModal}</h3>
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Engineering Official Repository</p>
+                                        <h3 className="text-xl font-black text-[#2c1d11] dark:text-white tracking-tight capitalize">{activeModal}</h3>
+                                        <p className="text-[10px] font-bold text-[#736254] dark:text-slate-400 uppercase tracking-widest">Engineering Official Repository</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setActiveModal(null)} className="p-3 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                                    <ChevronRight className="rotate-90 md:rotate-0" />
+                                <button onClick={() => setActiveModal(null)} className="p-2.5 hover:bg-[#ffefe5] dark:hover:bg-slate-800 rounded-full transition-colors text-[#736254] dark:text-slate-400">
+                                    <ChevronRight className="rotate-90" size={18} />
                                 </button>
                             </div>
 
-                            {/* Modal Content */}
-                            <div className="p-10 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                            <div className="p-8 max-h-[60vh] overflow-y-auto">
                                 {activeModal === 'directives' ? (
-                                    <div className="space-y-4">
+                                    <div className="space-y-3">
                                         {DIRECTIVES.map(dir => (
-                                            <div key={dir.id} className="group p-6 rounded-2xl border border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] hover:bg-orange-500/5 hover:border-orange-500/30 transition-all flex items-center justify-between">
-                                                <div className="flex items-center gap-6">
-                                                    <div className="font-mono text-[10px] font-black p-2 bg-slate-900 text-white rounded cursor-default shrink-0">{dir.id}</div>
+                                            <div key={dir.id} className="group p-5 rounded-2xl border border-[#f3e9e2] dark:border-slate-800 bg-[#fffbf9] dark:bg-slate-800/40 hover:border-[#ff6b00]/30 transition-all flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="font-mono text-[10px] font-black p-1.5 bg-[#2c1d11] dark:bg-slate-700 text-white rounded shrink-0">{dir.id}</div>
                                                     <div>
-                                                        <h4 className="font-bold text-slate-900 dark:text-white group-hover:text-orange-600 transition-colors">{dir.title}</h4>
-                                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">{dir.author} • {dir.date}</p>
+                                                        <h4 className="font-bold text-sm text-[#2c1d11] dark:text-white group-hover:text-[#ff6b00] transition-colors">{dir.title}</h4>
+                                                        <p className="text-[10px] text-[#736254] dark:text-slate-400 font-bold uppercase tracking-widest mt-0.5">{dir.author} • {dir.date}</p>
                                                     </div>
                                                 </div>
-                                                <button className="flex items-center gap-2 text-[10px] font-black text-orange-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    View PDF <ExternalLink size={14} />
+                                                <button className="flex items-center gap-1.5 text-[10px] font-black text-[#ff6b00] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                    View <ExternalLink size={12} />
                                                 </button>
                                             </div>
                                         ))}
@@ -547,18 +494,18 @@ export default function GovLanding() {
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {RESOURCES.map((res, i) => (
-                                            <div key={i} className="group p-6 rounded-2xl border border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] hover:bg-blue-500/5 hover:border-blue-500/30 transition-all">
-                                                <div className="flex items-center gap-4 mb-4">
-                                                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500">
-                                                        <res.icon size={20} />
+                                            <div key={i} className="group p-5 rounded-2xl border border-[#f3e9e2] dark:border-slate-800 bg-[#fffbf9] dark:bg-slate-800/40 hover:border-[#ff6b00]/30 transition-all">
+                                                <div className="flex items-center gap-3 mb-3">
+                                                    <div className="w-9 h-9 bg-[#ffefe5] dark:bg-[#ff6b00]/15 rounded-xl flex items-center justify-center text-[#ff6b00]">
+                                                        <res.icon size={18} />
                                                     </div>
-                                                    <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{res.type}</div>
+                                                    <div className="text-[10px] font-black text-[#ff6b00] uppercase tracking-widest">{res.type}</div>
                                                 </div>
-                                                <h4 className="font-bold text-slate-900 dark:text-white leading-tight mb-4 group-hover:text-blue-600 transition-colors">{res.title}</h4>
-                                                <div className="flex items-center justify-between mt-auto">
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{res.size}</span>
-                                                    <button className="p-2 bg-slate-100 dark:bg-white/5 rounded-lg text-slate-500 hover:text-blue-600 transition-colors">
-                                                        <ExternalLink size={14} />
+                                                <h4 className="font-bold text-sm text-[#2c1d11] dark:text-white leading-tight mb-3 group-hover:text-[#ff6b00] transition-colors">{res.title}</h4>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold text-[#736254] dark:text-slate-400 uppercase">{res.size}</span>
+                                                    <button className="p-1.5 bg-[#ffefe5] dark:bg-slate-700 rounded-lg text-[#ff6b00] dark:text-slate-300 hover:text-[#e65c00] transition-colors">
+                                                        <ExternalLink size={13} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -567,9 +514,8 @@ export default function GovLanding() {
                                 )}
                             </div>
 
-                            {/* Modal Footer */}
-                            <div className="p-8 bg-slate-50 dark:bg-white/5 border-t border-slate-200 dark:border-white/10 text-center">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+                            <div className="px-8 py-5 bg-[#fffbf9] dark:bg-slate-800/40 border-t border-[#f3e9e2] dark:border-slate-800 text-center">
+                                <p className="text-[10px] font-bold text-[#736254] dark:text-slate-400 uppercase tracking-[0.2em]">
                                     Confidential Administrative System • Authorized Use Only
                                 </p>
                             </div>

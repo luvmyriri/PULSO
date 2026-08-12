@@ -4,7 +4,7 @@
  * Implements the full division + position hierarchy of the City Engineering Office.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     AlertTriangle, LayoutDashboard, ClipboardCheck, Landmark,
@@ -47,18 +47,28 @@ const NavItem = ({ icon: Icon, label, to, tab, activeTab, onTabChange, badge, in
         ? location.pathname === to || location.pathname.startsWith(to + '/')
         : activeTab === tab;
 
-    const baseClass = `w-full flex items-center justify-between px-3 py-2 rounded-lg font-bold transition-all group text-sm ${indent ? 'pl-8' : ''}`;
-    const activeClass = 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400';
-    const inactiveClass = 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white';
+    // Premium, fully rounded pill items instead of flat left borders
+    const baseClass = `w-full flex items-center justify-between px-3.5 py-2 rounded-lg font-medium transition-all duration-200 group ${
+        indent ? 'text-[13px] pl-4 text-neutral-muted/90' : 'text-sm'
+    }`;
+    const activeClass = 'bg-primary-light text-primary font-semibold shadow-sm shadow-primary/5';
+    const inactiveClass = 'text-neutral-muted hover:bg-primary-light/30 hover:text-neutral-text';
 
     const content = (
         <>
             <span className="flex items-center gap-3">
-                <Icon size={16} className="shrink-0" />
+                <Icon 
+                    size={indent ? 15 : 16} 
+                    className={`shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                        isActive ? 'text-primary' : 'text-neutral-muted group-hover:text-neutral-text'
+                    }`} 
+                />
                 <span className="truncate">{label}</span>
             </span>
             {badge !== undefined && badge !== null && (
-                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 min-w-[18px] text-center">{badge}</span>
+                <span className="bg-secondary/15 text-secondary-dark text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 min-w-[20px] text-center transition-all duration-200 group-hover:scale-105">
+                    {badge}
+                </span>
             )}
         </>
     );
@@ -117,22 +127,22 @@ const NavSection = ({ title, icon: Icon, children, defaultOpen = false, color = 
     };
 
     return (
-        <div className="mb-1">
+        <div className="mb-0.5">
             <button
                 onClick={handleToggle}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all hover:bg-slate-50 dark:hover:bg-slate-800/50 group`}
+                className="w-full flex items-center justify-between px-3.5 py-2 rounded-lg transition-all duration-200 hover:bg-primary-light/30 group text-sm font-medium text-neutral-muted hover:text-neutral-text"
             >
-                <span className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest text-${color}-500`}>
-                    <Icon size={13} />
-                    {title}
+                <span className="flex items-center gap-3">
+                    <Icon size={16} className="text-neutral-muted group-hover:text-neutral-text transition-colors duration-200" />
+                    <span className="truncate">{title}</span>
                 </span>
                 {open
-                    ? <ChevronDown size={13} className="text-slate-400" />
-                    : <ChevronRight size={13} className="text-slate-400" />
+                    ? <ChevronDown size={14} className="text-neutral-muted/70 group-hover:text-neutral-text transition-transform" />
+                    : <ChevronRight size={14} className="text-neutral-muted/70 group-hover:text-neutral-text transition-transform" />
                 }
             </button>
             {open && (
-                <div className="mt-0.5 space-y-0.5 pb-1 border-l-2 border-slate-100 dark:border-slate-800 ml-3 pl-1">
+                <div className="mt-0.5 space-y-0.5 pb-1 border-l border-neutral-border/40 ml-5 pl-2">
                     {children}
                 </div>
             )}
@@ -146,6 +156,26 @@ const NavSection = ({ title, icon: Icon, children, defaultOpen = false, color = 
 const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
     const navigate = useNavigate();
     const role = currentUser?.role || 'dispatcher';
+    const scrollContainerRef = useRef(null);
+
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        // Restore scroll position
+        const savedScrollPos = sessionStorage.getItem('govSidebarScrollPos');
+        if (savedScrollPos) {
+            container.scrollTop = parseInt(savedScrollPos, 10);
+        }
+
+        // Save scroll position on scroll
+        const handleScroll = () => {
+            sessionStorage.setItem('govSidebarScrollPos', container.scrollTop.toString());
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const handleSignOut = () => {
         const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
@@ -197,19 +227,19 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
     const bg = avatarBg[role] || 'from-slate-500 to-slate-700';
 
     return (
-        <div className="w-64 bg-white dark:bg-slate-900 flex flex-col shrink-0 z-50 relative h-screen">
+        <div className="w-64 bg-white border-r border-neutral-border flex flex-col shrink-0 z-50 relative h-screen">
             {/* Logo */}
-            <div className="h-20 flex items-center px-4 relative shrink-0 border-b border-slate-100 dark:border-slate-800">
+            <div className="h-20 flex items-center px-5 relative shrink-0 border-b border-neutral-border/50">
                 <Link to="/" className="flex items-center">
                     <Branding size="h-9" />
                 </Link>
             </div>
 
             {/* Navigation */}
-            <div className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5 custom-scrollbar">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5 custom-scrollbar bg-white">
 
                 {/* ── OPERATIONS ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-1">Operations</div>
+                <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-1.5">Operations</div>
                 <NavItem icon={LayoutDashboard} label="My Dashboard" to="/gov/my-dashboard" />
                 {/* Command Center only for dispatcher / admin clerk + senior roles */}
                 {hasRole(role, ['admin_clerk', 'dispatcher', 'admin_officer', ...SENIOR_ROLES]) && (
@@ -222,13 +252,13 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
                 {/* ── ANALYTICS INTELLIGENCE (admin + exec only) ── */}
                 {hasRole(role, ['system_admin', 'city_engineer', 'asst_city_engineer']) && (
                     <>
-                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Intelligence</div>
+                        <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">Intelligence</div>
                         <NavItem icon={Brain} label="Analytics Command Center" to="/gov/analytics" />
                     </>
                 )}
 
                 {/* ── WORK & TRIAGE ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Triage & Work Orders</div>
+                <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">Triage & Work Orders</div>
                 {hasRole(role, SENIOR_ROLES) && (
                     <NavItem icon={ClipboardCheck} label="W.O. Approvals" tab="approvals" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
                 )}
@@ -240,7 +270,7 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
                 )}
 
                 {/* ── DIVISIONS ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Divisions</div>
+                <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">Divisions</div>
 
                 {/* Administrative Division */}
                 {hasRole(role, ['admin_officer','admin_clerk','records_officer','system_admin','manager','city_engineer','asst_city_engineer']) && (
@@ -298,20 +328,20 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
                 {/* ── BROADCAST & COMMS ── */}
                 {hasRole(role, SENIOR_ROLES) && (
                     <>
-                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">Communications</div>
+                        <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">Communications</div>
                         <NavItem icon={Megaphone} label="Post Advisory" tab="advisories" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
                     </>
                 )}
 
                 {/* ── SYSTEM ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-3">System</div>
+                <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">System</div>
                 {hasRole(role, ADMIN_ONLY) && (
                     <NavItem icon={UserCog} label="Role Management" to="/gov/users" />
                 )}
                 <NavItem icon={Settings} label="Settings" to="/gov/settings" />
                 <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg font-bold text-sm transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 mt-1"
+                    className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg font-medium text-sm transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 mt-1"
                 >
                     <LogOut size={16} />
                     Sign Out
@@ -319,16 +349,16 @@ const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
             </div>
 
             {/* User Card */}
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
+            <div className="p-4 border-t border-neutral-border/50 bg-neutral-bg/30 shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${bg} flex items-center justify-center font-black text-white text-sm shadow shrink-0`}>
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center font-bold text-white text-sm shadow-sm shrink-0 border border-white/20">
                         {currentUser?.full_name?.charAt(0)?.toUpperCase() || 'G'}
                     </div>
-                    <div className="min-w-0">
-                        <div className="font-black text-slate-900 dark:text-white text-sm leading-tight truncate">
+                    <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-neutral-text text-sm leading-tight truncate">
                             {currentUser?.full_name || 'LGU Staff'}
                         </div>
-                        <div className="text-[10px] text-indigo-500 font-bold truncate">
+                        <div className="text-[11px] text-neutral-muted font-medium truncate mt-0.5">
                             {roleLabels[role] || role}
                         </div>
                     </div>

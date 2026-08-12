@@ -216,8 +216,12 @@ async def verify_residency(
     
     result = await ocr_service.perform_ocr(front_bytes, back_bytes)
     
+    # Return early if OCR failed entirely
+    if not result.get("success"):
+        return result
+        
     # STRICT VALIDATION: If the AI or heuristic detected a mismatch, block the scan
-    extracted = result.get("extracted_data", {})
+    extracted = result.get("extracted_data") or {}
     if extracted.get("is_document_mismatch"):
         reason = extracted.get("mismatch_reason", "ID verification failed: Document mismatch detected.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
