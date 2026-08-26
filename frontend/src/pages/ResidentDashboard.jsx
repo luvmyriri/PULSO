@@ -2252,24 +2252,24 @@ const ResidentModals = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+                className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto"
                 onClick={() => setActiveModal(null)}
             >
                 <motion.div
                     initial={{ scale: 0.96, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.96, opacity: 0 }}
-                    className={`pointer-events-auto transition-colors ${
+                    className={`pointer-events-auto transition-colors w-full ${
                         activeModal === 'map'
-                            ? 'w-full max-w-7xl h-[90vh] flex flex-col my-8 bg-white dark:bg-slate-900 backdrop-blur-xl rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden'
+                            ? 'max-w-7xl h-[88dvh] sm:h-[90vh] flex flex-col my-auto bg-white dark:bg-slate-900 backdrop-blur-xl rounded-2xl sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden'
                             : activeModal === 'file-report'
-                                ? 'bg-white dark:bg-slate-900 rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[92vh]'
-                                : 'w-full max-w-xl flex flex-col my-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden'
+                                ? 'bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 max-w-4xl max-h-[94dvh] sm:max-h-[92vh] my-auto'
+                                : 'max-w-xl flex flex-col my-auto bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90dvh]'
                     }`}
                     onClick={e => e.stopPropagation()}
                 >
                     {activeModal === 'file-report' && (
-                        <div className="flex flex-col h-full p-4 sm:p-6 overflow-hidden">
+                        <div className="flex flex-col h-full p-3.5 sm:p-6 overflow-hidden">
                             {/* Modal Header */}
                             <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0">
                                 <div className="flex items-center gap-3">
@@ -2717,27 +2717,27 @@ const ResidentModals = ({
                         </div>
                     )}
                     {activeModal === 'services' && (
-                        <div className="p-8">
-                            <div className="flex justify-between items-center mb-8">
+                        <div className="p-4 sm:p-6 md:p-8 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                            <div className="flex justify-between items-center mb-6">
                                 <div>
-                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white">LGU Services</h3>
-                                    <p className="text-slate-500 font-medium">Official Digital Portal Services</p>
+                                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">LGU Services</h3>
+                                    <p className="text-xs sm:text-sm text-slate-500 font-medium">Official Digital Portal Services</p>
                                 </div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={24} /></button>
+                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                                 {LGU_SERVICES_LIST(t).map(service => (
                                     <button
                                         key={service.id}
                                         onClick={() => window.open(service.url, '_blank')}
-                                        className="flex items-start gap-4 p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-orange-500/30 hover:bg-white dark:hover:bg-slate-800 transition-all text-left group"
+                                        className="flex items-start gap-3 sm:gap-4 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-orange-500/30 hover:bg-white dark:hover:bg-slate-800 transition-all text-left group"
                                     >
-                                        <div className={`w-12 h-12 rounded-2xl bg-${service.color}-500/10 text-${service.color}-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+                                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-${service.color}-500/10 text-${service.color}-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
                                             {service.icon}
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-slate-900 dark:text-white mb-1">{service.name}</h4>
-                                            <p className="text-xs text-slate-500 leading-relaxed font-medium">{service.desc}</p>
+                                            <h4 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white mb-1">{service.name}</h4>
+                                            <p className="text-xs text-slate-500 leading-relaxed font-medium line-clamp-2">{service.desc}</p>
                                             <span className="text-[10px] font-black uppercase text-orange-500 mt-2 inline-block tracking-widest group-hover:translate-x-1 transition-transform">Apply Now →</span>
                                         </div>
                                     </button>
@@ -2746,30 +2746,30 @@ const ResidentModals = ({
                         </div>
                     )}
                     {activeModal === 'knowledge' && (
-                        <div className="p-8">
-                            <div className="flex justify-between items-center mb-8">
+                        <div className="p-4 sm:p-6 md:p-8 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                            <div className="flex justify-between items-center mb-6">
                                 <div>
-                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white">Knowledge Base</h3>
-                                    <p className="text-slate-500 font-medium">Guides, Tips & Information Hub</p>
+                                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">Knowledge Base</h3>
+                                    <p className="text-xs sm:text-sm text-slate-500 font-medium">Guides, Tips & Information Hub</p>
                                 </div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={24} /></button>
+                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
                             </div>
-                            <div className="space-y-4">
+                            <div className="space-y-3 sm:space-y-4">
                                 {KNOWLEDGE_BASE_ARTICLES(t).map(article => (
-                                    <button key={article.id} className="w-full p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-orange-500/30 hover:bg-white dark:hover:bg-slate-800 transition-all text-left flex flex-col items-start gap-1">
+                                    <button key={article.id} className="w-full p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-orange-500/30 hover:bg-white dark:hover:bg-slate-800 transition-all text-left flex flex-col items-start gap-1">
                                         <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">{article.category}</span>
-                                        <h4 className="font-bold text-lg text-slate-900 dark:text-white">{article.title}</h4>
-                                        <p className="text-sm text-slate-500 font-medium">{article.excerpt}</p>
+                                        <h4 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">{article.title}</h4>
+                                        <p className="text-xs sm:text-sm text-slate-500 font-medium">{article.excerpt}</p>
                                         <div className="mt-2 h-0 w-0 group-hover:w-full border-b border-orange-500 transition-all"></div>
                                     </button>
                                 ))}
                             </div>
-                            <div className="mt-8 p-4 bg-orange-500 text-white rounded-3xl flex items-center justify-between">
+                            <div className="mt-6 p-4 bg-orange-500 text-white rounded-2xl sm:rounded-3xl flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center"><Info size={20} /></div>
-                                    <div><p className="text-sm font-bold">Need more help?</p><p className="text-[10px] opacity-80">Message our AI Assistant available 24/7.</p></div>
+                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><Info size={18} /></div>
+                                    <div><p className="text-xs sm:text-sm font-bold">Need more help?</p><p className="text-[10px] opacity-80">Message our AI Assistant available 24/7.</p></div>
                                 </div>
-                                <button className="px-5 py-2 bg-white text-orange-500 rounded-2xl font-black text-xs uppercase shadow-lg">Chat Support</button>
+                                <button onClick={() => { setActiveModal(null); setIsAIChatOpen(true); }} className="px-4 py-2 bg-white text-orange-500 rounded-xl sm:rounded-2xl font-black text-xs uppercase shadow-lg shrink-0 cursor-pointer">Chat Support</button>
                             </div>
                         </div>
                     )}
@@ -2779,18 +2779,18 @@ const ResidentModals = ({
                         const hotlineList = EMERGENCY_HOTLINES(t);
                         const hotline = hotlineList.find(h => h.name === hotlineName) || hotlineList[0];
                         return (
-                            <div className="p-12 flex flex-col items-center justify-center min-h-[400px] text-center relative overflow-hidden">
+                            <div className="p-6 sm:p-10 md:p-12 flex flex-col items-center justify-center min-h-[360px] text-center relative overflow-hidden">
                                 {/* Calling HUD Background Animation */}
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <motion.div
                                         animate={{ scale: [1, 1.5], opacity: [0.15, 0] }}
                                         transition={{ repeat: Infinity, duration: 2, ease: "easeOut" }}
-                                        className="w-64 h-64 rounded-full border-4 border-orange-500/20"
+                                        className="w-48 sm:w-64 h-48 sm:h-64 rounded-full border-4 border-orange-500/20"
                                     />
                                     <motion.div
                                         animate={{ scale: [1, 1.8], opacity: [0.1, 0] }}
                                         transition={{ repeat: Infinity, duration: 2.5, ease: "easeOut", delay: 0.5 }}
-                                        className="w-64 h-64 rounded-full border-2 border-orange-500/10"
+                                        className="w-48 sm:w-64 h-48 sm:h-64 rounded-full border-2 border-orange-500/10"
                                     />
                                 </div>
 
@@ -2798,23 +2798,23 @@ const ResidentModals = ({
                                     initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
                                     className="relative z-10"
                                 >
-                                    <div className="w-24 h-24 rounded-full bg-orange-500 flex items-center justify-center text-white mb-8 mx-auto shadow-[0_0_40px_rgba(249,115,22,0.4)] animate-pulse">
-                                        <PhoneCall size={42} strokeWidth={2.5} />
+                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-orange-500 flex items-center justify-center text-white mb-6 sm:mb-8 mx-auto shadow-[0_0_40px_rgba(249,115,22,0.4)] animate-pulse">
+                                        <PhoneCall size={36} strokeWidth={2.5} />
                                     </div>
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-orange-500/80 mb-2">Connecting to Secure Line</h3>
-                                    <h2 className="text-3xl font-black text-white mb-1">{hotline?.name || 'Emergency Line'}</h2>
-                                    <p className="text-xl font-mono font-bold text-slate-400 tracking-tighter mb-10">{hotline?.num || '---'}</p>
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.4em] text-orange-500/80 mb-2">Connecting to Secure Line</h3>
+                                    <h2 className="text-2xl sm:text-3xl font-black text-white mb-1">{hotline?.name || 'Emergency Line'}</h2>
+                                    <p className="text-lg sm:text-xl font-mono font-bold text-slate-400 tracking-tight mb-8 sm:mb-10">{hotline?.num || '---'}</p>
 
-                                    <div className="flex items-center gap-6 mb-12">
+                                    <div className="flex items-center gap-6 mb-8 sm:mb-12 justify-center">
                                         <div className="flex flex-col items-center gap-2">
-                                            <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
-                                                <MicOff size={20} />
+                                            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
+                                                <MicOff size={18} />
                                             </div>
                                             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Mute</span>
                                         </div>
                                         <div className="flex flex-col items-center gap-2">
-                                            <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
-                                                <Volume2 size={20} />
+                                            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
+                                                <Volume2 size={18} />
                                             </div>
                                             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Speaker</span>
                                         </div>
@@ -2822,33 +2822,34 @@ const ResidentModals = ({
 
                                     <button
                                         onClick={() => setActiveModal(null)}
-                                        className="w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-[0_15px_30px_rgba(220,38,38,0.3)] active:scale-90 transition-all group"
+                                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-[0_15px_30px_rgba(220,38,38,0.3)] active:scale-90 transition-all mx-auto cursor-pointer"
+                                        aria-label="End Call"
                                     >
-                                        <X size={32} strokeWidth={3} className="rotate-45" />
+                                        <X size={28} strokeWidth={3} className="rotate-45" />
                                     </button>
-                                    <p className="text-[10px] font-black text-red-500/80 uppercase tracking-widest mt-4">End Call</p>
+                                    <p className="text-[10px] font-black text-red-500/80 uppercase tracking-widest mt-3">End Call</p>
                                 </motion.div>
                             </div>
                         );
                     })()}
 
                     {activeModal === 'privacy' && (
-                        <div className="p-8">
-                            <div className="flex justify-between items-center mb-6">
-                                <div><h3 className="text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.privacy', { defaultValue: 'Privacy Policy' })}</h3><p className="text-slate-500 font-medium text-xs">PULSO Data Protection standards</p></div>
+                        <div className="p-5 sm:p-8">
+                            <div className="flex justify-between items-center mb-5">
+                                <div><h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.privacy', { defaultValue: 'Privacy Policy' })}</h3><p className="text-slate-500 font-medium text-xs">PULSO Data Protection standards</p></div>
                                 <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
                             </div>
-                            <div className="space-y-6 text-sm text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-4">
+                            <div className="space-y-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-2 sm:pr-4">
                                 <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 underline decoration-orange-500/30 underline-offset-4">{t('dashboard.privacy.s1_title', { defaultValue: '1. Information Collection' })}</h4>
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-orange-500/30 underline-offset-4">{t('dashboard.privacy.s1_title', { defaultValue: '1. Information Collection' })}</h4>
                                     <p>{t('dashboard.privacy.s1_desc', { defaultValue: 'PULSO collects data relevant to infrastructure reporting, including precise GPS coordinates, photographic evidence, and resident account details for verification purposes.' })}</p>
                                 </section>
                                 <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 underline decoration-orange-500/30 underline-offset-4">2. Digital Stewardship</h4>
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-orange-500/30 underline-offset-4">2. Digital Stewardship</h4>
                                     <p>Your data is stored in encrypted government-grade servers. We do not sell or share citizen data with 3rd party advertising entities.</p>
                                 </section>
                                 <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 underline decoration-orange-500/30 underline-offset-4">3. AI Analysis Disclosure</h4>
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-orange-500/30 underline-offset-4">3. AI Analysis Disclosure</h4>
                                     <p>Triage automation uses Gemini AI to analyze report photos. No resident facial biometric data is stored or used for surveillance.</p>
                                 </section>
                             </div>
@@ -2856,22 +2857,22 @@ const ResidentModals = ({
                     )}
 
                     {activeModal === 'terms' && (
-                        <div className="p-8">
-                            <div className="flex justify-between items-center mb-6">
-                                <div><h3 className="text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.terms', { defaultValue: 'Terms of Service' })}</h3><p className="text-slate-500 font-medium text-xs">Resident User agreement for reporting</p></div>
+                        <div className="p-5 sm:p-8">
+                            <div className="flex justify-between items-center mb-5">
+                                <div><h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.terms', { defaultValue: 'Terms of Service' })}</h3><p className="text-slate-500 font-medium text-xs">Resident User agreement for reporting</p></div>
                                 <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
                             </div>
-                            <div className="space-y-6 text-sm text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-4">
+                            <div className="space-y-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-2 sm:pr-4">
                                 <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 underline decoration-blue-500/30 underline-offset-4">{t('dashboard.terms.s1_title', { defaultValue: '1. Integrity Clause' })}</h4>
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-blue-500/30 underline-offset-4">{t('dashboard.terms.s1_title', { defaultValue: '1. Integrity Clause' })}</h4>
                                     <p>{t('dashboard.terms.s1_desc', { defaultValue: 'Residents are accountable for the accuracy of their reports. Fraudulent reporting will result in immediate Trust Score reduction and possible service restrictions.' })}</p>
                                 </section>
                                 <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 underline decoration-blue-500/30 underline-offset-4">2. Citizen Conduct</h4>
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-blue-500/30 underline-offset-4">2. Citizen Conduct</h4>
                                     <p>Harassment, abusive language, or uploading unrelated media to the engineering portal is strictly prohibited.</p>
                                 </section>
                                 <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-2 underline decoration-blue-500/30 underline-offset-4">3. Jurisdiction</h4>
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-blue-500/30 underline-offset-4">3. Jurisdiction</h4>
                                     <p>PULSO North Caloocan applies only to incidents within the city boundary as defined by the LGU mapping department.</p>
                                 </section>
                             </div>
@@ -2879,31 +2880,31 @@ const ResidentModals = ({
                     )}
                     {activeModal === 'post-details' && selectedPost && (
                         <div className="flex flex-col h-full max-h-[85vh]">
-                            <div className="p-8 pb-4 shrink-0 border-b border-slate-100 dark:border-slate-800">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-100 dark:border-orange-500/20 shrink-0">
-                                            <Bell size={24} />
+                            <div className="p-5 sm:p-8 pb-4 shrink-0 border-b border-slate-100 dark:border-slate-800">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-100 dark:border-orange-500/20 shrink-0">
+                                            <Bell size={20} />
                                         </div>
-                                        <div>
-                                            <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight pr-4">{selectedPost.department}</h3>
-                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mt-1">{new Date(selectedPost.created_at).toLocaleDateString()} • Ref: {selectedPost.advisory_id}</p>
+                                        <div className="min-w-0">
+                                            <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white leading-tight truncate">{selectedPost.department}</h3>
+                                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">{new Date(selectedPost.created_at).toLocaleDateString()} • Ref: {selectedPost.advisory_id}</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors shrink-0"><X size={24} /></button>
+                                    <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors shrink-0"><X size={20} /></button>
                                 </div>
                             </div>
-                            <div className="p-8 overflow-y-auto custom-scrollbar space-y-6">
+                            <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-6">
                                 <div>
-                                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">{selectedPost.title}</h2>
-                                    <p className="text-[15px] leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{selectedPost.description}</p>
+                                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-3">{selectedPost.title}</h2>
+                                    <p className="text-sm sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{selectedPost.description}</p>
                                 </div>
                                 {selectedPost.has_image && selectedPost.image_url && (
-                                    <div className="mt-6 rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
+                                    <div className="mt-4 sm:mt-6 rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
                                         <img src={`http://localhost:33159${selectedPost.image_url}`} alt="Advisory Content" className="w-full object-cover" />
                                     </div>
                                 )}
-                                <div className="flex items-center gap-2 mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+                                <div className="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
                                     <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${selectedPost.priority?.toLowerCase() === 'high' ? 'bg-rose-50 text-rose-500 dark:bg-rose-500/10' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>Priority: {selectedPost.priority}</span>
                                     <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-500 dark:bg-blue-500/10">Category: {selectedPost.category}</span>
                                 </div>
@@ -2912,13 +2913,13 @@ const ResidentModals = ({
                     )}
 
                     {activeModal === 'cookies' && (
-                        <div className="p-8">
-                            <div className="flex justify-between items-center mb-6">
-                                <div><h3 className="text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.cookie', { defaultValue: 'Cookie Policy' })}</h3><p className="text-slate-500 font-medium text-xs">How we manage your portal session</p></div>
+                        <div className="p-5 sm:p-8">
+                            <div className="flex justify-between items-center mb-5">
+                                <div><h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.cookie', { defaultValue: 'Cookie Policy' })}</h3><p className="text-slate-500 font-medium text-xs">How we manage your portal session</p></div>
                                 <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
                             </div>
-                            <div className="space-y-6 text-[13px] text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-4">
-                                <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl mb-4">
+                            <div className="space-y-4 text-xs sm:text-[13px] text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-2 sm:pr-4">
+                                <div className="p-3.5 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl mb-4">
                                     <p className="font-bold text-blue-700 dark:text-blue-400">PULSO uses essential local storage to keep you securely signed in and maintain your theme preferences across sessions.</p>
                                 </div>
                                 <ul className="list-disc pl-5 space-y-2">
@@ -3392,19 +3393,19 @@ const TopNavigation = ({
     );
 
     return (
-        <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 w-full relative border-b border-slate-200/80 dark:border-slate-800 transition-colors">
-            <div className="max-w-[1600px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
+        <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 w-full border-b border-slate-200/80 dark:border-slate-800 transition-colors">
+            <div className="max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
 
                 {/* Left Area: Logo & Search */}
-                <div className="flex items-center gap-4 w-1/3 md:w-1/4 min-w-[180px] relative" ref={searchRef}>
+                <div className="flex items-center gap-2 sm:gap-4 shrink-0 relative" ref={searchRef}>
                     <a href="/dashboard" className="flex items-center gap-2 group focus:outline-none shrink-0" onClick={(e) => { e.preventDefault(); handleSetTab('overview'); }}>
-                        <Branding size="h-9" showText={false} />
-                        <span className="font-extrabold text-2xl tracking-tight text-orange-500 hidden xl:block">PULSO</span>
+                        <Branding size="h-8 sm:h-9" showText={false} />
+                        <span className="font-extrabold text-xl sm:text-2xl tracking-tight text-orange-500 hidden min-[400px]:inline-block">PULSO</span>
                     </a>
 
                     {/* Desktop Search Bar */}
-                    <div className="hidden md:flex bg-slate-100 dark:bg-slate-800 rounded-full items-center px-3.5 py-2 border border-transparent focus-within:border-orange-500 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all w-full max-w-[280px] lg:max-w-[320px] relative shadow-sm">
-                        <Search size={16} className="text-slate-400 shrink-0" />
+                    <div className="hidden md:flex bg-slate-100 dark:bg-slate-800 rounded-full items-center px-3.5 py-1.5 sm:py-2 border border-transparent focus-within:border-orange-500 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all w-full max-w-[240px] lg:max-w-[320px] relative shadow-xs">
+                        <Search size={15} className="text-slate-400 shrink-0" />
                         <input
                             type="text"
                             value={searchQuery}
@@ -3414,7 +3415,7 @@ const TopNavigation = ({
                                 if (e.key === 'Escape') setIsSearchOpen(false);
                             }}
                             placeholder={t('dashboard.topNav.searchPlaceholder', { defaultValue: 'Search PULSO...' })}
-                            className="bg-transparent border-none outline-none text-sm ml-2 w-full text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-medium"
+                            className="bg-transparent border-none outline-none text-xs sm:text-sm ml-2 w-full text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-medium"
                         />
                         {searchQuery && (
                             <button
@@ -3433,7 +3434,7 @@ const TopNavigation = ({
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: 8, scale: 0.98 }}
                                     transition={{ duration: 0.15 }}
-                                    className="absolute top-12 left-0 w-[380px] lg:w-[440px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 text-slate-900 dark:text-white overflow-hidden ring-1 ring-black/5"
+                                    className="absolute top-12 left-0 w-[340px] lg:w-[440px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 text-slate-900 dark:text-white overflow-hidden ring-1 ring-black/5"
                                 >
                                     {renderSearchDropdown()}
                                 </motion.div>
@@ -3444,20 +3445,21 @@ const TopNavigation = ({
                     {/* Mobile Search Trigger Icon */}
                     <button
                         onClick={() => setIsMobileSearchOpen(true)}
-                        className="md:hidden w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="md:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                         title="Search"
+                        aria-label="Open Search"
                     >
-                        <Search size={17} />
+                        <Search size={16} />
                     </button>
                 </div>
 
-                {/* Center Navigation Tabs */}
-                <nav className="flex items-center justify-center gap-1 sm:gap-2 md:gap-4 lg:gap-8 h-full flex-1 max-w-[600px]">
+                {/* Center Navigation Tabs (Visible on Desktop / Tablet md+) */}
+                <nav className="hidden md:flex items-center justify-center gap-1 lg:gap-4 h-full flex-1 max-w-[540px]">
                     {navItems.map(item => (
                         <button
                             key={item.id}
                             onClick={() => handleSetTab(item.id)}
-                            className={`relative h-full px-2 sm:px-4 lg:px-8 flex flex-col items-center justify-center transition-colors group focus:outline-none 
+                            className={`relative h-full px-3 lg:px-6 flex flex-col items-center justify-center transition-colors group focus:outline-none 
                                 ${activeTab === item.id
                                     ? 'text-orange-500'
                                     : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'
@@ -3465,10 +3467,11 @@ const TopNavigation = ({
                         >
                             <div className="relative">
                                 {React.cloneElement(item.icon, {
+                                    size: 22,
                                     className: `transition-transform duration-200 ${activeTab === item.id ? 'stroke-[2.5px]' : 'group-hover:scale-110'}`
                                 })}
                             </div>
-                            <span className="text-[10px] sm:text-xs font-semibold mt-0.5 hidden sm:block whitespace-nowrap truncate max-w-[80px] md:max-w-[120px] lg:max-w-[150px] px-1">{item.label}</span>
+                            <span className="text-[11px] font-semibold mt-0.5 whitespace-nowrap truncate max-w-[100px] lg:max-w-[140px] px-1">{item.label}</span>
 
                             {/* Active Tab Indicator */}
                             {activeTab === item.id && (
@@ -3479,23 +3482,33 @@ const TopNavigation = ({
                 </nav>
 
                 {/* Right Area: Profile, Theme, Notifications */}
-                <div className="flex items-center justify-end gap-2 sm:gap-3 w-1/3 md:w-1/4 min-w-[180px]">
+                <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
 
                     {/* Theme Toggle menu item */}
-                    <div className="hidden lg:flex bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700/50 mr-2">
-                        <button onClick={() => changeTheme('light')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="Light"><Sun size={15} /></button>
-                        <button onClick={() => changeTheme('system')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="System"><Monitor size={15} /></button>
-                        <button onClick={() => changeTheme('dark')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="Dark"><Moon size={15} /></button>
+                    <div className="hidden lg:flex bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700/50">
+                        <button onClick={() => changeTheme('light')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-xs text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="Light"><Sun size={14} /></button>
+                        <button onClick={() => changeTheme('system')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-xs text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="System"><Monitor size={14} /></button>
+                        <button onClick={() => changeTheme('dark')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-xs text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="Dark"><Moon size={14} /></button>
                     </div>
+
+                    {/* Mobile Quick Theme Switcher */}
+                    <button
+                        onClick={() => changeTheme(theme === 'dark' ? 'light' : 'dark')}
+                        className="lg:hidden w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none"
+                        title={`Toggle ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+                    >
+                        {theme === 'dark' ? <Sun size={16} className="text-orange-400" /> : <Moon size={16} />}
+                    </button>
 
                     <div className="relative">
                         <button
-                            className="relative w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none"
+                            className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none"
                             onClick={() => setShowNotifications(!showNotifications)}
+                            aria-label="Notifications"
                         >
-                            <Bell size={19} />
+                            <Bell size={17} />
                             {notifications.length > 0 && notifications.some(n => !n.is_read && !n.is_hidden) && (
-                                <span className="absolute top-[8px] right-[10px] w-2 h-2 bg-red-500 rounded-full ring-2 ring-slate-100 dark:ring-slate-800"></span>
+                                <span className="absolute top-[6px] right-[8px] w-2 h-2 bg-red-500 rounded-full ring-2 ring-slate-100 dark:ring-slate-800"></span>
                             )}
                         </button>
 
@@ -3503,23 +3516,23 @@ const TopNavigation = ({
                             {showNotifications && (
                                 <motion.div
                                     initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className="absolute top-12 right-0 w-[320px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 z-50 text-slate-900 dark:text-white"
+                                    className="fixed sm:absolute top-14 sm:top-12 right-2 sm:right-0 w-[calc(100vw-1rem)] sm:w-[320px] max-w-[360px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 z-50 text-slate-900 dark:text-white"
                                 >
                                     <div className="flex justify-between items-center mb-3 px-1">
-                                        <h3 className="font-bold text-lg">Notifications</h3>
-                                        <div className="flex items-center gap-4">
+                                        <h3 className="font-bold text-base sm:text-lg">Notifications</h3>
+                                        <div className="flex items-center gap-3">
                                             <button
                                                 onClick={handleMarkAllRead}
                                                 className="text-orange-500 text-xs font-bold hover:underline shrink-0"
                                             >
-                                                Mark all as read
+                                                Mark all read
                                             </button>
-                                            <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                                                <X size={18} />
+                                            <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1">
+                                                <X size={16} />
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="space-y-1 max-h-[400px] overflow-y-auto custom-scrollbar">
+                                    <div className="space-y-1 max-h-[350px] overflow-y-auto custom-scrollbar">
                                         {notifications.filter(n => !n.is_hidden).length === 0 ? (
                                             <div className="p-4 text-center text-sm text-slate-500">No new notifications</div>
                                         ) : (
@@ -3527,18 +3540,18 @@ const TopNavigation = ({
                                                 <div key={notification.id} className="relative group block w-full">
                                                     <button 
                                                         onClick={() => handleNotificationClick(notification)}
-                                                        className="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex gap-3 overflow-hidden pr-10"
+                                                        className="w-full text-left p-2.5 sm:p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex gap-2.5 sm:gap-3 overflow-hidden pr-8"
                                                     >
-                                                        <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
-                                                            <FileText size={18} />
+                                                        <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                                                            <FileText size={16} />
                                                         </div>
-                                                        <div>
-                                                            <p className="text-sm font-semibold text-slate-900 dark:text-white pr-2">{notification.title}</p>
-                                                            <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{notification.message}</p>
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white pr-2 truncate">{notification.title}</p>
+                                                            <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-0.5">{notification.message}</p>
                                                             <span className="text-[10px] text-blue-500 font-bold mt-1 block">{new Date(notification.created_at).toLocaleString()}</span>
                                                         </div>
                                                         {!notification.is_read && (
-                                                            <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-4 right-3 group-hover:opacity-0 transition-opacity"></div>
+                                                            <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-3 right-3 group-hover:opacity-0 transition-opacity"></div>
                                                         )}
                                                     </button>
                                                     <button 
@@ -3556,15 +3569,15 @@ const TopNavigation = ({
                                                             }
                                                         }}
                                                         title="Dismiss notification"
-                                                        className="absolute top-3 right-2 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-all z-10"
+                                                        className="absolute top-2.5 right-1.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700 sm:opacity-0 sm:group-hover:opacity-100 transition-all z-10"
                                                     >
-                                                        <X size={14} />
+                                                        <X size={13} />
                                                     </button>
                                                 </div>
                                             ))
                                         )}
                                     </div>
-                                    <button onClick={() => { setShowNotifications(false); handleSetModal('all-notifications'); }} className="w-full text-center text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mt-2 py-2 border-t border-slate-100 dark:border-slate-800">See previous notifications</button>
+                                    <button onClick={() => { setShowNotifications(false); handleSetModal('all-notifications'); }} className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mt-2 py-2 border-t border-slate-100 dark:border-slate-800">See previous notifications</button>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -3572,13 +3585,14 @@ const TopNavigation = ({
 
                     <button
                         onClick={handleLogout}
-                        className="w-10 h-10 ml-1 flex items-center justify-center bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full transition-colors focus:outline-none"
+                        className="hidden sm:flex w-8 h-8 sm:w-9 sm:h-9 items-center justify-center bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full transition-colors focus:outline-none"
                         title="Sign Out"
+                        aria-label="Sign Out"
                     >
-                        <LogOut size={18} />
+                        <LogOut size={16} />
                     </button>
 
-                    <button onClick={() => handleSetTab('profile')} className="w-10 h-10 ml-1 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold flex items-center justify-center text-white shadow-sm shrink-0 hover:opacity-90 transition-opacity focus:outline-none cursor-pointer">
+                    <button onClick={() => handleSetTab('profile')} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold text-xs sm:text-sm flex items-center justify-center text-white shadow-xs shrink-0 hover:opacity-90 transition-opacity focus:outline-none cursor-pointer" aria-label="Profile">
                         {user.avatar}
                     </button>
                 </div>
@@ -4657,32 +4671,16 @@ export default function ResidentDashboard() {
                 setReportStatusFilter={setReportStatusFilter}
             />
 
-            {/* Main Layout Grid (3-Column Facebook Style) */}
+            {/* Main Layout Grid (Responsive 1/2/3-Column Layout) */}
             <main className="flex-1 overflow-hidden w-full flex flex-col relative">
 
-                {/* Mobile Bottom Bar Navigation (Replaces Top Nav on very small screens) */}
-                <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 z-40 flex justify-around items-center p-2 pb-6 pt-3 shadow-xl relative">
-                    {navItems.map((item) => (
-                        <button
-                            key={item.id}
-                            onClick={() => setActiveTab(item.id)}
-                            className={`p-2 flex-1 flex flex-col items-center gap-1 transition-colors ${activeTab === item.id ? 'text-orange-500' : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                        >
-                            {React.cloneElement(item.icon, {
-                                className: `transition-transform ${activeTab === item.id ? 'stroke-[2.5px]' : ''}`,
-                                size: 24
-                            })}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="max-w-[1600px] mx-auto w-full px-0 sm:px-4 h-[calc(100vh-4rem)]">
+                <div className="max-w-[1600px] mx-auto w-full px-0 sm:px-4 h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)]">
 
                     {/* Content switcher based on tabs */}
                     {(activeTab === 'overview' || activeTab === 'home') && (
-                        <div className="w-full h-full flex flex-row items-start justify-center gap-0 lg:gap-6 xl:gap-8">
+                        <div className="w-full h-full flex flex-col md:flex-row items-center md:items-start justify-center gap-0 lg:gap-6 xl:gap-8">
 
-                            {/* Left Column (Shortcuts) - 280px */}
+                            {/* Left Column (Shortcuts) - 280px to 320px on Desktop */}
                             <aside className="w-[280px] lg:w-[300px] xl:w-[320px] shrink-0 hidden md:block h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar">
                                 <LeftSidebar
                                     user={user}
@@ -4692,25 +4690,32 @@ export default function ResidentDashboard() {
                                 />
                             </aside>
 
-                            {/* Mobile Layout Fallback (Shows shortcuts above feed) */}
-                            <div className="md:hidden w-full px-4 pt-4 pb-2 bg-white dark:bg-slate-900 mb-2 shrink-0 relative z-20">
-                                <h3 className="font-bold text-[15px] text-slate-900 dark:text-white mb-3">
-                                    {t('dashboard.overview.shortcuts', { defaultValue: 'Shortcuts' })}
-                                </h3>
-                                <div className="flex overflow-x-auto gap-3 pb-4 snap-x hide-scrollbar -mx-4 px-4">
+                            {/* Mobile Layout Shortcuts Strip (Touch-Optimized Horizontal Carousel) */}
+                            <div className="md:hidden w-full px-3 sm:px-4 pt-3 pb-2.5 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 shrink-0 relative z-20 shadow-xs">
+                                <div className="flex items-center justify-between mb-2 px-1">
+                                    <h3 className="font-extrabold text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                        {t('dashboard.overview.shortcuts', { defaultValue: 'Quick Shortcuts' })}
+                                    </h3>
+                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">Swipe →</span>
+                                </div>
+                                <div className="flex overflow-x-auto gap-2.5 pb-2 snap-x hide-scrollbar -mx-1 px-1">
                                     {quickFunctions.map((func) => (
-                                        <button key={func.id} onClick={func.action} className="min-w-[72px] flex flex-col items-center justify-center snap-center focus:outline-none group">
-                                            <div className={`w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2 text-${func.color}-500 border border-slate-200 dark:border-slate-700 active:scale-95 transition-transform`}>
+                                        <button
+                                            key={func.id}
+                                            onClick={func.action}
+                                            className="min-w-[80px] max-w-[88px] flex flex-col items-center justify-center p-2 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 snap-start active:scale-95 transition-all shadow-2xs hover:border-orange-500/50 group"
+                                        >
+                                            <div className={`w-11 h-11 rounded-xl bg-white dark:bg-slate-700 flex items-center justify-center mb-1 text-${func.color}-500 shadow-2xs border border-slate-100 dark:border-slate-600 group-hover:scale-105 transition-transform`}>
                                                 {func.icon}
                                             </div>
-                                            <span className="font-semibold text-[11px] text-slate-700 dark:text-slate-300 whitespace-nowrap text-center">{func.label}</span>
+                                            <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200 text-center leading-tight line-clamp-2">{func.label}</span>
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
-                            {/* Center Column (Main Feed) - 680px */}
-                            <div className="flex-1 w-full min-w-[350px] lg:min-w-[500px] max-w-[680px] h-full overflow-y-auto custom-scrollbar pb-24 sm:pb-8 pt-0 md:pt-6 px-0 md:px-2">
+                            {/* Center Column (Main Feed) - Responsive width with mobile bottom padding */}
+                            <div className="flex-1 w-full min-w-0 max-w-[680px] h-full overflow-y-auto custom-scrollbar pb-28 md:pb-8 pt-2 md:pt-6 px-3 sm:px-4 md:px-2">
                                 <LguFeed
                                     lguUpdates={lguUpdates}
                                     loadingAdvisories={loadingAdvisories}
@@ -4722,7 +4727,7 @@ export default function ResidentDashboard() {
                                 />
                             </div>
 
-                            {/* Right Column (Widgets) - 320px */}
+                            {/* Right Column (Widgets) - 320px on Desktop */}
                             <aside className="w-[320px] shrink-0 hidden xl:block h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar">
                                 <RightSidebar
                                     user={user}
@@ -4741,9 +4746,9 @@ export default function ResidentDashboard() {
 
                     {/* Full Width Tab Views Container */}
                     {activeTab !== 'overview' && activeTab !== 'home' && (
-                        <div className="w-full h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar flex flex-col items-center pb-24 sm:pb-8 pt-0 sm:pt-6">
+                        <div className="w-full h-full overflow-y-auto custom-scrollbar flex flex-col items-center pb-28 md:pb-8 pt-3 sm:pt-6 px-3 sm:px-6">
                             {activeTab === 'reports' && (
-                                <div className="w-full max-w-5xl px-0 sm:px-6">
+                                <div className="w-full max-w-5xl">
                                     <MyReports
                                         userReports={userReports}
                                         loadingReports={loadingReports}
@@ -4758,7 +4763,7 @@ export default function ResidentDashboard() {
                                 </div>
                             )}
                             {activeTab === 'profile' && (
-                                <div className="w-full max-w-4xl px-0 sm:px-6">
+                                <div className="w-full max-w-4xl">
                                     <ProfileView
                                         user={user}
                                         setUser={setUser}
@@ -4772,7 +4777,7 @@ export default function ResidentDashboard() {
                                 </div>
                             )}
                             {activeTab === 'settings' && (
-                                <div className="w-full max-w-4xl px-0 sm:px-6">
+                                <div className="w-full max-w-4xl">
                                     <SettingsView
                                         user={user}
                                         handleLogout={handleLogout}
@@ -4788,34 +4793,68 @@ export default function ResidentDashboard() {
                 </div>
             </main>
 
+            {/* ── Mobile Bottom Navigation Bar (Ultra-responsive, glassmorphism, touch-optimized) ── */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around">
+                {navItems.map((item) => {
+                    const isActive = activeTab === item.id;
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => handleSetTab(item.id)}
+                            className={`flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all duration-200 relative group active:scale-95 ${
+                                isActive
+                                    ? 'text-orange-500 font-bold'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                            }`}
+                        >
+                            <div className="relative">
+                                {React.cloneElement(item.icon, {
+                                    size: 22,
+                                    className: `transition-transform duration-200 ${isActive ? 'stroke-[2.5px] scale-110' : ''}`
+                                })}
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="mobileNavActivePill"
+                                        className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-orange-500 rounded-full"
+                                    />
+                                )}
+                            </div>
+                            <span className={`text-[10px] mt-0.5 tracking-tight truncate max-w-[64px] ${isActive ? 'font-bold text-orange-500' : 'font-medium'}`}>
+                                {item.label}
+                            </span>
+                        </button>
+                    );
+                })}
+            </nav>
+
             {/* ── PULSO Resident AI Assistant FAB ────────────────────────────── */}
-            <div className="fixed bottom-24 right-6 z-[100] flex flex-col items-end gap-4">
+            <div className="fixed bottom-20 md:bottom-8 right-4 md:right-6 z-[50] flex flex-col items-end gap-4">
                 <AnimatePresence>
                     {isAIChatOpen && (
                         <>
-                            {/* Backdrop for maximized mode */}
-                            {isAIMaximized && (
+                            {/* Backdrop for maximized mode or mobile modal */}
+                            {(isAIMaximized || window.innerWidth < 640) && (
                                 <motion.div
                                     key="resident-ai-backdrop"
                                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99]"
-                                    onClick={() => setIsAIMaximized(false)}
+                                    className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[99]"
+                                    onClick={() => setIsAIChatOpen(false)}
                                 />
                             )}
 
                             <motion.div
                                 key="resident-ai-chat"
-                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                initial={{ opacity: 0, scale: 0.92, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                exit={{ opacity: 0, scale: 0.92, y: 20 }}
                                 transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                                 className={`bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col transition-all duration-300 ${isAIMaximized
-                                        ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[100] rounded-3xl'
-                                        : 'w-[360px] h-[500px] rounded-2xl relative z-[100]'
+                                        ? 'fixed inset-3 sm:inset-8 md:inset-12 z-[100] rounded-3xl'
+                                        : 'fixed inset-x-3 bottom-20 sm:inset-auto sm:bottom-24 sm:right-6 w-auto sm:w-[380px] h-[72vh] sm:h-[520px] max-h-[560px] rounded-2xl z-[100]'
                                     }`}
                             >
                                 {/* Header */}
-                                <div className="p-4 bg-gradient-to-r from-blue-900 to-blue-800 flex justify-between items-center shrink-0">
+                                <div className="p-3.5 sm:p-4 bg-gradient-to-r from-blue-900 to-blue-800 flex justify-between items-center shrink-0">
                                     <div className="flex items-center gap-2">
                                         <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                                             <Brain size={18} className="text-white" />
@@ -4843,9 +4882,9 @@ export default function ResidentDashboard() {
                                     </div>
                                 </div>
 
-                                {/* Suggested quick-actions (shown only when 1 message = greeting) */}
+                                {/* Suggested quick-actions */}
                                 {aiMessages.length === 1 && (
-                                    <div className="px-3 py-2 bg-orange-50 dark:bg-slate-800 border-b border-orange-100 dark:border-slate-700 flex gap-2 flex-wrap shrink-0">
+                                    <div className="px-3 py-2 bg-orange-50 dark:bg-slate-800 border-b border-orange-100 dark:border-slate-700 flex gap-1.5 flex-wrap shrink-0">
                                         {['How to file a report?', 'My report status', 'City hotlines', 'Evacuation routes'].map(q => (
                                             <button
                                                 key={q}
@@ -4859,7 +4898,7 @@ export default function ResidentDashboard() {
                                 )}
 
                                 {/* Messages */}
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+                                <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
                                     {aiMessages.map((msg, i) => (
                                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                             {msg.role === 'assistant' && (
@@ -4867,10 +4906,10 @@ export default function ResidentDashboard() {
                                                     <Brain size={12} className="text-white" />
                                                 </div>
                                             )}
-                                            <div className={`${isAIMaximized ? 'max-w-[65%]' : 'max-w-[82%]'
+                                            <div className={`${isAIMaximized ? 'max-w-[70%]' : 'max-w-[85%]'
                                                 } p-3 rounded-2xl text-[13px] font-medium leading-relaxed ${msg.role === 'user'
-                                                    ? 'bg-blue-700 text-white rounded-br-md'
-                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-md'
+                                                    ? 'bg-blue-700 text-white rounded-br-xs'
+                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-xs'
                                                 }`}>
                                                 {msg.text}
                                             </div>
@@ -4881,7 +4920,7 @@ export default function ResidentDashboard() {
                                             <div className="w-6 h-6 rounded-full bg-blue-800 flex items-center justify-center mr-2 mt-0.5 shrink-0">
                                                 <Brain size={12} className="text-white" />
                                             </div>
-                                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-md flex gap-1">
+                                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-xs flex gap-1">
                                                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
                                                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                                                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
@@ -4892,21 +4931,21 @@ export default function ResidentDashboard() {
                                 </div>
 
                                 {/* Input */}
-                                <form onSubmit={handleResidentAIChat} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shrink-0">
+                                <form onSubmit={handleResidentAIChat} className="p-2.5 sm:p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shrink-0">
                                     <div className="flex gap-2">
                                         <input
                                             type="text"
                                             value={aiQuery}
                                             onChange={e => setAiQuery(e.target.value)}
                                             placeholder="Ask PULSO Assistant..."
-                                            className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 py-2.5 text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-700 outline-none placeholder:text-slate-400"
+                                            className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-3.5 py-2 sm:py-2.5 text-xs sm:text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-700 outline-none placeholder:text-slate-400"
                                         />
                                         <button
                                             type="submit"
                                             disabled={isAILoading}
-                                            className="w-10 h-10 rounded-xl bg-blue-800 hover:bg-blue-700 flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0"
+                                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-800 hover:bg-blue-700 flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0"
                                         >
-                                            <Search size={16} />
+                                            <Search size={15} />
                                         </button>
                                     </div>
                                 </form>
@@ -4920,20 +4959,21 @@ export default function ResidentDashboard() {
                     onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="relative w-14 h-14 rounded-full bg-blue-900 shadow-xl shadow-blue-900/50 flex items-center justify-center text-white"
+                    className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-blue-900 shadow-xl shadow-blue-900/50 flex items-center justify-center text-white cursor-pointer"
                     title="PULSO Assistant"
+                    aria-label="Toggle PULSO Assistant"
                 >
                     <AnimatePresence>
                         {!isAIChatOpen && (
                             <motion.span
                                 key="pulse"
                                 className="absolute inset-0 rounded-full bg-blue-700 opacity-60"
-                                animate={{ scale: [1, 1.5], opacity: [0.7, 0] }}
+                                animate={{ scale: [1, 1.4], opacity: [0.7, 0] }}
                                 transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
                             />
                         )}
                     </AnimatePresence>
-                    {isAIChatOpen ? <X size={22} /> : <Brain size={24} />}
+                    {isAIChatOpen ? <X size={20} /> : <Brain size={22} />}
                 </motion.button>
             </div>
             {/* ── Image Zoom Overlay ── */}
