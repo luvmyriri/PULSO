@@ -1,0 +1,7 @@
+interface:
+  display_name: "PULSO Frontend Design"
+  short_description: "Shape PULSO's resident and government UI"
+  brand_color: "#B9380B"
+  default_prompt: "Use $pulso-frontend-design to shape this PULSO interface, preserve Civic Aperture, and carry approved visual decisions into Figma."
+policy:
+  allow_implicit_invocation: true
