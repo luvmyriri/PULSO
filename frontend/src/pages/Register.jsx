@@ -1242,11 +1242,14 @@ export default function Register() {
                                     </div>
                                 </div>
 
-                                {/* Tips Box Callout */}
-                                <div className="bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 dark:border-amber-500/30 rounded-2xl p-3.5 mb-5 flex gap-3 items-start text-xs text-amber-800 dark:text-amber-300 font-medium">
-                                    <Info size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                                    <div>
-                                        <span className="font-bold">Tips for best results:</span> Lay ID flat under bright lighting. Avoid glare, shadows, or covering text. Ensure all details are clearly legible.
+                                {/* Tips Box Callout - Glassmorphism */}
+                                <div className="bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-xs rounded-2xl p-3.5 mb-5 flex gap-3 items-start text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                    <div className="w-6 h-6 rounded-lg bg-orange-500/10 dark:bg-orange-400/15 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 mt-0.5">
+                                        <Info size={14} />
+                                    </div>
+                                    <div className="leading-relaxed">
+                                        <span className="font-bold text-slate-900 dark:text-white mr-1">Tips for best results:</span>
+                                        <span>Lay ID flat under bright lighting. Avoid glare, shadows, or covering text. Ensure all details are clearly legible.</span>
                                     </div>
                                 </div>
 

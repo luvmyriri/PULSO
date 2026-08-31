@@ -92,10 +92,14 @@ export default function LegalModal({ isOpen, onClose, initialTab = 'privacy' }) 
                     <div className="p-6 sm:p-8 overflow-y-auto space-y-6 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed custom-scrollbar flex-1">
                         {activeTab === 'privacy' ? (
                             <>
-                                <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex items-start gap-3 text-xs text-orange-900 dark:text-orange-300 font-medium">
-                                    <Lock size={16} className="text-[#ff6b00] shrink-0 mt-0.5" />
-                                    <div>
-                                        <span className="font-bold text-[#ff6b00]">Republic Act No. 10173 (Data Privacy Act of 2012):</span> PULSO is committed to safeguarding citizen data. All resident information collected is strictly governed by municipal data protection laws.
+                                {/* Glassmorphism Callout Banner - Neutral & Frosted */}
+                                <div className="bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-xs rounded-2xl p-3.5 flex gap-3 items-start text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                    <div className="w-6 h-6 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0 mt-0.5">
+                                        <Lock size={14} />
+                                    </div>
+                                    <div className="leading-relaxed">
+                                        <span className="font-bold text-slate-900 dark:text-white mr-1">Republic Act No. 10173 (Data Privacy Act of 2012):</span>
+                                        <span>PULSO is committed to safeguarding citizen data. All resident information collected is strictly governed by municipal data protection laws.</span>
                                     </div>
                                 </div>
 
@@ -137,10 +141,14 @@ export default function LegalModal({ isOpen, onClose, initialTab = 'privacy' }) 
                             </>
                         ) : (
                             <>
-                                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-start gap-3 text-xs text-blue-900 dark:text-blue-300 font-medium">
-                                    <Scale size={16} className="text-blue-500 shrink-0 mt-0.5" />
-                                    <div>
-                                        <span className="font-bold text-blue-500">Resident User Agreement:</span> By accessing PULSO, you agree to submit truthful utility hazard reports to assist the City Engineering Department.
+                                {/* Glassmorphism Callout Banner - Neutral & Frosted */}
+                                <div className="bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-xs rounded-2xl p-3.5 flex gap-3 items-start text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                    <div className="w-6 h-6 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0 mt-0.5">
+                                        <Scale size={14} />
+                                    </div>
+                                    <div className="leading-relaxed">
+                                        <span className="font-bold text-slate-900 dark:text-white mr-1">Resident User Agreement:</span>
+                                        <span>By accessing PULSO, you agree to submit truthful utility hazard reports to assist the City Engineering Department.</span>
                                     </div>
                                 </div>
 

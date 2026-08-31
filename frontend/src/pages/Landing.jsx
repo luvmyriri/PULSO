@@ -7,7 +7,8 @@ import {
     Users, CheckCircle2, ClipboardCheck, Camera,
     Bot, Headphones, Wrench, ExternalLink,
     UserCheck, Droplets, Lightbulb, ChevronDown, Building2,
-    Zap, Radio, Sparkles, HelpCircle, PhoneCall, Plus, Minus, ShieldAlert
+    Zap, Radio, Sparkles, HelpCircle, PhoneCall, Plus, Minus, ShieldAlert,
+    Smartphone, QrCode, Download
 } from 'lucide-react';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -27,7 +28,7 @@ function Landing() {
         const handleScroll = () => {
             setScrolled(window.scrollY > 20);
 
-            const sections = ['home', 'features', 'solutions', 'about', 'faq', 'emergency'];
+            const sections = ['home', 'features', 'solutions', 'about', 'mobile', 'faq', 'emergency'];
             const scrollPos = window.scrollY + 200;
 
             for (const sectionId of sections) {
@@ -94,10 +95,7 @@ function Landing() {
                     <div className="flex items-center gap-3 cursor-pointer" onClick={() => scrollToSection('home')}>
                         <Branding size={scrolled ? "h-7 sm:h-8" : "h-8 sm:h-9"} showText={false} />
                         <div className="flex flex-col">
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-[#2c1d11] dark:text-white font-black text-lg sm:text-xl tracking-tight leading-none">PULSO</span>
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#ff6b00] animate-pulse" />
-                            </div>
+                            <span className="text-[#2c1d11] dark:text-white font-black text-lg sm:text-xl tracking-tight leading-none">PULSO</span>
                             <span className="text-[9px] sm:text-[10px] font-extrabold tracking-widest text-[#ff6b00] uppercase mt-0.5">Caloocan City</span>
                         </div>
                     </div>
@@ -109,6 +107,7 @@ function Landing() {
                             { id: 'features', labelKey: 'platform', defaultText: 'Features' },
                             { id: 'solutions', labelKey: 'solutions', defaultText: 'Solutions' },
                             { id: 'about', labelKey: 'about', defaultText: 'About Us' },
+                            { id: 'mobile', labelKey: 'mobile', defaultText: 'Mobile App' },
                             { id: 'faq', labelKey: 'faq', defaultText: 'FAQ' },
                             { id: 'emergency', labelKey: 'emergency', defaultText: 'Hotlines' },
                         ].map((nav) => (
@@ -160,6 +159,7 @@ function Landing() {
                                 { id: 'features', labelKey: 'platform', defaultText: 'Features' },
                                 { id: 'solutions', labelKey: 'solutions', defaultText: 'Solutions' },
                                 { id: 'about', labelKey: 'about', defaultText: 'About Us' },
+                                { id: 'mobile', labelKey: 'mobile', defaultText: 'Mobile App' },
                                 { id: 'faq', labelKey: 'faq', defaultText: 'FAQ' },
                                 { id: 'emergency', labelKey: 'emergency', defaultText: 'Hotlines' },
                             ].map((nav) => (
@@ -189,13 +189,37 @@ function Landing() {
             <motion.section 
                 id="home" 
                 {...sectionTransition}
-                className="relative min-h-screen flex flex-col justify-center items-center pt-20 pb-12 sm:pt-24 sm:pb-16 overflow-hidden bg-[#fffbf9] dark:bg-[#070a12] border-b border-[#f3e9e2] dark:border-slate-800/80"
+                className="relative min-h-screen flex flex-col justify-center items-center pt-24 pb-14 sm:pt-28 sm:pb-20 overflow-hidden bg-[#fffbf9] dark:bg-[#070a12] border-b border-[#f3e9e2] dark:border-slate-800/80"
             >
-                {/* Ambient Radial Mesh Glow Backdrops */}
-                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                    <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[750px] sm:w-[900px] h-[450px] bg-gradient-to-tr from-[#ff6b00]/15 via-[#ff6b00]/10 to-transparent rounded-full blur-[130px]" />
-                    <div className="absolute top-1/3 -right-32 w-[350px] h-[350px] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[100px]" />
-                    <div className="absolute top-1/3 -left-32 w-[350px] h-[350px] bg-[#ff6b00]/10 dark:bg-[#ff6b00]/15 rounded-full blur-[100px]" />
+                {/* Synchronized & Aligned Day/Night City Background Images */}
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none">
+                    {/* Light Mode - Day Caloocan Monument Background */}
+                    <img
+                        src="/hero-light.jpg"
+                        alt="Caloocan City Monument & Fountain Day View"
+                        className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out opacity-100 dark:opacity-0"
+                    />
+
+                    {/* Dark Mode - Night Caloocan Monument Background */}
+                    <img
+                        src="/hero-dark.jpg"
+                        alt="Caloocan City Monument & Fountain Night View"
+                        className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out opacity-0 dark:opacity-100"
+                    />
+
+                    {/* Cinematic Contrast Layers & Scrims */}
+                    {/* Dark Mode Overlays - subtle to let night lights shine */}
+                    <div className="absolute inset-0 hidden dark:block bg-gradient-to-b from-[#070a12]/60 via-[#070a12]/35 to-[#070a12]" />
+                    <div className="absolute inset-0 hidden dark:block [background:radial-gradient(ellipse_at_center,_transparent_25%,_rgba(7,10,18,0.85)_85%)]" />
+
+                    {/* Light Mode Overlays - crystal clear with high background opacity */}
+                    <div className="absolute inset-0 dark:hidden bg-gradient-to-b from-[#fffbf9]/40 via-transparent to-[#fffbf9]/90" />
+                    <div className="absolute inset-0 dark:hidden [background:radial-gradient(ellipse_at_center,_rgba(255,251,249,0.25)_20%,_rgba(255,251,249,0.75)_90%)]" />
+
+                    {/* Subtle Ambient Mesh Glow Blooms */}
+                    <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[750px] sm:w-[900px] h-[450px] bg-gradient-to-tr from-[#ff6b00]/15 via-[#ff6b00]/5 to-transparent rounded-full blur-[140px]" />
+                    <div className="absolute top-1/3 -right-32 w-[350px] h-[350px] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[110px]" />
+                    <div className="absolute top-1/3 -left-32 w-[350px] h-[350px] bg-[#ff6b00]/10 dark:bg-[#ff6b00]/15 rounded-full blur-[110px]" />
                 </div>
 
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full text-center relative z-10">
@@ -208,15 +232,15 @@ function Landing() {
                         {/* Hero Headline */}
                         <motion.h1 
                             variants={fadeUp} 
-                            className="font-display font-black text-3xl sm:text-5xl md:text-6xl lg:text-7xl uppercase tracking-tight text-[#2c1d11] dark:text-white leading-[1.06] mb-5 sm:mb-6"
+                            className="font-display font-black text-3xl sm:text-5xl md:text-6xl lg:text-7xl uppercase tracking-tight text-[#1a1008] dark:text-white leading-[1.06] mb-5 sm:mb-6 drop-shadow-sm dark:drop-shadow-lg"
                         >
-                            SMART UTILITY <span className="bg-gradient-to-r from-[#ff6b00] via-orange-400 to-[#ff8533] bg-clip-text text-transparent">LOCATOR &amp; MAINTENANCE</span> SYSTEM
+                            SMART UTILITY <span className="bg-gradient-to-r from-[#e65100] via-[#f97316] to-[#ea580c] dark:from-[#ff6b00] dark:via-orange-400 dark:to-[#ff8533] bg-clip-text text-transparent">LOCATOR &amp; MAINTENANCE</span> SYSTEM
                         </motion.h1>
 
                         {/* Hero Subtitle */}
                         <motion.p 
                             variants={fadeUp} 
-                            className="text-sm sm:text-base md:text-lg text-[#736254] dark:text-slate-300 font-medium leading-relaxed mb-8 sm:mb-10 max-w-2xl mx-auto px-2"
+                            className="text-sm sm:text-base md:text-lg text-[#2c1d11] dark:text-slate-200 font-semibold leading-relaxed mb-8 sm:mb-10 max-w-2xl mx-auto px-2"
                         >
                             {t('landing.hero.subtitle', 'Improving everyday life for Caloocan City residents by helping engineers spot utility hazards early, resolve outages faster, and maintain reliable public services.')}
                         </motion.p>
@@ -226,11 +250,11 @@ function Landing() {
                             variants={fadeUp} 
                             className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center w-full sm:w-auto"
                         >
-                            <a href="/register" className="w-full sm:w-auto bg-[#ff6b00] hover:bg-[#e65c00] text-white px-8 sm:px-9 py-3.5 sm:py-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-lg hover:shadow-2xl hover:shadow-[#ff6b00]/30 hover:-translate-y-1 flex items-center justify-center gap-2">
+                            <a href="/register" className="w-full sm:w-auto bg-[#f05a00] hover:bg-[#d94e00] dark:bg-[#ff6b00] dark:hover:bg-[#e65c00] text-white px-8 sm:px-9 py-3.5 sm:py-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-lg hover:shadow-2xl hover:shadow-[#f05a00]/25 dark:hover:shadow-[#ff6b00]/30 hover:-translate-y-1 flex items-center justify-center gap-2">
                                 {t('landing.hero.register', 'Register')} <ArrowRight size={16} />
                             </a>
                             <button onClick={() => scrollToSection('features')} className="w-full sm:w-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-md hover:bg-[#ffefe5] dark:hover:bg-slate-800 text-[#2c1d11] dark:text-white border border-[#f3e9e2] dark:border-slate-800 px-7 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm hover:-translate-y-0.5">
-                                {t('landing.hero.exploreFeatures', 'Explore Features')} <ChevronDown size={16} className="text-[#ff6b00] animate-bounce" />
+                                {t('landing.hero.exploreFeatures', 'Explore Features')} <ChevronDown size={16} className="text-[#f05a00] dark:text-[#ff6b00] animate-bounce" />
                             </button>
                         </motion.div>
                     </motion.div>
@@ -501,6 +525,150 @@ function Landing() {
                             </div>
                         </div>
                     </motion.div>
+                </div>
+            </motion.section>
+
+            {/* MOBILE APP & QR CODE DOWNLOAD SECTION */}
+            <motion.section 
+                id="mobile" 
+                {...sectionTransition}
+                className="py-16 sm:py-24 bg-[#ffffff] dark:bg-[#05080e] border-b border-[#f3e9e2] dark:border-slate-800 relative overflow-hidden"
+            >
+                {/* Ambient Glow */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[450px] bg-gradient-to-tr from-[#ff6b00]/10 via-[#ff6b00]/5 to-transparent rounded-full blur-[140px] pointer-events-none" />
+
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+                        
+                        {/* Left Content Column */}
+                        <motion.div 
+                            className="lg:col-span-7 flex flex-col items-start"
+                            initial="hidden"
+                            whileInView="visible"
+                            viewport={{ once: true, margin: "-50px" }}
+                            variants={fadeUp}
+                        >
+                            <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-orange-500/10 text-[#ff6b00] rounded-full text-xs font-bold tracking-widest uppercase mb-4 border border-orange-500/20">
+                                <Smartphone size={14} /> {t('landing.mobile.badge', 'PULSO Mobile App & PWA')}
+                            </div>
+                            
+                            <h2 className="font-display font-extrabold text-2xl sm:text-4xl md:text-5xl uppercase tracking-tight text-[#2c1d11] dark:text-white mb-4 leading-tight">
+                                {t('landing.mobile.title', 'CALOOCAN RESIDENT APP AT YOUR FINGERTIPS')}
+                            </h2>
+                            
+                            <p className="text-sm sm:text-base text-[#736254] dark:text-slate-300 leading-relaxed mb-8 font-medium max-w-xl">
+                                {t('landing.mobile.subtitle', 'Report municipal utility hazards on the go, track live City Engineering repair crews in real time, and receive instant localized safety alerts straight to your phone.')}
+                            </p>
+
+                            {/* Key Mobile Features Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full mb-8">
+                                {[
+                                    { icon: <MapPinned size={18} />, title: "Instant GPS Pinning", desc: "Auto-detects your exact Caloocan barangay & street coordinates." },
+                                    { icon: <Camera size={18} />, title: "Photo & OCR AI Scan", desc: "Snap evidence of pipe leaks or power issues with camera support." },
+                                    { icon: <Activity size={18} />, title: "Real-Time Repair Tracker", desc: "Follow status from initial dispatch to job completion." },
+                                    { icon: <Shield size={18} />, title: "Verified Resident Pass", desc: "Government ID security with automated residency verification." },
+                                ].map((feat, idx) => (
+                                    <div key={idx} className="bg-[#fffbf9] dark:bg-slate-900/60 border border-[#f3e9e2] dark:border-slate-800/80 p-4 rounded-2xl flex items-start gap-3 shadow-xs">
+                                        <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-[#ff6b00] flex items-center justify-center shrink-0 mt-0.5">
+                                            {feat.icon}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-xs text-[#2c1d11] dark:text-white uppercase tracking-wide">{feat.title}</h4>
+                                            <p className="text-[11px] text-[#736254] dark:text-slate-400 mt-0.5 leading-snug">{feat.desc}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Install / Download Action Links */}
+                            <div className="flex flex-wrap gap-3 items-center">
+                                <a 
+                                    href="/register" 
+                                    className="bg-[#ff6b00] hover:bg-[#e65c00] text-white px-6 py-3.5 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg hover:shadow-[#ff6b00]/25 flex items-center gap-2"
+                                >
+                                    <Download size={16} /> {t('landing.mobile.getStarted', 'Launch Web App')}
+                                </a>
+                            </div>
+                        </motion.div>
+
+                        {/* Right Interactive QR Code Card */}
+                        <motion.div 
+                            className="lg:col-span-5 flex justify-center"
+                            initial="hidden"
+                            whileInView="visible"
+                            viewport={{ once: true, margin: "-50px" }}
+                            variants={fadeUp}
+                        >
+                            <div className="w-full max-w-sm bg-[#fffbf9]/90 dark:bg-slate-900/80 backdrop-blur-xl border border-[#f3e9e2] dark:border-slate-800 p-6 sm:p-7 rounded-3xl shadow-xl flex flex-col items-center text-center relative group">
+                                {/* Header badge */}
+                                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-orange-500/10 text-[#ff6b00] text-[10px] font-extrabold uppercase tracking-widest mb-5">
+                                    <QrCode size={13} /> {t('landing.mobile.scanToInstall', 'Scan QR Code')}
+                                </div>
+
+                                {/* QR Code Container with Frame Guides */}
+                                <div className="relative p-4 rounded-2xl bg-white shadow-md border border-slate-200">
+                                    {/* Corner Accents */}
+                                    <div className="absolute -top-1.5 -left-1.5 w-4 h-4 border-t-2 border-l-2 border-[#ff6b00] rounded-tl" />
+                                    <div className="absolute -top-1.5 -right-1.5 w-4 h-4 border-t-2 border-r-2 border-[#ff6b00] rounded-tr" />
+                                    <div className="absolute -bottom-1.5 -left-1.5 w-4 h-4 border-b-2 border-l-2 border-[#ff6b00] rounded-bl" />
+                                    <div className="absolute -bottom-1.5 -right-1.5 w-4 h-4 border-b-2 border-r-2 border-[#ff6b00] rounded-br" />
+
+                                    {/* SVG QR Code Pattern */}
+                                    <svg className="w-44 h-44 sm:w-48 sm:h-48 text-slate-900" viewBox="0 0 100 100" fill="currentColor">
+                                        {/* Outer Corner Finders */}
+                                        <path d="M5,5 h30 v30 h-30 z M10,10 v20 h20 v-20 z M15,15 h10 v10 h-10 z" />
+                                        <path d="M65,5 h30 v30 h-30 z M70,10 v20 h20 v-20 z M75,15 h10 v10 h-10 z" />
+                                        <path d="M5,65 h30 v30 h-30 z M10,70 v20 h20 v-20 z M15,75 h10 v10 h-10 z" />
+                                        
+                                        {/* Data Matrix Dots Pattern */}
+                                        <rect x="42" y="8" width="5" height="5" />
+                                        <rect x="52" y="8" width="5" height="5" />
+                                        <rect x="42" y="18" width="5" height="5" />
+                                        <rect x="52" y="24" width="5" height="5" />
+                                        <rect x="42" y="30" width="5" height="5" />
+
+                                        <rect x="8" y="42" width="5" height="5" />
+                                        <rect x="18" y="42" width="5" height="5" />
+                                        <rect x="28" y="42" width="5" height="5" />
+                                        <rect x="14" y="52" width="5" height="5" />
+                                        <rect x="24" y="52" width="5" height="5" />
+
+                                        <rect x="40" y="40" width="20" height="20" rx="4" fill="#ff6b00" />
+                                        <circle cx="50" cy="50" r="4.5" fill="#ffffff" />
+
+                                        <rect x="65" y="42" width="5" height="5" />
+                                        <rect x="75" y="42" width="5" height="5" />
+                                        <rect x="85" y="42" width="5" height="5" />
+                                        <rect x="65" y="52" width="5" height="5" />
+                                        <rect x="80" y="52" width="5" height="5" />
+
+                                        <rect x="42" y="65" width="5" height="5" />
+                                        <rect x="52" y="65" width="5" height="5" />
+                                        <rect x="42" y="75" width="5" height="5" />
+                                        <rect x="52" y="82" width="5" height="5" />
+                                        <rect x="42" y="88" width="5" height="5" />
+
+                                        <rect x="65" y="65" width="5" height="5" />
+                                        <rect x="75" y="68" width="5" height="5" />
+                                        <rect x="85" y="65" width="5" height="5" />
+                                        <rect x="70" y="78" width="5" height="5" />
+                                        <rect x="85" y="78" width="5" height="5" />
+                                        <rect x="65" y="88" width="5" height="5" />
+                                        <rect x="78" y="88" width="5" height="5" />
+                                        <rect x="88" y="88" width="5" height="5" />
+                                    </svg>
+                                </div>
+
+                                <p className="text-xs font-bold text-[#2c1d11] dark:text-white mt-4">
+                                    {t('landing.mobile.pointCamera', 'Scan with your Mobile Camera')}
+                                </p>
+                                <p className="text-[11px] text-[#736254] dark:text-slate-400 mt-1">
+                                    Instantly opens the verified Caloocan Resident Portal on your mobile device.
+                                </p>
+                            </div>
+                        </motion.div>
+
+                    </div>
                 </div>
             </motion.section>
 
