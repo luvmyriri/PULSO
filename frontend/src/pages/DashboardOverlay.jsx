@@ -333,7 +333,7 @@ export default function DashboardOverlay({ onNavigate }) {
                             <div className="p-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                     <Brain size={20} />
-                                    <span className="font-bold text-sm">PULSO Assistant</span>
+                                    <span className="font-bold text-sm">PULSEAI</span>
                                 </div>
                                 <button onClick={() => setIsAIChatOpen(false)}><X size={18} /></button>
                             </div>

@@ -4408,7 +4408,7 @@ export default function ResidentDashboard() {
     const [isAILoading, setIsAILoading] = useState(false);
     const [aiQuery, setAiQuery] = useState('');
     const [aiMessages, setAiMessages] = useState([
-        { role: 'assistant', text: `Hi ${currentUser?.full_name?.split(' ')[0] || 'there'}! I am PULSO Assistant, your 24/7 community helper. Ask me about filing reports, nearby hazards, city services, or anything about Caloocan City!` }
+        { role: 'assistant', text: `Hi ${currentUser?.full_name?.split(' ')[0] || 'there'}! I am PULSEAI, your 24/7 community helper. Ask me about filing reports, nearby hazards, city services, or anything about Caloocan City!` }
     ]);
     const aiChatEndRef = React.useRef(null);
 
@@ -4854,28 +4854,28 @@ export default function ResidentDashboard() {
                                     }`}
                             >
                                 {/* Header */}
-                                <div className="p-3.5 sm:p-4 bg-gradient-to-r from-blue-900 to-blue-800 flex justify-between items-center shrink-0">
+                                <div className="p-3.5 sm:p-4 bg-gradient-to-r from-[#e65100] via-[#f97316] to-[#ea580c] flex justify-between items-center shrink-0">
                                     <div className="flex items-center gap-2">
                                         <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                                             <Brain size={18} className="text-white" />
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-white text-sm">PULSO Assistant</h4>
-                                            <p className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">Community Helper · 24/7</p>
+                                            <h4 className="font-bold text-white text-sm">PULSEAI</h4>
+                                            <p className="text-[10px] text-orange-100 font-semibold uppercase tracking-wider">Community Helper · 24/7</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <button
                                             onClick={() => setIsAIMaximized(prev => !prev)}
                                             title={isAIMaximized ? 'Minimize' : 'Maximize'}
-                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors"
+                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors"
                                         >
                                             {isAIMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                                         </button>
                                         <button
                                             onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
                                             title="Close"
-                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors"
+                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors"
                                         >
                                             <X size={15} />
                                         </button>
@@ -4884,12 +4884,12 @@ export default function ResidentDashboard() {
 
                                 {/* Suggested quick-actions */}
                                 {aiMessages.length === 1 && (
-                                    <div className="px-3 py-2 bg-orange-50 dark:bg-slate-800 border-b border-orange-100 dark:border-slate-700 flex gap-1.5 flex-wrap shrink-0">
+                                    <div className="px-3 py-2 bg-orange-50/80 dark:bg-slate-800 border-b border-orange-100 dark:border-slate-700 flex gap-1.5 flex-wrap shrink-0">
                                         {['How to file a report?', 'My report status', 'City hotlines', 'Evacuation routes'].map(q => (
                                             <button
                                                 key={q}
                                                 onClick={() => { setAiQuery(q); }}
-                                                className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-white dark:bg-slate-700 border border-blue-200 dark:border-slate-600 px-2.5 py-1 rounded-full hover:bg-blue-800 hover:text-white hover:border-blue-800 transition-colors"
+                                                className="text-[10px] font-semibold text-[#ea580c] dark:text-orange-300 bg-white dark:bg-slate-700 border border-orange-200 dark:border-orange-900/40 px-2.5 py-1 rounded-full hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] transition-colors"
                                             >
                                                 {q}
                                             </button>
@@ -4902,13 +4902,13 @@ export default function ResidentDashboard() {
                                     {aiMessages.map((msg, i) => (
                                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                             {msg.role === 'assistant' && (
-                                                <div className="w-6 h-6 rounded-full bg-blue-800 flex items-center justify-center mr-2 mt-0.5 shrink-0">
+                                                <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0 shadow-xs">
                                                     <Brain size={12} className="text-white" />
                                                 </div>
                                             )}
                                             <div className={`${isAIMaximized ? 'max-w-[70%]' : 'max-w-[85%]'
                                                 } p-3 rounded-2xl text-[13px] font-medium leading-relaxed ${msg.role === 'user'
-                                                    ? 'bg-blue-700 text-white rounded-br-xs'
+                                                    ? 'bg-[#f05a00] text-white rounded-br-xs shadow-xs'
                                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-xs'
                                                 }`}>
                                                 {msg.text}
@@ -4917,13 +4917,13 @@ export default function ResidentDashboard() {
                                     ))}
                                     {isAILoading && (
                                         <div className="flex justify-start">
-                                            <div className="w-6 h-6 rounded-full bg-blue-800 flex items-center justify-center mr-2 mt-0.5 shrink-0">
+                                            <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0">
                                                 <Brain size={12} className="text-white" />
                                             </div>
                                             <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-xs flex gap-1">
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
+                                                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                                             </div>
                                         </div>
                                     )}
@@ -4937,13 +4937,13 @@ export default function ResidentDashboard() {
                                             type="text"
                                             value={aiQuery}
                                             onChange={e => setAiQuery(e.target.value)}
-                                            placeholder="Ask PULSO Assistant..."
-                                            className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-3.5 py-2 sm:py-2.5 text-xs sm:text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-700 outline-none placeholder:text-slate-400"
+                                            placeholder="Ask PULSEAI..."
+                                            className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-3.5 py-2 sm:py-2.5 text-xs sm:text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-[#f05a00] outline-none placeholder:text-slate-400"
                                         />
                                         <button
                                             type="submit"
                                             disabled={isAILoading}
-                                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-800 hover:bg-blue-700 flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0"
+                                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#f05a00] hover:bg-[#d94e00] flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0 shadow-sm cursor-pointer"
                                         >
                                             <Search size={15} />
                                         </button>
@@ -4959,15 +4959,15 @@ export default function ResidentDashboard() {
                     onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-blue-900 shadow-xl shadow-blue-900/50 flex items-center justify-center text-white cursor-pointer"
-                    title="PULSO Assistant"
-                    aria-label="Toggle PULSO Assistant"
+                    className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#f05a00] hover:bg-[#d94e00] shadow-xl shadow-orange-500/40 flex items-center justify-center text-white cursor-pointer"
+                    title="PULSEAI"
+                    aria-label="Toggle PULSEAI"
                 >
                     <AnimatePresence>
                         {!isAIChatOpen && (
                             <motion.span
                                 key="pulse"
-                                className="absolute inset-0 rounded-full bg-blue-700 opacity-60"
+                                className="absolute inset-0 rounded-full bg-orange-400 opacity-60"
                                 animate={{ scale: [1, 1.4], opacity: [0.7, 0] }}
                                 transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
                             />

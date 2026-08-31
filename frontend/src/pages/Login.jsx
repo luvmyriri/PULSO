@@ -506,8 +506,8 @@ export default function Login() {
                             </div>
                             
                             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-[#2c1d11] dark:text-white uppercase leading-[1.08] mb-3 sm:mb-4 tracking-tight">
-                                SMART UTILITY <br className="hidden sm:inline" />
-                                <span className="text-[#ff6b00]">MANAGEMENT SYSTEM</span>
+                                PUBLIC WORKS <br className="hidden sm:inline" />
+                                <span className="text-[#ff6b00]">MONITORING &amp; REPAIR PORTAL</span>
                             </h1>
 
                             <p className="text-xs sm:text-base text-[#736254] dark:text-slate-300 leading-relaxed font-medium max-w-xl mx-auto lg:mx-0">
