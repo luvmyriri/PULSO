@@ -224,17 +224,25 @@ function Landing() {
 
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full text-center relative z-10">
                     <motion.div
-                        className="flex flex-col items-center max-w-4xl mx-auto"
+                        className="flex flex-col items-center max-w-5xl lg:max-w-6xl mx-auto"
                         initial="hidden"
                         animate="visible"
                         variants={staggerContainer}
                     >
-                        {/* Hero Headline */}
+                        {/* Hero Headline - 3-Line Pyramid Structure */}
                         <motion.h1 
                             variants={fadeUp} 
-                            className="font-display font-black text-3xl sm:text-5xl md:text-6xl lg:text-7xl uppercase tracking-tight text-[#1a1008] dark:text-white leading-[1.06] mb-5 sm:mb-6 drop-shadow-sm dark:drop-shadow-lg"
+                            className="font-display font-black text-3xl sm:text-5xl md:text-6xl lg:text-7xl uppercase tracking-tight text-[#1a1008] dark:text-white leading-[1.05] mb-6 sm:mb-8 drop-shadow-sm dark:drop-shadow-lg flex flex-col items-center text-center"
                         >
-                            SMART UTILITY <span className="bg-gradient-to-r from-[#e65100] via-[#f97316] to-[#ea580c] dark:from-[#ff6b00] dark:via-orange-400 dark:to-[#ff8533] bg-clip-text text-transparent">LOCATOR &amp; MAINTENANCE</span> SYSTEM
+                            <span className="block whitespace-normal sm:whitespace-nowrap">
+                                {t('landing.hero.title1', 'PUBLIC WORKS')}
+                            </span>
+                            <span className="block bg-gradient-to-r from-[#e65100] via-[#f97316] to-[#ea580c] dark:from-[#ff6b00] dark:via-orange-400 dark:to-[#ff8533] bg-clip-text text-transparent my-1 sm:my-1.5 whitespace-normal sm:whitespace-nowrap">
+                                {t('landing.hero.title2', 'MONITORING & REPAIR')}
+                            </span>
+                            <span className="block whitespace-normal sm:whitespace-nowrap">
+                                {t('landing.hero.title3', 'PORTAL')}
+                            </span>
                         </motion.h1>
 
                         {/* Hero Subtitle */}
@@ -245,16 +253,24 @@ function Landing() {
                             {t('landing.hero.subtitle', 'Improving everyday life for Caloocan City residents by helping engineers spot utility hazards early, resolve outages faster, and maintain reliable public services.')}
                         </motion.p>
 
-                        {/* CTA Buttons */}
+                        {/* CTA Buttons - Compact & Balanced on Mobile */}
                         <motion.div 
                             variants={fadeUp} 
-                            className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center w-full sm:w-auto"
+                            className="flex flex-row flex-wrap sm:flex-nowrap gap-2.5 sm:gap-4 justify-center items-center w-full sm:w-auto"
                         >
-                            <a href="/register" className="w-full sm:w-auto bg-[#f05a00] hover:bg-[#d94e00] dark:bg-[#ff6b00] dark:hover:bg-[#e65c00] text-white px-8 sm:px-9 py-3.5 sm:py-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-lg hover:shadow-2xl hover:shadow-[#f05a00]/25 dark:hover:shadow-[#ff6b00]/30 hover:-translate-y-1 flex items-center justify-center gap-2">
-                                {t('landing.hero.register', 'Register')} <ArrowRight size={16} />
+                            <a 
+                                href="/register" 
+                                className="w-auto px-6 sm:px-8 py-2.5 sm:py-3.5 bg-[#f05a00] hover:bg-[#d94e00] dark:bg-[#ff6b00] dark:hover:bg-[#e65c00] text-white rounded-full font-bold text-[11px] sm:text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-xl hover:shadow-[#f05a00]/25 dark:hover:shadow-[#ff6b00]/30 hover:-translate-y-0.5 flex items-center justify-center gap-1.5 shrink-0 active:scale-95"
+                            >
+                                <span>{t('landing.hero.register', 'Register')}</span>
+                                <ArrowRight size={14} />
                             </a>
-                            <button onClick={() => scrollToSection('features')} className="w-full sm:w-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-md hover:bg-[#ffefe5] dark:hover:bg-slate-800 text-[#2c1d11] dark:text-white border border-[#f3e9e2] dark:border-slate-800 px-7 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm hover:-translate-y-0.5">
-                                {t('landing.hero.exploreFeatures', 'Explore Features')} <ChevronDown size={16} className="text-[#f05a00] dark:text-[#ff6b00] animate-bounce" />
+                            <button 
+                                onClick={() => scrollToSection('features')} 
+                                className="w-auto px-5 sm:px-7 py-2.5 sm:py-3.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md hover:bg-[#ffefe5] dark:hover:bg-slate-800 text-[#2c1d11] dark:text-white border border-[#f3e9e2] dark:border-slate-800 rounded-full font-bold text-[11px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-xs hover:-translate-y-0.5 shrink-0 active:scale-95 cursor-pointer"
+                            >
+                                <span>{t('landing.hero.exploreFeatures', 'Explore Features')}</span>
+                                <ChevronDown size={14} className="text-[#f05a00] dark:text-[#ff6b00] animate-bounce" />
                             </button>
                         </motion.div>
                     </motion.div>

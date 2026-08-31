@@ -13,7 +13,7 @@ import GovDivisionPage   from './pages/GovDivisionPage';
 import GovAnalyticsPage  from './pages/GovAnalyticsPage';
 import PositionDashboard from './pages/PositionDashboard';
 import ResetPassword     from './pages/ResetPassword';
-import LanguageSwitcher  from './components/LanguageSwitcher';
+import ScrollToTop       from './components/ScrollToTop';
 import ProtectedRoute, {
     GOV_ROLES,
     EXECUTIVE_ROLES,
@@ -176,7 +176,7 @@ function App() {
                     </Routes>
                 </ErrorBoundary>
 
-                <LanguageSwitcher />
+                <ScrollToTop />
             </BrowserRouter>
         </ThemeProvider>
     );
