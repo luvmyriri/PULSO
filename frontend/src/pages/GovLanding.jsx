@@ -1,17 +1,20 @@
 import React, { useState, useRef } from 'react';
 import ReCAPTCHA from "react-google-recaptcha";
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
     Shield, Lock, User, Eye, EyeOff, ChevronRight, Activity,
     Mail, ArrowLeft, CheckCircle, FileCheck, BookOpen, ExternalLink,
-    Map, ShieldCheck, Home, FileText, Users
+    Map, ShieldCheck, Home, Users, AlertCircle, X
 } from 'lucide-react';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
+import LegalModal from '../components/LegalModal';
+import OfficialBanner from '../components/landing/OfficialBanner';
 
 export default function GovLanding() {
     const navigate = useNavigate();
+    const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -121,327 +124,406 @@ export default function GovLanding() {
     ];
 
     return (
-        <div className="relative min-h-screen w-full bg-[#fffbf9] dark:bg-[#0b0f19] overflow-hidden font-sans text-[#2c1d11] dark:text-white transition-colors duration-300 flex flex-col justify-between">
+        <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden">
 
-            {/* Ambient Soft Glow Accents */}
-            <div className="hidden sm:block absolute top-1/4 left-10 w-96 h-96 bg-[#ff6b00]/10 dark:bg-[#ff6b00]/15 rounded-full blur-3xl pointer-events-none" />
-            <div className="hidden sm:block absolute bottom-10 right-1/4 w-80 h-80 bg-[#ffefe5]/70 dark:bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="hidden sm:block absolute top-1/2 right-0 w-96 h-96 bg-[#ff6b00]/5 dark:bg-[#ff6b00]/10 rounded-full blur-3xl pointer-events-none" />
+            {/* ── Official Government Banner (GOVPH standard) ───────────── */}
+            <div className="relative z-30 w-full">
+                <OfficialBanner />
+            </div>
 
-            {/* Navigation Header */}
-            <nav className="relative w-full p-4 sm:p-6 lg:p-8 flex justify-between items-center z-50 max-w-7xl mx-auto">
-                <div className="flex items-center gap-3 sm:gap-4">
-                    <button
-                        onClick={() => navigate('/')}
-                        className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-[#f3e9e2] dark:border-slate-800 shadow-sm text-[#736254] dark:text-slate-300 hover:text-[#ff6b00] hover:border-[#ff6b00]/40 transition-all"
-                        title="Back to Home"
-                    >
-                        <Home size={15} />
-                    </button>
-                    <div className="flex items-center gap-2.5 sm:gap-3">
-                        <Branding size="h-8 sm:h-10" showText={false} />
-                        <div className="flex items-center gap-2">
-                            <span className="text-xl sm:text-2xl font-black tracking-tighter text-[#2c1d11] dark:text-white">PULSO</span>
-                            <span className="px-2 sm:px-2.5 py-0.5 bg-[#ffefe5] dark:bg-[#ff6b00]/10 rounded-full text-[9px] sm:text-[10px] font-bold tracking-widest text-[#ff6b00] uppercase border border-[#f3e9e2] dark:border-[#ff6b00]/20">
-                                Gov Portal
-                            </span>
-                        </div>
-                    </div>
-                </div>
+            {/* ── Top Header: Branding & Navigation ───────────── */}
+            <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
+                {/* Branding: Official City Engineering Department Lockup + Gov Portal Tag */}
+                <Link
+                    to="/"
+                    className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
+                    title="Caloocan City PULSO Home"
+                >
+                    <Branding size="h-9 w-9 sm:h-10 sm:w-10" showText={true} />
+                    <span className="hidden sm:inline-flex px-2 py-0.5 bg-orange-50 dark:bg-orange-950/60 rounded-full text-[9px] font-mono-data font-bold tracking-widest text-[#ff6b00] uppercase border border-orange-200 dark:border-orange-800/60 self-center ml-1">
+                        Gov Portal
+                    </span>
+                </Link>
 
-                <div className="flex items-center gap-3 sm:gap-5">
-                    <div className="hidden md:flex items-center gap-5 text-xs font-bold pr-5 border-r border-[#f3e9e2] dark:border-slate-800">
+                {/* Controls & Nav */}
+                <div className="flex items-center gap-2.5 sm:gap-4">
+                    <div className="hidden md:flex items-center gap-4 text-xs font-bold pr-4 border-r border-slate-200 dark:border-slate-800">
                         <button
+                            type="button"
                             onClick={() => setActiveModal('directives')}
-                            className="text-[#736254] dark:text-slate-300 hover:text-[#ff6b00] transition-colors uppercase tracking-wider"
+                            className="text-slate-600 dark:text-slate-300 hover:text-[#ff6b00] transition-colors uppercase tracking-wider cursor-pointer"
                         >
                             Directives
                         </button>
                         <button
+                            type="button"
                             onClick={() => setActiveModal('resources')}
-                            className="text-[#736254] dark:text-slate-300 hover:text-[#ff6b00] transition-colors uppercase tracking-wider"
+                            className="text-slate-600 dark:text-slate-300 hover:text-[#ff6b00] transition-colors uppercase tracking-wider cursor-pointer"
                         >
                             Resources
                         </button>
                     </div>
                     <ThemeToggle />
+                    <Link
+                        to="/login"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                        title="Return to Citizen Portal"
+                    >
+                        <Home size={14} className="text-[#ff6b00]" />
+                        <span className="hidden sm:inline">Citizen Portal</span>
+                    </Link>
                 </div>
-            </nav>
+            </header>
 
-            {/* Main Content Grid */}
-            <main className="relative z-20 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-12 py-4 sm:py-8 flex-1 flex items-center">
-                <div className="grid lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-16 items-center w-full">
+            {/* ── Background Seal Watermark (Inherited from Resident Login) ───── */}
+            <div
+                className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 flex items-center justify-end"
+                aria-hidden="true"
+            >
+                <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
+                    <div className="absolute inset-0 rounded-full border-2 border-orange-500/30 dark:border-white/20 animate-pulse" style={{ animationDuration: '6s' }} />
+                    <div className="absolute inset-[-18px] sm:inset-[-24px] rounded-full border border-dashed border-[#ff6b00]/40 dark:border-[#ff6b00]/30" />
+                    <div className="absolute inset-[-36px] sm:inset-[-50px] rounded-full border border-slate-400/25 dark:border-white/10" />
 
-                    {/* Left Column: Info Panel */}
-                    <div className="lg:col-span-7 space-y-6 sm:space-y-8 text-center lg:text-left">
-                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-                            <div className="inline-flex items-center gap-2 mb-3 sm:mb-4 bg-[#ffefe5] dark:bg-[#ff6b00]/10 text-[#ff6b00] px-3.5 sm:px-4 py-1.5 rounded-full border border-[#f3e9e2] dark:border-[#ff6b00]/20 text-[10px] sm:text-xs font-bold tracking-widest uppercase">
-                                <Activity size={15} />
-                                <span>Unified Command Center • Caloocan City</span>
-                            </div>
+                    <img
+                        src="/engineering-logo.jpg"
+                        alt="Official Caloocan City Seal Watermark"
+                        className="w-full h-full object-contain rounded-full drop-shadow-sm dark:brightness-105"
+                        loading="eager"
+                    />
 
-                            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-[#2c1d11] dark:text-white uppercase leading-[1.08] mb-3 sm:mb-4 tracking-tight">
-                                THE PULSE OF <br className="hidden sm:inline" />
-                                <span className="text-[#ff6b00]">INFRASTRUCTURE</span>
-                            </h1>
+                    <div className="absolute inset-0 rounded-full bg-radial from-transparent via-transparent to-white/40 dark:to-[#070a12]/50 pointer-events-none" />
+                </div>
+            </div>
 
-                            <p className="text-xs sm:text-base text-[#736254] dark:text-slate-300 leading-relaxed font-medium max-w-xl mx-auto lg:mx-0">
-                                Official engineering management and public service operations platform for LGU personnel. Authorized access only.
-                            </p>
-                        </motion.div>
+            {/* ── Main Content Grid (60/40 Ratio in max-w-7xl) ───────────── */}
+            <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10 lg:py-14 flex-1 flex items-center">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center w-full">
 
-                        {/* Feature Cards */}
-                        <motion.div
-                            className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-left"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6, delay: 0.2 }}
-                        >
-                            <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-md border border-[#f3e9e2] dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-2.5 sm:mb-3">
-                                    <ShieldCheck size={20} />
+                    {/* Left Column: Hero & System Context (60% / 7 cols) */}
+                    <div className="lg:col-span-7 flex flex-col items-start text-left w-full">
+
+                        {/* Category Tag Pill */}
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
+                            <Activity size={14} className="text-[#ff6b00] shrink-0" />
+                            <span>Unified Command Center • Caloocan City</span>
+                        </div>
+
+                        {/* Main Display Heading */}
+                        <h1 className="font-heading font-black text-3xl sm:text-5xl lg:text-[52px] text-slate-900 dark:text-white uppercase leading-[1.12] mb-4 tracking-tight">
+                            THE PULSE OF <br className="hidden sm:inline" />
+                            <span className="text-[#ff6b00]">INFRASTRUCTURE</span>
+                        </h1>
+
+                        {/* Plain-Language Subtitle */}
+                        <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-300 font-normal leading-relaxed mb-6 max-w-xl">
+                            Official engineering management and public service operations platform for LGU personnel. Authorized access only.
+                        </p>
+
+                        {/* Feature Cards Grid (Mirrored Clean Style) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 w-full max-w-xl text-left">
+                            <div className="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
+                                <div className="w-9 h-9 bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] rounded-lg flex items-center justify-center mb-2.5 border border-orange-200 dark:border-orange-800/50">
+                                    <ShieldCheck size={18} />
                                 </div>
-                                <h3 className="font-bold text-xs text-[#2c1d11] dark:text-white uppercase tracking-wide mb-1">Secure Access</h3>
-                                <p className="text-[11px] text-[#736254] dark:text-slate-400 font-medium leading-normal">
+                                <h3 className="font-heading font-bold text-xs text-slate-900 dark:text-white uppercase tracking-wide mb-1">Secure Access</h3>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
                                     Encrypted government access under Data Privacy Act (RA 10173).
                                 </p>
                             </div>
 
-                            <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-md border border-[#f3e9e2] dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-2.5 sm:mb-3">
-                                    <Activity size={20} />
+                            <div className="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
+                                <div className="w-9 h-9 bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] rounded-lg flex items-center justify-center mb-2.5 border border-orange-200 dark:border-orange-800/50">
+                                    <Activity size={18} />
                                 </div>
-                                <h3 className="font-bold text-xs text-[#2c1d11] dark:text-white uppercase tracking-wide mb-1">Live Dispatch</h3>
-                                <p className="text-[11px] text-[#736254] dark:text-slate-400 font-medium leading-normal">
+                                <h3 className="font-heading font-bold text-xs text-slate-900 dark:text-white uppercase tracking-wide mb-1">Live Dispatch</h3>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
                                     Direct work order integration with LGU engineering crews.
                                 </p>
                             </div>
 
-                            <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-md border border-[#f3e9e2] dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#ffefe5] dark:bg-[#ff6b00]/15 text-[#ff6b00] rounded-xl flex items-center justify-center mb-2.5 sm:mb-3">
-                                    <Users size={20} />
+                            <div className="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
+                                <div className="w-9 h-9 bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] rounded-lg flex items-center justify-center mb-2.5 border border-orange-200 dark:border-orange-800/50">
+                                    <Users size={18} />
                                 </div>
-                                <h3 className="font-bold text-xs text-[#2c1d11] dark:text-white uppercase tracking-wide mb-1">Personnel Hub</h3>
-                                <p className="text-[11px] text-[#736254] dark:text-slate-400 font-medium leading-normal">
+                                <h3 className="font-heading font-bold text-xs text-slate-900 dark:text-white uppercase tracking-wide mb-1">Personnel Hub</h3>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
                                     Manage field teams, track assignments, and monitor progress.
                                 </p>
                             </div>
-                        </motion.div>
+                        </div>
+
                     </div>
 
-                    {/* Right Column: Login Card */}
-                    <div className="lg:col-span-5 flex justify-center lg:justify-end">
-                        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="w-full max-w-md">
-                            <div className="relative group">
-                                {/* Card Glow */}
-                                <div className="absolute -inset-1 bg-gradient-to-r from-[#ff6b00]/25 to-[#cc5200]/25 rounded-[2rem] sm:rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-75 transition-opacity" />
+                    {/* Right Column: Structured Auth Container (40% / 5 cols) */}
+                    <div className="lg:col-span-5 flex justify-center lg:justify-end w-full">
+                        <div className="w-full max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden">
 
-                                <div className="relative bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-[#f3e9e2] dark:border-slate-800 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl overflow-hidden min-h-[440px] sm:min-h-[480px] flex flex-col justify-center">
-                                    <AnimatePresence mode="wait">
-                                        {view === 'login' ? (
-                                            <motion.div
-                                                key="login-form"
-                                                initial={{ opacity: 0, x: 20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                exit={{ opacity: 0, x: -20 }}
-                                                transition={{ duration: 0.3 }}
-                                            >
-                                                {/* Header */}
-                                                <div className="mb-6 sm:mb-8 text-center">
-                                                    <div className="w-14 h-14 sm:w-16 sm:h-16 bg-[#ffefe5] dark:bg-[#ff6b00]/15 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 border border-[#f3e9e2] dark:border-[#ff6b00]/20 shadow-sm">
-                                                        <Lock className="text-[#ff6b00]" size={28} />
+                            {/* Card Body Area */}
+                            <div className="p-6 sm:p-8">
+                                <AnimatePresence mode="wait">
+                                    {view === 'login' ? (
+                                        <motion.div
+                                            key="login-form"
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -8 }}
+                                            transition={{ duration: 0.2 }}
+                                        >
+                                            <div className="mb-6 text-left">
+                                                <h2 className="text-xl sm:text-2xl font-heading font-black text-slate-900 dark:text-white tracking-tight">
+                                                    Internal Gateway
+                                                </h2>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                    Verify credentials for command center access.
+                                                </p>
+                                            </div>
+
+                                            {error && (
+                                                <div className="mb-5 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-xs font-medium flex items-center gap-2.5">
+                                                    <AlertCircle size={15} className="text-red-500 shrink-0" />
+                                                    <span>{error}</span>
+                                                </div>
+                                            )}
+
+                                            <form onSubmit={handleLogin} className="space-y-4">
+                                                {/* Personnel ID / Email */}
+                                                <div className="space-y-1.5 text-left">
+                                                    <label className="block text-[11px] font-mono-data font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                                        Personnel ID or Email
+                                                    </label>
+                                                    <div className="relative">
+                                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                                            <User size={16} />
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={email}
+                                                            onChange={(e) => setEmail(e.target.value)}
+                                                            className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-3.5 py-3 transition-all"
+                                                            placeholder="e.g. city.engineer@caloocan.gov.ph"
+                                                            required
+                                                            autoComplete="username"
+                                                        />
                                                     </div>
-                                                    <h2 className="text-xl sm:text-2xl font-black text-[#2c1d11] dark:text-white mb-1 tracking-tight">Internal Gateway</h2>
-                                                    <p className="text-[#736254] dark:text-slate-400 text-xs font-medium">Verify credentials for command center access</p>
                                                 </div>
 
-                                                {error && (
-                                                    <motion.div
-                                                        initial={{ opacity: 0, y: -10 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        className="mb-5 p-3.5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold flex items-center gap-3"
-                                                    >
-                                                        <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shrink-0" />
-                                                        {error}
-                                                    </motion.div>
-                                                )}
-
-                                                <form onSubmit={handleLogin} className="space-y-5" autoComplete="off">
-                                                    <div className="space-y-1.5">
-                                                        <label className="block text-[10px] font-black text-[#736254] dark:text-slate-400 uppercase tracking-widest ml-1">Personnel ID / Email</label>
-                                                        <div className="relative">
-                                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#736254] dark:text-slate-400">
-                                                                <User size={16} />
-                                                            </div>
-                                                            <input
-                                                                type="text"
-                                                                value={email}
-                                                                onChange={(e) => setEmail(e.target.value)}
-                                                                autoComplete="off"
-                                                                className="w-full bg-[#fffbf9] dark:bg-slate-800/60 border border-[#f3e9e2] dark:border-slate-700 text-[#2c1d11] dark:text-white placeholder-[#b8a99a] dark:placeholder-slate-500 text-sm rounded-xl focus:outline-none focus:border-[#ff6b00]/50 focus:ring-2 focus:ring-[#ff6b00]/10 pl-11 p-3.5 transition-all"
-                                                                placeholder="ID-000000 or email"
-                                                                required
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="space-y-1.5">
-                                                        <div className="flex justify-between items-center px-1">
-                                                            <label className="block text-[10px] font-black text-[#736254] dark:text-slate-400 uppercase tracking-widest">Access Key</label>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setView('forgot')}
-                                                                className="text-[10px] font-bold text-[#ff6b00] hover:text-[#e65c00] transition-colors uppercase tracking-widest"
-                                                            >
-                                                                Forgot Password?
-                                                            </button>
-                                                        </div>
-                                                        <div className="relative">
-                                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#736254] dark:text-slate-400">
-                                                                <Shield size={16} />
-                                                            </div>
-                                                            <input
-                                                                type={showPassword ? "text" : "password"}
-                                                                value={password}
-                                                                onChange={(e) => setPassword(e.target.value)}
-                                                                autoComplete="new-password"
-                                                                className="w-full bg-[#fffbf9] dark:bg-slate-800/60 border border-[#f3e9e2] dark:border-slate-700 text-[#2c1d11] dark:text-white placeholder-[#b8a99a] dark:placeholder-slate-500 text-sm rounded-xl focus:outline-none focus:border-[#ff6b00]/50 focus:ring-2 focus:ring-[#ff6b00]/10 pl-11 pr-11 p-3.5 transition-all"
-                                                                placeholder="••••••••"
-                                                                required
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setShowPassword(!showPassword)}
-                                                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#736254] dark:text-slate-400 hover:text-[#ff6b00] transition-colors"
-                                                            >
-                                                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    <AnimatePresence>
-                                                        {email && password && (
-                                                            <motion.div
-                                                                initial={{ opacity: 0, height: 0 }}
-                                                                animate={{ opacity: 1, height: 'auto' }}
-                                                                exit={{ opacity: 0, height: 0 }}
-                                                                className="flex justify-center w-full overflow-hidden"
-                                                            >
-                                                                <div className="relative z-10 scale-95 origin-center py-2">
-                                                                    <ReCAPTCHA
-                                                                        ref={recaptchaRef}
-                                                                        sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                                                                        onChange={(token) => setCaptchaToken(token)}
-                                                                    />
-                                                                </div>
-                                                            </motion.div>
-                                                        )}
-                                                    </AnimatePresence>
-
-                                                    <button
-                                                        type="submit"
-                                                        disabled={loading}
-                                                        className="w-full bg-[#ff6b00] hover:bg-[#e65c00] text-white p-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-[#ff6b00]/20 hover:shadow-[#ff6b00]/30 hover:-translate-y-0.5 flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >
-                                                        {loading ? (
-                                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                        ) : (
-                                                            <>
-                                                                Initialize Session
-                                                                <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                </form>
-                                            </motion.div>
-                                        ) : (
-                                            <motion.div
-                                                key="forgot-form"
-                                                initial={{ opacity: 0, x: -20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                exit={{ opacity: 0, x: 20 }}
-                                                transition={{ duration: 0.3 }}
-                                            >
-                                                {recoverySent ? (
-                                                    <div className="text-center py-6">
-                                                        <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-emerald-200 dark:border-emerald-500/20">
-                                                            <CheckCircle className="text-emerald-500" size={32} />
-                                                        </div>
-                                                        <h2 className="text-xl font-black text-[#2c1d11] dark:text-white mb-3 tracking-tight">Recovery Sent</h2>
-                                                        <p className="text-[#736254] dark:text-slate-400 text-xs font-medium mb-8 leading-relaxed">
-                                                            An administrative recovery protocol has been initiated for <span className="text-[#ff6b00] font-bold">{recoveryEmail}</span>. Please check your official inbox.
-                                                        </p>
+                                                {/* Password */}
+                                                <div className="space-y-1.5 text-left">
+                                                    <div className="flex justify-between items-center">
+                                                        <label className="block text-[11px] font-mono-data font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                                            Password
+                                                        </label>
                                                         <button
-                                                            onClick={() => { setView('login'); setRecoverySent(false); }}
-                                                            className="flex items-center gap-2 mx-auto text-[#ff6b00] font-bold uppercase tracking-widest text-[10px] hover:text-[#e65c00] transition-colors"
+                                                            type="button"
+                                                            onClick={() => { setView('forgot'); setError(''); }}
+                                                            className="text-[11px] font-semibold text-[#ff6b00] hover:text-[#e65c00] transition-colors cursor-pointer"
                                                         >
-                                                            <ArrowLeft size={14} /> Return to Login
+                                                            Forgot Password?
                                                         </button>
                                                     </div>
-                                                ) : (
-                                                    <>
-                                                        <div className="mb-6 text-center">
-                                                            <div className="w-14 h-14 bg-[#ffefe5] dark:bg-[#ff6b00]/15 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[#f3e9e2] dark:border-[#ff6b00]/20">
-                                                                <Mail className="text-[#ff6b00]" size={26} />
+                                                    <div className="relative">
+                                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                                            <Lock size={16} />
+                                                        </div>
+                                                        <input
+                                                            type={showPassword ? 'text' : 'password'}
+                                                            value={password}
+                                                            onChange={(e) => setPassword(e.target.value)}
+                                                            className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-10 py-3 transition-all"
+                                                            placeholder="Enter password"
+                                                            required
+                                                            autoComplete="current-password"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowPassword(!showPassword)}
+                                                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-[#ff6b00] transition-colors cursor-pointer"
+                                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                                        >
+                                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* ReCAPTCHA Checkbox */}
+                                                <AnimatePresence>
+                                                    {email && password && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="flex justify-center w-full py-1 overflow-hidden"
+                                                        >
+                                                            <div className="scale-90 origin-center">
+                                                                <ReCAPTCHA
+                                                                    ref={recaptchaRef}
+                                                                    sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                                    onChange={(token) => setCaptchaToken(token)}
+                                                                    theme="light"
+                                                                />
                                                             </div>
-                                                            <h2 className="text-xl font-black text-[#2c1d11] dark:text-white mb-1 tracking-tight">Recover Key</h2>
-                                                            <p className="text-[#736254] dark:text-slate-400 text-xs font-medium">Enter your email to initiate recovery</p>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+
+                                                {/* Submit CTA Button */}
+                                                <button
+                                                    type="submit"
+                                                    disabled={loading}
+                                                    className="w-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                                >
+                                                    {loading ? (
+                                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    ) : (
+                                                        <>
+                                                            <span>Initialize Session</span>
+                                                            <ChevronRight size={16} />
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </form>
+                                        </motion.div>
+                                    ) : (
+                                        /* Forgot Password Form */
+                                        <motion.div
+                                            key="forgot-form"
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -8 }}
+                                            transition={{ duration: 0.2 }}
+                                        >
+                                            {recoverySent ? (
+                                                <div className="text-center py-4">
+                                                    <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 border border-emerald-200 dark:border-emerald-800/60">
+                                                        <CheckCircle size={30} />
+                                                    </div>
+                                                    <h2 className="text-xl font-heading font-bold text-slate-900 dark:text-white mb-1.5">
+                                                        Recovery Sent
+                                                    </h2>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                                                        An administrative recovery protocol has been initiated for <span className="text-[#ff6b00] font-semibold">{recoveryEmail}</span>. Please check your official inbox.
+                                                    </p>
+                                                    <button
+                                                        onClick={() => { setView('login'); setRecoverySent(false); }}
+                                                        className="w-full bg-[#ff6b00] hover:bg-[#e65c00] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                                                    >
+                                                        Return to Sign In <ChevronRight size={16} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="mb-6 text-left">
+                                                        <h2 className="text-xl sm:text-2xl font-heading font-black text-slate-900 dark:text-white tracking-tight">
+                                                            Recover Password
+                                                        </h2>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                            Enter your registered personnel email to initiate recovery.
+                                                        </p>
+                                                    </div>
+
+                                                    {error && (
+                                                        <div className="mb-5 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-xs font-medium flex items-center gap-2.5">
+                                                            <AlertCircle size={15} className="text-red-500 shrink-0" />
+                                                            <span>{error}</span>
+                                                        </div>
+                                                    )}
+
+                                                    <form onSubmit={handleRecovery} className="space-y-4">
+                                                        <div className="space-y-1.5 text-left">
+                                                            <label className="block text-[11px] font-mono-data font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                                                Personnel Email
+                                                            </label>
+                                                            <div className="relative">
+                                                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                                                    <Mail size={16} />
+                                                                </div>
+                                                                <input
+                                                                    type="email"
+                                                                    value={recoveryEmail}
+                                                                    onChange={(e) => setRecoveryEmail(e.target.value)}
+                                                                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-3.5 py-3 transition-all"
+                                                                    placeholder="official@pulso.system"
+                                                                    required
+                                                                />
+                                                            </div>
                                                         </div>
 
-                                                        <form onSubmit={handleRecovery} className="space-y-5" autoComplete="off">
-                                                            <div className="space-y-1.5">
-                                                                <label className="block text-[10px] font-black text-[#736254] dark:text-slate-400 uppercase tracking-widest ml-1">Personnel Email</label>
-                                                                <div className="relative">
-                                                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#736254] dark:text-slate-400">
-                                                                        <Mail size={16} />
-                                                                    </div>
-                                                                    <input
-                                                                        type="email"
-                                                                        value={recoveryEmail}
-                                                                        onChange={(e) => setRecoveryEmail(e.target.value)}
-                                                                        autoComplete="off"
-                                                                        className="w-full bg-[#fffbf9] dark:bg-slate-800/60 border border-[#f3e9e2] dark:border-slate-700 text-[#2c1d11] dark:text-white placeholder-[#b8a99a] dark:placeholder-slate-500 text-sm rounded-xl focus:outline-none focus:border-[#ff6b00]/50 focus:ring-2 focus:ring-[#ff6b00]/10 pl-11 p-3.5 transition-all"
-                                                                        placeholder="official@pulso.system"
-                                                                        required
-                                                                    />
-                                                                </div>
-                                                            </div>
+                                                        <button
+                                                            type="submit"
+                                                            disabled={loading}
+                                                            className="w-full bg-[#ff6b00] hover:bg-[#e65c00] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                                        >
+                                                            {loading ? (
+                                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                            ) : (
+                                                                <>
+                                                                    <span>Send Recovery Link</span>
+                                                                    <ChevronRight size={16} />
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </form>
 
-                                                            <button
-                                                                type="submit"
-                                                                disabled={loading}
-                                                                className="w-full bg-[#ff6b00] hover:bg-[#e65c00] text-white p-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3 group disabled:opacity-50"
-                                                            >
-                                                                {loading ? (
-                                                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                                ) : (
-                                                                    <>Send Recovery Link <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" /></>
-                                                                )}
-                                                            </button>
-
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setView('login')}
-                                                                className="flex items-center gap-2 mx-auto text-[#736254] dark:text-slate-400 font-bold uppercase tracking-widest text-[10px] hover:text-[#ff6b00] transition-colors"
-                                                            >
-                                                                <ArrowLeft size={12} /> Cancel
-                                                            </button>
-                                                        </form>
-                                                    </>
-                                                )}
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => { setView('login'); setError(''); }} 
+                                                        className="flex items-center justify-center gap-2 mx-auto text-slate-500 hover:text-slate-800 dark:hover:text-white text-xs font-semibold transition-colors mt-6 cursor-pointer"
+                                                    >
+                                                        <ArrowLeft size={14} /> Back to Sign In
+                                                    </button>
+                                                </>
+                                            )}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
-                        </motion.div>
+                        </div>
                     </div>
+
                 </div>
             </main>
 
 
 
-            {/* PORTAL MODALS */}
+            {/* ── Standard Civic Legal Footer Strip ───────────────────────── */}
+            <footer className="relative z-10 w-full bg-slate-100/80 dark:bg-[#060911] border-t border-slate-200/80 dark:border-slate-800/80 py-3.5 text-slate-500 dark:text-slate-400 text-[11px] transition-colors">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+                    <span>
+                        &copy; {new Date().getFullYear()} City Government of Caloocan • City Engineering Department. All rights reserved.
+                    </span>
+                    <div className="flex items-center gap-4 font-semibold">
+                        <button 
+                            type="button" 
+                            onClick={() => setLegalModal({ isOpen: true, tab: 'privacy' })} 
+                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+                        >
+                            Privacy Policy
+                        </button>
+                        <span>•</span>
+                        <button 
+                            type="button" 
+                            onClick={() => setLegalModal({ isOpen: true, tab: 'terms' })} 
+                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+                        >
+                            Terms of Service
+                        </button>
+                        <span>•</span>
+                        <Link to="/" className="hover:text-[#ff6b00] transition-colors cursor-pointer">
+                            Portal Home
+                        </Link>
+                    </div>
+                </div>
+            </footer>
+
+            {/* Legal Terms/Privacy Modal */}
+            <LegalModal
+                isOpen={legalModal.isOpen}
+                onClose={() => setLegalModal(prev => ({ ...prev, isOpen: false }))}
+                initialTab={legalModal.tab}
+            />
+
+            {/* PORTAL MODALS (Directives & Resources) */}
             <AnimatePresence>
                 {activeModal && (
                     <motion.div
@@ -452,59 +534,62 @@ export default function GovLanding() {
                         className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md"
                     >
                         <motion.div
-                            initial={{ scale: 0.9, y: 20, opacity: 0 }}
+                            initial={{ scale: 0.95, y: 16, opacity: 0 }}
                             animate={{ scale: 1, y: 0, opacity: 1 }}
-                            exit={{ scale: 0.9, y: 20, opacity: 0 }}
+                            exit={{ scale: 0.95, y: 16, opacity: 0 }}
                             onClick={e => e.stopPropagation()}
-                            className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[2.5rem] border border-[#f3e9e2] dark:border-slate-800 shadow-2xl overflow-hidden"
+                            className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"
                         >
-                            <div className="px-8 py-6 border-b border-[#f3e9e2] dark:border-slate-800 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-11 h-11 bg-[#ff6b00] rounded-2xl flex items-center justify-center shadow-lg shadow-[#ff6b00]/20">
-                                        {activeModal === 'directives' ? <FileCheck className="text-white" size={22} /> : <BookOpen className="text-white" size={22} />}
+                            <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                                <div className="flex items-center gap-3.5">
+                                    <div className="w-10 h-10 bg-orange-50 dark:bg-orange-950/60 text-[#ff6b00] rounded-xl flex items-center justify-center border border-orange-200 dark:border-orange-800/60">
+                                        {activeModal === 'directives' ? <FileCheck size={20} /> : <BookOpen size={20} />}
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-black text-[#2c1d11] dark:text-white tracking-tight capitalize">{activeModal}</h3>
-                                        <p className="text-[10px] font-bold text-[#736254] dark:text-slate-400 uppercase tracking-widest">Engineering Official Repository</p>
+                                        <h3 className="text-lg font-heading font-black text-slate-900 dark:text-white tracking-tight capitalize">{activeModal}</h3>
+                                        <p className="text-[10px] font-mono-data font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Engineering Official Repository</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setActiveModal(null)} className="p-2.5 hover:bg-[#ffefe5] dark:hover:bg-slate-800 rounded-full transition-colors text-[#736254] dark:text-slate-400">
-                                    <ChevronRight className="rotate-90" size={18} />
+                                <button 
+                                    onClick={() => setActiveModal(null)} 
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                                >
+                                    <X size={18} />
                                 </button>
                             </div>
 
-                            <div className="p-8 max-h-[60vh] overflow-y-auto">
+                            <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
                                 {activeModal === 'directives' ? (
                                     <div className="space-y-3">
                                         {DIRECTIVES.map(dir => (
-                                            <div key={dir.id} className="group p-5 rounded-2xl border border-[#f3e9e2] dark:border-slate-800 bg-[#fffbf9] dark:bg-slate-800/40 hover:border-[#ff6b00]/30 transition-all flex items-center justify-between">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="font-mono text-[10px] font-black p-1.5 bg-[#2c1d11] dark:bg-slate-700 text-white rounded shrink-0">{dir.id}</div>
+                                            <div key={dir.id} className="group p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-[#ff6b00]/40 transition-all flex items-center justify-between">
+                                                <div className="flex items-center gap-3.5">
+                                                    <div className="font-mono-data text-[10px] font-black px-2 py-1 bg-slate-900 dark:bg-slate-700 text-white rounded-md shrink-0">{dir.id}</div>
                                                     <div>
-                                                        <h4 className="font-bold text-sm text-[#2c1d11] dark:text-white group-hover:text-[#ff6b00] transition-colors">{dir.title}</h4>
-                                                        <p className="text-[10px] text-[#736254] dark:text-slate-400 font-bold uppercase tracking-widest mt-0.5">{dir.author} • {dir.date}</p>
+                                                        <h4 className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">{dir.title}</h4>
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">{dir.author} • {dir.date}</p>
                                                     </div>
                                                 </div>
-                                                <button className="flex items-center gap-1.5 text-[10px] font-black text-[#ff6b00] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                                    View <ExternalLink size={12} />
+                                                <button className="flex items-center gap-1 text-xs font-bold text-[#ff6b00] opacity-0 group-hover:opacity-100 transition-opacity shrink-0 cursor-pointer">
+                                                    <span>View</span> <ExternalLink size={12} />
                                                 </button>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                         {RESOURCES.map((res, i) => (
-                                            <div key={i} className="group p-5 rounded-2xl border border-[#f3e9e2] dark:border-slate-800 bg-[#fffbf9] dark:bg-slate-800/40 hover:border-[#ff6b00]/30 transition-all">
-                                                <div className="flex items-center gap-3 mb-3">
-                                                    <div className="w-9 h-9 bg-[#ffefe5] dark:bg-[#ff6b00]/15 rounded-xl flex items-center justify-center text-[#ff6b00]">
-                                                        <res.icon size={18} />
+                                            <div key={i} className="group p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-[#ff6b00]/40 transition-all">
+                                                <div className="flex items-center gap-2.5 mb-2.5">
+                                                    <div className="w-8 h-8 bg-orange-50 dark:bg-orange-950/60 text-[#ff6b00] rounded-lg flex items-center justify-center border border-orange-200 dark:border-orange-800/50">
+                                                        <res.icon size={16} />
                                                     </div>
-                                                    <div className="text-[10px] font-black text-[#ff6b00] uppercase tracking-widest">{res.type}</div>
+                                                    <div className="text-[10px] font-mono-data font-bold text-[#ff6b00] uppercase tracking-wider">{res.type}</div>
                                                 </div>
-                                                <h4 className="font-bold text-sm text-[#2c1d11] dark:text-white leading-tight mb-3 group-hover:text-[#ff6b00] transition-colors">{res.title}</h4>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[10px] font-bold text-[#736254] dark:text-slate-400 uppercase">{res.size}</span>
-                                                    <button className="p-1.5 bg-[#ffefe5] dark:bg-slate-700 rounded-lg text-[#ff6b00] dark:text-slate-300 hover:text-[#e65c00] transition-colors">
+                                                <h4 className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white leading-snug mb-2 group-hover:text-[#ff6b00] transition-colors">{res.title}</h4>
+                                                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                                                    <span className="text-[10px] font-mono-data text-slate-500 dark:text-slate-400">{res.size}</span>
+                                                    <button className="p-1 text-slate-400 hover:text-[#ff6b00] transition-colors cursor-pointer">
                                                         <ExternalLink size={13} />
                                                     </button>
                                                 </div>
@@ -514,9 +599,9 @@ export default function GovLanding() {
                                 )}
                             </div>
 
-                            <div className="px-8 py-5 bg-[#fffbf9] dark:bg-slate-800/40 border-t border-[#f3e9e2] dark:border-slate-800 text-center">
-                                <p className="text-[10px] font-bold text-[#736254] dark:text-slate-400 uppercase tracking-[0.2em]">
-                                    Confidential Administrative System • Authorized Use Only
+                            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-800 text-center">
+                                <p className="text-[10px] font-mono-data font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                    Confidential Administrative System • Authorized Personnel Only
                                 </p>
                             </div>
                         </motion.div>

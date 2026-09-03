@@ -10,6 +10,7 @@ import {
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
 import LegalModal from '../components/LegalModal';
+import OfficialBanner from '../components/landing/OfficialBanner';
 import '../index.css';
 
 export default function Login() {
@@ -448,8 +449,13 @@ export default function Login() {
     return (
         <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden">
 
+            {/* ── Official Government Banner (GOVPH standard) ───────────── */}
+            <div className="relative z-30 w-full">
+                <OfficialBanner />
+            </div>
+
             {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
-            <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 w-full flex justify-between items-center">
+            <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
                 {/* Logo on top-left linking to home */}
                 <Link
                     to="/"
