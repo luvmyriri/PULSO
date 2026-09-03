@@ -76,7 +76,10 @@ import {
     Landmark,
     Lightbulb,
     Cone,
-    Edit3
+    Edit3,
+    PlusCircle,
+    Flame,
+    Wrench
 } from 'lucide-react';
 
 import { useTheme } from '../contexts/ThemeContext';
@@ -134,10 +137,11 @@ const QUICK_FUNCTIONS_DATA = (t) => [
 ];
 
 const NAV_ITEMS = (t) => [
-    { id: 'overview', icon: <Home size={28} strokeWidth={2.5} />, label: t('dashboard.sidebar.overview', { defaultValue: 'Overview' }) },
-    { id: 'reports', icon: <FileText size={28} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My Reports' }) },
-    { id: 'profile', icon: <User size={28} />, label: t('dashboard.sidebar.profile', { defaultValue: 'Profile' }) },
-    { id: 'settings', icon: <Settings size={28} />, label: t('dashboard.sidebar.settings', { defaultValue: 'Settings' }) },
+    { id: 'overview', icon: <Home size={22} strokeWidth={2} />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
+    { id: 'reports', icon: <FileText size={22} strokeWidth={2} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
+    { id: 'report', icon: <Plus size={24} strokeWidth={3} />, label: t('dashboard.sidebar.report', { defaultValue: 'Report' }), isAction: true },
+    { id: 'updates', icon: <Bell size={22} strokeWidth={2} />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
+    { id: 'profile', icon: <User size={22} strokeWidth={2} />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
 ];
 
 const LGU_SERVICES_LIST = (t) => [
@@ -156,41 +160,81 @@ const KNOWLEDGE_BASE_ARTICLES = (t) => [
     { id: 4, title: t('knowledge.art4.title', { defaultValue: 'Noise Ordinance Info' }), category: t('knowledge.cat.community', { defaultValue: 'Community' }), excerpt: t('knowledge.art4.excerpt', { defaultValue: 'Understanding the city wide peace and order regulations.' }) },
 ];
 
-const LeftSidebar = ({ user, handleSetTab, handleSetModal, t }) => (
-    <div className="w-full h-full pb-6 hidden md:block pl-2 pr-4 lg:pr-6 pt-6">
-        <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-4 rounded-xl hover:bg-slate-200/50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group">
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative">
-                {user.avatar}
-                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </div>
-            <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-[15px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">{user.name}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{user.barangay}</p>
-            </div>
-        </div>
-        <nav className="space-y-1 mt-4">
-            <div className="px-3 pb-2 text-[13px] font-bold text-slate-500 dark:text-slate-400">{t('dashboard.sidebar.shortcuts', { defaultValue: 'Shortcuts' })}</div>
-            {QUICK_FUNCTIONS_DATA(t).map(func => (
-                <button
-                    key={func.id}
-                    onClick={func.modal ? () => handleSetModal(func.modal) : () => handleSetTab(func.tab)}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors focus:outline-none group text-left"
-                >
-                    <div className={`w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-${func.color}-500 shrink-0 group-hover:bg-white dark:group-hover:bg-slate-700 shadow-sm transition-colors`}>
-                        {func.icon}
+const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, t }) => {
+    const navList = [
+        { id: 'overview', icon: <Home size={20} strokeWidth={2} />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
+        { id: 'reports', icon: <FileText size={20} strokeWidth={2} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
+        { id: 'report', icon: <PlusCircle size={20} strokeWidth={2.5} />, label: t('dashboard.sidebar.report', { defaultValue: 'Report an issue' }), isPrimary: true },
+        { id: 'updates', icon: <Bell size={20} strokeWidth={2} />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
+        { id: 'profile', icon: <User size={20} strokeWidth={2} />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
+    ];
+
+    return (
+        <div className="w-full h-full pb-6 hidden lg:flex flex-col justify-between pl-2 pr-4 lg:pr-5 pt-6 border-r border-slate-200/80 dark:border-slate-800">
+            <div>
+                {/* User Identity Snapshot */}
+                <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-5 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 hover:border-orange-500/50 cursor-pointer transition-all group shadow-2xs">
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative">
+                        {user.avatar}
                     </div>
-                    <span className="font-semibold text-[15px] text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{func.label}</span>
-                </button>
-            ))}
-        </nav>
-        <div className="px-4 text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed mt-8">
-            <button onClick={() => handleSetModal('privacy')} className="hover:underline hover:text-orange-500 mr-2 inline-block">{t('footer.privacy', { defaultValue: 'Privacy' })}</button> ·
-            <button onClick={() => handleSetModal('terms')} className="hover:underline hover:text-orange-500 mx-2 inline-block">{t('footer.terms', { defaultValue: 'Terms' })}</button> ·
-            <button onClick={() => handleSetModal('cookies')} className="hover:underline hover:text-orange-500 mx-2 inline-block">{t('footer.cookie', { defaultValue: 'Cookies' })}</button> ·
-            <div className="mt-2 text-slate-400 dark:text-slate-600">PULSO Caloocan North © 2026</div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-[15px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">{user.name}</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.barangay}</p>
+                    </div>
+                </div>
+
+                {/* Persistent Side Navigation Rail (5 Items) */}
+                <nav className="space-y-1.5">
+                    {navList.map(item => {
+                        if (item.isPrimary) {
+                            return (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => handleSetModal('file-report')}
+                                    className="w-full my-2 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-extrabold text-sm tracking-wide shadow-md hover:shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                >
+                                    {item.icon}
+                                    <span>{item.label}</span>
+                                </button>
+                            );
+                        }
+
+                        const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
+
+                        return (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleSetTab(item.id)}
+                                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                                    isActive
+                                        ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] shadow-2xs border border-orange-200/60 dark:border-orange-800/40 font-extrabold'
+                                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white border border-transparent'
+                                }`}
+                            >
+                                <span className={isActive ? 'text-[#ff6b00]' : 'text-slate-400 group-hover:text-slate-600'}>
+                                    {item.icon}
+                                </span>
+                                <span>{item.label}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
+            </div>
+
+            {/* Supporting Footer Links */}
+            <div className="px-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed pt-6 border-t border-slate-200/60 dark:border-slate-800/60">
+                <div className="flex flex-wrap gap-2 mb-2">
+                    <button onClick={() => handleSetModal('privacy')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.privacy', { defaultValue: 'Privacy' })}</button> ·
+                    <button onClick={() => handleSetModal('terms')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.terms', { defaultValue: 'Terms' })}</button> ·
+                    <button onClick={() => handleSetModal('cookies')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.cookie', { defaultValue: 'Cookies' })}</button>
+                </div>
+                <div className="text-[11px] text-slate-400 dark:text-slate-600">PULSO Caloocan North © 2026</div>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const RightSidebar = ({
     user,
@@ -330,9 +374,441 @@ const RightSidebar = ({
     </div>
 );
 
-const LguFeed = ({ lguUpdates, loadingAdvisories, getIconForCategory, setSelectedPost, setActiveModal, containerVariants, t }) => (
+const ResidentHomeView = ({
+    user,
+    userReports,
+    loadingReports,
+    lguUpdates,
+    loadingAdvisories,
+    processedHazards,
+    handleSetTab,
+    setActiveModal,
+    setSelectedPost,
+    t
+}) => {
+    // 1. Alert Banner Data (Dynamic from urgent advisory or authoritative municipal alert)
+    const topAlert = (lguUpdates && lguUpdates.find(u => u.priority === 'urgent' || u.priority === 'critical')) || {
+        id: 'alert-default',
+        title: 'WALANG PASOK SA JULY 23',
+        description: 'Tuloy ang monitoring ng mga pangunahing kalsada at flood-prone areas.',
+        priority: 'urgent'
+    };
+
+    // 2. Latest Report Data: Most recent user report or realistic active ticket
+    const latestReport = (userReports && userReports.length > 0) ? userReports[0] : {
+        id: 'pul-demo-latest',
+        ticket_id: 'PUL-2026-0822',
+        status: 'assigned',
+        location_string: '10th Ave. cor. C. Garcia St., Grace Park',
+        created_at: new Date(Date.now() - 3600000 * 4).toISOString()
+    };
+
+    const trackerSteps = [
+        { id: 'received', label: 'Received' },
+        { id: 'reviewed', label: 'Reviewed' },
+        { id: 'assigned', label: 'Assigned' },
+        { id: 'in_progress', label: 'In progress' },
+        { id: 'resolved', label: 'Resolved' }
+    ];
+
+    const getStepIndex = (status) => {
+        const s = (status || '').toLowerCase();
+        if (s === 'resolved') return 4;
+        if (s === 'in_progress' || s === 'dispatched') return 3;
+        if (s === 'assigned' || s === 'approved_internal') return 2;
+        if (s === 'reviewed') return 1;
+        return 0; // received / pending
+    };
+
+    const currentStepIndex = getStepIndex(latestReport?.status || 'assigned');
+
+    // 3. Nearby Issues Data
+    const nearbyList = [
+        {
+            id: 'nb-1',
+            title: 'Sira na kanal sa bangketa',
+            address: '8th Ave. near Bagong Barrio Elem. School',
+            distance: '120 m',
+            icon: Wrench
+        },
+        {
+            id: 'nb-2',
+            title: 'Ilaw sa kalsada patay',
+            address: 'Camarin Rd. near Tala St.',
+            distance: '210 m',
+            icon: Zap
+        },
+        {
+            id: 'nb-3',
+            title: 'Tambak ng basura',
+            address: '10th Ave. near P. Burgos St.',
+            distance: '350 m',
+            icon: Cone
+        }
+    ];
+
+    // 4. Services & Emergency Contacts Data
+    const emergencyContacts = [
+        { id: 'ndrrmc', title: 'NDRRMC', num: '911', tel: '911', icon: ShieldCheck },
+        { id: 'pnp', title: 'Caloocan PNP', num: '8892-6166', tel: '0288926166', icon: ShieldAlert },
+        { id: 'bfp', title: 'BFP Caloocan', num: '8896-5700', tel: '0288965700', icon: Flame },
+        { id: 'drrmo', title: 'Caloocan DRRMO', num: '8397-6212', tel: '0283976212', icon: Truck }
+    ];
+
+    // Top city updates for sidebar / teaser
+    const displayUpdates = (lguUpdates && lguUpdates.length > 0) ? lguUpdates.slice(0, 3) : [
+        {
+            id: 'u-1',
+            title: 'Road reblocking sa EDSA-Philcoa flyover',
+            description: 'Hulyo 25–27. Mag-ingat at planuhin ang biyahe.',
+            created_at: new Date().toISOString()
+        },
+        {
+            id: 'u-2',
+            title: 'Maynilad Scheduled Water Interruption',
+            description: 'Brgy. 171, 175, 178 emergency pipe maintenance.',
+            created_at: new Date().toISOString()
+        }
+    ];
+
+    const copyOrCall = (e, tel) => {
+        if (!navigator.userAgent.match(/Mobi|Android|iPhone/i)) {
+            // Desktop helper
+            navigator.clipboard?.writeText(tel);
+        }
+    };
+
+    return (
+        <div className="w-full max-w-[1400px] mx-auto pb-28 lg:pb-8 pt-2 sm:pt-4 px-3 sm:px-4 lg:px-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
+                
+                {/* ── LEFT COLUMN (Primary, ~65-70% on desktop) ── */}
+                <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4 sm:gap-5 w-full">
+                    
+                    {/* 1. Alert Banner */}
+                    <div 
+                        onClick={() => {
+                            if (topAlert.title.includes('JULY 23')) {
+                                setActiveModal('services');
+                            } else {
+                                setSelectedPost(topAlert);
+                                setActiveModal('post-details');
+                            }
+                        }}
+                        className="w-full p-3.5 sm:p-4 rounded-2xl bg-orange-50/90 dark:bg-orange-950/40 border border-orange-300 dark:border-orange-800/80 shadow-xs hover:shadow-md transition-all flex items-center justify-between gap-3 cursor-pointer group"
+                    >
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-orange-500/15 dark:bg-orange-500/25 text-[#ff6b00] flex items-center justify-center shrink-0">
+                                <AlertTriangle size={22} className="text-[#ff6b00]" />
+                            </div>
+                            <div className="min-w-0">
+                                <h4 className="font-heading font-black text-xs sm:text-sm text-red-600 dark:text-red-400 tracking-wide uppercase leading-tight">
+                                    {topAlert.title}
+                                </h4>
+                                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium line-clamp-1 mt-0.5">
+                                    {topAlert.description}
+                                </p>
+                            </div>
+                        </div>
+                        <ChevronRight size={18} className="text-orange-500 shrink-0 transform group-hover:translate-x-1 transition-transform" />
+                    </div>
+
+                    {/* 2. Latest Report Card */}
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+                        <div className="p-4 sm:p-5">
+                            {/* Header: Title, Ticket ID, Status Badge */}
+                            <div className="flex items-start justify-between gap-2 mb-4 sm:mb-6">
+                                <div>
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-0.5">
+                                        Latest report
+                                    </span>
+                                    <h3 className="font-mono-data font-black text-base sm:text-lg text-slate-900 dark:text-white tracking-wide">
+                                        {latestReport.ticket_id || 'PUL-2026-0822'}
+                                    </h3>
+                                </div>
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800/80 text-orange-600 dark:text-orange-400 text-xs font-bold capitalize">
+                                    <User size={13} className="shrink-0" />
+                                    <span>{latestReport.status || 'Assigned'}</span>
+                                </div>
+                            </div>
+
+                            {/* 5-Step Horizontal Tracker with Desktop Breathing Room */}
+                            <div className="w-full py-2 sm:py-3 px-1 sm:px-3">
+                                <div className="relative flex items-center justify-between w-full">
+                                    {/* Base Inactive Track Line */}
+                                    <div className="absolute top-[13px] sm:top-[15px] left-[15px] sm:left-[20px] right-[15px] sm:right-[20px] h-[3px] bg-slate-200 dark:bg-slate-800 z-0" />
+                                    {/* Active Completed Track Line */}
+                                    <div 
+                                        className="absolute top-[13px] sm:top-[15px] left-[15px] sm:left-[20px] h-[3px] bg-[#ff6b00] transition-all duration-500 z-0" 
+                                        style={{ width: `${(currentStepIndex / (trackerSteps.length - 1)) * 100}%` }}
+                                    />
+
+                                    {/* Steps */}
+                                    {trackerSteps.map((step, idx) => {
+                                        const isCompleted = idx < currentStepIndex;
+                                        const isCurrent = idx === currentStepIndex;
+                                        return (
+                                            <div key={step.id} className="relative z-10 flex flex-col items-center">
+                                                <div 
+                                                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
+                                                        isCompleted
+                                                            ? 'bg-[#ff6b00] text-white shadow-xs'
+                                                            : isCurrent
+                                                                ? 'bg-white dark:bg-slate-900 border-2 border-[#ff6b00] text-[#ff6b00] ring-4 ring-orange-500/20'
+                                                                : 'bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-transparent'
+                                                    }`}
+                                                >
+                                                    {isCompleted ? (
+                                                        <Check size={14} strokeWidth={3} />
+                                                    ) : isCurrent ? (
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-[#ff6b00]" />
+                                                    ) : null}
+                                                </div>
+                                                <span 
+                                                    className={`text-[10px] sm:text-xs mt-2 text-center whitespace-nowrap ${
+                                                        idx <= currentStepIndex
+                                                            ? 'text-slate-900 dark:text-white font-bold'
+                                                            : 'text-slate-500 dark:text-slate-400 font-medium'
+                                                    }`}
+                                                >
+                                                    {step.label}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Location Footer Strip */}
+                        <div 
+                            onClick={() => setActiveModal('map')}
+                            className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/40 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] cursor-pointer transition-colors"
+                        >
+                            <div className="flex items-center gap-2 truncate pr-2">
+                                <MapPin size={15} className="text-slate-500 dark:text-slate-400 shrink-0" />
+                                <span className="truncate">{latestReport.location_string || '10th Ave. cor. C. Garcia St., Grace Park'}</span>
+                            </div>
+                            <ChevronRight size={16} className="shrink-0 text-slate-500" />
+                        </div>
+                    </div>
+
+                    {/* 3. Primary "Report an issue" CTA Button */}
+                    <button
+                        type="button"
+                        onClick={() => setActiveModal('file-report')}
+                        className="w-full sm:w-auto self-stretch sm:self-start inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-extrabold text-sm sm:text-base tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[50px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
+                        aria-label="Report an issue"
+                    >
+                        <PlusCircle size={20} className="text-white shrink-0" />
+                        <span>Report an issue</span>
+                    </button>
+
+                    {/* 4. Nearby Issues Card */}
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+                        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                            <MapPin size={18} className="text-[#ff6b00]" />
+                            <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                                Nearby issues
+                            </h3>
+                        </div>
+
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {nearbyList.map(item => {
+                                const ItemIcon = item.icon;
+                                return (
+                                    <div 
+                                        key={item.id}
+                                        onClick={() => setActiveModal('map')}
+                                        className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0 group-hover:text-[#ff6b00] transition-colors">
+                                                <ItemIcon size={18} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-[#ff6b00] transition-colors">
+                                                    {item.title}
+                                                </h4>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                    {item.address}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0 text-xs font-mono font-bold text-[#ff6b00]">
+                                            <span>{item.distance}</span>
+                                            <ChevronRight size={15} className="transform group-hover:translate-x-0.5 transition-transform" />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div 
+                            onClick={() => setActiveModal('map')}
+                            className="p-3 bg-slate-50/50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800 text-center text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] cursor-pointer transition-colors flex items-center justify-center gap-1"
+                        >
+                            <span>View more nearby issues</span>
+                            <ChevronRight size={14} />
+                        </div>
+                    </div>
+
+                </div>
+
+                {/* ── RIGHT COLUMN (Secondary Sidebar Content, ~30-35% on desktop) ── */}
+                <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-4 sm:gap-5 w-full">
+                    
+                    {/* 1. City Updates Card */}
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+                        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Radio size={18} className="text-[#ff6b00]" />
+                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                                    City updates
+                                </h3>
+                            </div>
+                            <button 
+                                onClick={() => handleSetTab('overview')} 
+                                className="text-xs font-bold text-[#ff6b00] hover:underline cursor-pointer"
+                            >
+                                View all
+                            </button>
+                        </div>
+
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {displayUpdates.map((update, uIdx) => (
+                                <div 
+                                    key={update.id || uIdx}
+                                    onClick={() => { setSelectedPost(update); setActiveModal('post-details'); }}
+                                    className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-start justify-between gap-2 cursor-pointer group"
+                                >
+                                    <div className="min-w-0 pr-2">
+                                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors line-clamp-1">
+                                            {update.title}
+                                        </h4>
+                                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                                            {update.description}
+                                        </p>
+                                    </div>
+                                    <ChevronRight size={16} className="text-slate-400 group-hover:text-[#ff6b00] shrink-0 mt-0.5 transform group-hover:translate-x-0.5 transition-transform" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 2. Services & Emergency Contacts Grid */}
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-4 sm:p-5">
+                        <div className="flex items-center gap-2 mb-3.5">
+                            <PhoneCall size={18} className="text-[#ff6b00]" />
+                            <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                                Services &amp; emergency contacts
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                            {emergencyContacts.map(ec => {
+                                const IconComp = ec.icon;
+                                return (
+                                    <a
+                                        key={ec.id}
+                                        href={`tel:${ec.tel}`}
+                                        onClick={(e) => copyOrCall(e, ec.tel)}
+                                        className="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 hover:border-[#ff6b00]/60 hover:bg-orange-50/50 dark:hover:bg-orange-950/20 transition-all text-center group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-white dark:bg-slate-700 text-[#ff6b00] flex items-center justify-center mb-1.5 shadow-2xs group-hover:scale-105 transition-transform">
+                                            <IconComp size={18} />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-slate-900 dark:text-white leading-tight">
+                                            {ec.title}
+                                        </span>
+                                        <span className="text-[11px] font-mono font-bold text-orange-600 dark:text-orange-400 mt-0.5">
+                                            {ec.num}
+                                        </span>
+                                    </a>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
+const LguFeed = ({ lguUpdates, loadingAdvisories, getIconForCategory, setSelectedPost, setActiveModal, handleSetTab, containerVariants, t }) => (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full">
-        <div className="mb-4 hidden md:block relative pb-4">
+        {/* ── CORE RESIDENT ACTIONS ZONE: 4 large tappable cards ── */}
+        <div className="mb-6 w-full">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full">
+                {/* 1. Report an Issue (Primary Action - Filled Orange) */}
+                <button
+                    type="button"
+                    onClick={() => setActiveModal('file-report')}
+                    className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[92px] sm:min-h-[104px] text-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="Report an Issue"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center mb-1.5 shrink-0">
+                        <Camera size={22} className="text-white" />
+                    </div>
+                    <span className="font-heading font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+                        Report an Issue
+                    </span>
+                </button>
+
+                {/* 2. Track My Report */}
+                <button
+                    type="button"
+                    onClick={() => handleSetTab && handleSetTab('reports')}
+                    className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-800 hover:border-[#ff6b00]/60 active:scale-[0.98] text-slate-900 dark:text-white transition-all shadow-xs hover:shadow-md min-h-[92px] sm:min-h-[104px] text-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="Track My Report"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center mb-1.5 shrink-0">
+                        <Search size={22} className="text-[#ff6b00]" />
+                    </div>
+                    <span className="font-heading font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+                        Track My Report
+                    </span>
+                </button>
+
+                {/* 3. News */}
+                <button
+                    type="button"
+                    onClick={() => {
+                        const el = document.getElementById('advisories-feed');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-800 hover:border-[#ff6b00]/60 active:scale-[0.98] text-slate-900 dark:text-white transition-all shadow-xs hover:shadow-md min-h-[92px] sm:min-h-[104px] text-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="News"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center mb-1.5 shrink-0">
+                        <Bell size={22} className="text-[#ff6b00]" />
+                    </div>
+                    <span className="font-heading font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+                        News
+                    </span>
+                </button>
+
+                {/* 4. Other Services */}
+                <button
+                    type="button"
+                    onClick={() => setActiveModal('services')}
+                    className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-800 hover:border-[#ff6b00]/60 active:scale-[0.98] text-slate-900 dark:text-white transition-all shadow-xs hover:shadow-md min-h-[92px] sm:min-h-[104px] text-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="Other Services"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center mb-1.5 shrink-0">
+                        <Handshake size={22} className="text-[#ff6b00]" />
+                    </div>
+                    <span className="font-heading font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+                        Other Services
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        {/* ── Official Board & Advisories (Demoted below 4-action grid) ── */}
+        <div id="advisories-feed" className="mb-4 relative pb-2 pt-1">
             <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white flex items-center gap-2 px-1">
                 <ShieldCheck className="text-orange-500" size={24} /> {t('dashboard.overview.latestUpdate', { defaultValue: 'Official Board' })}
             </h2>
@@ -3453,36 +3929,37 @@ const TopNavigation = ({
                     </button>
                 </div>
 
-                {/* Center Navigation Tabs (Visible on Desktop / Tablet md+) */}
-                <nav className="hidden md:flex items-center justify-center gap-1 lg:gap-4 h-full flex-1 max-w-[540px]">
-                    {navItems.map(item => (
+                {/* Center Header Space (Navigation is persistently handled in Left Rail on Desktop and Bottom Bar on Mobile) */}
+                <div className="flex-1" />
+
+                {/* Right Area: Language Toggle, Profile, Theme, Notifications */}
+                <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+
+                    {/* Language Toggle Pill [ EN | FIL ] */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-full p-0.5 border border-slate-200 dark:border-slate-700/60 shadow-2xs">
                         <button
-                            key={item.id}
-                            onClick={() => handleSetTab(item.id)}
-                            className={`relative h-full px-3 lg:px-6 flex flex-col items-center justify-center transition-colors group focus:outline-none 
-                                ${activeTab === item.id
-                                    ? 'text-orange-500'
-                                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                                }`}
+                            type="button"
+                            onClick={() => i18n?.changeLanguage('en')}
+                            className={`px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition-all cursor-pointer ${
+                                !i18n?.language?.startsWith('tl') && !i18n?.language?.startsWith('fil')
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                            }`}
                         >
-                            <div className="relative">
-                                {React.cloneElement(item.icon, {
-                                    size: 22,
-                                    className: `transition-transform duration-200 ${activeTab === item.id ? 'stroke-[2.5px]' : 'group-hover:scale-110'}`
-                                })}
-                            </div>
-                            <span className="text-[11px] font-semibold mt-0.5 whitespace-nowrap truncate max-w-[100px] lg:max-w-[140px] px-1">{item.label}</span>
-
-                            {/* Active Tab Indicator */}
-                            {activeTab === item.id && (
-                                <motion.div layoutId="activeTabBottom" className="absolute bottom-0 left-0 right-0 h-[3px] bg-orange-500 rounded-t-full" />
-                            )}
+                            EN
                         </button>
-                    ))}
-                </nav>
-
-                {/* Right Area: Profile, Theme, Notifications */}
-                <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => i18n?.changeLanguage('tl')}
+                            className={`px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold transition-all cursor-pointer ${
+                                i18n?.language?.startsWith('tl') || i18n?.language?.startsWith('fil')
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                        >
+                            FIL
+                        </button>
+                    </div>
 
                     {/* Theme Toggle menu item */}
                     <div className="hidden lg:flex bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700/50">
@@ -4671,132 +5148,124 @@ export default function ResidentDashboard() {
                 setReportStatusFilter={setReportStatusFilter}
             />
 
-            {/* Main Layout Grid (Responsive 1/2/3-Column Layout) */}
+            {/* Main Layout Grid (Responsive 2-Column Content + Persistent Side Nav) */}
             <main className="flex-1 overflow-hidden w-full flex flex-col relative">
 
-                <div className="max-w-[1600px] mx-auto w-full px-0 sm:px-4 h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)]">
+                <div className="max-w-[1700px] mx-auto w-full px-0 sm:px-4 h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)] flex">
+
+                    {/* Persistent Desktop Left Side Navigation Rail (≥1024px) */}
+                    <aside className="w-60 xl:w-64 shrink-0 hidden lg:block h-full overflow-y-auto custom-scrollbar">
+                        <LeftSidebar
+                            user={user}
+                            activeTab={activeTab}
+                            handleSetTab={handleSetTab}
+                            handleSetModal={handleSetModal}
+                            t={t}
+                        />
+                    </aside>
 
                     {/* Content switcher based on tabs */}
-                    {(activeTab === 'overview' || activeTab === 'home') && (
-                        <div className="w-full h-full flex flex-col md:flex-row items-center md:items-start justify-center gap-0 lg:gap-6 xl:gap-8">
+                    <div className="flex-1 min-w-0 h-full overflow-y-auto custom-scrollbar">
+                        {(activeTab === 'overview' || activeTab === 'home') && (
+                            <ResidentHomeView
+                                user={user}
+                                userReports={userReports}
+                                loadingReports={loadingReports}
+                                lguUpdates={lguUpdates}
+                                loadingAdvisories={loadingAdvisories}
+                                processedHazards={processedHazards}
+                                handleSetTab={handleSetTab}
+                                setActiveModal={setActiveModal}
+                                setSelectedPost={setSelectedPost}
+                                t={t}
+                            />
+                        )}
 
-                            {/* Left Column (Shortcuts) - 280px to 320px on Desktop */}
-                            <aside className="w-[280px] lg:w-[300px] xl:w-[320px] shrink-0 hidden md:block h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar">
-                                <LeftSidebar
-                                    user={user}
-                                    handleSetTab={handleSetTab}
+                        {activeTab === 'reports' && (
+                            <div className="w-full max-w-5xl mx-auto pb-28 lg:pb-8 pt-3 sm:pt-6 px-3 sm:px-6">
+                                <MyReports
+                                    userReports={userReports}
+                                    loadingReports={loadingReports}
                                     handleSetModal={handleSetModal}
+                                    containerVariants={containerVariants}
+                                    setZoomedImage={setZoomedImage}
+                                    reportStatusFilter={reportStatusFilter}
+                                    setReportStatusFilter={setReportStatusFilter}
+                                    handleCancelReport={handleCancelReport}
                                     t={t}
                                 />
-                            </aside>
-
-                            {/* Mobile Layout Shortcuts Strip (Touch-Optimized Horizontal Carousel) */}
-                            <div className="md:hidden w-full px-3 sm:px-4 pt-3 pb-2.5 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 shrink-0 relative z-20 shadow-xs">
-                                <div className="flex items-center justify-between mb-2 px-1">
-                                    <h3 className="font-extrabold text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                        {t('dashboard.overview.shortcuts', { defaultValue: 'Quick Shortcuts' })}
-                                    </h3>
-                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">Swipe →</span>
-                                </div>
-                                <div className="flex overflow-x-auto gap-2.5 pb-2 snap-x hide-scrollbar -mx-1 px-1">
-                                    {quickFunctions.map((func) => (
-                                        <button
-                                            key={func.id}
-                                            onClick={func.action}
-                                            className="min-w-[80px] max-w-[88px] flex flex-col items-center justify-center p-2 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 snap-start active:scale-95 transition-all shadow-2xs hover:border-orange-500/50 group"
-                                        >
-                                            <div className={`w-11 h-11 rounded-xl bg-white dark:bg-slate-700 flex items-center justify-center mb-1 text-${func.color}-500 shadow-2xs border border-slate-100 dark:border-slate-600 group-hover:scale-105 transition-transform`}>
-                                                {func.icon}
-                                            </div>
-                                            <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200 text-center leading-tight line-clamp-2">{func.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
                             </div>
+                        )}
 
-                            {/* Center Column (Main Feed) - Responsive width with mobile bottom padding */}
-                            <div className="flex-1 w-full min-w-0 max-w-[680px] h-full overflow-y-auto custom-scrollbar pb-28 md:pb-8 pt-2 md:pt-6 px-3 sm:px-4 md:px-2">
+                        {activeTab === 'updates' && (
+                            <div className="w-full max-w-3xl mx-auto pb-28 lg:pb-8 pt-3 sm:pt-6 px-3 sm:px-6">
                                 <LguFeed
                                     lguUpdates={lguUpdates}
                                     loadingAdvisories={loadingAdvisories}
                                     getIconForCategory={getIconForCategory}
                                     setSelectedPost={setSelectedPost}
                                     setActiveModal={setActiveModal}
+                                    handleSetTab={handleSetTab}
                                     containerVariants={containerVariants}
                                     t={t}
                                 />
                             </div>
+                        )}
 
-                            {/* Right Column (Widgets) - 320px on Desktop */}
-                            <aside className="w-[320px] shrink-0 hidden xl:block h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar">
-                                <RightSidebar
+                        {activeTab === 'profile' && (
+                            <div className="w-full max-w-4xl mx-auto pb-28 lg:pb-8 pt-3 sm:pt-6 px-3 sm:px-6">
+                                <ProfileView
                                     user={user}
-                                    handleSetModal={handleSetModal}
+                                    setUser={setUser}
+                                    handleUpdateProfile={handleUpdateProfile}
+                                    updatingProfile={updatingProfile}
+                                    containerVariants={containerVariants}
                                     userReports={userReports}
-                                    loadingReports={loadingReports}
-                                    processedHazards={processedHazards}
-                                    setSelectedHazard={setSelectedHazard}
-                                    map={map}
+                                    showToast={showToast}
                                     t={t}
                                 />
-                            </aside>
+                            </div>
+                        )}
 
-                        </div>
-                    )}
-
-                    {/* Full Width Tab Views Container */}
-                    {activeTab !== 'overview' && activeTab !== 'home' && (
-                        <div className="w-full h-full overflow-y-auto custom-scrollbar flex flex-col items-center pb-28 md:pb-8 pt-3 sm:pt-6 px-3 sm:px-6">
-                            {activeTab === 'reports' && (
-                                <div className="w-full max-w-5xl">
-                                    <MyReports
-                                        userReports={userReports}
-                                        loadingReports={loadingReports}
-                                        handleSetModal={handleSetModal}
-                                        containerVariants={containerVariants}
-                                        setZoomedImage={setZoomedImage}
-                                        reportStatusFilter={reportStatusFilter}
-                                        setReportStatusFilter={setReportStatusFilter}
-                                        handleCancelReport={handleCancelReport}
-                                        t={t}
-                                    />
-                                </div>
-                            )}
-                            {activeTab === 'profile' && (
-                                <div className="w-full max-w-4xl">
-                                    <ProfileView
-                                        user={user}
-                                        setUser={setUser}
-                                        handleUpdateProfile={handleUpdateProfile}
-                                        updatingProfile={updatingProfile}
-                                        containerVariants={containerVariants}
-                                        userReports={userReports}
-                                        showToast={showToast}
-                                        t={t}
-                                    />
-                                </div>
-                            )}
-                            {activeTab === 'settings' && (
-                                <div className="w-full max-w-4xl">
-                                    <SettingsView
-                                        user={user}
-                                        handleLogout={handleLogout}
-                                        containerVariants={containerVariants}
-                                        token={token}
-                                        showToast={showToast}
-                                        t={t}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
+                        {activeTab === 'settings' && (
+                            <div className="w-full max-w-4xl mx-auto pb-28 lg:pb-8 pt-3 sm:pt-6 px-3 sm:px-6">
+                                <SettingsView
+                                    user={user}
+                                    handleLogout={handleLogout}
+                                    containerVariants={containerVariants}
+                                    token={token}
+                                    showToast={showToast}
+                                    t={t}
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </main>
 
             {/* ── Mobile Bottom Navigation Bar (Ultra-responsive, glassmorphism, touch-optimized) ── */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around">
+            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around">
                 {navItems.map((item) => {
-                    const isActive = activeTab === item.id;
+                    if (item.id === 'report') {
+                        return (
+                            <button
+                                key="report"
+                                type="button"
+                                onClick={() => handleSetModal('file-report')}
+                                className="flex flex-col items-center justify-center -mt-6 group focus:outline-none cursor-pointer"
+                                aria-label="Report an issue"
+                            >
+                                <div className="w-12 h-12 rounded-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-90 text-white shadow-lg flex items-center justify-center border-3 border-white dark:border-slate-900 transition-transform group-hover:scale-105">
+                                    <Plus size={26} strokeWidth={3} />
+                                </div>
+                                <span className="text-[10px] font-extrabold text-[#ff6b00] mt-0.5">
+                                    {item.label}
+                                </span>
+                            </button>
+                        );
+                    }
+
+                    const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
                     return (
                         <button
                             key={item.id}

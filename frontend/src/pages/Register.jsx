@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown, Calendar, ChevronRight, UserCheck, Bell, FileCheck, MapPin } from 'lucide-react';
+import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown, Calendar, ChevronRight, UserCheck, Bell, FileCheck, MapPin, Check } from 'lucide-react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import Branding from '../components/Branding';
+import ThemeToggle from '../components/ThemeToggle';
 import IDCameraModal from '../components/IDCameraModal';
 import LegalModal from '../components/LegalModal';
 
@@ -915,116 +916,123 @@ export default function Register() {
     const step2Valid = formData.firstName && formData.lastName && formData.dob && formData.barangay && !ageError;
 
     return (
-        <div className="relative min-h-screen w-full bg-[#fffbf9] dark:bg-[#070a12] font-sans text-slate-900 dark:text-white flex flex-col justify-between transition-colors duration-500 overflow-x-hidden">
+        <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] font-sans text-slate-900 dark:text-white flex flex-col justify-between transition-colors duration-300 overflow-x-hidden">
 
-            {/* ── High-Performance Ambient Mesh Backdrop ──────────── */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-                <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[850px] sm:w-[1000px] h-[450px] bg-gradient-to-tr from-orange-500/15 via-amber-500/10 to-transparent rounded-full blur-[130px]" />
-                <div className="absolute top-1/3 -right-32 w-[400px] h-[400px] bg-orange-500/10 dark:bg-orange-500/15 rounded-full blur-[110px]" />
-                <div className="absolute bottom-10 -left-32 w-[400px] h-[400px] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[110px]" />
-                <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 dark:opacity-20" />
+            {/* ── Background Seal Watermark (Inherited from Landing Page) ───── */}
+            <div
+                className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 flex items-center justify-end"
+                aria-hidden="true"
+            >
+                <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
+                    <div className="absolute inset-0 rounded-full border-2 border-orange-500/30 dark:border-white/20 animate-pulse" style={{ animationDuration: '6s' }} />
+                    <div className="absolute inset-[-18px] sm:inset-[-24px] rounded-full border border-dashed border-[#ff6b00]/40 dark:border-[#ff6b00]/30" />
+                    <div className="absolute inset-[-36px] sm:inset-[-50px] rounded-full border border-slate-400/25 dark:border-white/10" />
+
+                    <img
+                        src="/engineering-logo.jpg"
+                        alt="Official Caloocan City Seal Watermark"
+                        className="w-full h-full object-contain rounded-full drop-shadow-sm dark:brightness-105"
+                        loading="eager"
+                    />
+
+                    <div className="absolute inset-0 rounded-full bg-radial from-transparent via-transparent to-white/40 dark:to-[#070a12]/50 pointer-events-none" />
+                </div>
             </div>
 
-            {/* ── Navigation Header ────── */}
-            <header className="relative z-50 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 w-full flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                    <Branding size="h-9 sm:h-10" showText={false} />
-                    <div className="flex items-center gap-2">
-                        <span className="text-xl sm:text-2xl font-black tracking-tighter text-slate-900 dark:text-white">PULSO</span>
-                        <span className="px-2.5 py-0.5 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-full text-[10px] font-bold tracking-wider uppercase border border-orange-500/20">
-                            Resident Registration
-                        </span>
-                    </div>
-                </div>
+            {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
+            <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 w-full flex justify-between items-center">
+                {/* Logo on top-left linking to home */}
+                <Link
+                    to="/"
+                    className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
+                    title="Caloocan City PULSO Home"
+                >
+                    <Branding size="h-9 w-9 sm:h-10 sm:w-10" />
+                </Link>
 
-                <div className="flex items-center gap-3 sm:gap-4">
-                    {/* Theme Toggle Button Bar */}
-                    <div className="flex bg-white/70 dark:bg-slate-800/70 backdrop-blur-md rounded-full p-1 border border-slate-200 dark:border-slate-700/60 shadow-sm">
-                        <button onClick={() => changeTheme('light')} title="Light Theme" className={`p-1.5 rounded-full transition-all ${theme === 'light' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Sun size={14} /></button>
-                        <button onClick={() => changeTheme('system')} title="System Theme" className={`p-1.5 rounded-full transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-700 text-orange-500 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Monitor size={14} /></button>
-                        <button onClick={() => changeTheme('dark')} title="Dark Theme" className={`p-1.5 rounded-full transition-all ${theme === 'dark' ? 'bg-slate-700 text-orange-500 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Moon size={14} /></button>
-                    </div>
-
-                    <button 
-                        onClick={() => navigate('/')} 
-                        className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 transition-colors uppercase tracking-wider bg-white/80 dark:bg-slate-800/80 backdrop-blur-md px-3.5 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm"
+                {/* Right side: Theme Toggle & Home Navigation */}
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                    <ThemeToggle />
+                    <Link
+                        to="/"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                        title="Return to Home Section"
                     >
-                        <Home size={14} /> <span className="hidden sm:inline">Home</span>
-                    </button>
+                        <Home size={14} className="text-[#ff6b00]" />
+                        <span className="hidden sm:inline">Home</span>
+                    </Link>
                 </div>
             </header>
 
-            {/* ── Main Content Grid ─────── */}
-            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-4 lg:py-8 flex-1 flex flex-col justify-center">
+            {/* ── Main Content Grid (5-col / 7-col ratio in max-w-7xl) ────── */}
+            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-6 sm:py-10 lg:py-14 flex-1 flex flex-col justify-center">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
                     
-                    {/* Left: Professional Community Spotlight Panel */}
-                    <div className="lg:col-span-5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                    {/* Left: Professional Community Spotlight Panel (5 cols) */}
+                    <div className="lg:col-span-5 text-left max-w-xl mx-auto lg:mx-0 w-full">
                         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
-                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-full text-xs font-bold tracking-wider uppercase mb-4 border border-orange-500/20">
-                                <ShieldCheck size={14} /> Caloocan City Resident
+                            
+                            {/* Super-Badge */}
+                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
+                                <span>🏛 CITY OF CALOOCAN • CITIZEN VERIFICATION</span>
                             </div>
                             
-                            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-[1.1] mb-4 tracking-tight">
-                                Become the <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-orange-600">Eyes &amp; Ears</span> of Your Community
+                            {/* 800-weight Display Title */}
+                            <h1 className="font-heading font-black text-3xl sm:text-4xl lg:text-5xl text-slate-900 dark:text-white leading-[1.12] mb-4 tracking-tight">
+                                Become the <span className="text-[#ff6b00]">Eyes &amp; Ears</span> of Your Community.
                             </h1>
                             
-                            <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 font-medium mb-8 leading-relaxed">
-                                Join PULSO to report public utility issues, track ongoing maintenance, and collaborate with City Engineers to keep Caloocan City safe.
+                            {/* Subtitle */}
+                            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-normal leading-relaxed mb-6 max-w-xl">
+                                Join PULSO to report municipal infrastructure hazards, track field repair dispatches in real-time, and collaborate directly with City Engineering crews across Caloocan.
                             </p>
 
-                            {/* Benefit Feature List */}
-                            <div className="space-y-4 text-left mb-8 hidden sm:block">
-                                <div className="flex items-start gap-3 p-3.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm">
-                                    <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
-                                        <Bell size={18} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Instant Incident Reporting</h4>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Report utility issues and infrastructure concerns directly to local dispatchers.</p>
-                                    </div>
-                                </div>
 
-                                <div className="flex items-start gap-3 p-3.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm">
-                                    <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
-                                        <FileCheck size={18} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Automated AI Document Audit</h4>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Upload any valid Philippine ID to instantly verify residency and authenticate your account.</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-3 p-3.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm">
-                                    <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
-                                        <MapPin size={18} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">All Caloocan Barangays Covered</h4>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Tailored for all Caloocan City neighborhoods with precise barangay mapping.</p>
-                                    </div>
-                                </div>
-                            </div>
                         </motion.div>
                     </div>
 
-                    {/* Right: Registration Form Wizard Panel */}
+                    {/* Right: Registration Form Wizard Panel (7 cols) */}
                     <div className="lg:col-span-7 w-full max-w-2xl lg:max-w-none mx-auto">
                         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
-                            <div className="relative bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl transition-colors duration-500">
-                    {/* Stepper */}
-                    <div className="flex items-center mb-6 relative px-1">
-                        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 dark:bg-slate-700 -translate-y-1/2 z-0 rounded-full" />
-                        <div className={`absolute top-1/2 left-0 h-0.5 bg-orange-500 -translate-y-1/2 z-0 rounded-full transition-all duration-500 ${step === 1 ? 'w-0' : step === 2 ? 'w-1/3' : step === 3 ? 'w-2/3' : 'w-full'}`} />
-                        {[1, 2, 3, 4].map(s => (
-                            <div key={s} className={`relative z-10 flex items-center justify-center w-9 h-9 rounded-full font-bold text-sm border-2 transition-all duration-300 mr-auto last:mr-0
-                                ${step > s ? 'bg-orange-500 border-orange-500 text-white shadow-md' :
-                                  step === s ? 'bg-orange-500 border-orange-500 text-white shadow-lg ring-4 ring-orange-200 dark:ring-orange-950' :
-                                  'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-400'}`}>
-                                {step > s ? <CheckCircle size={16} /> : s}
-                            </div>
-                        ))}
-                    </div>
+                            <div className="relative bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-8 lg:p-10 shadow-xl transition-colors duration-300">
+                                
+                                {/* Stepper: Segmented Step Bar */}
+                                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-6 p-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+                                    {[
+                                        { num: 1, label: 'Identity' },
+                                        { num: 2, label: 'Details' },
+                                        { num: 3, label: 'Credentials' },
+                                        { num: 4, label: 'Verify' },
+                                    ].map((s) => {
+                                        const isActive = step === s.num;
+                                        const isDone = step > s.num;
+                                        return (
+                                            <div
+                                                key={s.num}
+                                                className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-center transition-all ${
+                                                    isActive
+                                                        ? 'bg-[#ff6b00] text-white shadow-xs font-bold'
+                                                        : isDone
+                                                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-200 dark:border-emerald-800/40'
+                                                        : 'text-slate-500 dark:text-slate-400 font-medium'
+                                                }`}
+                                            >
+                                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono-data shrink-0 ${
+                                                    isActive
+                                                        ? 'bg-white text-[#ff6b00] font-black'
+                                                        : isDone
+                                                        ? 'bg-emerald-500 text-white'
+                                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                                }`}>
+                                                    {isDone ? <Check size={11} /> : s.num}
+                                                </span>
+                                                <span className="text-[11px] sm:text-xs truncate hidden sm:inline">
+                                                    {s.label}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
 
                     {/* Step title */}
                     <div className="mb-5">
@@ -1052,24 +1060,24 @@ export default function Register() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
                                     
                                     {/* ID Front Card */}
-                                    <div className={`relative group rounded-2xl border transition-all duration-300 overflow-hidden ${
+                                    <div className={`relative group rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
                                         formData.idFront 
-                                            ? 'bg-green-500/5 dark:bg-green-500/10 border-green-500/40 shadow-sm' 
-                                            : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/80 hover:border-orange-500/50'
+                                            ? 'border-solid bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/40 shadow-xs' 
+                                            : 'border-dashed border-slate-300 dark:border-slate-700 hover:border-[#ff6b00] dark:hover:border-[#ff6b00] bg-slate-50/60 dark:bg-slate-800/40'
                                     }`}>
                                         <input type="file" id="idFront" accept="image/*" onChange={e => handleFileUpload(e, 'idFront')} className="hidden" />
                                         
                                         {/* Card Header */}
-                                        <div className="flex items-center justify-between p-3.5 border-b border-slate-200/60 dark:border-slate-700/50 bg-white/40 dark:bg-slate-900/40">
+                                        <div className="flex items-center justify-between p-3.5 border-b border-slate-200/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/60">
                                             <div className="flex items-center gap-2">
-                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${formData.idFront ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'}`}>
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${formData.idFront ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'}`}>
                                                     {formData.idFront ? <CheckCircle size={15} /> : <FileCheck size={15} />}
                                                 </div>
                                                 <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">ID Front</span>
                                             </div>
                                             
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                                formData.idFront ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                            <span className={`text-[10px] font-mono-data font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                                formData.idFront ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] dark:text-orange-300 border border-orange-200 dark:border-orange-800'
                                             }`}>
                                                 {formData.idFront ? 'Ready' : 'Required'}
                                             </span>
@@ -1100,7 +1108,7 @@ export default function Register() {
                                                             <button 
                                                                 type="button" 
                                                                 onClick={() => setZoomedSide('idFront')}
-                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm"
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm cursor-pointer"
                                                                 title="Zoom View"
                                                             >
                                                                 <ZoomIn size={16} />
@@ -1108,7 +1116,7 @@ export default function Register() {
                                                             <button 
                                                                 type="button" 
                                                                 onClick={e => { e.preventDefault(); setFormData(prev => ({ ...prev, idFrontRotation: (prev.idFrontRotation || 0) + 90 })); }}
-                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm"
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm cursor-pointer"
                                                                 title="Rotate Image"
                                                             >
                                                                 <RotateCw size={16} />
@@ -1116,7 +1124,7 @@ export default function Register() {
                                                             <button 
                                                                 type="button" 
                                                                 onClick={e => handleRemoveID(e, 'idFront')}
-                                                                className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full transition-all"
+                                                                className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full transition-all cursor-pointer"
                                                                 title="Remove Image"
                                                             >
                                                                 <X size={16} />
@@ -1130,13 +1138,13 @@ export default function Register() {
                                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3">Upload a clear photo of your ID Front</p>
                                                     
                                                     <div className="flex gap-2 w-full justify-center">
-                                                        <label htmlFor="idFront" className="flex-1 max-w-[120px] cursor-pointer bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm">
-                                                            <UploadCloud size={13} className="text-orange-500" /> Upload
+                                                        <label htmlFor="idFront" className="flex-1 max-w-[125px] cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs">
+                                                            <UploadCloud size={13} className="text-[#ff6b00]" /> Upload
                                                         </label>
                                                         <button 
                                                             type="button"
                                                             onClick={(e) => openCamera(e, 'front')}
-                                                            className="flex-1 max-w-[120px] bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/20 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+                                                            className="flex-1 max-w-[125px] bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/60 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
                                                         >
                                                             <Camera size={13} /> Camera
                                                         </button>
@@ -1147,24 +1155,24 @@ export default function Register() {
                                     </div>
 
                                     {/* ID Back Card */}
-                                    <div className={`relative group rounded-2xl border transition-all duration-300 overflow-hidden ${
+                                    <div className={`relative group rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
                                         formData.idBack 
-                                            ? 'bg-green-500/5 dark:bg-green-500/10 border-green-500/40 shadow-sm' 
-                                            : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/80 hover:border-orange-500/50'
+                                            ? 'border-solid bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/40 shadow-xs' 
+                                            : 'border-dashed border-slate-300 dark:border-slate-700 hover:border-[#ff6b00] dark:hover:border-[#ff6b00] bg-slate-50/60 dark:bg-slate-800/40'
                                     }`}>
                                         <input type="file" id="idBack" accept="image/*" onChange={e => handleFileUpload(e, 'idBack')} className="hidden" />
                                         
                                         {/* Card Header */}
-                                        <div className="flex items-center justify-between p-3.5 border-b border-slate-200/60 dark:border-slate-700/50 bg-white/40 dark:bg-slate-900/40">
+                                        <div className="flex items-center justify-between p-3.5 border-b border-slate-200/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/60">
                                             <div className="flex items-center gap-2">
-                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${formData.idBack ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'}`}>
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${formData.idBack ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'}`}>
                                                     {formData.idBack ? <CheckCircle size={15} /> : <FileCheck size={15} />}
                                                 </div>
                                                 <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">ID Back</span>
                                             </div>
                                             
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                                formData.idBack ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                            <span className={`text-[10px] font-mono-data font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                                formData.idBack ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] dark:text-orange-300 border border-orange-200 dark:border-orange-800'
                                             }`}>
                                                 {formData.idBack ? 'Ready' : 'Required'}
                                             </span>
@@ -1195,7 +1203,7 @@ export default function Register() {
                                                             <button 
                                                                 type="button" 
                                                                 onClick={() => setZoomedSide('idBack')}
-                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm"
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm cursor-pointer"
                                                                 title="Zoom View"
                                                             >
                                                                 <ZoomIn size={16} />
@@ -1203,7 +1211,7 @@ export default function Register() {
                                                             <button 
                                                                 type="button" 
                                                                 onClick={e => { e.preventDefault(); setFormData(prev => ({ ...prev, idBackRotation: (prev.idBackRotation || 0) + 90 })); }}
-                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm"
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm cursor-pointer"
                                                                 title="Rotate Image"
                                                             >
                                                                 <RotateCw size={16} />
@@ -1211,7 +1219,7 @@ export default function Register() {
                                                             <button 
                                                                 type="button" 
                                                                 onClick={e => handleRemoveID(e, 'idBack')}
-                                                                className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full transition-all"
+                                                                className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full transition-all cursor-pointer"
                                                                 title="Remove Image"
                                                             >
                                                                 <X size={16} />
@@ -1225,13 +1233,13 @@ export default function Register() {
                                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3">Upload a clear photo of your ID Back</p>
                                                     
                                                     <div className="flex gap-2 w-full justify-center">
-                                                        <label htmlFor="idBack" className="flex-1 max-w-[120px] cursor-pointer bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm">
-                                                            <UploadCloud size={13} className="text-orange-500" /> Upload
+                                                        <label htmlFor="idBack" className="flex-1 max-w-[125px] cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs">
+                                                            <UploadCloud size={13} className="text-[#ff6b00]" /> Upload
                                                         </label>
                                                         <button 
                                                             type="button"
                                                             onClick={(e) => openCamera(e, 'back')}
-                                                            className="flex-1 max-w-[120px] bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/20 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+                                                            className="flex-1 max-w-[125px] bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/60 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
                                                         >
                                                             <Camera size={13} /> Camera
                                                         </button>
@@ -1242,9 +1250,9 @@ export default function Register() {
                                     </div>
                                 </div>
 
-                                {/* Tips Box Callout - Glassmorphism */}
-                                <div className="bg-white/60 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-xs rounded-2xl p-3.5 mb-5 flex gap-3 items-start text-xs text-slate-600 dark:text-slate-300 font-medium">
-                                    <div className="w-6 h-6 rounded-lg bg-orange-500/10 dark:bg-orange-400/15 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 mt-0.5">
+                                {/* Tips Box Callout - Neutral Glassmorphism */}
+                                <div className="bg-slate-50/70 dark:bg-slate-800/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-700/70 text-slate-700 dark:text-slate-300 rounded-xl p-3 text-xs flex items-start gap-2.5 mb-5 shadow-2xs">
+                                    <div className="w-5 h-5 rounded-md bg-slate-200/70 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0 mt-0.5">
                                         <Info size={14} />
                                     </div>
                                     <div className="leading-relaxed">
@@ -1255,7 +1263,7 @@ export default function Register() {
 
                                 {/* Error Banner */}
                                 {scanError && (
-                                    <div className="mb-5 bg-red-500/10 border border-red-500/20 rounded-2xl p-3.5 flex gap-3 items-start text-xs text-red-600 dark:text-red-400 font-medium">
+                                    <div className="mb-5 bg-red-500/10 border border-red-500/20 rounded-xl p-3.5 flex gap-3 items-start text-xs text-red-600 dark:text-red-400 font-medium">
                                         <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-500" />
                                         <span>{scanError}</span>
                                     </div>
@@ -1267,12 +1275,12 @@ export default function Register() {
                                         type="button"
                                         onClick={handleScanID}
                                         disabled={!formData.idFront || !formData.idBack || isScanning}
-                                        className="w-full bg-gradient-to-r from-orange-500 via-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-lg shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                                        className="w-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                                     >
                                         {isScanning ? (
                                             <><Loader2 size={18} className="animate-spin" /> {scanStatus}</>
                                         ) : (
-                                            <><ShieldCheck size={18} /> Scan Documents &amp; Continue</>
+                                            <><ShieldCheck size={18} /> Scan Documents &amp; Continue <ChevronRight size={16} /></>
                                         )}
                                     </button>
                                     <p className="text-[10px] text-center font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Both Front and Back images are required for verification</p>
@@ -1383,7 +1391,7 @@ export default function Register() {
                                         type="button"
                                         onClick={nextStep}
                                         disabled={!step2Valid}
-                                        className="w-2/3 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-2/3 bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                                     >
                                         Next Step
                                     </button>
@@ -1487,7 +1495,7 @@ export default function Register() {
                                         <button
                                             type="submit"
                                             disabled={!formData.email || !formData.mobile || !formData.password || formData.password !== formData.confirmPassword || registering}
-                                            className="w-2/3 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                            className="w-2/3 bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                                         >
                                             {registering ? <><Loader2 size={17} className="animate-spin" /> Creating Account...</> : 'Create My Account'}
                                         </button>
@@ -1540,7 +1548,7 @@ export default function Register() {
                                         type="button"
                                         onClick={handleVerifyCode}
                                         disabled={otp.some(d => !d) || verifying}
-                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-6"
+                                        className="w-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 mb-6 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                                     >
                                         {verifying ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> : 'Confirm Account'}
                                     </button>
@@ -1579,7 +1587,7 @@ export default function Register() {
                                     <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Account Verified!</h3>
                                     <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">Your PULSO account has been successfully verified. Welcome to the community!</p>
                                 </div>
-                                <Link to="/login" className="mt-2 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white px-8 py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md flex items-center gap-2">
+                                <Link to="/login" className="mt-2 bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white px-8 py-3.5 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 flex items-center gap-2 cursor-pointer">
                                     Proceed to Login
                                 </Link>
                             </motion.div>
@@ -1591,13 +1599,8 @@ export default function Register() {
                         <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800/50 text-center relative z-20">
                             <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
                                 Already have an account?{' '}
-                                <Link to="/login" className="text-orange-600 dark:text-orange-400 font-bold hover:underline decoration-2 underline-offset-4">Sign In</Link>
+                                <Link to="/login" className="text-[#ff6b00] font-bold hover:underline decoration-2 underline-offset-4">Sign In</Link>
                             </p>
-                            <div className="flex justify-center gap-4 text-xs text-slate-400 dark:text-slate-500 font-medium mt-3">
-                                <button type="button" onClick={() => setLegalModal({ isOpen: true, tab: 'privacy' })} className="hover:text-orange-500 transition-colors cursor-pointer">Privacy Policy</button>
-                                <span>•</span>
-                                <button type="button" onClick={() => setLegalModal({ isOpen: true, tab: 'terms' })} className="hover:text-orange-500 transition-colors cursor-pointer">Terms of Service</button>
-                            </div>
                         </div>
                     )}
                 </div>
@@ -1605,6 +1608,39 @@ export default function Register() {
         </div>
     </div>
 </main>
+
+            {/* ── Standard Civic Legal Footer Strip ───────────────────────── */}
+            <footer className="relative z-10 w-full bg-slate-100/80 dark:bg-[#060911] border-t border-slate-200/80 dark:border-slate-800/80 py-3.5 text-slate-500 dark:text-slate-400 text-[11px] transition-colors">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+                    <span>
+                        &copy; {new Date().getFullYear()} LGU Caloocan City. Encrypted under Data Privacy Act (RA 10173).
+                    </span>
+                    <div className="flex items-center gap-4 font-semibold">
+                        <button 
+                            type="button" 
+                            onClick={() => setLegalModal({ isOpen: true, tab: 'privacy' })} 
+                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+                        >
+                            Privacy Policy
+                        </button>
+                        <span>•</span>
+                        <button 
+                            type="button" 
+                            onClick={() => setLegalModal({ isOpen: true, tab: 'terms' })} 
+                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+                        >
+                            Terms of Service
+                        </button>
+                        <span>•</span>
+                        <a 
+                            href="/#hotlines" 
+                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+                        >
+                            LGU Engineering Directory
+                        </a>
+                    </div>
+                </div>
+            </footer>
 
             {/* Legal Modal */}
             <LegalModal

@@ -25,12 +25,14 @@
     "landing": {
       "nav": {
         "home": "Home",
-        "platform": "Features",
-        "solutions": "Solutions",
-        "about": "About Us",
-        "login": "Login",
+        "report": "Report Issue",
+        "track": "Track Report",
+        "map": "Live Map",
+        "howItWorks": "How It Works",
+        "hotlines": "Hotlines",
+        "login": "Sign In",
         "register": "Register",
-        "openDashboard": "Register"
+        "reportAnIssue": "Report an Issue"
       },
       "hero": {
         "tag": "PUBLIC UTILITY MONITORING FOR CALOOCAN CITY",

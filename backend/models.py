@@ -97,3 +97,19 @@ class PasswordResetToken(Base):
     token = Column(String, unique=True, index=True)
     expires_at = Column(DateTime(timezone=True))
     used = Column(Boolean, default=False)
+
+class NewsItem(Base):
+    __tablename__ = "news_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String, index=True)  # Advisories, Events, Infrastructure, General
+    headline = Column(String, nullable=False)
+    excerpt = Column(Text, nullable=False)
+    image_url = Column(String, nullable=True)
+    barangay = Column(String, nullable=True)
+    source_url = Column(String, nullable=True)
+    published_at = Column(DateTime(timezone=True), default=func.now(), index=True)
+    priority = Column(String, default="normal", index=True)  # normal | urgent
+    posted_by = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+

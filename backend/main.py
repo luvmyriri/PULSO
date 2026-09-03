@@ -1420,6 +1420,148 @@ def change_password(
     return {"message": "Password updated successfully"}
 
 # ---------------------------------------------------------------------------
+# City News & Announcements Endpoints (with In-Memory TTL Caching)
+# ---------------------------------------------------------------------------
+
+NEWS_UPLOAD_DIR = "uploads/news"
+os.makedirs(NEWS_UPLOAD_DIR, exist_ok=True)
+
+# 3-minute TTL In-Memory Cache for high-performance public reads
+_news_cache = {}
+_news_cache_ttl = 180  # seconds
+
+def invalidate_news_cache():
+    global _news_cache
+    _news_cache.clear()
+
+
+@app.get("/api/news", response_model=schemas.NewsListResponse)
+def read_news(
+    category: Optional[str] = Query(None, description="Category filter (All, Advisories, Events, Infrastructure)"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    """
+    Public City News endpoint.
+    Returns paginated items with 'urgent' items pinned first.
+    Served via 3-minute in-memory cache for fast load times.
+    """
+    import time
+    cache_key = f"{category or 'all'}_{page}_{limit}"
+    now = time.time()
+    
+    if cache_key in _news_cache:
+        cached_time, cached_data = _news_cache[cache_key]
+        if now - cached_time < _news_cache_ttl:
+            return cached_data
+            
+    data = crud.get_news(db, category=category, page=page, limit=limit)
+    _news_cache[cache_key] = (now, data)
+    return data
+
+@app.post("/api/news", response_model=schemas.NewsItemResponse)
+async def create_news_item(
+    category: str = Form(...),
+    headline: str = Form(...),
+    excerpt: str = Form(...),
+    priority: str = Form("normal"),
+    barangay: Optional[str] = Form(None),
+    source_url: Optional[str] = Form(None),
+    posted_by: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Staff / Admin write endpoint for City News.
+    Validates image size (max 5MB) and type, saves image,
+    inserts record, and invalidates public cache.
+    """
+    image_url = None
+    if image and image.filename:
+        allowed_types = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
+        if image.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Invalid image format. Allowed formats: JPG, PNG, WEBP.")
+            
+        content = await image.read()
+        if len(content) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit.")
+            
+        ext = os.path.splitext(image.filename)[1] or ".jpg"
+        filename = f"news_{secrets.token_hex(6)}{ext}"
+        filepath = os.path.join(NEWS_UPLOAD_DIR, filename)
+        
+        with open(filepath, "wb") as f:
+            f.write(content)
+            
+        image_url = f"/api/uploads/news/{filename}"
+        
+    news_create = schemas.NewsItemCreate(
+        category=category,
+        headline=headline,
+        excerpt=excerpt,
+        priority=priority,
+        barangay=barangay,
+        source_url=source_url,
+        image_url=image_url
+    )
+    
+    author = posted_by or "City Engineering Department"
+    item = crud.create_news(db, news_create, image_url=image_url, posted_by=author)
+    invalidate_news_cache()
+    return item
+
+@app.put("/api/news/{news_id}", response_model=schemas.NewsItemResponse)
+async def update_news_item(
+    news_id: int,
+    category: Optional[str] = Form(None),
+    headline: Optional[str] = Form(None),
+    excerpt: Optional[str] = Form(None),
+    priority: Optional[str] = Form(None),
+    barangay: Optional[str] = Form(None),
+    source_url: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db)
+):
+    image_url = None
+    if image and image.filename:
+        allowed_types = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
+        if image.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Invalid image format. Allowed formats: JPG, PNG, WEBP.")
+        content = await image.read()
+        if len(content) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit.")
+        ext = os.path.splitext(image.filename)[1] or ".jpg"
+        filename = f"news_{secrets.token_hex(6)}{ext}"
+        filepath = os.path.join(NEWS_UPLOAD_DIR, filename)
+        with open(filepath, "wb") as f:
+            f.write(content)
+        image_url = f"/api/uploads/news/{filename}"
+        
+    update_data = schemas.NewsItemUpdate(
+        category=category,
+        headline=headline,
+        excerpt=excerpt,
+        priority=priority,
+        barangay=barangay,
+        source_url=source_url,
+        image_url=image_url
+    )
+    item = crud.update_news(db, news_id, update_data, image_url=image_url)
+    if not item:
+        raise HTTPException(status_code=404, detail="News item not found")
+    invalidate_news_cache()
+    return item
+
+@app.delete("/api/news/{news_id}")
+def delete_news_item(news_id: int, db: Session = Depends(get_db)):
+    success = crud.delete_news(db, news_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="News item not found")
+    invalidate_news_cache()
+    return {"message": f"News item {news_id} deleted successfully"}
+
+# ---------------------------------------------------------------------------
 # Entry Point
 # ---------------------------------------------------------------------------
 

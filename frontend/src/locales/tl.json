@@ -25,12 +25,14 @@
     "landing": {
       "nav": {
         "home": "Home",
-        "platform": "Mga Tampok",
-        "solutions": "Mga Solusyon",
-        "about": "Tungkol sa Amin",
-        "login": "Mag-login",
+        "report": "Mag-ulat ng Isyu",
+        "track": "Sundan ang Ulat",
+        "map": "Live na Mapa",
+        "howItWorks": "Paano Gamitin",
+        "hotlines": "Mga Hotline",
+        "login": "Mag-sign In",
         "register": "Mag-rehistro",
-        "openDashboard": "Mag-rehistro"
+        "reportAnIssue": "Mag-ulat ng Isyu"
       },
       "hero": {
         "tag": "PAGSUSUBAYBAY NG MGA PAMPUBLIKONG UTILITY PARA SA CALOOCAN CITY",

@@ -57,20 +57,47 @@ html {
   --color-light: #ffffff;
 
   --font-sans: "Inter", sans-serif;
-  --font-display: "Oswald", sans-serif;
+  --font-display: "Space Grotesk", "Oswald", sans-serif;
+  --font-heading: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --bg: #fffbf9;
+  --text: #1e293b;
+  --surface: #ffffff;
+  --surface-hover: #f8fafc;
+  --border: #f3e9e2;
+  --accent: #ff6b00;
+  --accent-hover: #e65c00;
+  --muted: #64748b;
+  --navy-dark: #070a12;
+}
+
+.dark {
+  --bg: #070a12;
+  --text: #f8fafc;
+  --surface: #0f172a;
+  --surface-hover: #1e293b;
+  --border: #1e293b;
+  --accent: #ff6b00;
+  --accent-hover: #e65c00;
+  --muted: #94a3b8;
+  --navy-dark: #070a12;
 }
 
 @layer base {
   body {
-    background-color: transparent;
-    color: var(--color-dark);
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
 
   .dark body,
   body.dark {
-    background-color: transparent;
-    color: var(--color-light);
+    background-color: var(--bg);
+    color: var(--text);
   }
 
   /* Global hand cursor for all interactive elements */
@@ -415,4 +442,25 @@ canvas + div {
   display: none !important;
   opacity: 0 !important;
   pointer-events: none !important;
+}
+
+/* Typography tokens for PULSO Civic Portal */
+.font-heading {
+  font-family: var(--font-heading), "Space Grotesk", sans-serif;
+}
+
+.font-mono-data {
+  font-family: var(--font-mono), "JetBrains Mono", monospace;
+}
+
+/* Accessibility: prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
