@@ -23,6 +23,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getAuthUser } from '../utils/authSession';
 import {
     BarChart2, TrendingUp, TrendingDown, Clock, CheckCircle2,
     AlertTriangle, ShieldCheck, Filter, RotateCcw, Calendar,
@@ -109,11 +110,8 @@ export default function GovBiDashboard() {
 
     // ── Global User & State ──
     const [currentUser] = useState(() => {
-        try {
-            return JSON.parse(localStorage.getItem('pulso_user') || '{}');
-        } catch {
-            return { name: 'Ana Reyes', roleLabel: 'Dispatcher', role: 'dispatcher' };
-        }
+        const u = getAuthUser();
+        return u || { name: 'Ana Reyes', roleLabel: 'Dispatcher', role: 'dispatcher' };
     });
 
     // ── Filter States ──

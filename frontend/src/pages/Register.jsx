@@ -9,6 +9,7 @@ import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
 import IDCameraModal from '../components/IDCameraModal';
 import LegalModal from '../components/LegalModal';
+import { clearAuthSession } from '../utils/authSession';
 
 // ---------------------------------------------------------------------------
 // OCR Address Parser
@@ -899,8 +900,7 @@ export default function Register() {
             };
             const res = await axios.post('http://localhost:33159/api/auth/register', payload);
             if (res.status === 200 || res.status === 201) {
-                localStorage.removeItem('pulso_token');
-                localStorage.removeItem('pulso_user');
+                clearAuthSession();
                 setResendTimer(60);
                 setCanResend(false);
                 setStep(4);

@@ -15,6 +15,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
 import Swal from 'sweetalert2';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REFERENCE INITIAL DATA (Exact Parity with media_1788468315863.png)
@@ -306,20 +307,17 @@ export default function GovReportsDashboard() {
         email: 'ana.reyes@caloocan.gov.ph'
     });
 
-    // ── Read user from localStorage ──
+    // ── Read user from session ──
     useEffect(() => {
         try {
-            const rawUser = localStorage.getItem('pulso_user');
-            if (rawUser) {
-                const u = JSON.parse(rawUser);
-                if (u?.name || u?.username) {
-                    setCurrentUser({
-                        name: u.full_name || u.name || 'Ana Reyes',
-                        role: u.role || 'dispatcher',
-                        roleLabel: (u.role || 'dispatcher').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                        email: u.email || 'dispatcher@caloocan.gov.ph'
-                    });
-                }
+            const u = getAuthUser();
+            if (u && (u.name || u.username || u.full_name)) {
+                setCurrentUser({
+                    name: u.full_name || u.name || 'Ana Reyes',
+                    role: u.role || 'dispatcher',
+                    roleLabel: (u.role || 'dispatcher').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    email: u.email || 'dispatcher@caloocan.gov.ph'
+                });
             }
         } catch { /* fallback */ }
     }, []);
@@ -339,7 +337,7 @@ export default function GovReportsDashboard() {
     // ── Attempt live API fetch if token exists ──
     useEffect(() => {
         const fetchLiveReports = async () => {
-            const token = localStorage.getItem('pulso_token');
+            const token = getAuthToken();
             if (!token) return;
             try {
                 const res = await fetch(`http://localhost:33159/api/reports?limit=50&t=${Date.now()}`, {

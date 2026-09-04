@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Menu, X, PhoneCall, LogIn, UserPlus, LogOut, ArrowRight, User } from 'lucide-react';
 import Branding from '../Branding';
 import ThemeToggle from '../ThemeToggle';
+import { getAuthToken, getAuthUser, clearAuthSession } from '../../utils/authSession';
 
 /**
  * CivicNavbar
@@ -13,7 +14,7 @@ import ThemeToggle from '../ThemeToggle';
  * - Paired with secondary outlined "Create Account" button for new residents.
  * - Both actions remain pinned and visible in the collapsed mobile header.
  * - State-Aware: Replaces Sign In with recognizable account badge (avatar + name)
- *   when a session is detected in localStorage.
+ *   when an active session is detected in sessionStorage.
  * - Accessible: aria-labels, 4.5:1+ contrast ratio, keyboard focus rings.
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -25,22 +26,21 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 15);
+      setScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // State awareness: Detect active user session from localStorage
+  // State awareness: Detect active user session from session storage
   useEffect(() => {
     try {
-      const token = localStorage.getItem('pulso_token');
-      const userStr = localStorage.getItem('pulso_user');
-      if (token && userStr) {
-        const parsed = JSON.parse(userStr);
-        if (parsed && (parsed.full_name || parsed.name || parsed.email)) {
-          setCurrentUser(parsed);
-        }
+      const token = getAuthToken();
+      const user = getAuthUser();
+      if (token && user && (user.full_name || user.name || user.email)) {
+        setCurrentUser(user);
+      } else {
+        setCurrentUser(null);
       }
     } catch {
       setCurrentUser(null);
@@ -50,8 +50,7 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
   const handleSignOut = (e) => {
     e?.preventDefault();
     const wasGov = currentUser?.role && currentUser.role !== 'resident';
-    localStorage.removeItem('pulso_token');
-    localStorage.removeItem('pulso_user');
+    clearAuthSession();
     setCurrentUser(null);
     window.location.href = wasGov ? '/gov' : '/login';
   };

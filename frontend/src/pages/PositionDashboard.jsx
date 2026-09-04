@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
 import { useTheme } from '../contexts/ThemeContext';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 import Spline from '@splinetool/react-spline';
 
 const API = 'http://localhost:33159';
@@ -612,10 +613,8 @@ const StatsBar = ({ token }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const PositionDashboard = () => {
     const navigate = useNavigate();
-    const [token] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
-    });
+    const [token] = useState(() => getAuthToken());
+    const [currentUser] = useState(() => getAuthUser());
 
     const { theme } = useTheme();
     const DARK_SCENE  = 'https://prod.spline.design/us1Y6xfaQLiI2cim/scene.splinecode';

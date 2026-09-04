@@ -41,6 +41,7 @@ import OrangeSelect from '../components/OrangeSelect';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 import Swal from 'sweetalert2';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 
 import {
     NORTH_CALOOCAN_PATH,
@@ -215,11 +216,8 @@ const DispatcherDashboard = () => {
     const apiHost = window.location.hostname;
     const API_BASE_URL = `http://${apiHost}:33159`;
 
-    const [token, setToken] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser, setCurrentUser] = useState(() => {
-        const storedUser = localStorage.getItem('pulso_user');
-        return storedUser ? JSON.parse(storedUser) : null;
-    });
+    const [token, setToken] = useState(() => getAuthToken());
+    const [currentUser, setCurrentUser] = useState(() => getAuthUser());
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);

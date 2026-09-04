@@ -8,6 +8,7 @@ html {
 @variant dark (&:is(.dark *));
 
 @theme {
+  --breakpoint-xs: 420px;
   /* Brand Primary (Orange Palette) */
   --color-primary: #ff6b00;
   --color-primary-light: #ffefe5;

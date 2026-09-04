@@ -33,6 +33,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 import ThemeToggle from '../components/ThemeToggle';
+import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
 
 const API_BASE_URL = `http://${window.location.hostname}:33159`;
 
@@ -56,11 +57,8 @@ const MockBarChart = ({ color, values }) => (
 const ManagementDashboard = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const [token] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser] = useState(() => {
-        const storedUser = localStorage.getItem('pulso_user');
-        return storedUser ? JSON.parse(storedUser) : null;
-    });
+    const [token] = useState(() => getAuthToken());
+    const [currentUser] = useState(() => getAuthUser());
     const [activeTab, setActiveTab] = useState('overview');
 
     // Date range filter
@@ -402,10 +400,9 @@ const ManagementDashboard = () => {
                         <ThemeToggle />
                         <button
                             onClick={() => { 
-                                const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
+                                const user = getAuthUser();
                                 const wasGov = user?.role && user.role !== 'resident';
-                                localStorage.removeItem('pulso_token'); 
-                                localStorage.removeItem('pulso_user'); 
+                                clearAuthSession();
                                 navigate(wasGov ? '/gov' : '/login'); 
                             }}
                             className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"

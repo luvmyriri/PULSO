@@ -26,7 +26,11 @@ import ProtectedRoute, {
     ADMIN_ONLY,
 } from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
+import { initAuthSession } from './utils/authSession';
 import './index.css';
+
+// Purge any stale persistent credentials from localStorage
+initAuthSession();
 
 // Convenience wrappers so the JSX below stays readable
 const AnyAuth    = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>;

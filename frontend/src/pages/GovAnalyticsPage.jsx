@@ -15,6 +15,7 @@ import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 
 const API_BASE_URL = `http://${window.location.hostname}:33159`;
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -122,7 +123,7 @@ export default function GovAnalyticsPage() {
         ? window.matchMedia('(prefers-color-scheme: dark)').matches 
         : theme === 'dark';
     const navigate = useNavigate();
-    const token = localStorage.getItem('pulso_token');
+    const token = getAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     const [summary, setSummary] = useState(null);
@@ -142,7 +143,7 @@ export default function GovAnalyticsPage() {
     const [categoryFilter, setCategoryFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [mapRef, setMapRef] = useState(null);
-    const [currentUser] = useState(() => JSON.parse(localStorage.getItem('pulso_user') || '{}'));
+    const [currentUser] = useState(() => getAuthUser() || {});
     const [toast, setToast] = useState(null);
     const [fetchError, setFetchError] = useState(null);
     const [generatingBrief, setGeneratingBrief] = useState(false);

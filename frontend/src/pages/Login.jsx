@@ -11,6 +11,7 @@ import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
 import LegalModal from '../components/LegalModal';
 import OfficialBanner from '../components/landing/OfficialBanner';
+import { setAuthSession } from '../utils/authSession';
 import '../index.css';
 
 export default function Login() {
@@ -135,10 +136,7 @@ export default function Login() {
                 return;
             }
 
-            localStorage.setItem('pulso_token', data.access_token);
-            if (data.user) {
-                localStorage.setItem('pulso_user', JSON.stringify(data.user));
-            }
+            setAuthSession(data.access_token, data.user);
 
             const role = data.user?.role;
             if (role === 'lgu_official' || role === 'admin') {
@@ -297,12 +295,7 @@ export default function Login() {
             });
 
             if (res.ok || enteredCode === generated2FACode || enteredCode === '123456') {
-                if (pendingAuth?.token) {
-                    localStorage.setItem('pulso_token', pendingAuth.token);
-                }
-                if (pendingAuth?.user) {
-                    localStorage.setItem('pulso_user', JSON.stringify(pendingAuth.user));
-                }
+                setAuthSession(pendingAuth?.token, pendingAuth?.user);
 
                 const role = pendingAuth?.user?.role;
                 if (role === 'lgu_official' || role === 'admin') {
@@ -320,12 +313,7 @@ export default function Login() {
             }
         } catch {
             if (enteredCode === generated2FACode || enteredCode === '123456') {
-                if (pendingAuth?.token) {
-                    localStorage.setItem('pulso_token', pendingAuth.token);
-                }
-                if (pendingAuth?.user) {
-                    localStorage.setItem('pulso_user', JSON.stringify(pendingAuth.user));
-                }
+                setAuthSession(pendingAuth?.token, pendingAuth?.user);
                 const role = pendingAuth?.user?.role;
                 if (role === 'lgu_official' || role === 'admin') {
                     navigate('/gov');

@@ -18,6 +18,7 @@ import {
 import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
 import ThemeToggle from '../components/ThemeToggle';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 
 const API_BASE = 'http://localhost:33159';
 
@@ -437,10 +438,8 @@ const AuditRow = ({ entry, index }) => {
 const GovDivisionPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const [token] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
-    });
+    const [token] = useState(() => getAuthToken());
+    const [currentUser] = useState(() => getAuthUser());
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');

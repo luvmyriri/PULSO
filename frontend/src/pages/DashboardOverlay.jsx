@@ -5,6 +5,7 @@ import {
     Send, Clock, Truck, HardHat, Bell, LogOut, Loader2, Brain, Search, X
 } from 'lucide-react';
 import Branding from '../components/Branding';
+import { getAuthToken } from '../utils/authSession';
 
 export default function DashboardOverlay({ onNavigate }) {
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -138,7 +139,7 @@ export default function DashboardOverlay({ onNavigate }) {
         setIsAILoading(true);
 
         try {
-            const token = localStorage.getItem('pulso_token');
+            const token = getAuthToken();
             const resp = await fetch('http://localhost:33159/api/ai/assistant', {
                 method: 'POST',
                 headers: { 

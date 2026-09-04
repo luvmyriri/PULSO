@@ -11,6 +11,7 @@ import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
 import LegalModal from '../components/LegalModal';
 import OfficialBanner from '../components/landing/OfficialBanner';
+import { setAuthSession, clearAuthSession } from '../utils/authSession';
 
 export default function GovLanding() {
     const navigate = useNavigate();
@@ -48,8 +49,7 @@ export default function GovLanding() {
 
             if (response.ok) {
                 const data = await response.json();
-                localStorage.setItem('pulso_token', data.access_token);
-                localStorage.setItem('pulso_user', JSON.stringify(data.user));
+                setAuthSession(data.access_token, data.user);
                 const GOV_ROLES = [
                     'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
                     'records_officer','division_chief','design_engineer','estimator',
@@ -61,8 +61,7 @@ export default function GovLanding() {
                     navigate('/gov/my-dashboard');
                 } else {
                     setError('Authorized Government Personnel Only. Citizens please use the Citizen Portal.');
-                    localStorage.removeItem('pulso_token');
-                    localStorage.removeItem('pulso_user');
+                    clearAuthSession();
                     setLoading(false);
                     if (recaptchaRef.current) recaptchaRef.current.reset();
                     setCaptchaToken(null);

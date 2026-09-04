@@ -7,10 +7,15 @@ export default function ScrollToTop() {
     const [isVisible, setIsVisible] = useState(false);
     const location = useLocation();
 
-    // Hide on all government/internal management pages
-    const isGov = location.pathname.startsWith('/gov') ||
+    // Hide on resident dashboard, government portals, and authentication pages
+    const isHidden = 
+        location.pathname.startsWith('/dashboard') ||
+        location.pathname.startsWith('/gov') ||
         location.pathname.startsWith('/management') ||
-        location.pathname.startsWith('/dispatcher');
+        location.pathname.startsWith('/dispatcher') ||
+        location.pathname.startsWith('/login') ||
+        location.pathname.startsWith('/register') ||
+        location.pathname.startsWith('/reset-password');
 
     useEffect(() => {
         const toggleVisibility = () => {
@@ -32,7 +37,7 @@ export default function ScrollToTop() {
         });
     };
 
-    if (isGov) return null;
+    if (isHidden) return null;
 
     return (
         <AnimatePresence>
