@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import {
+  GoogleMap,
+  useJsApiLoader,
+  MarkerF,
+  PolygonF,
+} from '@react-google-maps/api';
 import {
   MapPin,
   Droplets,
@@ -13,8 +19,112 @@ import {
   ChevronDown,
   Check,
   Layers,
-  Compass
+  Compass,
+  Loader2,
 } from 'lucide-react';
+import {
+  NORTH_CALOOCAN_PATH,
+  SOUTH_CALOOCAN_PATH,
+  NORTH_CALOOCAN_CENTROID,
+  SOUTH_CALOOCAN_CENTROID,
+  COMBINED_CALOOCAN_BOUNDS,
+} from '../../data/caloocanBoundaries';
+import { useTheme } from '../../contexts/ThemeContext';
+
+const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry'];
+
+const CALOOCAN_CENTER = { lat: 14.7104, lng: 121.0298 };
+
+// Civic Zero-Clutter Map Styles (zero commercial POIs, high contrast civic roads & borders)
+const DARK_BASE_RULES = [
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { elementType: 'geometry', stylers: [{ color: '#0c1322' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#0c1322' }] },
+  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#0b111e' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#070b14' }] },
+  { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#1e293b' }, { weight: 1 }] },
+  { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#334155' }] },
+  { featureType: 'administrative.province', elementType: 'geometry.stroke', stylers: [{ color: '#243247' }] },
+];
+
+const DARK_CIVIC_MAP_STYLE = [
+  ...DARK_BASE_RULES,
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#293952' }, { weight: 1.5 }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#8193aa' }] },
+  { featureType: 'road.highway', elementType: 'labels.text.stroke', stylers: [{ color: '#0c1322' }, { weight: 3 }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#1c283a' }, { weight: 1.2 }] },
+  { featureType: 'road.arterial', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+  { featureType: 'road.arterial', elementType: 'labels.text.stroke', stylers: [{ color: '#0c1322' }, { weight: 3 }] },
+  { featureType: 'road.local', elementType: 'geometry', stylers: [{ color: '#141d2c' }, { weight: 0.8 }] },
+  { featureType: 'road.local', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#7b8ea5' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.stroke', stylers: [{ color: '#0c1322' }, { weight: 3 }] },
+  { featureType: 'administrative.neighborhood', elementType: 'labels.text.fill', stylers: [{ color: '#546478' }] },
+  { featureType: 'administrative.neighborhood', elementType: 'labels.text.stroke', stylers: [{ color: '#0c1322' }, { weight: 2 }] },
+];
+
+const LIGHT_BASE_RULES = [
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
+  { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#cbd5e1' }] },
+];
+
+const LIGHT_CIVIC_MAP_STYLE = [
+  ...LIGHT_BASE_RULES,
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#cbd5e1' }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
+  { featureType: 'road.arterial', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+  { featureType: 'road.local', elementType: 'geometry', stylers: [{ color: '#f1f5f9' }] },
+  { featureType: 'road.local', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#334155' }] },
+  { featureType: 'administrative.neighborhood', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+];
+
+const getMarkerSVG = (category, status, isSelected = false) => {
+  let color = '#ff6b00'; // Default PULSO orange
+  const stat = (status || '').toLowerCase();
+  if (stat.includes('resolve')) color = '#10b981'; // Emerald
+  else if (stat.includes('dispatch')) color = '#3b82f6'; // Blue
+  else if (stat.includes('progress')) color = '#f59e0b'; // Amber
+
+  const cat = (category || '').toLowerCase();
+  let svgIcon = '';
+  if (cat.includes('water') || cat.includes('leak') || cat.includes('drain')) {
+    svgIcon = `<path d="M12 22a7.5 7.5 0 0 0 7.5-7.5c0-4.14-7.5-12.5-7.5-12.5S4.5 10.36 4.5 14.5A7.5 7.5 0 0 0 12 22z" fill="white"/>`;
+  } else if (cat.includes('power') || cat.includes('light') || cat.includes('electric') || cat.includes('zap')) {
+    svgIcon = `<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/>`;
+  } else {
+    // Road / Infrastructure
+    svgIcon = `<path d="M12 2a6 6 0 0 0-6 6v2H4v2h16v-2h-2V8a6 6 0 0 0-6-6zm0 2a4 4 0 0 1 4 4v2H8V8a4 4 0 0 1 4-4z" fill="white"/>`;
+  }
+
+  const strokeColor = isSelected ? '#ff6b00' : '#ffffff';
+  const strokeWidth = isSelected ? '3' : '2';
+
+  const svgString = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 48" width="40" height="48">
+      <defs>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="rgba(0,0,0,0.35)"/>
+        </filter>
+      </defs>
+      <path d="M20 46 C20 46, 36 28, 36 18 A16 16 0 0 0 4 18 C4 28, 20 46, 20 46 Z" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" filter="url(#shadow)"/>
+      <circle cx="20" cy="18" r="11" fill="rgba(0,0,0,0.18)"/>
+      <g transform="translate(10, 8) scale(0.8)">
+        ${svgIcon}
+      </g>
+    </svg>
+  `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
+};
 
 const DISTRICT_OPTIONS = [
   {
@@ -23,7 +133,7 @@ const DISTRICT_OPTIONS = [
     shortLabel: 'All 188 Barangays',
     badge: '188 Brgys',
     icon: Layers,
-    description: 'Citywide Caloocan (North & South)'
+    description: 'Citywide Caloocan (North & South)',
   },
   {
     id: 'North Caloocan',
@@ -31,7 +141,7 @@ const DISTRICT_OPTIONS = [
     shortLabel: 'North District',
     badge: 'Brgy 165–188',
     icon: Compass,
-    description: 'Camarin, Bagong Silang, Tala, Deparo'
+    description: 'Camarin, Bagong Silang, Tala, Deparo',
   },
   {
     id: 'South Caloocan',
@@ -39,8 +149,8 @@ const DISTRICT_OPTIONS = [
     shortLabel: 'South District',
     badge: 'Brgy 1–164',
     icon: MapPin,
-    description: 'Monumento, Grace Park, Sangandaan'
-  }
+    description: 'Monumento, Grace Park, Sangandaan',
+  },
 ];
 
 const CALOOCAN_INCIDENTS = [
@@ -55,9 +165,9 @@ const CALOOCAN_INCIDENTS = [
     crew: 'Maynilad & City Water Division Team 2',
     time: '45 mins ago',
     coordinates: '14.7523° N, 121.0421° E',
+    lat: 14.7523,
+    lng: 121.0421,
     icon: Droplets,
-    top: '32%',
-    left: '46%'
   },
   {
     id: 'REP-2026-0479',
@@ -70,9 +180,9 @@ const CALOOCAN_INCIDENTS = [
     crew: 'City Electrical Maintenance Crew #3',
     time: '1.5 hrs ago',
     coordinates: '14.7645° N, 121.0552° E',
+    lat: 14.7645,
+    lng: 121.0552,
     icon: Zap,
-    top: '20%',
-    left: '62%'
   },
   {
     id: 'REP-2026-0465',
@@ -85,13 +195,13 @@ const CALOOCAN_INCIDENTS = [
     crew: 'Highway Maintenance Division - South',
     time: 'Resolved today',
     coordinates: '14.6572° N, 120.9841° E',
+    lat: 14.6572,
+    lng: 120.9841,
     icon: RoadIcon,
-    top: '78%',
-    left: '28%'
   },
   {
     id: 'REP-2026-0458',
-    category: 'drainage',
+    category: 'road',
     title: 'Storm Canal Declogging & Cover Repair',
     barangay: 'Brgy. 168, Deparo Road',
     district: 'North Caloocan',
@@ -100,9 +210,9 @@ const CALOOCAN_INCIDENTS = [
     crew: 'Drainage & Flood Control Unit A',
     time: 'In progress',
     coordinates: '14.7350° N, 121.0180° E',
+    lat: 14.7350,
+    lng: 121.0180,
     icon: RoadIcon,
-    top: '48%',
-    left: '34%'
   },
   {
     id: 'REP-2026-0441',
@@ -115,20 +225,99 @@ const CALOOCAN_INCIDENTS = [
     crew: 'Meralco Caloocan & LGU Crew',
     time: 'Resolved yesterday',
     coordinates: '14.7810° N, 121.0820° E',
+    lat: 14.7810,
+    lng: 121.0820,
     icon: Zap,
-    top: '14%',
-    left: '74%'
-  }
+  },
 ];
 
 export default function MapPreviewSection() {
+  const { theme } = useTheme();
   const [activeCategory, setActiveCategory] = useState('all');
   const [districtFilter, setDistrictFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIncident, setSelectedIncident] = useState(CALOOCAN_INCIDENTS[0]);
-  const [zoomLevel, setZoomLevel] = useState(1);
   const [isDistrictOpen, setIsDistrictOpen] = useState(false);
   const districtDropdownRef = useRef(null);
+  const mapRef = useRef(null);
+
+  const isDarkMode =
+    theme === 'dark' ||
+    (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) ||
+    (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    libraries: GOOGLE_MAPS_LIBRARIES,
+  });
+
+  const mapOptions = useMemo(
+    () => ({
+      styles: isDarkMode ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE,
+      disableDefaultUI: true,
+      zoomControl: false,
+      gestureHandling: 'greedy',
+      minZoom: 10,
+      maxZoom: 18,
+    }),
+    [isDarkMode]
+  );
+
+  const onMapLoad = useCallback((mapInstance) => {
+    mapRef.current = mapInstance;
+    if (window.google && window.google.maps) {
+      const bounds = new window.google.maps.LatLngBounds(
+        new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
+        new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
+      );
+      mapInstance.fitBounds(bounds, { top: 30, right: 30, bottom: 30, left: 30 });
+    }
+  }, []);
+
+  const onMapUnmount = useCallback(() => {
+    mapRef.current = null;
+  }, []);
+
+  // Sync map center/bounds when district filter changes
+  useEffect(() => {
+    if (!mapRef.current || !window.google || !window.google.maps) return;
+    if (districtFilter === 'North Caloocan') {
+      mapRef.current.panTo(NORTH_CALOOCAN_CENTROID);
+      mapRef.current.setZoom(12);
+    } else if (districtFilter === 'South Caloocan') {
+      mapRef.current.panTo(SOUTH_CALOOCAN_CENTROID);
+      mapRef.current.setZoom(13);
+    } else {
+      const bounds = new window.google.maps.LatLngBounds(
+        new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
+        new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
+      );
+      mapRef.current.fitBounds(bounds, { top: 30, right: 30, bottom: 30, left: 30 });
+    }
+  }, [districtFilter]);
+
+  const handleSelectIncident = (incident) => {
+    setSelectedIncident(incident);
+    if (mapRef.current && incident?.lat && incident?.lng) {
+      mapRef.current.panTo({ lat: incident.lat, lng: incident.lng });
+      if (mapRef.current.getZoom() < 13) {
+        mapRef.current.setZoom(14);
+      }
+    }
+  };
+
+  const handleZoomIn = () => {
+    if (mapRef.current) {
+      mapRef.current.setZoom((mapRef.current.getZoom() || 11) + 1);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (mapRef.current) {
+      mapRef.current.setZoom((mapRef.current.getZoom() || 11) - 1);
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -329,62 +518,108 @@ export default function MapPreviewSection() {
         {/* Map Preview Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-3 sm:p-5">
           
-          {/* Left Canvas: Cartographic Caloocan Map View with Light/Dark Theme Parity */}
-          <div className="lg:col-span-7 relative min-h-[320px] sm:min-h-[440px] rounded-xl overflow-hidden bg-slate-100 dark:bg-[#0a0f1d] border border-slate-200 dark:border-transparent flex flex-col justify-between p-3 sm:p-4 shadow-inner select-none transition-colors">
+          {/* Left Canvas: Real Google Maps Caloocan System View with Light/Dark Parity */}
+          <div className="lg:col-span-7 relative min-h-[380px] sm:min-h-[460px] h-[380px] sm:h-[460px] lg:h-auto rounded-xl overflow-hidden bg-slate-100 dark:bg-[#0a0f1d] border border-slate-200 dark:border-slate-800 shadow-inner select-none transition-colors">
             
-            {/* Cartographic Road Grid */}
-            <div
-              className="absolute inset-0 opacity-40 dark:opacity-20 text-slate-300 dark:text-[#38bdf8]"
-              style={{
-                backgroundImage: `
-                  linear-gradient(to right, currentColor 1px, transparent 1px),
-                  linear-gradient(to bottom, currentColor 1px, transparent 1px)
-                `,
-                backgroundSize: '40px 40px'
-              }}
-            />
+            {isLoaded ? (
+              <GoogleMap
+                mapContainerStyle={{ width: '100%', height: '100%' }}
+                center={CALOOCAN_CENTER}
+                zoom={11}
+                onLoad={onMapLoad}
+                onUnmount={onMapUnmount}
+                options={mapOptions}
+              >
+                {/* North Caloocan Boundary Polygon */}
+                <PolygonF
+                  paths={NORTH_CALOOCAN_PATH}
+                  options={{
+                    fillColor: '#ff6b00',
+                    fillOpacity: isDarkMode ? 0.08 : 0.05,
+                    strokeColor: '#ff6b00',
+                    strokeOpacity: 0.85,
+                    strokeWeight: 2,
+                    clickable: false,
+                  }}
+                />
 
-            {/* Caloocan Major Arterial Roads Layout */}
-            <svg
-              viewBox="0 0 500 400"
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              fill="none"
-              strokeWidth="2"
-            >
-              {/* North Caloocan Boundary */}
-              <polygon
-                points="180,40 260,30 380,50 420,90 390,170 300,200 230,170 170,120"
-                stroke="#ff6b00"
-                strokeWidth="1.5"
-                strokeDasharray="4 3"
-                fill="rgba(255,107,0,0.06)"
-              />
-              {/* South Caloocan Boundary */}
-              <polygon
-                points="110,260 190,240 220,280 180,360 100,340 70,290"
-                stroke="#ff6b00"
-                strokeWidth="1.5"
-                strokeDasharray="4 3"
-                fill="rgba(255,107,0,0.06)"
-              />
-              {/* Major Corridors */}
-              <path d="M 50,300 L 220,280 L 320,190 L 400,80" className="stroke-slate-300 dark:stroke-[#334155]" strokeWidth="3" />
-              <path d="M 180,120 L 280,100 L 380,50" className="stroke-slate-300 dark:stroke-[#334155]" strokeWidth="2.5" />
-              <path d="M 230,170 L 280,130 L 320,190" className="stroke-slate-300 dark:stroke-[#334155]" strokeWidth="2" />
-            </svg>
+                {/* South Caloocan Boundary Polygon */}
+                <PolygonF
+                  paths={SOUTH_CALOOCAN_PATH}
+                  options={{
+                    fillColor: '#ff6b00',
+                    fillOpacity: isDarkMode ? 0.08 : 0.05,
+                    strokeColor: '#ff6b00',
+                    strokeOpacity: 0.85,
+                    strokeWeight: 2,
+                    clickable: false,
+                  }}
+                />
+
+                {/* Real Caloocan System Markers */}
+                {filteredIncidents.map((rep) => {
+                  const isSelected = selectedIncident?.id === rep.id;
+                  return (
+                    <MarkerF
+                      key={rep.id}
+                      position={{ lat: rep.lat, lng: rep.lng }}
+                      zIndex={isSelected ? 500 : 150}
+                      title={`${rep.id}: ${rep.title}`}
+                      onClick={() => handleSelectIncident(rep)}
+                      icon={
+                        window.google && window.google.maps
+                          ? {
+                              url: getMarkerSVG(rep.category, rep.status, isSelected),
+                              scaledSize: new window.google.maps.Size(isSelected ? 42 : 32, isSelected ? 50 : 38),
+                              anchor: new window.google.maps.Point(isSelected ? 21 : 16, isSelected ? 50 : 38),
+                            }
+                          : undefined
+                      }
+                    />
+                  );
+                })}
+              </GoogleMap>
+            ) : (
+              /* Loading / Fallback Cartographic Container */
+              <div className="w-full h-full flex flex-col items-center justify-center relative bg-slate-100 dark:bg-[#0a0f1d] p-6 text-center">
+                <div
+                  className="absolute inset-0 opacity-40 dark:opacity-20 text-slate-300 dark:text-[#38bdf8]"
+                  style={{
+                    backgroundImage: `
+                      linear-gradient(to right, currentColor 1px, transparent 1px),
+                      linear-gradient(to bottom, currentColor 1px, transparent 1px)
+                    `,
+                    backgroundSize: '40px 40px'
+                  }}
+                />
+                <div className="relative z-10 flex flex-col items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-[#ff6b00]">
+                    <Loader2 size={22} className="animate-spin" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold font-heading text-slate-800 dark:text-slate-200 block">
+                      Initializing Caloocan GIS Engine...
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Loading civic boundary layers and live utility pins
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Top Toolbar overlay on map */}
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/95 dark:bg-slate-950/85 backdrop-blur-md text-slate-900 dark:text-white text-[10px] sm:text-[11px] font-mono-data border border-slate-200 dark:border-white/10 shadow-xs">
+            <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
+              <div className="pointer-events-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/95 dark:bg-slate-950/85 backdrop-blur-md text-slate-900 dark:text-white text-[10px] sm:text-[11px] font-mono-data border border-slate-200 dark:border-white/10 shadow-xs">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Caloocan GIS View</span>
+                <span>Caloocan GIS Live System</span>
               </div>
 
               {/* Map Zoom Controls */}
-              <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-950/85 backdrop-blur-md rounded-lg p-1 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white shadow-xs">
+              <div className="pointer-events-auto flex items-center gap-1 bg-white/95 dark:bg-slate-950/85 backdrop-blur-md rounded-lg p-1 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white shadow-xs">
                 <button
                   type="button"
-                  onClick={() => setZoomLevel((z) => Math.min(z + 0.15, 1.4))}
+                  onClick={handleZoomIn}
                   className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded cursor-pointer transition-colors"
                   title="Zoom In"
                   aria-label="Zoom In"
@@ -393,7 +628,7 @@ export default function MapPreviewSection() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setZoomLevel((z) => Math.max(z - 0.15, 0.85))}
+                  onClick={handleZoomOut}
                   className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded cursor-pointer transition-colors"
                   title="Zoom Out"
                   aria-label="Zoom Out"
@@ -403,37 +638,9 @@ export default function MapPreviewSection() {
               </div>
             </div>
 
-            {/* Interactive Pins Container */}
-            <div
-              className="relative z-10 h-56 sm:h-72 w-full my-auto transition-transform duration-300"
-              style={{ transform: `scale(${zoomLevel})` }}
-            >
-              {filteredIncidents.map((rep) => {
-                const isSelected = selectedIncident?.id === rep.id;
-                const Icon = rep.icon;
-
-                return (
-                  <button
-                    key={rep.id}
-                    type="button"
-                    onClick={() => setSelectedIncident(rep)}
-                    style={{ top: rep.top, left: rep.left }}
-                    className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center p-1.5 sm:p-2 rounded-full transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-[#ff6b00] text-white scale-125 z-30 shadow-xl ring-4 ring-orange-500/40'
-                        : 'bg-white dark:bg-slate-900/90 text-[#ff6b00] dark:text-orange-400 hover:bg-[#ff6b00] hover:text-white dark:hover:bg-[#ff6b00] dark:hover:text-white z-20 shadow-md border border-slate-200 dark:border-white/20'
-                    }`}
-                    title={`${rep.id}: ${rep.title}`}
-                  >
-                    <Icon size={13} />
-                  </button>
-                );
-              })}
-            </div>
-
             {/* Selected Pin Bottom Info Bar */}
             {selectedIncident && (
-              <div className="relative z-10 bg-white/95 dark:bg-slate-950/90 backdrop-blur-md border border-slate-200/90 dark:border-white/15 rounded-xl p-2.5 sm:p-3.5 text-slate-900 dark:text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left shadow-md transition-colors">
+              <div className="absolute bottom-3 left-3 right-3 z-10 pointer-events-auto bg-white/95 dark:bg-slate-950/90 backdrop-blur-md border border-slate-200/90 dark:border-white/15 rounded-xl p-2.5 sm:p-3.5 text-slate-900 dark:text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left shadow-lg transition-colors">
                 <div className="truncate">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[9px] sm:text-[10px] font-mono-data font-bold text-[#ff6b00] uppercase">
@@ -489,7 +696,7 @@ export default function MapPreviewSection() {
                     <button
                       key={rep.id}
                       type="button"
-                      onClick={() => setSelectedIncident(rep)}
+                      onClick={() => handleSelectIncident(rep)}
                       className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-white dark:bg-slate-800/90 border-[#ff6b00] shadow-sm ring-1 ring-[#ff6b00]/30'

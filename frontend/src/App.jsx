@@ -10,6 +10,7 @@ import ResidentDashboard from './pages/ResidentDashboard';
 import DispatcherDashboard from './pages/DispatcherDashboard';
 import ManagementDashboard from './pages/ManagementDashboard';
 import GovDivisionPage   from './pages/GovDivisionPage';
+import GovProjectsPage   from './pages/GovProjectsPage';
 import GovAnalyticsPage  from './pages/GovAnalyticsPage';
 import PositionDashboard from './pages/PositionDashboard';
 import GovReportsDashboard from './pages/GovReportsDashboard';
@@ -110,7 +111,7 @@ function App() {
 
                         {/* LGU Projects — all gov staff can view */}
                         <Route path="/gov/projects" element={
-                            <GovOnly><GovDivisionPage /></GovOnly>
+                            <GovOnly><GovProjectsPage /></GovOnly>
                         } />
 
                         {/* Process Timeline — all gov staff */}

@@ -440,6 +440,7 @@ const GovDivisionPage = () => {
     const navigate = useNavigate();
     const [token] = useState(() => getAuthToken());
     const [currentUser] = useState(() => getAuthUser());
+
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
