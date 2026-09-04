@@ -32,7 +32,14 @@ import {
     X,
     Trash2,
     Image as ImageIcon,
-    Building2
+    Building2,
+    HelpCircle,
+    Info,
+    CheckCircle2,
+    ChevronDown,
+    ChevronUp,
+    RotateCcw,
+    Sparkles
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, HeatmapLayerF, OverlayViewF } from '@react-google-maps/api';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -78,14 +85,165 @@ const INFRASTRUCTURE_CATEGORIES = [
 
 const STATUS_OPTIONS = [
     'All Statuses',
-    'Pending',
-    'Pending Approval (Phase 2)',
-    'Approved (Phase 3)',
-    'Dispatched (Phase 4)',
-    'Resolved (Phase 5)',
-    'Rejected',
+    'Pending Review',
+    'Awaiting Approval',
+    'Approved for Work Order',
+    'Dispatched (In Progress)',
+    'Resolved (Fixed)',
+    'Rejected (Spam / Invalid)',
     'Cancelled'
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAIN LANGUAGE CIVIC TRIAGE HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Extracts a human-readable, plain-language title for any report.
+ * Promotes real problem descriptions/summaries over technical tracking codes.
+ */
+export const getReportPlainTitle = (report) => {
+    if (!report) return 'Citizen Report';
+    if (report.title && report.title.trim()) return report.title.trim();
+    if (report.ai_summary && report.ai_summary.trim()) {
+        const clean = report.ai_summary.replace(/^["']|["']$/g, '').trim();
+        if (clean.length > 0 && clean.length <= 65) return clean;
+        if (clean.length > 65) return clean.substring(0, 62) + '...';
+    }
+    if (report.description && report.description.trim()) {
+        const desc = report.description.trim();
+        return desc.length <= 55 ? desc : desc.substring(0, 52) + '...';
+    }
+    if (report.category) return report.category;
+    if (report.ai_category) return report.ai_category;
+    return 'Infrastructure Issue';
+};
+
+/**
+ * Maps raw AI confidence scores to plain-language guidance qualifiers.
+ */
+export const getAiConfidenceDetails = (confidence) => {
+    const conf = Number(confidence) || 70;
+    if (conf >= 80) {
+        return {
+            level: 'High',
+            badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+            dotColor: 'bg-emerald-500',
+            qualifier: 'High confidence — AI detection matches verified infrastructure patterns.',
+            shortNote: 'High confidence'
+        };
+    } else if (conf >= 60) {
+        return {
+            level: 'Medium',
+            badgeClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20',
+            dotColor: 'bg-orange-500',
+            qualifier: 'Medium confidence — please verify the attached photo before dispatching.',
+            shortNote: 'Medium confidence'
+        };
+    } else {
+        return {
+            level: 'Low',
+            badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+            dotColor: 'bg-rose-500',
+            qualifier: 'Low confidence — manual staff review strongly advised.',
+            shortNote: 'Low confidence'
+        };
+    }
+};
+
+/**
+ * Returns plain-language status descriptor with icon, text label, and style.
+ */
+export const getStatusDescriptor = (status) => {
+    switch (status) {
+        case 'unverified':
+        case 'pending':
+            return {
+                label: 'Pending Review',
+                icon: Clock,
+                badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
+                description: 'New citizen report awaiting staff review.'
+            };
+        case 'pending_approval':
+            return {
+                label: 'Awaiting Approval',
+                icon: CheckCircle2,
+                badgeClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+                description: 'Triaged by staff, awaiting Division Chief sign-off.'
+            };
+        case 'approved_internal':
+            return {
+                label: 'Approved for W.O.',
+                icon: Briefcase,
+                badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+                description: 'Budget locked and approved for work order creation.'
+            };
+        case 'dispatched':
+            return {
+                label: 'Dispatched',
+                icon: Truck,
+                badgeClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30',
+                description: 'Field repair crew dispatched and on site.'
+            };
+        case 'resolved':
+            return {
+                label: 'Resolved (Fixed)',
+                icon: CheckCircle,
+                badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+                description: 'Repairs completed and verified with photo proof.'
+            };
+        case 'rejected':
+            return {
+                label: 'Rejected',
+                icon: X,
+                badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
+                description: 'Spam, duplicate, or unverified submission.'
+            };
+        case 'cancelled':
+            return {
+                label: 'Cancelled',
+                icon: X,
+                badgeClass: 'bg-slate-500/10 text-slate-500 border-slate-500/30',
+                description: 'Cancelled by citizen or department.'
+            };
+        default:
+            return {
+                label: (status || 'Unknown').replace(/_/g, ' '),
+                icon: AlertTriangle,
+                badgeClass: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+                description: 'Status update pending.'
+            };
+    }
+};
+
+/**
+ * Returns plain-language urgency descriptor with icon, text label, and meaning.
+ */
+export const getUrgencyDescriptor = (urgency) => {
+    const u = (urgency || '').toLowerCase();
+    if (u === 'critical' || u === 'high') {
+        return {
+            label: 'High Priority',
+            badgeClass: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30',
+            dotClass: 'bg-red-500',
+            plainMeaning: 'Immediate hazard (e.g. live wire, major flooding, deep road crater)'
+        };
+    }
+    if (u === 'medium') {
+        return {
+            label: 'Medium Priority',
+            badgeClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30',
+            dotClass: 'bg-orange-500',
+            plainMeaning: 'Standard repair (affects neighborhood services)'
+        };
+    }
+    return {
+        label: 'Low Priority',
+        badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+        dotClass: 'bg-emerald-500',
+        plainMeaning: 'Routine maintenance (minor aesthetic or non-blocking)'
+    };
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CUSTOM CIVIC-FOCUSED MAP STYLES (Zero POI clutter, Progressive Disclosure)
@@ -294,6 +452,20 @@ const DispatcherDashboard = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState(null);
     const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
+    const [showLegend, setShowLegend] = useState(false); // Collapsible status/priority legend
+    const [showAiHelp, setShowAiHelp] = useState(false); // Expandable Gemini AI helper in triage queue
+
+    const handleClearAllFilters = () => {
+        setSearchQuery('');
+        setSelectedBarangay('All Barangays');
+        setSelectedCategory('All Categories');
+        setSelectedStatus('All Statuses');
+    };
+
+    const isFiltersActive = searchQuery.trim() !== '' || 
+        selectedBarangay !== 'All Barangays' || 
+        selectedCategory !== 'All Categories' || 
+        selectedStatus !== 'All Statuses';
 
     // AI Omni-Assistant State
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -950,30 +1122,51 @@ const DispatcherDashboard = () => {
             // 1. Dashboard Mode & Granular Status Filter
             if (selectedStatus !== 'All Statuses') {
                 const statusMap = {
-                    'Pending': 'pending',
-                    'Pending Approval (Phase 2)': 'pending_approval',
-                    'Approved (Phase 3)': 'approved_internal',
-                    'Dispatched (Phase 4)': 'dispatched',
-                    'Resolved (Phase 5)': 'resolved',
-                    'Rejected': 'rejected',
-                    'Cancelled': 'cancelled'
+                    'Pending Review': ['pending', 'unverified'],
+                    'Pending': ['pending', 'unverified'],
+                    'Awaiting Approval': ['pending_approval'],
+                    'Pending Approval (Phase 2)': ['pending_approval'],
+                    'Approved for Work Order': ['approved_internal'],
+                    'Approved (Phase 3)': ['approved_internal'],
+                    'Dispatched (In Progress)': ['dispatched'],
+                    'Dispatched (Phase 4)': ['dispatched'],
+                    'Resolved (Fixed)': ['resolved'],
+                    'Resolved (Phase 5)': ['resolved'],
+                    'Rejected (Spam / Invalid)': ['rejected'],
+                    'Rejected': ['rejected'],
+                    'Cancelled': ['cancelled']
                 };
-                const targetStatus = statusMap[selectedStatus];
-                if (targetStatus && report.status !== targetStatus) return false;
+                const targetStatuses = statusMap[selectedStatus] || [selectedStatus.toLowerCase()];
+                if (!targetStatuses.includes(report.status)) return false;
             }
             // By intentionally omitting the 'else' block, selecting 'All Statuses' overrides the 
             // restrictive Triage/Active mode toggles and strictly displays 100% of the dataset.
 
-            // 2. Search Query Filter
-            const searchLower = searchQuery.toLowerCase();
-            const ticketIdText = (report.ticket_id || `RPT-${report.id}`).toLowerCase();
-            const matchesSearch = !searchQuery || 
-                report.id.toString().includes(searchLower) || 
-                ticketIdText.includes(searchLower) ||
-                (report.ai_category || report.category || '').toLowerCase().includes(searchLower) ||
-                (report.location_string || '').toLowerCase().includes(searchLower);
-            
-            if (!matchesSearch) return false;
+            // 2. Comprehensive Search Query Filter (Report ID, Plain Title, Description, AI Summary, Category, Location)
+            const searchLower = searchQuery.toLowerCase().trim();
+            if (searchLower) {
+                const ticketIdText = (report.ticket_id || `RPT-${report.id}`).toLowerCase();
+                const plainTitle = getReportPlainTitle(report).toLowerCase();
+                const titleText = (report.title || '').toLowerCase();
+                const descText = (report.description || '').toLowerCase();
+                const aiSummaryText = (report.ai_summary || '').toLowerCase();
+                const categoryText = (report.category || report.ai_category || '').toLowerCase();
+                const locationText = (report.location_string || '').toLowerCase();
+                const barangayText = (report.barangay || '').toString().toLowerCase();
+
+                const matchesSearch = 
+                    report.id.toString().includes(searchLower) || 
+                    ticketIdText.includes(searchLower) ||
+                    plainTitle.includes(searchLower) ||
+                    titleText.includes(searchLower) ||
+                    descText.includes(searchLower) ||
+                    aiSummaryText.includes(searchLower) ||
+                    categoryText.includes(searchLower) ||
+                    locationText.includes(searchLower) ||
+                    barangayText.includes(searchLower);
+                
+                if (!matchesSearch) return false;
+            }
 
             // 3. Barangay Filter (Robust Match)
             if (selectedBarangay !== 'All Barangays') {
@@ -1495,7 +1688,26 @@ const DispatcherDashboard = () => {
                         </div>
                     </div>
                     
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4">
+                        {/* PULSO Omni-Assistant AI Copilot in Header */}
+                        <button
+                            onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-sm ${
+                                isAIChatOpen
+                                    ? 'bg-blue-600 text-white shadow-blue-500/25 ring-2 ring-blue-400'
+                                    : 'bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800'
+                            }`}
+                            title={isAIChatOpen ? "Close AI Copilot" : "Open PULSO Omni-Assistant (AI Copilot)"}
+                            aria-label="Toggle PULSO Omni-Assistant AI Copilot"
+                        >
+                            <Brain size={15} className={isAIChatOpen ? 'animate-pulse' : ''} />
+                            <span className="hidden sm:inline">AI Copilot</span>
+                            <span className="flex h-2 w-2 relative">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                        </button>
+
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
                             <span className="text-sm font-semibold text-slate-500 dark:text-slate-400"><span className="text-slate-900 dark:text-white">8/12</span> Teams Available</span>
@@ -1518,26 +1730,39 @@ const DispatcherDashboard = () => {
                         >
                             {/* Removed right subtle shadow */}
                             <div className="p-4 relative flex flex-col gap-3">
-                                {/* Removed bottom shadow */}
-                                <h2 className="font-bold text-neutral-text dark:text-white text-lg flex items-center gap-2">
-                                    {dashboardMode === 'triage' ? (
-                                        <><AlertTriangle size={18} className="text-primary"/> Incoming Reports</>
-                                    ) : (
-                                        <><Radio size={18} className="text-secondary"/> Dispatched Work</>
-                                    )}
-                                </h2>
+                                <div className="flex items-center justify-between">
+                                    <h2 className="font-bold text-neutral-text dark:text-white text-lg flex items-center gap-2">
+                                        {dashboardMode === 'triage' ? (
+                                            <><AlertTriangle size={18} className="text-primary"/> Incoming Reports</>
+                                        ) : (
+                                            <><Radio size={18} className="text-secondary"/> Dispatched Work</>
+                                        )}
+                                    </h2>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold font-mono">
+                                        {activeReports.length} {activeReports.length === 1 ? 'report' : 'reports'}
+                                    </span>
+                                </div>
                                 <div className="flex flex-col gap-2">
                                     <div className="relative">
-                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-muted dark:text-slate-400" />
+                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-muted dark:text-slate-400 pointer-events-none" />
                                         <input 
                                             type="text" 
-                                            placeholder="Search by RPT ID, Category, or Location..." 
+                                            placeholder="Search by issue, location, category, or report ID..." 
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-neutral-bg dark:bg-slate-950 border border-neutral-border dark:border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-neutral-text dark:text-white placeholder-neutral-muted focus:outline-none focus:border-primary transition-colors" 
+                                            className="w-full bg-neutral-bg dark:bg-slate-950 border border-neutral-border dark:border-slate-800 rounded-lg pl-9 pr-8 py-2 text-xs text-neutral-text dark:text-white placeholder-neutral-muted focus:outline-none focus:border-primary transition-colors" 
                                         />
+                                        {searchQuery && (
+                                            <button 
+                                                onClick={() => setSearchQuery('')}
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5"
+                                                aria-label="Clear search query"
+                                            >
+                                                <X size={13} />
+                                            </button>
+                                        )}
                                     </div>
-                                    <div className="flex flex-col gap-2.5">
+                                    <div className="flex flex-col gap-2">
                                         <OrangeSelect
                                             value={selectedBarangay}
                                             onChange={setSelectedBarangay}
@@ -1564,18 +1789,105 @@ const DispatcherDashboard = () => {
                                         />
                                     </div>
                                     
-                                    {/* Professional Visualizer Control */}
-                                    <div className="mt-1 pt-3 border-t border-slate-100 dark:border-slate-800/50 flex items-center justify-between">
+                                    {/* Heatmap & Filter Controls */}
+                                    <div className="mt-1 pt-2 border-t border-slate-100 dark:border-slate-800/50 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <Flame size={14} className={`${showHeatmap ? 'text-orange-500 animate-pulse' : 'text-slate-400'}`} />
                                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{showHeatmap ? 'Hide Heatmap' : 'Show Heatmap'}</span>
                                         </div>
-                                        <button 
-                                            onClick={() => setShowHeatmap(!showHeatmap)}
-                                            className={`relative w-8 h-4 rounded-full transition-colors duration-200 focus:outline-none ${showHeatmap ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-800'}`}
+                                        <div className="flex items-center gap-3">
+                                            {isFiltersActive && (
+                                                <button 
+                                                    onClick={handleClearAllFilters}
+                                                    className="text-[10px] font-bold text-orange-500 hover:text-orange-600 flex items-center gap-1 transition-colors"
+                                                    title="Reset all search and dropdown filters"
+                                                >
+                                                    <RotateCcw size={10} /> Clear
+                                                </button>
+                                            )}
+                                            <button 
+                                                onClick={() => setShowHeatmap(!showHeatmap)}
+                                                className={`relative w-8 h-4 rounded-full transition-colors duration-200 focus:outline-none ${showHeatmap ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-800'}`}
+                                                aria-label={showHeatmap ? 'Hide incident heatmap' : 'Show incident heatmap'}
+                                            >
+                                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${showHeatmap ? 'translate-x-4' : 'translate-x-0'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Status & Urgency Legend Accordion (Always Accessible) */}
+                                    <div className="mt-1 border border-slate-200/80 dark:border-slate-800/80 rounded-xl bg-slate-50/70 dark:bg-slate-950/60 overflow-hidden">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowLegend(!showLegend)}
+                                            className="w-full px-3 py-2 flex items-center justify-between text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 transition-colors"
+                                            aria-expanded={showLegend}
                                         >
-                                            <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${showHeatmap ? 'translate-x-4' : 'translate-x-0'}`} />
+                                            <span className="flex items-center gap-1.5">
+                                                <Info size={13} className="text-orange-500 shrink-0" />
+                                                <span className="text-[11px] font-bold tracking-tight">Status & Priority Guide</span>
+                                            </span>
+                                            {showLegend ? <ChevronUp size={13} className="text-slate-400" /> : <ChevronDown size={13} className="text-slate-400" />}
                                         </button>
+                                        {showLegend && (
+                                            <div className="px-3 pb-3 pt-1 border-t border-slate-200/60 dark:border-slate-800/60 space-y-2.5 text-[11px]">
+                                                <div>
+                                                    <div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Report Status Meanings</div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 shrink-0 w-24 justify-center">
+                                                                <Clock size={9} /> Pending Review
+                                                            </span>
+                                                            <span className="text-slate-500 dark:text-slate-400 text-[10px] leading-tight">Needs staff check</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 flex items-center gap-1 shrink-0 w-24 justify-center">
+                                                                <CheckCircle2 size={9} /> In Review
+                                                            </span>
+                                                            <span className="text-slate-500 dark:text-slate-400 text-[10px] leading-tight">With Chief Engineer</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 flex items-center gap-1 shrink-0 w-24 justify-center">
+                                                                <Truck size={9} /> Dispatched
+                                                            </span>
+                                                            <span className="text-slate-500 dark:text-slate-400 text-[10px] leading-tight">Crew en route to site</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shrink-0 w-24 justify-center">
+                                                                <CheckCircle size={9} /> Resolved
+                                                            </span>
+                                                            <span className="text-slate-500 dark:text-slate-400 text-[10px] leading-tight">Fixed with proof photo</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1 shrink-0 w-24 justify-center">
+                                                                <X size={9} /> Rejected
+                                                            </span>
+                                                            <span className="text-slate-500 dark:text-slate-400 text-[10px] leading-tight">Spam or invalid</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+                                                    <div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Priority Meanings</div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 text-[10px]">
+                                                            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
+                                                            <span className="font-bold text-red-600 dark:text-red-400">High:</span>
+                                                            <span className="text-slate-500 dark:text-slate-400">Immediate hazard (live wire, flood, deep crater)</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-[10px]">
+                                                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0"></span>
+                                                            <span className="font-bold text-orange-600 dark:text-orange-400">Medium:</span>
+                                                            <span className="text-slate-500 dark:text-slate-400">Standard disruption</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-[10px]">
+                                                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">Low:</span>
+                                                            <span className="text-slate-500 dark:text-slate-400">Routine maintenance</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1598,14 +1910,37 @@ const DispatcherDashboard = () => {
                                     </div>
                                 )}
                                 {loadingReports ? (
-                                    <div className="p-4 text-center text-slate-500">Loading reports...</div>
+                                    <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2">
+                                        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                                        <span className="text-xs">Loading incoming reports...</span>
+                                    </div>
                                 ) : activeReports.length === 0 ? (
-                                    <div className="p-4 text-center text-slate-500">No active reports in queue.</div>
+                                    <div className="p-6 text-center flex flex-col items-center justify-center my-auto min-h-[260px]">
+                                        <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-3 border border-orange-500/20">
+                                            <Filter size={22} />
+                                        </div>
+                                        <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-1">No reports found for this filter</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[220px] mb-4 leading-relaxed">
+                                            Try adjusting your search terms, barangay, or status filters.
+                                        </p>
+                                        {isFiltersActive && (
+                                            <button
+                                                onClick={handleClearAllFilters}
+                                                className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
+                                            >
+                                                <RotateCcw size={12} /> Clear all filters
+                                            </button>
+                                        )}
+                                    </div>
                                 ) : (
                                     activeReports.map(report => {
                                         const color = getReportColor(report.category || report.ai_category);
                                         const icon = getReportIcon(report.category || report.ai_category);
                                         const aiConfidence = urgencyToConfidence(report.ai_urgency);
+                                        const plainTitle = getReportPlainTitle(report);
+                                        const statusDesc = getStatusDescriptor(report.status);
+                                        const urgencyDesc = getUrgencyDescriptor(report.ai_urgency);
+                                        const StatusIcon = statusDesc.icon;
 
                                         // Tactical highlight: glow yellow if this report is in the active stress zone
                                         const reportBrgyDigits = (report.barangay || '').toString().replace(/\D/g, '');
@@ -1641,49 +1976,58 @@ const DispatcherDashboard = () => {
                                             }}
                                             className={`w-full text-left p-3 rounded-xl border transition-all ${selectionClass} ${isSelected ? 'z-10' : ''}`}
                                         >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-6 h-6 rounded flex items-center justify-center ${
-                                                        color === 'orange' ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20' :
-                                                        color === 'blue' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
-                                                        color === 'green' ? 'bg-green-500/10 text-green-500 border border-green-500/20' :
-                                                        color === 'red' ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
-                                                        'bg-slate-500/10 text-slate-500'
-                                                    }`}>
-                                                        {(() => {
-                                                            const iconName = getReportIcon(report.category || report.ai_category);
-                                                            if (iconName === 'HardHat') return <HardHat size={14} />;
-                                                            if (iconName === 'Droplets') return <Droplets size={14} />;
-                                                            if (iconName === 'Zap') return <Zap size={14} />;
-                                                            if (iconName === 'ShieldAlert') return <ShieldAlert size={14} />;
-                                                            if (iconName === 'Building2') return <Building2 size={14} />;
-                                                            return <AlertTriangle size={14} />;
-                                                        })()}
-                                                    </div>
-                                                    <span className="font-bold text-slate-900 dark:text-white text-sm">{report.ticket_id || `RPT-${report.id}`}</span>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-1 text-right">
+                                            {/* Primary Line: Plain Language Issue Title + Status Pill with Icon & Label */}
+                                            <div className="flex justify-between items-start gap-2 mb-1.5">
+                                                <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-snug line-clamp-2 flex-1">
+                                                    {plainTitle}
+                                                </h4>
+                                                <div className="flex flex-col items-end gap-1 shrink-0">
                                                     {isTacticalMatch && (
                                                         <span className="text-[9px] font-black text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                                             ⚡ Zone
                                                         </span>
                                                     )}
-                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{new Date(report.created_at).toLocaleDateString()}</span>
-                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border shadow-sm ${
-                                                        report.status === 'unverified' ? 'bg-slate-500/10 text-slate-400 border-slate-500/30' :
-                                                        report.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' :
-                                                        report.status === 'pending_approval' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' :
-                                                        report.status === 'rejected' ? 'bg-red-500/10 text-red-500 border-red-500/30' :
-                                                        'bg-slate-500/10 text-slate-400 border-slate-500/30'
-                                                    }`}>
-                                                        {report.status?.replace('_', ' ')}
+                                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 shadow-sm whitespace-nowrap ${statusDesc.badgeClass}`}>
+                                                        <StatusIcon size={10} />
+                                                        {statusDesc.label}
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className="text-sm text-slate-700 dark:text-slate-300 font-bold truncate mb-1">{report.category || report.ai_category || 'Uncategorized'}</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 mb-3 truncate font-medium">
-                                                <span className="flex items-center gap-1 truncate">
-                                                    <MapPin size={12} className="text-slate-400 shrink-0"/> {report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}
+
+                                            {/* Secondary Line: Category + Tracking ID reference + Date */}
+                                            <div className="flex items-center justify-between gap-1 mb-1.5 text-xs">
+                                                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-semibold truncate">
+                                                    <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
+                                                        color === 'orange' ? 'text-orange-500' :
+                                                        color === 'blue' ? 'text-blue-500' :
+                                                        color === 'green' ? 'text-green-500' :
+                                                        color === 'red' ? 'text-red-500' : 'text-slate-400'
+                                                    }`}>
+                                                        {(() => {
+                                                            const iconName = getReportIcon(report.category || report.ai_category);
+                                                            if (iconName === 'HardHat') return <HardHat size={12} />;
+                                                            if (iconName === 'Droplets') return <Droplets size={12} />;
+                                                            if (iconName === 'Zap') return <Zap size={12} />;
+                                                            if (iconName === 'ShieldAlert') return <ShieldAlert size={12} />;
+                                                            if (iconName === 'Building2') return <Building2 size={12} />;
+                                                            return <AlertTriangle size={12} />;
+                                                        })()}
+                                                    </div>
+                                                    <span className="truncate">{report.category || report.ai_category || 'General Issue'}</span>
+                                                    <span className="text-slate-400 dark:text-slate-600 font-mono text-[10px]">
+                                                        #{report.ticket_id || report.id}
+                                                    </span>
+                                                </div>
+                                                <span className="text-[10px] text-slate-400 shrink-0 font-medium">
+                                                    {new Date(report.created_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
+
+                                            {/* Location line with District badge */}
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 mb-2.5 truncate font-medium">
+                                                <span className="flex items-center gap-1 truncate text-[11px]">
+                                                    <MapPin size={11} className="text-slate-400 shrink-0"/> 
+                                                    <span className="truncate">{report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}</span>
                                                 </span>
                                                 {(() => {
                                                     if (!report.location_lat || !report.location_lng) return null;
@@ -1696,40 +2040,44 @@ const DispatcherDashboard = () => {
                                                     }
                                                     return (
                                                         <span className="shrink-0 text-[9px] font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30" title="Coordinates are outside Caloocan boundaries">
-                                                            ⚠️ Outside Caloocan
+                                                            ⚠️ Outside
                                                         </span>
                                                     );
                                                 })()}
                                             </div>
                                             
-                                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
-                                                <div className="flex items-center gap-1">
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${aiConfidence < 75 ? 'bg-orange-500' : 'bg-blue-500'}`}></span>
-                                                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                                                        {report.ai_urgency ? `AI: ${report.ai_urgency}` : `Conf: ${aiConfidence}%`}
+                                            {/* Footer line: Priority/Urgency Badge with Icon + Separated Actions */}
+                                            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${urgencyDesc.dotClass}`}></span>
+                                                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                                                        {urgencyDesc.label}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1.5">
                                                     <button 
                                                         onClick={(e) => { 
                                                             e.stopPropagation(); 
                                                             handleStreetViewClick({ lat: report.location_lat, lng: report.location_lng });
                                                         }}
-                                                        className="group p-1.5 rounded bg-slate-100 dark:bg-slate-800 transition-all cursor-pointer shadow-sm active:scale-95"
-                                                        title="Quick Street View"
+                                                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-orange-50 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-500 hover:text-orange-500 transition-all cursor-pointer shadow-sm active:scale-95"
+                                                        title={`View street view for ${report.ticket_id || `Report #${report.id}`}`}
+                                                        aria-label={`View street view for ${report.ticket_id || `Report #${report.id}`}`}
                                                     >
-                                                        <Eye size={14} className="text-slate-500 dark:text-slate-400 group-hover:text-orange-500 dark:group-hover:text-orange-400 transition-colors" />
+                                                        <Eye size={13} />
                                                     </button>
                                                     {(report.status === 'unverified' || report.status === 'pending') && (
                                                         <span 
                                                             onClick={(e) => { e.stopPropagation(); handleVerifyReport(report.id); }}
-                                                            className="text-[10px] bg-primary hover:bg-primary-hover text-white px-2.5 py-1 rounded-md uppercase font-black tracking-wider transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-95"
+                                                            className="text-[10px] bg-primary hover:bg-primary-hover text-white px-2.5 py-1 rounded-lg uppercase font-bold tracking-wider transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-95"
                                                         >
                                                             {actionLoading === report.id ? '...' : 'Verify'}
                                                         </span>
                                                     )}
                                                     {report.status === 'pending_approval' && (
-                                                        <span className="text-[10px] bg-primary-light text-primary border border-primary/20 px-2 py-1 rounded uppercase font-bold tracking-wider flex items-center gap-1"><Clock size={10}/> Pending Eng</span>
+                                                        <span className="text-[10px] bg-primary-light text-primary border border-primary/20 px-2 py-1 rounded-lg uppercase font-bold tracking-wider flex items-center gap-1">
+                                                            <Clock size={10}/> In Review
+                                                        </span>
                                                     )}
                                                     {report.status === 'approved_internal' && (
                                                         <span 
@@ -1738,7 +2086,7 @@ const DispatcherDashboard = () => {
                                                                 setSelectedReport({...report, aiConfidence, color, icon});
                                                                 setIsDispatchModalOpen(true); 
                                                             }}
-                                                            className="text-[10px] bg-primary-light text-primary border border-primary/20 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-primary hover:text-white transition-colors cursor-pointer"
+                                                            className="text-[10px] bg-primary-light text-primary border border-primary/20 px-2 py-1 rounded-lg uppercase font-bold tracking-wider hover:bg-primary hover:text-white transition-colors cursor-pointer"
                                                         >
                                                             {actionLoading === report.id ? '...' : 'Create W.O.'}
                                                         </span>
@@ -1746,17 +2094,19 @@ const DispatcherDashboard = () => {
                                                     {report.status === 'dispatched' && (
                                                         <span 
                                                             onClick={(e) => { e.stopPropagation(); handleResolveReport(report.id); }}
-                                                            className="text-[10px] bg-secondary-light text-secondary border border-secondary/20 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-secondary hover:text-white transition-colors cursor-pointer"
+                                                            className="text-[10px] bg-secondary-light text-secondary border border-secondary/20 px-2 py-1 rounded-lg uppercase font-bold tracking-wider hover:bg-secondary hover:text-white transition-colors cursor-pointer"
                                                         >
                                                             {actionLoading === report.id ? '...' : 'Resolve'}
                                                         </span>
                                                     )}
+                                                    <div className="h-3 w-px bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); setReportToDelete(report); }}
-                                                        className="group p-1.5 rounded bg-slate-100 dark:bg-slate-800 transition-all cursor-pointer shadow-sm active:scale-95"
-                                                        title="Delete Report Permanently"
+                                                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-500 transition-all cursor-pointer shadow-sm active:scale-95"
+                                                        title={`Permanently delete ${report.ticket_id || `Report #${report.id}`}`}
+                                                        aria-label={`Permanently delete ${report.ticket_id || `Report #${report.id}`}`}
                                                     >
-                                                        <Trash2 size={14} className="text-slate-500 dark:text-slate-400 group-hover:text-red-500 dark:group-hover:text-red-400 transition-colors" />
+                                                        <Trash2 size={13} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -1786,6 +2136,20 @@ const DispatcherDashboard = () => {
                         title={isRightSidebarOpen ? "Hide Triage Details" : "Show Triage Details"}
                     >
                         {isRightSidebarOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                    </button>
+
+                    {/* PULSO Omni-Assistant AI Brain Button on Map Canvas (Always positioned on map, never blocking triage cards) */}
+                    <button
+                        onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                        className={`absolute top-4 right-16 z-40 shadow-xl border p-2.5 rounded-full transition-all flex items-center justify-center pointer-events-auto group ${
+                            isAIChatOpen
+                                ? 'bg-blue-600 border-blue-500 text-white ring-2 ring-blue-400'
+                                : 'bg-white dark:bg-slate-900 border-neutral-border text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50'
+                        }`}
+                        title={isAIChatOpen ? "Close AI Assistant" : "Open PULSO Omni-Assistant (AI Copilot)"}
+                        aria-label="Toggle PULSO Omni-Assistant AI Copilot"
+                    >
+                        <Brain size={18} className={isAIChatOpen ? 'animate-pulse' : 'group-hover:scale-110 transition-transform'} />
                     </button>
 
                     {isLoaded ? (
@@ -2015,18 +2379,50 @@ const DispatcherDashboard = () => {
                                                     })()}
                                                 </div>
 
-                                                <div style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.1em', color:'#94a3b8', marginBottom:'4px', fontFamily:'monospace' }}>
-                                                    {selectedMarker.ticket_id || `RPT-${selectedMarker.id}`}
-                                                </div>
-
+                                                {/* Plain-Language Header: Description First */}
                                                 <h4 style={{ 
-                                                    fontWeight: 700, 
+                                                    fontWeight: 800, 
                                                     fontSize: '14px', 
                                                     color: isDarkMode ? '#f1f5f9' : '#0f172a', 
                                                     lineHeight: 1.3, 
-                                                    margin: '0 0 6px', 
-                                                    padding: '0 16px' 
-                                                }}>{selectedMarker.category || selectedMarker.ai_category || 'Uncategorized'}</h4>
+                                                    margin: '0 0 4px', 
+                                                    padding: '0 12px',
+                                                    letterSpacing: '-0.01em'
+                                                }}>
+                                                    {getReportPlainTitle(selectedMarker)}
+                                                </h4>
+
+                                                {/* Subtitle: Category & Report ID reference */}
+                                                <div style={{ fontSize:'10px', fontWeight:600, color:'#94a3b8', marginBottom:'10px', display:'flex', alignItems:'center', gap:'4px' }}>
+                                                    <span>{selectedMarker.category || selectedMarker.ai_category || 'General Issue'}</span>
+                                                    <span>•</span>
+                                                    <span style={{ fontFamily:'monospace', color:'#f97316', fontWeight:700 }}>
+                                                        #{selectedMarker.ticket_id || selectedMarker.id}
+                                                    </span>
+                                                </div>
+
+                                                {/* Status Badge with Icon + Plain Text */}
+                                                {(() => {
+                                                    const markerStatusDesc = getStatusDescriptor(selectedMarker.status);
+                                                    return (
+                                                        <div style={{ 
+                                                            fontSize:'10px', 
+                                                            fontWeight:700, 
+                                                            color: selectedMarker.status==='resolved'?'#10b981': selectedMarker.status==='rejected'?'#ef4444':'#f97316', 
+                                                            background: selectedMarker.status==='resolved'?'rgba(16,185,129,0.12)': selectedMarker.status==='rejected'?'rgba(239,68,68,0.12)':'rgba(249,115,22,0.12)', 
+                                                            border: selectedMarker.status==='resolved'?'1px solid rgba(16,185,129,0.25)': selectedMarker.status==='rejected'?'1px solid rgba(239,68,68,0.25)':'1px solid rgba(249,115,22,0.25)', 
+                                                            padding:'3px 12px', 
+                                                            borderRadius:'999px', 
+                                                            marginBottom:'12px',
+                                                            display:'inline-flex',
+                                                            alignItems:'center',
+                                                            gap:'4px'
+                                                        }}>
+                                                            <span>●</span>
+                                                            <span>{markerStatusDesc.label}</span>
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 {!directionsResponse ? (
                                                     <button
@@ -2035,7 +2431,7 @@ const DispatcherDashboard = () => {
                                                         onClick={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
                                                         style={{ 
                                                             width:'100%', 
-                                                            padding:'10px 0', 
+                                                            padding:'9px 0', 
                                                             background: directionsLoading 
                                                                 ? (isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)') 
                                                                 : (isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'), 
@@ -2045,7 +2441,7 @@ const DispatcherDashboard = () => {
                                                             fontSize:'12px', 
                                                             fontWeight:600, 
                                                             cursor: directionsLoading ? 'wait' : 'pointer', 
-                                                            marginBottom:'14px', 
+                                                            marginBottom:'10px', 
                                                             display:'flex', 
                                                             alignItems:'center', 
                                                             justifyContent:'center', 
@@ -2055,47 +2451,73 @@ const DispatcherDashboard = () => {
                                                             zIndex:1001 
                                                         }}
                                                     >
-                                                {directionsLoading ? (
-                                                    <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                                                        {directionsLoading ? (
+                                                            <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                                                        ) : (
+                                                            <><Navigation size={13} color="#f97316" /> Plan Team Route</>
+                                                        )}
+                                                    </button>
                                                 ) : (
-                                                    <><Navigation size={14} color="#f97316" /> Get Directions</>
+                                                    <div style={{ display:'flex', flexDirection:'column', gap:'6px', width:'100%', marginBottom:'10px' }}>
+                                                        <div style={{ 
+                                                            display:'flex', 
+                                                            alignItems:'center', 
+                                                            justifyContent:'center', 
+                                                            gap:'6px', 
+                                                            background: isDarkMode ? 'rgba(249,115,22,0.1)' : 'rgba(249,115,22,0.05)', 
+                                                            border: isDarkMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(249,115,22,0.1)', 
+                                                            borderRadius:'12px', 
+                                                            padding:'7px 12px' 
+                                                        }}>
+                                                            <Truck size={12} style={{ color:'#f97316' }} />
+                                                            <span style={{ fontSize:'10px', fontWeight:800, color: isDarkMode ? '#f1f5f9' : '#0f172a' }}>{distance} • {duration}</span>
+                                                        </div>
+                                                    </div>
                                                 )}
-                                            </button>
-                                        ) : (
-                                            <div style={{ display:'flex', flexDirection:'column', gap:'8px', width:'100%', marginBottom:'14px' }}>
-                                                <div style={{ 
-                                                    display:'flex', 
-                                                    alignItems:'center', 
-                                                    justifyContent:'center', 
-                                                    gap:'6px', 
-                                                    background: isDarkMode ? 'rgba(249,115,22,0.1)' : 'rgba(249,115,22,0.05)', 
-                                                    border: isDarkMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(249,115,22,0.1)', 
-                                                    borderRadius:'12px', 
-                                                    padding:'8px 14px' 
-                                                }}>
-                                                    <Truck size={12} style={{ color:'#f97316' }} />
-                                                    <span style={{ fontSize:'10px', fontWeight:800, color: isDarkMode ? '#f1f5f9' : '#0f172a' }}>{distance} • {duration}</span>
+                                                
+                                                {/* Action Buttons: Street View + Separated Delete */}
+                                                <div style={{ display:'flex', gap:'8px', width:'100%', marginTop:'4px', alignItems:'center' }}>
+                                                    <button
+                                                        onClick={() => handleStreetViewClick({ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng })}
+                                                        style={{ 
+                                                            flex: 1, 
+                                                            padding:'8px 0', 
+                                                            background:'#ea580c', 
+                                                            border:'none', 
+                                                            borderRadius:'10px', 
+                                                            color:'white', 
+                                                            fontSize:'11px', 
+                                                            fontWeight:700, 
+                                                            cursor:'pointer', 
+                                                            display:'flex', 
+                                                            alignItems:'center', 
+                                                            justifyContent:'center', 
+                                                            gap:'6px' 
+                                                        }}
+                                                        aria-label={`Open Google Street View for ${selectedMarker.ticket_id || `Report #${selectedMarker.id}`}`}
+                                                    >
+                                                        <Eye size={12} /> Street View
+                                                    </button>
+                                                    
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setReportToDelete(selectedMarker); }}
+                                                        style={{ 
+                                                            padding:'7px 10px', 
+                                                            background: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', 
+                                                            border: isDarkMode ? '1px solid rgba(239,68,68,0.3)' : '1px solid #fecaca', 
+                                                            borderRadius:'10px', 
+                                                            color:'#ef4444', 
+                                                            cursor:'pointer', 
+                                                            display:'flex', 
+                                                            alignItems:'center', 
+                                                            justifyContent:'center' 
+                                                        }}
+                                                        title={`Permanently delete ${selectedMarker.ticket_id || `Report #${selectedMarker.id}`}`}
+                                                        aria-label={`Permanently delete ${selectedMarker.ticket_id || `Report #${selectedMarker.id}`}`}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
                                                 </div>
-                                            </div>
-                                        )}
-
-                                        <div style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.12em', color: selectedMarker.status==='resolved'?'#4ade80': selectedMarker.status==='rejected'?'#f87171':'#fb923c', background: selectedMarker.status==='resolved'?'rgba(74,222,128,0.12)': selectedMarker.status==='rejected'?'rgba(248,113,113,0.12)':'rgba(251,146,60,0.12)', padding:'3px 12px', borderRadius:'999px', marginBottom:'14px', textTransform:'uppercase' }}>{(selectedMarker.status || '').replace(/_/g,' ')}</div>
-                                        
-                                        <div style={{ display:'flex', gap:'8px', width:'100%', marginTop:'6px' }}>
-                                            <button
-                                                onClick={() => handleStreetViewClick({ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng })}
-                                                className="flex-1 py-1.5 bg-orange-600 hover:bg-orange-500 rounded-xl text-white text-[11px] font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20 active:scale-95"
-                                            >
-                                                <Eye size={12} /> Street View
-                                            </button>
-                                            
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setReportToDelete(selectedMarker); }}
-                                                className="p-1.5 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white rounded-xl transition-all border border-red-200 hover:border-red-600 active:scale-95 flex items-center justify-center"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
                                             </>
                                         )}
                                     </div>
@@ -2539,23 +2961,23 @@ const DispatcherDashboard = () => {
                     {/* Map UI Floating Controls */}
                     <div className="absolute bottom-6 left-4 flex flex-col gap-2 pointer-events-none">
                         {/* Legend */}
-                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex flex-col gap-3 shadow-xl pointer-events-auto">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Live Map Feed</h4>
-                            <div className="flex items-center gap-3">
-                                <span className="flex items-center gap-1.5 text-[10px] font-bold text-red-500">
-                                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div> Pending
+                        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex flex-col gap-2 shadow-xl pointer-events-auto">
+                            <h4 className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Map Status Legend</h4>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <span className="flex items-center gap-1.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div> Pending Review
                                 </span>
-                                <span className="flex items-center gap-1.5 text-[10px] font-bold text-orange-500">
-                                    <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div> Active
+                                <span className="flex items-center gap-1.5 text-[10px] font-bold text-orange-600 dark:text-orange-400">
+                                    <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div> Dispatched
                                 </span>
-                                <span className="flex items-center gap-1.5 text-[10px] font-bold text-green-500">
-                                    <div className="w-2 h-2 rounded-full bg-green-500"></div> Resolved
+                                <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Resolved
                                 </span>
                                 <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                                    <div className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500"></div> Rejected
+                                    <div className="w-2 h-2 rounded-full bg-rose-500"></div> Rejected
                                 </span>
                                 <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500">
-                                    <div className="w-2 h-2 rounded-full bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-700"></div> Cancelled
+                                    <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700"></div> Cancelled
                                 </span>
                             </div>
                         </div>
@@ -2648,170 +3070,272 @@ const DispatcherDashboard = () => {
                             <div className="space-y-4">
                                 {selectedReport ? (
                                     <div className="bg-white dark:bg-slate-950/50 border border-neutral-border dark:border-slate-800 rounded-xl p-4">
-                                        <div className="flex flex-col gap-4">
+                                        <div className="flex flex-col gap-3">
+                                            {/* Header */}
                                             <div>
-                                                <div className="flex items-center gap-1.5 mb-2">
+                                                <div className="flex items-center gap-1.5 mb-1">
                                                     <ShieldAlert className="text-primary shrink-0" size={18}/>
-                                                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Human-in-the-Loop Required</h3>
+                                                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Needs Your Review</h3>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                    Barangay Staff Verification &amp; Triage
+                                                </p>
+                                            </div>
+
+                                            {/* Selected Incident Plain Title & Reference */}
+                                            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                                <div className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider mb-0.5">Selected Incident</div>
+                                                <h4 className="font-bold text-xs text-slate-900 dark:text-white leading-snug">
+                                                    {getReportPlainTitle(selectedReport)}
+                                                </h4>
+                                                <div className="text-[10px] font-mono text-orange-500 font-semibold mt-0.5">
+                                                    #{selectedReport.ticket_id || `RPT-${selectedReport.id}`}
                                                 </div>
                                             </div>
 
-                                                {/* Strategic Process Roadmap */}
-                                                <div className="mb-6 relative">
-                                                    <div className="flex items-center justify-between text-[9px] font-bold text-slate-500 uppercase tracking-tighter mb-2">
-                                                        <span className={['pending', 'unverified'].includes(selectedReport.status) ? 'text-orange-500' : 'text-slate-400'}>Intake</span>
-                                                        <span className={selectedReport.status === 'pending_approval' ? 'text-orange-500' : 'text-slate-400'}>Budgeting</span>
-                                                        <span className={['approved_internal', 'dispatched'].includes(selectedReport.status) ? 'text-orange-500' : 'text-slate-400'}>Execution</span>
-                                                        <span className={selectedReport.status === 'resolved' ? 'text-green-500' : 'text-slate-400'}>Resolved</span>
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full flex overflow-hidden">
-                                                        <div className={`h-full transition-all duration-700 ${
-                                                            ['pending', 'unverified'].includes(selectedReport.status) ? 'w-1/4 bg-orange-500' :
-                                                            selectedReport.status === 'pending_approval' ? 'w-2/4 bg-orange-500' :
-                                                            ['approved_internal', 'dispatched'].includes(selectedReport.status) ? 'w-3/4 bg-blue-500' :
-                                                            selectedReport.status === 'resolved' ? 'w-full bg-green-500' : 'w-0'
-                                                        }`}></div>
-                                                    </div>
-                                                    <div className="flex justify-between mt-1 px-0.5">
-                                                        {[0, 1, 2, 3].map(i => (
-                                                            <div key={i} className={`w-2 h-2 rounded-full border-2 border-white dark:border-slate-900 ${
-                                                                (i === 0 && ['pending', 'unverified', 'pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status)) ||
-                                                                (i === 1 && ['pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status)) ||
-                                                                (i === 2 && ['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status)) ||
-                                                                (i === 3 && selectedReport.status === 'resolved')
-                                                                    ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
-                                                            }`}></div>
-                                                        ))}
-                                                    </div>
+                                            {/* Strategic Process Roadmap */}
+                                            <div className="mb-2 relative">
+                                                <div className="flex items-center justify-between text-[9px] font-bold text-slate-500 uppercase tracking-tighter mb-2">
+                                                    <span className={['pending', 'unverified'].includes(selectedReport.status) ? 'text-orange-500' : 'text-slate-400'}>1. Intake</span>
+                                                    <span className={selectedReport.status === 'pending_approval' ? 'text-orange-500' : 'text-slate-400'}>2. Review</span>
+                                                    <span className={['approved_internal', 'dispatched'].includes(selectedReport.status) ? 'text-orange-500' : 'text-slate-400'}>3. Work Order</span>
+                                                    <span className={selectedReport.status === 'resolved' ? 'text-green-500' : 'text-slate-400'}>4. Resolved</span>
                                                 </div>
+                                                <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full flex overflow-hidden">
+                                                    <div className={`h-full transition-all duration-700 ${
+                                                        ['pending', 'unverified'].includes(selectedReport.status) ? 'w-1/4 bg-orange-500' :
+                                                        selectedReport.status === 'pending_approval' ? 'w-2/4 bg-orange-500' :
+                                                        ['approved_internal', 'dispatched'].includes(selectedReport.status) ? 'w-3/4 bg-blue-500' :
+                                                        selectedReport.status === 'resolved' ? 'w-full bg-green-500' : 'w-0'
+                                                    }`}></div>
+                                                </div>
+                                                <div className="flex justify-between mt-1 px-0.5">
+                                                    {[0, 1, 2, 3].map(i => (
+                                                        <div key={i} className={`w-2 h-2 rounded-full border-2 border-white dark:border-slate-900 ${
+                                                            (i === 0 && ['pending', 'unverified', 'pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status)) ||
+                                                            (i === 1 && ['pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status)) ||
+                                                            (i === 2 && ['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status)) ||
+                                                            (i === 3 && selectedReport.status === 'resolved')
+                                                                ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
+                                                        }`}></div>
+                                                    ))}
+                                                </div>
+                                            </div>
 
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-3">AI Vision confidence for <strong>{selectedReport.ticket_id || `RPT-${selectedReport.id}`}</strong> is {selectedReport.aiConfidence || urgencyToConfidence(selectedReport.ai_urgency)}%. Manual categorization required before generating Work Order.</p>
-                                                
-                                                <div className="bg-white dark:bg-slate-900 rounded-lg p-2 mb-3 border border-slate-200 dark:border-slate-800">
-                                                    <div className="text-xs font-bold text-slate-500 mb-2">Attached Image:</div>
-                                                    <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden flex items-center justify-center text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 relative group">
-                                                        {selectedReport.image_url ? (
-                                                            <button 
-                                                                onClick={() => setZoomedImage(`http://localhost:33159${selectedReport.image_url}`)}
-                                                                className="w-full h-full cursor-zoom-in"
-                                                                title="Click to Zoom"
-                                                            >
-                                                                <img 
-                                                                    src={`http://localhost:33159${selectedReport.image_url}`} 
-                                                                    alt="Report Evidence" 
-                                                                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" 
-                                                                />
-                                                            </button>
-                                                        ) : (
-                                                            <div className="flex flex-col items-center gap-2">
-                                                                <ImageIcon size={24} className="opacity-20"/>
-                                                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">No citizen media</span>
+                                            {/* Plain-Language AI Guidance Box */}
+                                            {(() => {
+                                                const conf = selectedReport.aiConfidence || urgencyToConfidence(selectedReport.ai_urgency);
+                                                const confDetails = getAiConfidenceDetails(conf);
+                                                return (
+                                                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                                                <Sparkles size={13} className="text-orange-500" />
+                                                                AI Verification Guidance
+                                                            </span>
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${confDetails.badgeClass}`}>
+                                                                {conf}% Sure · {confDetails.shortNote}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-1.5">
+                                                            The AI is <strong>{conf}% sure</strong> about this category — please double-check the photo and location before approving.
+                                                        </p>
+                                                        <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${confDetails.dotColor} shrink-0`}></div>
+                                                            <span>{confDetails.qualifier}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                            
+                                            {/* Attached Citizen Photo */}
+                                            <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800">
+                                                <div className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-2 flex items-center justify-between">
+                                                    <span>Attached Citizen Photo:</span>
+                                                    {selectedReport.image_url && (
+                                                        <span className="text-[10px] text-slate-400">Click to expand</span>
+                                                    )}
+                                                </div>
+                                                <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 relative group">
+                                                    {selectedReport.image_url ? (
+                                                        <button 
+                                                            onClick={() => setZoomedImage(`http://localhost:33159${selectedReport.image_url}`)}
+                                                            className="w-full h-full cursor-zoom-in"
+                                                            title="Click to Zoom Photo"
+                                                            aria-label="Click to Zoom Photo"
+                                                        >
+                                                            <img 
+                                                                src={`http://localhost:33159${selectedReport.image_url}`} 
+                                                                alt="Citizen report photographic evidence" 
+                                                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" 
+                                                            />
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <ImageIcon size={24} className="opacity-20"/>
+                                                            <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">No citizen media attached</span>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Quick Street View Toggle for Current Report Location */}
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleStreetViewClick({ lat: selectedReport.location_lat, lng: selectedReport.location_lng });
+                                                        }}
+                                                        className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur text-white p-2 rounded-lg text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-orange-600"
+                                                        aria-label="View Google Street View for this location"
+                                                    >
+                                                        <Eye size={12}/> View Street View
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Gemini AI Smart Analysis with "What does this mean?" Expandable */}
+                                            {selectedReport.ai_summary && (
+                                                <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-3">
+                                                    <div className="flex items-center gap-2 text-indigo-500 font-bold text-xs mb-1.5 uppercase tracking-tight">
+                                                        <Brain size={14}/> Gemini AI Smart Analysis
+                                                    </div>
+                                                    <p className="text-xs text-slate-600 dark:text-slate-300 italic mb-2">
+                                                        "{selectedReport.ai_summary}"
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 text-[10px] font-bold">
+                                                            Category: {selectedReport.ai_category || selectedReport.category || 'General'}
+                                                        </span>
+                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${selectedReport.ai_urgency === 'Critical' ? 'bg-red-500/10 text-red-500' : 'bg-orange-500/10 text-orange-500'}`}>
+                                                            Urgency: {selectedReport.ai_urgency || 'Standard'}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Expandable "What does this mean?" Helper */}
+                                                    <div className="mt-2.5 pt-2 border-t border-indigo-500/15">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowAiHelp(!showAiHelp)}
+                                                            className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 flex items-center justify-between w-full transition-colors"
+                                                            aria-expanded={showAiHelp}
+                                                        >
+                                                            <span className="flex items-center gap-1">
+                                                                <HelpCircle size={12} />
+                                                                What does this mean?
+                                                            </span>
+                                                            {showAiHelp ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                                        </button>
+                                                        {showAiHelp && (
+                                                            <div className="mt-2 space-y-1.5 text-[10px] text-slate-600 dark:text-slate-300 bg-white/70 dark:bg-slate-900/80 p-2.5 rounded-lg border border-indigo-500/20 leading-relaxed">
+                                                                <p>
+                                                                    <strong className="text-indigo-600 dark:text-indigo-400">AI Category:</strong> Auto-detected by Google Gemini Vision from citizen photos to route to the correct municipal division (e.g. Roads, Drainage, Lighting).
+                                                                </p>
+                                                                <p>
+                                                                    <strong className="text-indigo-600 dark:text-indigo-400">AI Urgency:</strong> Estimates how quickly crews should respond based on hazard severity and public safety risk (Low, Medium, High).
+                                                                </p>
+                                                                <p>
+                                                                    <strong className="text-indigo-600 dark:text-indigo-400">Confidence Score:</strong> How closely the visual evidence matches verified municipal patterns. Scores below 80% should be verified by staff.
+                                                                </p>
                                                             </div>
                                                         )}
-                                                        
-                                                        {/* Quick Street View Toggle for Current Report Location */}
-                                                        <button 
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleStreetViewClick({ lat: selectedReport.location_lat, lng: selectedReport.location_lng });
-                                                            }}
-                                                            className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur text-white p-2 rounded-lg text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-orange-600"
-                                                        >
-                                                            <Eye size={12}/> View Street View
-                                                        </button>
                                                     </div>
                                                 </div>
+                                            )}
 
-                                                {selectedReport.ai_summary && (
-                                                    <div className="mb-4 bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-3">
-                                                        <div className="flex items-center gap-2 text-indigo-500 font-bold text-xs mb-2 uppercase tracking-tight">
-                                                            <Brain size={14}/> Gemini AI Smart Analysis
-                                                        </div>
-                                                        <p className="text-xs text-slate-600 dark:text-slate-300 italic">
-                                                            "{selectedReport.ai_summary}"
-                                                        </p>
-                                                        <div className="mt-2 flex gap-2">
-                                                            <span className="px-1.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 text-[10px] font-bold">
-                                                                AI Category: {selectedReport.ai_category}
-                                                            </span>
-                                                            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${selectedReport.ai_urgency === 'Critical' ? 'bg-red-500/10 text-red-500' : 'bg-orange-500/10 text-orange-500'}`}>
-                                                                AI Urgency: {selectedReport.ai_urgency}
-                                                            </span>
+                                            {/* Route Info in Sidebar (Detailed Road Logistics) */}
+                                            {directionsResponse && (
+                                                <div className="p-3 rounded-xl bg-orange-500/5 border border-orange-500/20 flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">Route to Incident</div>
+                                                        <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                            <Truck size={14} className="text-orange-500"/> {distance} • {duration}
                                                         </div>
                                                     </div>
-                                                )}
-
-                                                {/* Route Info in Sidebar (Detailed Road Logistics) */}
-                                                {directionsResponse && (
-                                                    <div className="mb-4 p-3 rounded-xl bg-orange-500/5 border border-orange-500/20 flex items-center justify-between">
-                                                        <div>
-                                                            <div className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">Route to Incident</div>
-                                                            <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                                                <Truck size={14} className="text-orange-500"/> {distance} • {duration}
-                                                            </div>
-                                                        </div>
-                                                        <button 
-                                                            onClick={() => handleExternalDirections(selectedReport)}
-                                                            className="p-2 rounded-lg bg-white dark:bg-slate-800 text-slate-500 hover:text-blue-500 transition-colors shadow-sm"
-                                                        >
-                                                            <Navigation size={16} />
-                                                        </button>
-                                                    </div>
-                                                )}
-
-                                                {!directionsResponse && (
                                                     <button 
-                                                        onClick={() => handleGetDirections(selectedReport)}
-                                                        className="w-full mb-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-800"
+                                                        onClick={() => handleExternalDirections(selectedReport)}
+                                                        className="p-2 rounded-lg bg-white dark:bg-slate-800 text-slate-500 hover:text-blue-500 transition-colors shadow-sm"
+                                                        aria-label="Open directions in Google Maps external view"
                                                     >
-                                                        <Navigation size={14} className="text-orange-500"/>
-                                                        Calculate Logistics & Route
+                                                        <Navigation size={16} />
                                                     </button>
-                                                )}
+                                                </div>
+                                            )}
 
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <button 
-                                                        onClick={() => handleRejectReport(selectedReport.id)}
-                                                        disabled={actionLoading === selectedReport.id}
-                                                        className="bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 py-2 rounded text-xs font-bold transition-colors border border-red-200 dark:border-red-700 disabled:opacity-50"
-                                                    >
-                                                        {actionLoading === selectedReport.id ? '...' : 'Reject Spam'}
-                                                    </button>
-                                                    {(selectedReport.status === 'unverified' || selectedReport.status === 'pending') && (
+                                            {!directionsResponse && (
+                                                <button 
+                                                    onClick={() => handleGetDirections(selectedReport)}
+                                                    className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-800 active:scale-98"
+                                                >
+                                                    <Navigation size={14} className="text-orange-500"/>
+                                                    Plan Team Route
+                                                </button>
+                                            )}
+
+                                            {/* Guided Actions with Plain-Language Explanations */}
+                                            <div className="space-y-2.5 pt-1">
+                                                {/* Primary Action Button with Contextual Explanation */}
+                                                {(selectedReport.status === 'unverified' || selectedReport.status === 'pending') && (
+                                                    <div className="space-y-1">
                                                         <button 
                                                             onClick={() => handleVerifyReport(selectedReport.id)}
                                                             disabled={actionLoading === selectedReport.id}
-                                                            className="bg-primary hover:bg-primary-hover text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50"
+                                                            className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow disabled:opacity-50 flex items-center justify-center gap-2 active:scale-98"
                                                         >
-                                                            {actionLoading === selectedReport.id ? '...' : 'Verify to Manager'}
+                                                            <CheckCircle2 size={14} />
+                                                            {actionLoading === selectedReport.id ? 'Verifying...' : 'Verify & Send to Chief'}
                                                         </button>
-                                                    )}
-                                                    {selectedReport.status === 'pending_approval' && (
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center leading-tight">
+                                                            Confirms report validity and forwards to Engineering Division Chief.
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {selectedReport.status === 'pending_approval' && (
+                                                    <div className="space-y-1">
                                                         <button 
                                                             onClick={() => handleApproveReport(selectedReport.id)}
                                                             disabled={actionLoading === selectedReport.id}
-                                                            className="bg-primary hover:bg-primary-hover text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-2"
+                                                            className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow disabled:opacity-50 flex items-center justify-center gap-2 active:scale-98"
                                                         >
-                                                            <Briefcase size={14} /> Budgeting & Financial Approval
+                                                            <Briefcase size={14} />
+                                                            {actionLoading === selectedReport.id ? 'Approving...' : 'Approve for Work Order'}
                                                         </button>
-                                                    )}
-                                                    {selectedReport.status === 'approved_internal' && (
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center leading-tight">
+                                                            Finalizes budgeting and moves project into active crew dispatch queue.
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {selectedReport.status === 'approved_internal' && (
+                                                    <div className="space-y-1">
                                                         <button 
                                                             onClick={() => setIsDispatchModalOpen(true)}
-                                                            className="bg-primary hover:bg-primary-hover text-white py-2 rounded text-xs font-bold transition-colors shadow flex items-center justify-center gap-2"
+                                                            className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow flex items-center justify-center gap-2 active:scale-98"
                                                         >
                                                             <Briefcase size={14} /> Generate Work Order
                                                         </button>
-                                                    )}
-                                                    {selectedReport.status === 'dispatched' && (
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center leading-tight">
+                                                            Assigns personnel, vehicles, and schedules field repair deployment.
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {selectedReport.status === 'dispatched' && (
+                                                    <div className="space-y-1">
                                                         <button 
                                                             onClick={() => handleResolveReport(selectedReport.id)}
                                                             disabled={actionLoading === selectedReport.id}
-                                                            className="bg-secondary hover:bg-secondary-hover text-white py-2 rounded text-xs font-bold transition-colors shadow disabled:opacity-50"
+                                                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow disabled:opacity-50 flex items-center justify-center gap-2 active:scale-98"
                                                         >
-                                                            {actionLoading === selectedReport.id ? '...' : 'Mark Resolved'}
+                                                            <CheckCircle size={14} />
+                                                            {actionLoading === selectedReport.id ? 'Updating...' : 'Mark Resolved'}
                                                         </button>
-                                                    )}
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center leading-tight">
+                                                            Uploads completion photo proof and notifies citizen of resolved issue.
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Secondary Actions Row: Process Audit & Reject Spam */}
+                                                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
                                                     <button 
                                                         onClick={() => Swal.fire({
                                                             title: '',
@@ -2820,7 +3344,7 @@ const DispatcherDashboard = () => {
                                                                     <div class="w-14 h-14 rounded-full bg-orange-600/20 flex items-center justify-center border-2 border-orange-500/30 mb-7 mx-auto">
                                                                         <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                                                                     </div>
-                                                                    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Strategic Process Flow</h2>
+                                                                    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Milestone Progress &amp; Audit</h2>
                                                                     <p class="text-slate-400 text-[11px] mb-10 uppercase tracking-[0.2em] font-bold">
                                                                         Tracking: <span class="text-orange-500">${selectedReport.ticket_id || `RPT-${selectedReport.id}`}</span>
                                                                     </p>
@@ -2832,7 +3356,7 @@ const DispatcherDashboard = () => {
                                                                             <div class="flex items-start gap-5 relative group">
                                                                                 <div class="mt-1.5 w-3 h-3 rounded-full bg-orange-500 z-10"></div>
                                                                                 <div>
-                                                                                    <div class="text-[13px] font-bold text-white leading-none mb-1">Phase 1: Intake & Analysis</div>
+                                                                                    <div class="text-[13px] font-bold text-white leading-none mb-1">Phase 1: Intake &amp; Analysis</div>
                                                                                     <div class="text-[10px] text-slate-500 leading-relaxed">AI Vision automatically categorizes and evaluates citizen reports.</div>
                                                                                 </div>
                                                                             </div>
@@ -2848,7 +3372,7 @@ const DispatcherDashboard = () => {
                                                                             <div class="flex items-start gap-5 relative group">
                                                                                 <div class="mt-1.5 w-3 h-3 rounded-full z-10 ${['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'bg-orange-500' : 'bg-slate-800'}"></div>
                                                                                 <div>
-                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'text-white' : 'text-slate-600'}">Phase 3: Budgeting & Approval</div>
+                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'text-white' : 'text-slate-600'}">Phase 3: Budgeting &amp; Approval</div>
                                                                                     <div class="text-[10px] text-slate-500 leading-relaxed">Manager review, resource locking, and final site authorization.</div>
                                                                                 </div>
                                                                             </div>
@@ -2884,16 +3408,32 @@ const DispatcherDashboard = () => {
                                                             width: '460px',
                                                             padding: '4.5rem 2rem 5rem 2rem'
                                                         })}
-                                                        className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 py-2 rounded text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700"
+                                                        className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 rounded-xl text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 active:scale-95"
+                                                        title="View milestone progress and audit trail"
                                                     >
-                                                        <Activity size={14}/> Process Audit
+                                                        <Activity size={13}/> Process Audit
+                                                    </button>
+
+                                                    <button 
+                                                        onClick={() => handleRejectReport(selectedReport.id)}
+                                                        disabled={actionLoading === selectedReport.id}
+                                                        className="bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 py-2 rounded-xl text-[11px] font-bold transition-colors border border-red-200 dark:border-red-800/60 disabled:opacity-50 flex items-center justify-center gap-1.5 active:scale-95"
+                                                        title="Flag report as spam or invalid"
+                                                    >
+                                                        <X size={13} />
+                                                        {actionLoading === selectedReport.id ? '...' : 'Reject Spam'}
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
-                                        Select an unverified report from the feed to review.
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12 px-4 text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex flex-col items-center">
+                                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3 text-slate-400">
+                                            <AlertTriangle size={18} />
+                                        </div>
+                                        <span className="font-bold text-slate-700 dark:text-slate-300 mb-1">No Report Selected</span>
+                                        <span>Select any citizen report from the left list to review photos, inspect AI guidance, and dispatch field crews.</span>
                                     </div>
                                 )}
                             </div>
@@ -3163,203 +3703,194 @@ const DispatcherDashboard = () => {
 
                 </main>
 
-                {/* PULSO Omni-Assistant FAB */}
-                <div className="fixed bottom-24 right-6 z-[100] flex flex-col items-end gap-4">
-                    <AnimatePresence>
-                        {isAIChatOpen && (
-                            <>
-                                {/* Backdrop (maximized only) */}
-                                {isAIMaximized && (
-                                    <motion.div
-                                        key="backdrop"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[99]"
-                                        onClick={() => setIsAIMaximized(false)}
-                                    />
-                                )}
-
+                {/* PULSO Omni-Assistant Chat Window (Triggered from Top Header and Map Canvas toolbar) */}
+                <AnimatePresence>
+                    {isAIChatOpen && (
+                        <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
+                            {/* Backdrop (maximized only) */}
+                            {isAIMaximized && (
                                 <motion.div
-                                    key="chat"
-                                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                                    transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-                                    className={`bg-slate-900 shadow-2xl border border-slate-700 overflow-hidden flex flex-col transition-all duration-300 ${
-                                        isAIMaximized
-                                            ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[100] rounded-3xl'
-                                            : 'w-[380px] h-[500px] rounded-2xl relative z-[100]'
-                                    }`}
-                                >
-                                    {/* Header */}
-                                    <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shrink-0">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-blue-800 flex items-center justify-center animate-pulse">
-                                                <Brain size={18} className="text-white" />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-white text-sm">PULSO Omni-Assistant</h4>
-                                                <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Engineering Co-pilot</p>
-                                            </div>
+                                    key="backdrop"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[99]"
+                                    onClick={() => setIsAIMaximized(false)}
+                                />
+                            )}
+
+                            <motion.div
+                                key="chat"
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                                className={`bg-slate-900 shadow-2xl border border-slate-700 overflow-hidden flex flex-col transition-all duration-300 ${
+                                    isAIMaximized
+                                        ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[100] rounded-3xl'
+                                        : 'w-[380px] h-[520px] rounded-2xl relative z-[100]'
+                                }`}
+                            >
+                                {/* Header */}
+                                <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shrink-0">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-blue-800 flex items-center justify-center animate-pulse">
+                                            <Brain size={18} className="text-white" />
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            {/* Maximize / Minimize toggle */}
-                                            <button
-                                                onClick={() => setIsAIMaximized(prev => !prev)}
-                                                title={isAIMaximized ? 'Minimize' : 'Maximize'}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                                            >
-                                                {isAIMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                                            </button>
-                                            {/* Close */}
-                                            <button
-                                                onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
-                                                title="Close"
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
-                                            >
-                                                <MoreHorizontal size={18} />
-                                            </button>
+                                        <div>
+                                            <h4 className="font-bold text-white text-sm">PULSO Omni-Assistant</h4>
+                                            <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Engineering Co-pilot</p>
                                         </div>
                                     </div>
+                                    <div className="flex items-center gap-1">
+                                        {/* Maximize / Minimize toggle */}
+                                        <button
+                                            onClick={() => setIsAIMaximized(prev => !prev)}
+                                            title={isAIMaximized ? 'Minimize' : 'Maximize'}
+                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                                        >
+                                            {isAIMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                                        </button>
+                                        {/* Close */}
+                                        <button
+                                            onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
+                                            title="Close"
+                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+                                </div>
 
-                                    {/* Messages */}
-                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
-                                        {aiMessages.map((msg, i) => (
-                                            <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                {/* Text bubble */}
-                                                <div className={`${
-                                                    isAIMaximized ? 'max-w-[70%]' : 'max-w-[90%]'
-                                                } p-3 rounded-2xl text-xs font-medium leading-relaxed ${
-                                                    msg.role === 'user' ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
-                                                }`}>
-                                                    {msg.text}
-                                                </div>
+                                {/* Messages */}
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
+                                    {aiMessages.map((msg, i) => (
+                                        <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                            {/* Text bubble */}
+                                            <div className={`${
+                                                isAIMaximized ? 'max-w-[70%]' : 'max-w-[90%]'
+                                            } p-3 rounded-2xl text-xs font-medium leading-relaxed ${
+                                                msg.role === 'user' ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
+                                            }`}>
+                                                {msg.text}
+                                            </div>
 
-                                                {/* Map Result Card — shown only for assistant messages with location data */}
-                                                {msg.role === 'assistant' && msg.mapData && msg.mapData.length > 0 && isLoaded && (
-                                                    <div className={`w-full ${isAIMaximized ? 'max-w-[85%]' : 'max-w-full'} rounded-2xl border border-slate-700 overflow-hidden bg-slate-800/80`}>
-                                                        {/* Map label */}
-                                                        <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/60 border-b border-slate-700">
-                                                            <MapIcon size={13} className="text-orange-400" />
-                                                            <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest">Live Report Locations</span>
-                                                            <span className="ml-auto text-[10px] text-slate-400 font-semibold">{msg.mapData.length} pins</span>
-                                                        </div>
-
-                                                        {/* Embedded mini Google Map */}
-                                                        <div className="w-full h-44 relative">
-                                                            <GoogleMap
-                                                                mapContainerStyle={{ width: '100%', height: '100%' }}
-                                                                center={CALOOCAN_CENTER}
-                                                                zoom={13}
-                                                                options={{
-                                                                    disableDefaultUI: true,
-                                                                    styles: isDarkMode ? [
-                                                                        { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-                                                                        { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-                                                                        { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
-                                                                        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-                                                                        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0c1626' }] },
-                                                                    ] : [
-                                                                        { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
-                                                                        { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
-                                                                        { elementType: 'labels.text.stroke', stylers: [{ color: '#f8fafc' }] },
-                                                                        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-                                                                        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
-                                                                    ]
-                                                                }}
-                                                            >
-                                                                {msg.mapData.map(r => r.location_lat && r.location_lng && (
-                                                                    <MarkerF
-                                                                        key={r.id}
-                                                                        position={{ lat: r.location_lat, lng: r.location_lng }}
-                                                                        title={`RPT-${r.id}: ${r.ai_category || r.category}`}
-                                                                        icon={window.google?.maps ? {
-                                                                            path: window.google.maps.SymbolPath.CIRCLE,
-                                                                            fillColor: r.status === 'resolved' ? '#22c55e' : r.ai_urgency === 'Critical' ? '#ef4444' : '#f97316',
-                                                                            fillOpacity: 1,
-                                                                            scale: 7,
-                                                                            strokeColor: 'white',
-                                                                            strokeWeight: 2,
-                                                                        } : undefined}
-                                                                    />
-                                                                ))}
-                                                            </GoogleMap>
-                                                        </div>
-
-                                                        {/* Report list — scrollable */}
-                                                        <div className="max-h-48 overflow-y-auto divide-y divide-slate-700/50 scrollbar-thin scrollbar-thumb-slate-700">
-                                                            {msg.mapData.map((r, idx) => (
-                                                                <button
-                                                                    key={r.id}
-                                                                    onClick={() => map?.panTo({ lat: r.location_lat, lng: r.location_lng })}
-                                                                    className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-slate-700/50 transition-colors text-left group"
-                                                                >
-                                                                    {/* Index badge */}
-                                                                    <span className="shrink-0 w-5 h-5 rounded-full bg-slate-700 text-[10px] font-bold text-slate-300 flex items-center justify-center mt-0.5">{idx + 1}</span>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                                                            <span className="text-[11px] font-bold text-white truncate">{r.ai_category || r.category || 'Uncategorized'}</span>
-                                                                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
-                                                                                r.status === 'resolved' ? 'bg-green-500/15 text-green-400' :
-                                                                                r.ai_urgency === 'Critical' ? 'bg-red-500/15 text-red-400' :
-                                                                                'bg-orange-500/15 text-orange-400'
-                                                                            }`}>{r.status}</span>
-                                                                        </div>
-                                                                        <div className="flex items-center gap-1 mt-0.5">
-                                                                            <MapPin size={9} className="text-slate-500 shrink-0" />
-                                                                            <span className="text-[10px] text-slate-400 truncate">
-                                                                                {r.location_string || `${r.location_lat?.toFixed(4)}°N, ${r.location_lng?.toFixed(4)}°E`}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <span className="text-[9px] font-mono text-slate-600 group-hover:text-orange-400 transition-colors shrink-0">{r.ticket_id || `RPT-${r.id}`}</span>
-                                                                </button>
-                                                            ))}
-                                                        </div>
+                                            {/* Map Result Card — shown only for assistant messages with location data */}
+                                            {msg.role === 'assistant' && msg.mapData && msg.mapData.length > 0 && isLoaded && (
+                                                <div className={`w-full ${isAIMaximized ? 'max-w-[85%]' : 'max-w-full'} rounded-2xl border border-slate-700 overflow-hidden bg-slate-800/80`}>
+                                                    {/* Map label */}
+                                                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/60 border-b border-slate-700">
+                                                        <MapIcon size={13} className="text-orange-400" />
+                                                        <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest">Live Report Locations</span>
+                                                        <span className="ml-auto text-[10px] text-slate-400 font-semibold">{msg.mapData.length} pins</span>
                                                     </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                        {isAILoading && (
-                                            <div className="flex justify-start">
-                                                <div className="bg-slate-800 p-3 rounded-2xl flex gap-1">
-                                                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
-                                                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+
+                                                    {/* Embedded mini Google Map */}
+                                                    <div className="w-full h-44 relative">
+                                                        <GoogleMap
+                                                            mapContainerStyle={{ width: '100%', height: '100%' }}
+                                                            center={CALOOCAN_CENTER}
+                                                            zoom={13}
+                                                            options={{
+                                                                disableDefaultUI: true,
+                                                                styles: isDarkMode ? [
+                                                                    { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+                                                                    { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+                                                                    { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+                                                                    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+                                                                    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0c1626' }] },
+                                                                ] : [
+                                                                    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+                                                                    { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+                                                                    { elementType: 'labels.text.stroke', stylers: [{ color: '#f8fafc' }] },
+                                                                    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+                                                                    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
+                                                                ]
+                                                            }}
+                                                        >
+                                                            {msg.mapData.map(r => r.location_lat && r.location_lng && (
+                                                                <MarkerF
+                                                                    key={r.id}
+                                                                    position={{ lat: r.location_lat, lng: r.location_lng }}
+                                                                    title={`RPT-${r.id}: ${r.ai_category || r.category}`}
+                                                                    icon={window.google?.maps ? {
+                                                                        path: window.google.maps.SymbolPath.CIRCLE,
+                                                                        fillColor: r.status === 'resolved' ? '#22c55e' : r.ai_urgency === 'Critical' ? '#ef4444' : '#f97316',
+                                                                        fillOpacity: 1,
+                                                                        scale: 7,
+                                                                        strokeColor: 'white',
+                                                                        strokeWeight: 2,
+                                                                    } : undefined}
+                                                                />
+                                                            ))}
+                                                        </GoogleMap>
+                                                    </div>
+
+                                                    {/* Report list — scrollable */}
+                                                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-700/50 scrollbar-thin scrollbar-thumb-slate-700">
+                                                        {msg.mapData.map((r, idx) => (
+                                                            <button
+                                                                key={r.id}
+                                                                onClick={() => map?.panTo({ lat: r.location_lat, lng: r.location_lng })}
+                                                                className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-slate-700/50 transition-colors text-left group"
+                                                            >
+                                                                {/* Index badge */}
+                                                                <span className="shrink-0 w-5 h-5 rounded-full bg-slate-700 text-[10px] font-bold text-slate-300 flex items-center justify-center mt-0.5">{idx + 1}</span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <span className="text-[11px] font-bold text-white truncate">{r.ai_category || r.category || 'Uncategorized'}</span>
+                                                                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                                                                            r.status === 'resolved' ? 'bg-green-500/15 text-green-400' :
+                                                                            r.ai_urgency === 'Critical' ? 'bg-red-500/15 text-red-400' :
+                                                                            'bg-orange-500/15 text-orange-400'
+                                                                        }`}>{r.status}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1 mt-0.5">
+                                                                        <MapPin size={9} className="text-slate-500 shrink-0" />
+                                                                        <span className="text-[10px] text-slate-400 truncate">
+                                                                            {r.location_string || `${r.location_lat?.toFixed(4)}°N, ${r.location_lng?.toFixed(4)}°E`}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-[9px] font-mono text-slate-600 group-hover:text-orange-400 transition-colors shrink-0">{r.ticket_id || `RPT-${r.id}`}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                        <div ref={aiChatEndRef} />
-                                    </div>
-
-                                    {/* Input */}
-                                    <form onSubmit={handleAIChat} className="p-4 bg-slate-800 border-t border-slate-700 shrink-0">
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                value={aiQuery}
-                                                onChange={(e) => setAiQuery(e.target.value)}
-                                                placeholder="Ask PULSO Brain..."
-                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-blue-600 outline-none"
-                                            />
-                                            <button type="submit" disabled={isAILoading} className="absolute right-2 top-[7px] text-blue-400 hover:text-blue-300 disabled:opacity-40">
-                                                <Search size={16} />
-                                            </button>
+                                            )}
                                         </div>
-                                    </form>
-                                </motion.div>
-                            </>
-                        )}
-                    </AnimatePresence>
+                                    ))}
+                                    {isAILoading && (
+                                        <div className="flex justify-start">
+                                            <div className="bg-slate-800 p-3 rounded-2xl flex gap-1">
+                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={aiChatEndRef} />
+                                </div>
 
-                    <button
-                        onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-                        className="w-16 h-16 rounded-full bg-blue-900 shadow-2xl shadow-blue-900/50 flex items-center justify-center text-white hover:bg-blue-800 transition-all hover:scale-105 active:scale-95 group"
-                    >
-                        <Brain size={32} className="group-hover:animate-pulse" />
-                    </button>
-                </div>
+                                {/* Input */}
+                                <form onSubmit={handleAIChat} className="p-4 bg-slate-800 border-t border-slate-700 shrink-0">
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={aiQuery}
+                                            onChange={(e) => setAiQuery(e.target.value)}
+                                            placeholder="Ask PULSO Brain..."
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-blue-600 outline-none"
+                                        />
+                                        <button type="submit" disabled={isAILoading} className="absolute right-2 top-[7px] text-blue-400 hover:text-blue-300 disabled:opacity-40">
+                                            <Search size={16} />
+                                        </button>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
             </div>
             {/* ── Image Zoom Overlay ── */}
             <AnimatePresence>
@@ -3445,7 +3976,7 @@ const DispatcherDashboard = () => {
                                     Confirm Permanent Deletion
                                 </h3>
                                 <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                                    Are you sure you want to delete report <span className="font-mono text-red-500 font-bold">{reportToDelete.ticket_id || `RPT-${reportToDelete.id}`}</span>? 
+                                    Are you sure you want to permanently remove <strong className="text-slate-900 dark:text-white">"{getReportPlainTitle(reportToDelete)}"</strong> (<span className="font-mono text-red-500 font-bold">#{reportToDelete.ticket_id || reportToDelete.id}</span>)? 
                                     This action is irreversible and will remove all associated logs and work orders.
                                 </p>
                                 
