@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 import models, gov_models, schemas
 import json
 
@@ -122,7 +123,7 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
         db.commit()
         
         # Notification messages for each status transition
-        ticket = db_report.ticket_id or f"RPT-{db_report.id}"
+        ticket = db_report.ticket_id or f"PUL-{datetime.now().year}-{db_report.id:04d}"
         status_messages = {
             "pending_approval": (
                 "Report Verified",

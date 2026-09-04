@@ -91,8 +91,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import Swal from 'sweetalert2';
 import Branding from '../components/Branding';
 import { useTranslation } from 'react-i18next';
-import IDCameraModal from '../components/IDCameraModal';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
+import { formatTicketId } from '../utils/reportWorkflow';
 
 import {
     NORTH_CALOOCAN_PATH,
@@ -5097,7 +5097,7 @@ export default function ResidentDashboard() {
         }
 
         // Logic to navigate or show full details
-        if (notif.message.includes('RPT-')) {
+        if (notif.message && (notif.message.includes('PUL-') || notif.message.includes('RPT-'))) {
             // It's a report-related notification
             setActiveTab('reports');
             setReportStatusFilter('all');
@@ -5262,12 +5262,13 @@ export default function ResidentDashboard() {
                 }
             }
 
+            const formattedTicket = formatTicketId(r.ticket_id, r.id);
             return {
-                id: r.id || `user-report-${r.ticket_id}`,
-                ticket_id: r.ticket_id || `RPT-${r.id}`,
+                id: r.id || `user-report-${formattedTicket}`,
+                ticket_id: formattedTicket,
                 lat,
                 lng,
-                title: r.description || `Resident Report - ${r.ticket_id}`,
+                title: r.description || `Resident Report - ${formattedTicket}`,
                 category: r.category || r.ai_category || 'Resident Report',
                 status: (r.status || 'pending').toLowerCase(),
                 location: r.location_string || 'N/A',

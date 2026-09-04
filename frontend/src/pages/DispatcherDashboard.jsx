@@ -38,17 +38,22 @@ import {
     CheckCircle2,
     ChevronDown,
     ChevronUp,
-    RotateCcw,
-    Sparkles
+    Sparkles,
+    FileText,
+    ArrowUpRight,
+    Wrench,
+    ShieldCheck,
+    Users
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, HeatmapLayerF, OverlayViewF } from '@react-google-maps/api';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 import Swal from 'sweetalert2';
-import { getAuthToken, getAuthUser } from '../utils/authSession';
+import { CANONICAL_STATUS_LIST, getStatusDescriptor, formatTicketId } from '../utils/reportWorkflow';
+import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
 
 import {
     NORTH_CALOOCAN_PATH,
@@ -86,12 +91,11 @@ const INFRASTRUCTURE_CATEGORIES = [
 const STATUS_OPTIONS = [
     'All Statuses',
     'Pending Review',
-    'Awaiting Approval',
-    'Approved for Work Order',
-    'Dispatched (In Progress)',
-    'Resolved (Fixed)',
-    'Rejected (Spam / Invalid)',
-    'Cancelled'
+    'Verified',
+    'Assigned',
+    'In Progress',
+    'Resolved',
+    'Rejected'
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,70 +155,6 @@ export const getAiConfidenceDetails = (confidence) => {
     }
 };
 
-/**
- * Returns plain-language status descriptor with icon, text label, and style.
- */
-export const getStatusDescriptor = (status) => {
-    switch (status) {
-        case 'unverified':
-        case 'pending':
-            return {
-                label: 'Pending Review',
-                icon: Clock,
-                badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
-                description: 'New citizen report awaiting staff review.'
-            };
-        case 'pending_approval':
-            return {
-                label: 'Awaiting Approval',
-                icon: CheckCircle2,
-                badgeClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
-                description: 'Triaged by staff, awaiting Division Chief sign-off.'
-            };
-        case 'approved_internal':
-            return {
-                label: 'Approved for W.O.',
-                icon: Briefcase,
-                badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
-                description: 'Budget locked and approved for work order creation.'
-            };
-        case 'dispatched':
-            return {
-                label: 'Dispatched',
-                icon: Truck,
-                badgeClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30',
-                description: 'Field repair crew dispatched and on site.'
-            };
-        case 'resolved':
-            return {
-                label: 'Resolved (Fixed)',
-                icon: CheckCircle,
-                badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
-                description: 'Repairs completed and verified with photo proof.'
-            };
-        case 'rejected':
-            return {
-                label: 'Rejected',
-                icon: X,
-                badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
-                description: 'Spam, duplicate, or unverified submission.'
-            };
-        case 'cancelled':
-            return {
-                label: 'Cancelled',
-                icon: X,
-                badgeClass: 'bg-slate-500/10 text-slate-500 border-slate-500/30',
-                description: 'Cancelled by citizen or department.'
-            };
-        default:
-            return {
-                label: (status || 'Unknown').replace(/_/g, ' '),
-                icon: AlertTriangle,
-                badgeClass: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
-                description: 'Status update pending.'
-            };
-    }
-};
 
 /**
  * Returns plain-language urgency descriptor with icon, text label, and meaning.
@@ -369,6 +309,8 @@ const DispatcherDashboard = () => {
     const { theme } = useTheme();
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchParams] = useSearchParams();
+    const queryReportId = searchParams.get('reportId');
 
     // Standardized API Base URL for all backend interactions
     const apiHost = window.location.hostname;
@@ -384,6 +326,7 @@ const DispatcherDashboard = () => {
     const [showHeatmap, setShowHeatmap] = useState(false);
     
     const [selectedReport, setSelectedReport] = useState(null);
+    const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
 
     // Tactical Deep-Link state: set when navigated from Analytics Command Center
     const [tacticalContext, setTacticalContext] = useState(null); // { center, zoom, category, barangay }
@@ -399,6 +342,21 @@ const DispatcherDashboard = () => {
     const pinIconCache = useRef(new Map());
     const iconCacheRef = useRef(new Map());
     const [photoPinIcons, setPhotoPinIcons] = useState({});
+
+    // Deep-link auto-selection listener from Citizen Reports (?reportId=...)
+    useEffect(() => {
+        if (!queryReportId || allReports.length === 0) return;
+        const target = allReports.find(r => r.id?.toString() === queryReportId || r.ticket_id === queryReportId);
+        if (target) {
+            setSelectedReport(target);
+            setSelectedMarker(target);
+            setIsRightSidebarOpen(true);
+            if (map && target.location_lat && target.location_lng) {
+                map.panTo({ lat: Number(target.location_lat), lng: Number(target.location_lng) });
+                map.setZoom(16);
+            }
+        }
+    }, [queryReportId, allReports, map]);
 
     // Memoized Google Maps Icon Object Cache to prevent MarkerF re-render flicker
     const getCachedIcon = (url, w, h, ax, ay) => {
@@ -572,7 +530,7 @@ const DispatcherDashboard = () => {
                         reportsForMap = await rResp.json();
                         reportContext = `\n\nLive Report Data (${reportsForMap.length} active reports):\n` +
                             reportsForMap.map((r, i) =>
-                                `${i + 1}. ${r.ticket_id || `RPT-${r.id}`} — ${r.ai_category || r.category || 'Uncategorized'} — ${r.location_string || `Lat:${r.location_lat?.toFixed(4)}, Lng:${r.location_lng?.toFixed(4)}`} — Status: ${r.status}`
+                                `${i + 1}. ${formatTicketId(r.ticket_id, r.id)} — ${r.ai_category || r.category || 'Uncategorized'} — ${r.location_string || `Lat:${r.location_lat?.toFixed(4)}, Lng:${r.location_lng?.toFixed(4)}`} — Status: ${r.status}`
                             ).join('\n');
                     }
                 } catch { /* silently skip if reports unavailable */ }
@@ -876,7 +834,7 @@ const DispatcherDashboard = () => {
     const handleStatusAction = async (reportId, endpoint, successMsg, confirmTitle = null, targetStatus = null) => {
         if (confirmTitle) {
             const report = allReports.find(r => r.id === reportId);
-            const ticketId = report ? (report.ticket_id || `RPT-${reportId}`) : `Report #${reportId}`;
+            const ticketId = report ? formatTicketId(report.ticket_id, reportId) : `Report #${reportId}`;
             
             const result = await Swal.fire({
                 title: '',
@@ -958,7 +916,7 @@ const DispatcherDashboard = () => {
         setIsDeleting(true);
         setDeleteError(null);
         const targetId = reportToDelete.id;
-        const ticketId = reportToDelete.ticket_id || `RPT-${targetId}`;
+        const ticketId = formatTicketId(reportToDelete.ticket_id, targetId);
         
         try {
             const url = `${API_BASE_URL}/api/reports/${targetId}`;
@@ -1009,7 +967,7 @@ const DispatcherDashboard = () => {
     const handleRejectReport  = (id) => handleStatusAction(id, '/reject', 'Report rejected and resident penalized.', "Reject this report?");
     const handleResolveReport = async (reportId) => {
         const report = allReports.find(r => r.id === reportId);
-        const ticketId = report ? (report.ticket_id || `RPT-${reportId}`) : `Report #${reportId}`;
+        const ticketId = report ? formatTicketId(report.ticket_id, reportId) : `Report #${reportId}`;
         
         const { value: file } = await Swal.fire({
             title: 'Upload Completion Proof',
@@ -1103,15 +1061,37 @@ const DispatcherDashboard = () => {
             });
 
             if (response.ok) {
+                const newWo = await response.json();
                 setIsDispatchModalOpen(false);
                 fetchReports();
                 setSelectedReport(null);
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Work Order Dispatched!',
+                    text: `Work order ${newWo.wo_number || ''} created and field team deployed. Status updated to Dispatched.`,
+                    timer: 3500,
+                    showConfirmButton: false,
+                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
+                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                });
             } else {
                 const err = await response.json();
                 console.error("Failed to create Work Order:", err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Dispatch Failed',
+                    text: err.detail || 'Could not create work order on the server.',
+                    confirmButtonColor: '#ff6b00'
+                });
             }
         } catch (error) {
             console.error("Error creating Work Order:", error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Network Error',
+                text: 'Backend server is unreachable.',
+                confirmButtonColor: '#ff6b00'
+            });
         } finally {
             setActionLoading(null);
         }
@@ -1124,16 +1104,20 @@ const DispatcherDashboard = () => {
                 const statusMap = {
                     'Pending Review': ['pending', 'unverified'],
                     'Pending': ['pending', 'unverified'],
+                    'Verified': ['verified', 'pending_approval'],
                     'Awaiting Approval': ['pending_approval'],
                     'Pending Approval (Phase 2)': ['pending_approval'],
+                    'Assigned': ['assigned', 'approved_internal'],
                     'Approved for Work Order': ['approved_internal'],
                     'Approved (Phase 3)': ['approved_internal'],
-                    'Dispatched (In Progress)': ['dispatched'],
+                    'In Progress': ['in_progress', 'dispatched'],
+                    'Dispatched (In Progress)': ['dispatched', 'in_progress'],
                     'Dispatched (Phase 4)': ['dispatched'],
+                    'Resolved': ['resolved'],
                     'Resolved (Fixed)': ['resolved'],
                     'Resolved (Phase 5)': ['resolved'],
+                    'Rejected': ['rejected', 'cancelled'],
                     'Rejected (Spam / Invalid)': ['rejected'],
-                    'Rejected': ['rejected'],
                     'Cancelled': ['cancelled']
                 };
                 const targetStatuses = statusMap[selectedStatus] || [selectedStatus.toLowerCase()];
@@ -1145,7 +1129,8 @@ const DispatcherDashboard = () => {
             // 2. Comprehensive Search Query Filter (Report ID, Plain Title, Description, AI Summary, Category, Location)
             const searchLower = searchQuery.toLowerCase().trim();
             if (searchLower) {
-                const ticketIdText = (report.ticket_id || `RPT-${report.id}`).toLowerCase();
+                const formattedTicket = formatTicketId(report.ticket_id, report.id).toLowerCase();
+                const ticketIdText = (report.ticket_id || '').toLowerCase();
                 const plainTitle = getReportPlainTitle(report).toLowerCase();
                 const titleText = (report.title || '').toLowerCase();
                 const descText = (report.description || '').toLowerCase();
@@ -1156,6 +1141,7 @@ const DispatcherDashboard = () => {
 
                 const matchesSearch = 
                     report.id.toString().includes(searchLower) || 
+                    formattedTicket.includes(searchLower) ||
                     ticketIdText.includes(searchLower) ||
                     plainTitle.includes(searchLower) ||
                     titleText.includes(searchLower) ||
@@ -1660,39 +1646,72 @@ const DispatcherDashboard = () => {
                     </div>
                 )}
                 
-                {/* Top Header */}
-                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 z-40 relative border-b border-neutral-border dark:border-slate-800 transition-colors duration-150">
-                    {/* Removed bottom header shadow */}
-                    <div className="flex items-center gap-6">
-                        <h1 className="text-xl font-display font-bold text-neutral-text dark:text-white">
-                            LGU Command Center
-                        </h1>
-                        <div className="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
+                {/* Top Header & Unified Navigation */}
+                <header className="min-h-16 h-auto py-2 lg:py-0 lg:h-18 bg-white dark:bg-[#090e1a] flex items-center justify-between px-4 lg:px-6 shrink-0 z-40 relative border-b border-neutral-border dark:border-slate-800 transition-colors duration-150 gap-2 lg:gap-4 overflow-hidden">
+                    <div className="flex items-center gap-3 lg:gap-5 min-w-0">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-lg lg:text-xl font-display font-bold text-neutral-text dark:text-white leading-none whitespace-nowrap">
+                                    LGU Command Center
+                                </h1>
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 whitespace-nowrap">
+                                    <span className="hidden sm:inline">Field Dispatch & Operations</span>
+                                    <span className="sm:hidden">Dispatch</span>
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden 2xl:block mt-1 truncate max-w-md">
+                                Spatial Dispatch & Geographic Routing — Coordinate repair fleets and dispatch crews.
+                            </p>
+                        </div>
+                        <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden lg:block shrink-0"></div>
                         
                         {/* Dashboard Mode Toggle */}
-                        <div className="flex bg-neutral-bg dark:bg-slate-950 p-1 rounded-lg border border-neutral-border dark:border-slate-800">
+                        <div className="flex bg-neutral-bg dark:bg-slate-950 p-0.5 sm:p-1 rounded-lg border border-neutral-border dark:border-slate-800 shrink-0">
                             <button
                                 onClick={() => { setDashboardMode('triage'); setActiveTab('queue'); setSelectedReport(null); }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${dashboardMode === 'triage' ? 'bg-white dark:bg-slate-800 text-primary dark:text-white shadow-sm border border-neutral-border/50' : 'text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
+                                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all ${dashboardMode === 'triage' ? 'bg-white dark:bg-slate-800 text-primary dark:text-white shadow-sm border border-neutral-border/50' : 'text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
+                                title="Triage Mode — Screen and verify incoming citizen reports"
                             >
-                                <AlertTriangle size={16} className={dashboardMode === 'triage' ? 'text-primary' : 'text-neutral-muted'}/>
-                                Triage Mode
+                                <AlertTriangle size={14} className={dashboardMode === 'triage' ? 'text-primary' : 'text-neutral-muted'}/>
+                                <span>Triage</span>
                             </button>
                             <button
                                 onClick={() => { setDashboardMode('active'); setActiveTab('fleet'); setSelectedReport(null); }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${dashboardMode === 'active' ? 'bg-white dark:bg-slate-800 text-secondary dark:text-white shadow-sm border border-neutral-border/50' : 'text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
+                                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all ${dashboardMode === 'active' ? 'bg-white dark:bg-slate-800 text-secondary dark:text-white shadow-sm border border-neutral-border/50' : 'text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
+                                title="Active Operations — Track and coordinate deployed field crews"
                             >
-                                <Radio size={16} className={dashboardMode === 'active' ? 'text-secondary' : 'text-neutral-muted'} />
-                                Active Operations
+                                <Radio size={14} className={dashboardMode === 'active' ? 'text-secondary' : 'text-neutral-muted'} />
+                                <span>Active</span>
                             </button>
                         </div>
                     </div>
                     
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
+                        {/* Segmented View Switcher: Map View ↔ Table View */}
+                        <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 sm:p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                            <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-xs border border-slate-200/60 dark:border-slate-600">
+                                <MapIcon size={13} />
+                                <span className="hidden sm:inline">Map</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const param = selectedReport?.id ? `?reportId=${selectedReport.id}` : '';
+                                    navigate(`/gov/reports${param}`);
+                                }}
+                                className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer"
+                                title="Switch to Administrative Table & Audit View (Citizen Reports)"
+                                aria-label="Switch to Administrative Table & Audit View"
+                            >
+                                <FileText size={13} />
+                                <span className="hidden sm:inline">Table</span>
+                            </button>
+                        </div>
+
                         {/* PULSO Omni-Assistant AI Copilot in Header */}
                         <button
                             onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-sm ${
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all shadow-sm ${
                                 isAIChatOpen
                                     ? 'bg-blue-600 text-white shadow-blue-500/25 ring-2 ring-blue-400'
                                     : 'bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800'
@@ -1700,17 +1719,17 @@ const DispatcherDashboard = () => {
                             title={isAIChatOpen ? "Close AI Copilot" : "Open PULSO Omni-Assistant (AI Copilot)"}
                             aria-label="Toggle PULSO Omni-Assistant AI Copilot"
                         >
-                            <Brain size={15} className={isAIChatOpen ? 'animate-pulse' : ''} />
-                            <span className="hidden sm:inline">AI Copilot</span>
+                            <Brain size={14} className={isAIChatOpen ? 'animate-pulse' : ''} />
+                            <span className="hidden md:inline">AI Copilot</span>
                             <span className="flex h-2 w-2 relative">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                             </span>
                         </button>
 
-                        <div className="flex items-center gap-2">
+                        <div className="hidden 2xl:flex items-center gap-1.5 text-xs">
                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <span className="text-sm font-semibold text-slate-500 dark:text-slate-400"><span className="text-slate-900 dark:text-white">8/12</span> Teams Available</span>
+                            <span className="font-semibold text-slate-500 dark:text-slate-400"><span className="text-slate-900 dark:text-white">8/12</span> Teams</span>
                         </div>
                         <ThemeToggle />
                     </div>
@@ -1726,7 +1745,7 @@ const DispatcherDashboard = () => {
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: -320, opacity: 0 }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative border-r border-neutral-border"
+                            className="w-72 2xl:w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative border-r border-neutral-border"
                         >
                             {/* Removed right subtle shadow */}
                             <div className="p-4 relative flex flex-col gap-3">
@@ -2237,7 +2256,7 @@ const DispatcherDashboard = () => {
                                         isSelected ? 50 : 42
                                     );
 
-                                const ariaTitle = `Report ${report.ticket_id || `RPT-${report.id}`}, ${report.category || report.ai_category || 'Incident'}, ${(report.status || 'PENDING').toUpperCase()} — click to view details`;
+                                const ariaTitle = `Report ${formatTicketId(report.ticket_id, report.id)}, ${report.category || report.ai_category || 'Incident'}, ${(report.status || 'PENDING').toUpperCase()} — click to view details`;
 
                                 return (
                                     <MarkerF
@@ -2297,225 +2316,178 @@ const DispatcherDashboard = () => {
                                         zIndex: 1000 
                                     }}
                                 >
-                                    {/* Restore Previous Professional Design */}
+                                    {/* Professional Tactical Map Card */}
                                     <div 
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => e.stopPropagation()}
                                         style={{ 
-                                            background: isDarkMode ? 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)' : '#ffffff', 
-                                            borderRadius:'16px', 
-                                            padding:'16px', 
-                                            minWidth:'220px', 
-                                            border: isDarkMode ? '1px solid rgba(255,255,255,0.07)' : '1px solid #e2e8f0', 
-                                            margin:'-10px', 
-                                            boxShadow: isDarkMode ? '0 25px 50px rgba(0,0,0,0.7)' : '0 10px 25px rgba(0,0,0,0.1)', 
-                                            fontFamily:'Inter,sans-serif', 
-                                            display:'flex', 
-                                            flexDirection:'column', 
-                                            alignItems:'center', 
-                                            textAlign:'center', 
-                                            position:'relative' 
+                                            background: isDarkMode ? '#0f172a' : '#ffffff', 
+                                            borderRadius: '18px', 
+                                            padding: '16px', 
+                                            width: '280px',
+                                            maxWidth: '290px',
+                                            border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0', 
+                                            margin: '-10px', 
+                                            boxShadow: isDarkMode ? '0 20px 40px -8px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)' : '0 14px 34px -4px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.05)', 
+                                            fontFamily: 'Inter, system-ui, -apple-system, sans-serif', 
+                                            display: 'flex', 
+                                            flexDirection: 'column', 
+                                            textAlign: 'left', 
+                                            position: 'relative' 
                                         }}
                                     >
-                                        <button onClick={() => setSelectedMarker(null)} style={{ position:'absolute', top:'10px', right:'10px', background:'rgba(255,255,255,0.07)', border:'none', borderRadius:'50%', width:'26px', height:'26px', cursor:'pointer', color:'#94a3b8', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
-                                        
                                         {selectedMarker.isHQ ? (
                                             /* HQ VARIANT: Strategic Operations Hub */
                                             <>
-                                                <div style={{ 
-                                                    width:'54px', 
-                                                    height:'54px', 
-                                                    borderRadius:'50%', 
-                                                    background:'rgba(249,115,22,0.15)', 
-                                                    border:'1.5px solid rgba(249,115,22,0.4)', 
-                                                    display:'flex', 
-                                                    alignItems:'center', 
-                                                    justifyContent:'center', 
-                                                    marginBottom:'12px', 
-                                                    color:'#f97316',
-                                                    boxShadow: '0 0 20px rgba(249,115,22,0.15)'
-                                                }}>
-                                                    <Building2 size={24} />
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/25 text-xs font-bold text-orange-600 dark:text-orange-400">
+                                                        <Building2 size={13} />
+                                                        <span>LGU Headquarters</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => setSelectedMarker(null)} 
+                                                        title="Close"
+                                                        aria-label="Close"
+                                                        className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                                                    >
+                                                        <X size={15} />
+                                                    </button>
                                                 </div>
-                                                <h4 style={{ 
-                                                    fontWeight: 800, 
-                                                    fontSize: '15px', 
-                                                    color: isDarkMode ? '#f1f5f9' : '#0f172a', 
-                                                    margin: '0 0 4px',
-                                                    letterSpacing: '-0.02em'
-                                                }}>LGU COMMAND CENTER</h4>
-                                                <p style={{ fontSize:'10px', fontWeight:600, color:'#94a3b8', marginBottom:'16px', textTransform:'uppercase', letterSpacing:'0.05em' }}>HQ Operations Hub</p>
-                                                
+
+                                                <h4 className="font-heading font-extrabold text-sm text-slate-900 dark:text-white mb-1 leading-snug">
+                                                    LGU COMMAND CENTER
+                                                </h4>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+                                                    Central Dispatch & Tactical Operations Hub • Caloocan City Hall
+                                                </p>
+
                                                 <button
                                                     onClick={() => handleStreetViewClick({ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng })}
-                                                    style={{ width: '100%', padding:'12px 0', background:'linear-gradient(135deg,#ea580c,#f97316)', border:'none', borderRadius:'12px', color:'white', fontSize:'12px', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', boxShadow:'0 4px 15px rgba(249,115,22,0.25)' }}
+                                                    className="w-full py-2.5 px-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-white text-xs font-bold shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
                                                 >
-                                                    <Eye size={14} /> Street View
+                                                    <Eye size={14} />
+                                                    <span>Open Street View</span>
                                                 </button>
                                             </>
                                         ) : (
                                             /* REPORT VARIANT: Standard Incident Triage */
                                             <>
-                                                <div style={{ 
-                                                    width:'42px', 
-                                                    height:'42px', 
-                                                    borderRadius:'50%', 
-                                                    background:'rgba(249,115,22,0.12)', 
-                                                    border:'1px solid rgba(249,115,22,0.25)', 
-                                                    display:'flex', 
-                                                    alignItems:'center', 
-                                                    justifyContent:'center', 
-                                                    marginBottom:'10px', 
-                                                    color:'#f97316' 
-                                                }}>
-                                                    {(() => {
-                                                        const iconName = getReportIcon(selectedMarker.category || selectedMarker.ai_category);
-                                                        if (iconName === 'HardHat') return <HardHat size={18} />;
-                                                        if (iconName === 'Droplets') return <Droplets size={18} />;
-                                                        if (iconName === 'Zap') return <Zap size={18} />;
-                                                        if (iconName === 'ShieldAlert') return <ShieldAlert size={18} />;
-                                                        if (iconName === 'Building2') return <Building2 size={18} />;
-                                                        return <AlertTriangle size={18} />;
-                                                    })()}
+                                                {/* Header Row: Category Badge + Top Action Controls */}
+                                                <div className="flex items-center justify-between gap-2 mb-2.5">
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                                                        {(() => {
+                                                            const iconName = getReportIcon(selectedMarker.category || selectedMarker.ai_category);
+                                                            if (iconName === 'HardHat') return <HardHat size={13} className="text-amber-500 shrink-0" />;
+                                                            if (iconName === 'Droplets') return <Droplets size={13} className="text-blue-500 shrink-0" />;
+                                                            if (iconName === 'Zap') return <Zap size={13} className="text-yellow-500 shrink-0" />;
+                                                            if (iconName === 'ShieldAlert') return <ShieldAlert size={13} className="text-red-500 shrink-0" />;
+                                                            if (iconName === 'Building2') return <Building2 size={13} className="text-indigo-500 shrink-0" />;
+                                                            return <AlertTriangle size={13} className="text-orange-500 shrink-0" />;
+                                                        })()}
+                                                        <span className="truncate max-w-[130px]">{selectedMarker.category || selectedMarker.ai_category || 'Public Report'}</span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        {/* Subtle delete button */}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setReportToDelete(selectedMarker); }}
+                                                            className="w-7 h-7 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 flex items-center justify-center transition-colors cursor-pointer"
+                                                            title={`Delete report #${selectedMarker.ticket_id || selectedMarker.id}`}
+                                                            aria-label="Delete report"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                        {/* Clean close button */}
+                                                        <button 
+                                                            onClick={() => setSelectedMarker(null)} 
+                                                            title="Close"
+                                                            aria-label="Close"
+                                                            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                                                        >
+                                                            <X size={15} />
+                                                        </button>
+                                                    </div>
                                                 </div>
 
-                                                {/* Plain-Language Header: Description First */}
-                                                <h4 style={{ 
-                                                    fontWeight: 800, 
-                                                    fontSize: '14px', 
-                                                    color: isDarkMode ? '#f1f5f9' : '#0f172a', 
-                                                    lineHeight: 1.3, 
-                                                    margin: '0 0 4px', 
-                                                    padding: '0 12px',
-                                                    letterSpacing: '-0.01em'
-                                                }}>
+                                                {/* Incident Plain Title */}
+                                                <h4 className="font-heading font-extrabold text-[13px] text-slate-900 dark:text-white leading-snug line-clamp-2 mb-1">
                                                     {getReportPlainTitle(selectedMarker)}
                                                 </h4>
 
-                                                {/* Subtitle: Category & Report ID reference */}
-                                                <div style={{ fontSize:'10px', fontWeight:600, color:'#94a3b8', marginBottom:'10px', display:'flex', alignItems:'center', gap:'4px' }}>
-                                                    <span>{selectedMarker.category || selectedMarker.ai_category || 'General Issue'}</span>
-                                                    <span>•</span>
-                                                    <span style={{ fontFamily:'monospace', color:'#f97316', fontWeight:700 }}>
-                                                        #{selectedMarker.ticket_id || selectedMarker.id}
+                                                {/* Ticket Code & Barangay Reference */}
+                                                <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                                                    <span className="font-mono font-bold text-orange-600 dark:text-orange-400">
+                                                        #{formatTicketId(selectedMarker.ticket_id, selectedMarker.id)}
                                                     </span>
+                                                    {selectedMarker.barangay && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span className="flex items-center gap-0.5 text-slate-600 dark:text-slate-300 truncate">
+                                                                <MapPin size={10} className="shrink-0 text-slate-400" />
+                                                                Brgy. {selectedMarker.barangay}
+                                                            </span>
+                                                        </>
+                                                    )}
                                                 </div>
 
-                                                {/* Status Badge with Icon + Plain Text */}
+                                                {/* Standardized Canonical Status Badge */}
                                                 {(() => {
                                                     const markerStatusDesc = getStatusDescriptor(selectedMarker.status);
+                                                    const StatusIcon = markerStatusDesc.icon || Clock;
                                                     return (
-                                                        <div style={{ 
-                                                            fontSize:'10px', 
-                                                            fontWeight:700, 
-                                                            color: selectedMarker.status==='resolved'?'#10b981': selectedMarker.status==='rejected'?'#ef4444':'#f97316', 
-                                                            background: selectedMarker.status==='resolved'?'rgba(16,185,129,0.12)': selectedMarker.status==='rejected'?'rgba(239,68,68,0.12)':'rgba(249,115,22,0.12)', 
-                                                            border: selectedMarker.status==='resolved'?'1px solid rgba(16,185,129,0.25)': selectedMarker.status==='rejected'?'1px solid rgba(239,68,68,0.25)':'1px solid rgba(249,115,22,0.25)', 
-                                                            padding:'3px 12px', 
-                                                            borderRadius:'999px', 
-                                                            marginBottom:'12px',
-                                                            display:'inline-flex',
-                                                            alignItems:'center',
-                                                            gap:'4px'
-                                                        }}>
-                                                            <span>●</span>
-                                                            <span>{markerStatusDesc.label}</span>
+                                                        <div className="mb-3">
+                                                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${markerStatusDesc.badgeClass}`}>
+                                                                <StatusIcon size={12} className="shrink-0" />
+                                                                <span>{markerStatusDesc.label}</span>
+                                                            </div>
                                                         </div>
                                                     );
                                                 })()}
 
+                                                {/* Primary Route Dispatch Button */}
                                                 {!directionsResponse ? (
                                                     <button
                                                         disabled={directionsLoading}
                                                         onPointerDown={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
                                                         onClick={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
-                                                        style={{ 
-                                                            width:'100%', 
-                                                            padding:'9px 0', 
-                                                            background: directionsLoading 
-                                                                ? (isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)') 
-                                                                : (isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'), 
-                                                            border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)', 
-                                                            borderRadius:'12px', 
-                                                            color: isDarkMode ? '#f1f5f9' : '#0f172a', 
-                                                            fontSize:'12px', 
-                                                            fontWeight:600, 
-                                                            cursor: directionsLoading ? 'wait' : 'pointer', 
-                                                            marginBottom:'10px', 
-                                                            display:'flex', 
-                                                            alignItems:'center', 
-                                                            justifyContent:'center', 
-                                                            gap:'8px', 
-                                                            transition:'all 0.2s', 
-                                                            position:'relative', 
-                                                            zIndex:1001 
-                                                        }}
+                                                        className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-orange-600 dark:bg-slate-800 dark:hover:bg-orange-600 text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer mb-2.5 disabled:opacity-50"
                                                     >
                                                         {directionsLoading ? (
-                                                            <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                                                            <div className="animate-spin w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"></div>
                                                         ) : (
-                                                            <><Navigation size={13} color="#f97316" /> Plan Team Route</>
+                                                            <>
+                                                                <Navigation size={13} className="text-orange-400" />
+                                                                <span>Plan Team Route</span>
+                                                            </>
                                                         )}
                                                     </button>
                                                 ) : (
-                                                    <div style={{ display:'flex', flexDirection:'column', gap:'6px', width:'100%', marginBottom:'10px' }}>
-                                                        <div style={{ 
-                                                            display:'flex', 
-                                                            alignItems:'center', 
-                                                            justifyContent:'center', 
-                                                            gap:'6px', 
-                                                            background: isDarkMode ? 'rgba(249,115,22,0.1)' : 'rgba(249,115,22,0.05)', 
-                                                            border: isDarkMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(249,115,22,0.1)', 
-                                                            borderRadius:'12px', 
-                                                            padding:'7px 12px' 
-                                                        }}>
-                                                            <Truck size={12} style={{ color:'#f97316' }} />
-                                                            <span style={{ fontSize:'10px', fontWeight:800, color: isDarkMode ? '#f1f5f9' : '#0f172a' }}>{distance} • {duration}</span>
-                                                        </div>
+                                                    <div className="w-full py-2 px-3 rounded-xl bg-orange-500/10 border border-orange-500/25 text-orange-600 dark:text-orange-400 flex items-center justify-center gap-2 text-xs font-bold mb-2.5">
+                                                        <Truck size={13} className="text-orange-500" />
+                                                        <span>{distance} • {duration}</span>
                                                     </div>
                                                 )}
-                                                
-                                                {/* Action Buttons: Street View + Separated Delete */}
-                                                <div style={{ display:'flex', gap:'8px', width:'100%', marginTop:'4px', alignItems:'center' }}>
+
+                                                {/* Secondary Action Grid: Street View + Full Report */}
+                                                <div className="grid grid-cols-2 gap-2 w-full">
                                                     <button
                                                         onClick={() => handleStreetViewClick({ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng })}
-                                                        style={{ 
-                                                            flex: 1, 
-                                                            padding:'8px 0', 
-                                                            background:'#ea580c', 
-                                                            border:'none', 
-                                                            borderRadius:'10px', 
-                                                            color:'white', 
-                                                            fontSize:'11px', 
-                                                            fontWeight:700, 
-                                                            cursor:'pointer', 
-                                                            display:'flex', 
-                                                            alignItems:'center', 
-                                                            justifyContent:'center', 
-                                                            gap:'6px' 
-                                                        }}
+                                                        className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                                                         aria-label={`Open Google Street View for ${selectedMarker.ticket_id || `Report #${selectedMarker.id}`}`}
+                                                        title="Open Google Street View"
                                                     >
-                                                        <Eye size={12} /> Street View
+                                                        <Eye size={13} className="text-orange-500 shrink-0" />
+                                                        <span className="whitespace-nowrap">Street View</span>
                                                     </button>
-                                                    
+
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); setReportToDelete(selectedMarker); }}
-                                                        style={{ 
-                                                            padding:'7px 10px', 
-                                                            background: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', 
-                                                            border: isDarkMode ? '1px solid rgba(239,68,68,0.3)' : '1px solid #fecaca', 
-                                                            borderRadius:'10px', 
-                                                            color:'#ef4444', 
-                                                            cursor:'pointer', 
-                                                            display:'flex', 
-                                                            alignItems:'center', 
-                                                            justifyContent:'center' 
-                                                        }}
-                                                        title={`Permanently delete ${selectedMarker.ticket_id || `Report #${selectedMarker.id}`}`}
-                                                        aria-label={`Permanently delete ${selectedMarker.ticket_id || `Report #${selectedMarker.id}`}`}
+                                                        onClick={() => navigate(`/gov/reports?reportId=${selectedMarker.id}`)}
+                                                        className="py-2 px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold border border-blue-500/25 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                                        aria-label={`View full report for ${formatTicketId(selectedMarker.ticket_id, selectedMarker.id)} in citizen reports table`}
+                                                        title="Open full administrative report and audit log"
                                                     >
-                                                        <Trash2 size={14} />
+                                                        <FileText size={13} className="text-blue-500 shrink-0" />
+                                                        <span className="whitespace-nowrap">Full Report</span>
                                                     </button>
                                                 </div>
                                             </>
@@ -3044,7 +3016,7 @@ const DispatcherDashboard = () => {
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 320, opacity: 0 }}
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative border-l border-neutral-border"
+                        className="w-72 2xl:w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative border-l border-neutral-border"
                     >
                         {/* Removed left sidebar inner shadow */}
                     <div className="flex relative border-b border-neutral-border">
@@ -3089,9 +3061,24 @@ const DispatcherDashboard = () => {
                                                     {getReportPlainTitle(selectedReport)}
                                                 </h4>
                                                 <div className="text-[10px] font-mono text-orange-500 font-semibold mt-0.5">
-                                                    #{selectedReport.ticket_id || `RPT-${selectedReport.id}`}
+                                                    #{formatTicketId(selectedReport.ticket_id, selectedReport.id)}
                                                 </div>
                                             </div>
+
+                                            {/* Deep-link to Citizen Reports (Table View & Audit Log) */}
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate(`/gov/reports?reportId=${selectedReport.id}`)}
+                                                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/25 text-xs font-bold transition-all cursor-pointer group"
+                                                title={`View full report & audit trail for #${formatTicketId(selectedReport.ticket_id, selectedReport.id)} in Citizen Reports`}
+                                                aria-label={`View full report & audit trail for #${formatTicketId(selectedReport.ticket_id, selectedReport.id)}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <FileText size={14} className="text-blue-500" />
+                                                    <span>View Full Report & Audit</span>
+                                                </div>
+                                                <ArrowUpRight size={13} className="text-blue-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                            </button>
 
                                             {/* Strategic Process Roadmap */}
                                             <div className="mb-2 relative">
@@ -3307,7 +3294,15 @@ const DispatcherDashboard = () => {
                                                 {selectedReport.status === 'approved_internal' && (
                                                     <div className="space-y-1">
                                                         <button 
-                                                            onClick={() => setIsDispatchModalOpen(true)}
+                                                            onClick={() => {
+                                                                setDispatchForm({
+                                                                    assigned_to_id: 2,
+                                                                    priority: selectedReport.urgency === 'critical' ? 'critical' : selectedReport.urgency === 'high' ? 'high' : 'normal',
+                                                                    title: `Repair ${selectedReport.ai_category || selectedReport.category || 'Infrastructure Issue'}`,
+                                                                    description: selectedReport.description || selectedReport.ai_summary || ''
+                                                                });
+                                                                setIsDispatchModalOpen(true);
+                                                            }}
                                                             className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow flex items-center justify-center gap-2 active:scale-98"
                                                         >
                                                             <Briefcase size={14} /> Generate Work Order
@@ -3337,81 +3332,12 @@ const DispatcherDashboard = () => {
                                                 {/* Secondary Actions Row: Process Audit & Reject Spam */}
                                                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
                                                     <button 
-                                                        onClick={() => Swal.fire({
-                                                            title: '',
-                                                            html: `
-                                                                <div class="flex flex-col items-center text-center p-2 mb-2">
-                                                                    <div class="w-14 h-14 rounded-full bg-orange-600/20 flex items-center justify-center border-2 border-orange-500/30 mb-7 mx-auto">
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                                                                    </div>
-                                                                    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Milestone Progress &amp; Audit</h2>
-                                                                    <p class="text-slate-400 text-[11px] mb-10 uppercase tracking-[0.2em] font-bold">
-                                                                        Tracking: <span class="text-orange-500">${selectedReport.ticket_id || `RPT-${selectedReport.id}`}</span>
-                                                                    </p>
-                                                                    
-                                                                    <div class="w-full max-w-[320px] mx-auto relative px-4 text-left">
-                                                                        <div class="absolute left-6 top-3 bottom-3 w-px bg-slate-800"></div>
-                                                                        
-                                                                        <div class="space-y-10">
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full bg-orange-500 z-10"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold text-white leading-none mb-1">Phase 1: Intake &amp; Analysis</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">AI Vision automatically categorizes and evaluates citizen reports.</div>
-                                                                                </div>
-                                                                            </div>
-                                                                            
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full z-10 ${['pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'bg-orange-500' : 'bg-slate-800'}"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${['pending_approval', 'approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'text-white' : 'text-slate-600'}">Phase 2: Tactical Planning</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">Dispatcher evaluates logistics, routing, and fleet availability.</div>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full z-10 ${['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'bg-orange-500' : 'bg-slate-800'}"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${['approved_internal', 'dispatched', 'resolved'].includes(selectedReport.status) ? 'text-white' : 'text-slate-600'}">Phase 3: Budgeting &amp; Approval</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">Manager review, resource locking, and final site authorization.</div>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full z-10 ${['dispatched', 'resolved'].includes(selectedReport.status) ? 'bg-orange-500' : 'bg-slate-800'}"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${['dispatched', 'resolved'].includes(selectedReport.status) ? 'text-white' : 'text-slate-600'}">Phase 4: Field Execution</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">Assigned fleet executes work according to engineering specs.</div>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div class="flex items-start gap-5 relative group">
-                                                                                <div class="mt-1.5 w-3 h-3 rounded-full z-10 ${selectedReport.status === 'resolved' ? 'bg-orange-500' : 'bg-slate-800'}"></div>
-                                                                                <div>
-                                                                                    <div class="text-[13px] font-bold leading-none mb-1 ${selectedReport.status === 'resolved' ? 'text-white' : 'text-slate-600'}">Phase 5: Site Resolution</div>
-                                                                                    <div class="text-[10px] text-slate-500 leading-relaxed">Final site audit, report closure, and citizen notification.</div>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            `,
-                                                            showConfirmButton: false,
-                                                            showCloseButton: true,
-                                                            customClass: {
-                                                                popup: 'rounded-[40px] border border-white/5 shadow-[0_30px_100px_-20px_rgba(0,0,0,0.8)]',
-                                                                closeButton: 'text-slate-500 hover:text-orange-500 transition-colors border-none shadow-none focus:outline-none'
-                                                            },
-                                                            buttonsStyling: false,
-                                                            background: '#0F172A',
-                                                            color: '#fff',
-                                                            width: '460px',
-                                                            padding: '4.5rem 2rem 5rem 2rem'
-                                                        })}
-                                                        className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 rounded-xl text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 active:scale-95"
+                                                        type="button"
+                                                        onClick={() => setIsAuditModalOpen(true)}
+                                                        className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 rounded-xl text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 active:scale-95 cursor-pointer"
                                                         title="View milestone progress and audit trail"
                                                     >
-                                                        <Activity size={13}/> Process Audit
+                                                        <Activity size={13} className="text-orange-500" /> Process Audit
                                                     </button>
 
                                                     <button 
@@ -3515,106 +3441,192 @@ const DispatcherDashboard = () => {
                 {/* Dispatch / Generate Work Order Modal */}
                 <AnimatePresence>
                     {isDispatchModalOpen && selectedReport && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
                             <motion.div 
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full border border-slate-200 dark:border-slate-800 flex flex-col"
+                                initial={{ opacity: 0, scale: 0.94, y: 16 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.94, y: 16 }}
+                                transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+                                className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden max-w-lg w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]"
                             >
-                                <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-orange-100/50 dark:bg-orange-500/10 flex items-center justify-center text-orange-600 dark:text-orange-500">
-                                            <Briefcase size={20} />
+                                {/* Top Accent Gradient Strip */}
+                                <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
+
+                                {/* Modal Header */}
+                                <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                                    <div className="flex items-center justify-between gap-3 mb-2.5">
+                                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                                            <Briefcase size={13} className="text-orange-500" />
+                                            <span>MUNICIPAL WORK ORDER DISPATCH</span>
                                         </div>
-                                        <div>
-                                            <h2 className="font-bold text-slate-900 dark:text-white text-lg leading-tight">Generate Work Order</h2>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">For Ticket {selectedReport.ticket_id || `RPT-${selectedReport.id}`}</p>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        onClick={() => setIsDispatchModalOpen(false)}
-                                        className="w-8 h-8 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 transition-colors"
-                                    >
-                                        &times;
-                                    </button>
-                                </div>
-                                
-                                <form onSubmit={handleCreateWorkOrder} className="p-6 flex flex-col gap-4">
-                                    
-                                    <div className="bg-slate-50 dark:bg-slate-950/50 rounded-lg p-3 border border-slate-200 dark:border-slate-800 mb-2">
-                                        <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1">Issue Location</div>
-                                        <div className="text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                                            <MapPin size={14} className="text-slate-400"/>
-                                            {selectedReport.location_string || `${selectedReport.location_lat?.toFixed(4)}, ${selectedReport.location_lng?.toFixed(4)}`}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Assign To (Field Engineer)</label>
-                                        <select 
-                                            required
-                                            value={dispatchForm.assigned_to_id}
-                                            onChange={(e) => setDispatchForm({...dispatchForm, assigned_to_id: e.target.value})}
-                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-orange-500 transition-colors"
-                                        >
-                                            <option value="2">Engr. Dela Cruz (Team Alpha - Electrical)</option>
-                                            <option value="3">Engr. Bautista (Team Beta - General)</option>
-                                            <option value="4">Engr. Reyes (Team Gamma - Plumbing)</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Priority Level</label>
-                                        <select 
-                                            value={dispatchForm.priority}
-                                            onChange={(e) => setDispatchForm({...dispatchForm, priority: e.target.value})}
-                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-orange-500 transition-colors"
-                                        >
-                                            <option value="low">Low Priority (Maintenance)</option>
-                                            <option value="normal">Normal (Standard SLA)</option>
-                                            <option value="high">High Priority (Urgent repair)</option>
-                                            <option value="critical">Critical (Immediate danger)</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Task Title</label>
-                                        <input 
-                                            type="text"
-                                            placeholder={`Fix ${selectedReport.ai_category || selectedReport.category}`}
-                                            value={dispatchForm.title}
-                                            onChange={(e) => setDispatchForm({...dispatchForm, title: e.target.value})}
-                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-orange-500 transition-colors"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Dispatcher Notes / Action Plan</label>
-                                        <textarea 
-                                            rows="3"
-                                            placeholder="Provide specific instructions to the field team..."
-                                            value={dispatchForm.description}
-                                            onChange={(e) => setDispatchForm({...dispatchForm, description: e.target.value})}
-                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-orange-500 transition-colors custom-scrollbar"
-                                        ></textarea>
-                                    </div>
-
-                                    <div className="mt-2 flex gap-3">
                                         <button 
                                             type="button"
                                             onClick={() => setIsDispatchModalOpen(false)}
-                                            className="flex-1 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                            aria-label="Close dialog"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+
+                                    <h2 className="text-xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                                        Generate Work Order
+                                    </h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                                        Authorize and deploy engineering field teams with official dispatch parameters.
+                                    </p>
+
+                                    {/* Incident Summary Lockup */}
+                                    <div className="mt-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <span className="font-mono text-xs font-extrabold text-orange-500">
+                                                    #{formatTicketId(selectedReport.ticket_id, selectedReport.id)}
+                                                </span>
+                                                {selectedReport.barangay && (
+                                                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
+                                                        <span>•</span>
+                                                        <MapPin size={10} className="text-slate-400 shrink-0" />
+                                                        <span>Brgy. {selectedReport.barangay}</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                                                {getReportPlainTitle(selectedReport)}
+                                            </h4>
+                                        </div>
+                                        {(() => {
+                                            const desc = getStatusDescriptor(selectedReport.status);
+                                            const StatusIcon = desc.icon || Clock;
+                                            return (
+                                                <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${desc.badgeClass}`}>
+                                                    <StatusIcon size={12} className="shrink-0" />
+                                                    <span>{desc.label}</span>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                                
+                                {/* Modal Scrollable Form Body */}
+                                <form onSubmit={handleCreateWorkOrder} className="p-6 overflow-y-auto space-y-4 text-xs">
+                                    {/* Issue Verified Location Card */}
+                                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800/80 flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 mt-0.5 border border-orange-500/20">
+                                            <MapPin size={15} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
+                                                Field Operations Site
+                                            </div>
+                                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug break-words">
+                                                {selectedReport.location_string || `${selectedReport.location_lat?.toFixed(5)}°N, ${selectedReport.location_lng?.toFixed(5)}°E (Caloocan)`}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 2-Column Responsive Form Controls */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                        {/* Assigned Fleet / Engineer */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                                <Truck size={13} className="text-orange-500" />
+                                                <span>Assign To Fleet / Lead</span>
+                                            </label>
+                                            <select 
+                                                required
+                                                value={dispatchForm.assigned_to_id}
+                                                onChange={(e) => setDispatchForm({...dispatchForm, assigned_to_id: e.target.value})}
+                                                className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all cursor-pointer shadow-xs"
+                                            >
+                                                <option value="2">Team Alpha — Engr. Dela Cruz (Electrical & Lighting)</option>
+                                                <option value="3">Team Beta — Engr. Bautista (Roads & Bridges)</option>
+                                                <option value="4">Team Gamma — Engr. Reyes (Drainage & Waterworks)</option>
+                                                <option value="5">Team Delta — Environmental Sanitation Task Force</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Priority Level */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                                <ShieldCheck size={13} className="text-orange-500" />
+                                                <span>Priority Level</span>
+                                            </label>
+                                            <select 
+                                                value={dispatchForm.priority}
+                                                onChange={(e) => setDispatchForm({...dispatchForm, priority: e.target.value})}
+                                                className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all cursor-pointer shadow-xs"
+                                            >
+                                                <option value="critical">Critical (Immediate Danger / Safety Hazard)</option>
+                                                <option value="high">High (Urgent Infrastructure Repair)</option>
+                                                <option value="normal">Normal (Standard Dispatch SLA)</option>
+                                                <option value="low">Low (Routine Maintenance Sweep)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Task Title */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <Wrench size={13} className="text-orange-500" />
+                                            <span>Work Order Task Title</span>
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            required
+                                            placeholder={`e.g. Repair ${selectedReport.ai_category || selectedReport.category || 'damaged infrastructure'}`}
+                                            value={dispatchForm.title}
+                                            onChange={(e) => setDispatchForm({...dispatchForm, title: e.target.value})}
+                                            className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all shadow-xs"
+                                        />
+                                    </div>
+
+                                    {/* Dispatcher Instructions / Action Plan */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <FileText size={13} className="text-orange-500" />
+                                            <span>Dispatcher Instructions & Action Plan</span>
+                                        </label>
+                                        <textarea 
+                                            rows="3"
+                                            placeholder="Specify field instructions, required heavy equipment, safety perimeters, or coordinate notes..."
+                                            value={dispatchForm.description}
+                                            onChange={(e) => setDispatchForm({...dispatchForm, description: e.target.value})}
+                                            className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all shadow-xs resize-none"
+                                        ></textarea>
+                                    </div>
+
+                                    {/* Information Notice Strip */}
+                                    <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-slate-700 dark:text-slate-300 text-[11px] flex items-start gap-2.5">
+                                        <Sparkles size={14} className="text-orange-500 shrink-0 mt-0.5" />
+                                        <div className="leading-relaxed">
+                                            Executing dispatch advances the report to <strong className="text-orange-600 dark:text-orange-400 font-bold">Dispatched</strong>, locks engineering resources, logs an immutable audit event, and syncs across the Command Center map.
+                                        </div>
+                                    </div>
+
+                                    {/* Footer Controls */}
+                                    <div className="pt-2 flex items-center gap-3 border-t border-slate-100 dark:border-slate-800">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setIsDispatchModalOpen(false)}
+                                            disabled={actionLoading === selectedReport.id}
+                                            className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                         >
                                             Cancel
                                         </button>
                                         <button 
                                             type="submit"
                                             disabled={actionLoading === selectedReport.id}
-                                            className="flex-1 py-2.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold shadow transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                            className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
                                         >
-                                            {actionLoading === selectedReport.id ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div> : <Navigation size={16}/>}
-                                            Execute Dispatch
+                                            {actionLoading === selectedReport.id ? (
+                                                <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                                            ) : (
+                                                <>
+                                                    <Navigation size={14} />
+                                                    <span>Confirm & Dispatch Crew</span>
+                                                </>
+                                            )}
                                         </button>
                                     </div>
                                 </form>
@@ -3812,7 +3824,7 @@ const DispatcherDashboard = () => {
                                                                 <MarkerF
                                                                     key={r.id}
                                                                     position={{ lat: r.location_lat, lng: r.location_lng }}
-                                                                    title={`RPT-${r.id}: ${r.ai_category || r.category}`}
+                                                                    title={`${formatTicketId(r.ticket_id, r.id)}: ${r.ai_category || r.category}`}
                                                                     icon={window.google?.maps ? {
                                                                         path: window.google.maps.SymbolPath.CIRCLE,
                                                                         fillColor: r.status === 'resolved' ? '#22c55e' : r.ai_urgency === 'Critical' ? '#ef4444' : '#f97316',
@@ -3852,7 +3864,7 @@ const DispatcherDashboard = () => {
                                                                         </span>
                                                                     </div>
                                                                 </div>
-                                                                <span className="text-[9px] font-mono text-slate-600 group-hover:text-orange-400 transition-colors shrink-0">{r.ticket_id || `RPT-${r.id}`}</span>
+                                                                <span className="text-[9px] font-mono text-slate-600 group-hover:text-orange-400 transition-colors shrink-0">{formatTicketId(r.ticket_id, r.id)}</span>
                                                             </button>
                                                         ))}
                                                     </div>
@@ -4023,6 +4035,236 @@ const DispatcherDashboard = () => {
                             
                             {/* Bottom aesthetic bar */}
                             <div className="h-1.5 w-full bg-red-600" />
+                        </motion.div>
+                    </motion.div>
+                )}
+                {/* ── Milestone Progress & Audit Lifecycle Modal ── */}
+                {isAuditModalOpen && selectedReport && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md"
+                        onClick={() => setIsAuditModalOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.94, opacity: 0, y: 16 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.94, opacity: 0, y: 16 }}
+                            transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[88vh]"
+                        >
+                            {/* Top Accent Gradient Strip */}
+                            <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
+
+                            {/* Modal Header */}
+                            <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                                <div className="flex items-center justify-between gap-3 mb-2.5">
+                                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                                        </span>
+                                        <span>PULSO DISPATCH LIFECYCLE AUDIT</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsAuditModalOpen(false)}
+                                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        aria-label="Close modal"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+
+                                <h2 className="text-xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                                    Milestone Progress & Audit
+                                </h2>
+                                
+                                {/* Report Summary Lockup */}
+                                <div className="mt-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <span className="font-mono text-xs font-extrabold text-orange-500">
+                                                #{formatTicketId(selectedReport.ticket_id, selectedReport.id)}
+                                            </span>
+                                            {selectedReport.barangay && (
+                                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
+                                                    <span>•</span>
+                                                    <MapPin size={10} className="text-slate-400 shrink-0" />
+                                                    <span>Brgy. {selectedReport.barangay}</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                                            {getReportPlainTitle(selectedReport)}
+                                        </h4>
+                                    </div>
+                                    {(() => {
+                                        const desc = getStatusDescriptor(selectedReport.status);
+                                        const StatusIcon = desc.icon || Clock;
+                                        return (
+                                            <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${desc.badgeClass}`}>
+                                                <StatusIcon size={12} className="shrink-0" />
+                                                <span>{desc.label}</span>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+
+                            {/* Stepper Body */}
+                            <div className="p-6 overflow-y-auto space-y-6">
+                                {/* Rejected Alert Banner if applicable */}
+                                {['rejected', 'cancelled', 'canceled', 'spam', 'invalid'].some(k => (selectedReport.status || '').toLowerCase().includes(k)) && (
+                                    <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-400 text-xs flex items-start gap-2.5">
+                                        <X size={16} className="shrink-0 mt-0.5 text-rose-500" />
+                                        <div>
+                                            <strong className="font-bold">Submission Flagged as Rejected / Invalid</strong>
+                                            <p className="mt-0.5 text-[11px] opacity-90">This report was screened and excluded from active dispatch. All audit events and photo logs remain preserved for record integrity.</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Timeline List */}
+                                <div className="relative pl-7 space-y-6 before:absolute before:left-[11px] before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
+                                    {(() => {
+                                        const raw = (selectedReport.status || '').toLowerCase();
+                                        const isResolved = ['resolved', 'completed', 'fixed', 'closed'].some(k => raw.includes(k));
+                                        const isDispatched = ['dispatched', 'in progress', 'in_progress', 'ongoing'].some(k => raw.includes(k));
+                                        const isAssigned = ['assigned', 'approved_internal', 'approved for w.o.', 'approved for work order', 'approved'].some(k => raw.includes(k)) || isDispatched || isResolved;
+                                        const isVerified = ['verified', 'pending_approval', 'awaiting approval'].some(k => raw.includes(k)) || isAssigned || isDispatched || isResolved;
+                                        const isRejected = ['rejected', 'cancelled', 'canceled', 'spam', 'invalid'].some(k => raw.includes(k));
+
+                                        const milestones = [
+                                            {
+                                                phase: 'Phase 1',
+                                                title: 'Citizen Intake & AI Vision Analysis',
+                                                description: 'Citizen report logged with photo evidence, GPS geotagging, and Gemini AI auto-classification.',
+                                                meta: selectedReport.created_at ? `Logged on ${new Date(selectedReport.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Logged in PULSO Portal',
+                                                isDone: true,
+                                                isActive: false
+                                            },
+                                            {
+                                                phase: 'Phase 2',
+                                                title: 'Staff Triage & Hazard Verification',
+                                                description: 'LGU desk dispatcher confirms physical report authenticity, inspects street hazards, and validates municipal service category.',
+                                                meta: isVerified ? 'Verified by Staff Dispatcher' : (isRejected ? 'Declined at Triage' : 'Awaiting Desk Verification'),
+                                                isDone: isVerified,
+                                                isActive: !isVerified && !isRejected
+                                            },
+                                            {
+                                                phase: 'Phase 3',
+                                                title: 'Work Order & Division Dispatch',
+                                                description: 'Department chief approves work order, locks required engineering resources, and assigns the responsible field fleet.',
+                                                meta: isAssigned ? `Assigned: ${selectedReport.assigned_to || 'City Engineering Fleet'}` : (isVerified ? 'Ready for Division Assignment' : 'Pending Verification'),
+                                                isDone: isAssigned,
+                                                isActive: isVerified && !isAssigned && !isRejected
+                                            },
+                                            {
+                                                phase: 'Phase 4',
+                                                title: 'Field Operations & On-Site Repair',
+                                                description: 'Dispatched engineering crew arrives on site with heavy equipment, safety perimeters, and executes infrastructure repair.',
+                                                meta: isResolved ? 'Field Work Completed' : (isDispatched ? 'Field Crew Active On-Site' : 'Pending Crew Deployment'),
+                                                isDone: isResolved,
+                                                isActive: isDispatched && !isResolved
+                                            },
+                                            {
+                                                phase: 'Phase 5',
+                                                title: 'Final Quality Audit & Resolution',
+                                                description: 'Field supervisor captures completion photo evidence, signs off on resolution, and triggers automated citizen SMS/email notification.',
+                                                meta: isResolved ? 'Audit Complete • Citizen Notified' : 'Awaiting Work Completion Sign-Off',
+                                                isDone: isResolved,
+                                                isActive: false
+                                            }
+                                        ];
+
+                                        return milestones.map((m, idx) => (
+                                            <div key={idx} className="relative flex items-start gap-4">
+                                                {/* Icon Indicator */}
+                                                <div className="absolute -left-7 mt-0.5">
+                                                    {m.isDone ? (
+                                                        <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/25 ring-4 ring-white dark:ring-slate-900">
+                                                            <CheckCircle2 size={13} />
+                                                        </div>
+                                                    ) : m.isActive ? (
+                                                        <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-md shadow-orange-500/25 ring-4 ring-orange-500/20 animate-pulse">
+                                                            <Activity size={12} />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-[10px] font-bold flex items-center justify-center ring-4 ring-white dark:ring-slate-900">
+                                                            {idx + 1}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Content Card */}
+                                                <div className={`flex-1 p-3.5 rounded-2xl transition-all ${
+                                                    m.isActive 
+                                                        ? 'bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/25 shadow-sm' 
+                                                        : m.isDone
+                                                            ? 'bg-slate-50/80 dark:bg-slate-950/40 border border-slate-200/70 dark:border-slate-800/70'
+                                                            : 'opacity-60 bg-transparent border border-transparent'
+                                                }`}>
+                                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-500 shrink-0">
+                                                                {m.phase}
+                                                            </span>
+                                                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                                                                {m.title}
+                                                            </h4>
+                                                        </div>
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                                            m.isDone 
+                                                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                                                                : m.isActive
+                                                                    ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                                                                    : 'text-slate-400 dark:text-slate-500'
+                                                        }`}>
+                                                            {m.isDone ? 'Completed' : (m.isActive ? 'In Progress' : 'Queued')}
+                                                        </span>
+                                                    </div>
+
+                                                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
+                                                        {m.description}
+                                                    </p>
+
+                                                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800/80 text-[10px] font-mono font-medium text-slate-600 dark:text-slate-300">
+                                                        <Sparkles size={10} className="text-orange-500 shrink-0" />
+                                                        <span>{m.meta}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
+                            </div>
+
+                            {/* Footer Controls */}
+                            <div className="p-4 px-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between gap-3 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsAuditModalOpen(false);
+                                        navigate(`/gov/reports?reportId=${selectedReport.id}`);
+                                    }}
+                                    className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer"
+                                    title="Open comprehensive administrative audit in Table View"
+                                >
+                                    <FileText size={14} />
+                                    <span>Inspect Full Audit Log in Table View</span>
+                                    <ArrowUpRight size={13} />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAuditModalOpen(false)}
+                                    className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                                >
+                                    Done
+                                </button>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

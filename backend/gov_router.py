@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from database import get_db
 from auth import get_current_user
+from datetime import datetime
 import models
 import gov_models
 import gov_schemas
@@ -937,7 +938,7 @@ def list_reports_archive(
     return [
         {
             "id": r.id,
-            "ticket_id": getattr(r, "ticket_id", f"RPT-{r.id:05d}"),
+            "ticket_id": getattr(r, "ticket_id", f"PUL-{datetime.now().year}-{r.id:04d}"),
             "title": r.category or "Infrastructure Report",
             "description": r.description or "",
             "status": r.status,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     ClipboardList, Wrench, Building2, MapPin, BarChart2,
     Users, Settings, ChevronLeft, ChevronRight, Search,
@@ -8,7 +8,8 @@ import {
     Square, ChevronDown, Filter, X, Copy, ExternalLink,
     MessageSquare, Phone, Flag, Shield, Lock, FileText,
     Share2, Pin, PinOff, Eye, RefreshCw, Layers, ArrowUpRight,
-    Bookmark
+    Bookmark, Map as MapIcon, CheckCircle2, Sparkles, Truck,
+    Briefcase, Navigation
 } from 'lucide-react';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -16,6 +17,13 @@ import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
 import Swal from 'sweetalert2';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
+import { 
+    getStatusDescriptor, 
+    getReportPlainTitle, 
+    getUrgencyDescriptor, 
+    CANONICAL_STATUS_LIST,
+    formatTicketId
+} from '../utils/reportWorkflow';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REFERENCE INITIAL DATA (Exact Parity with media_1788468315863.png)
@@ -267,6 +275,11 @@ const INITIAL_REPORTS = [
 
 export default function GovReportsDashboard() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const queryReportId = searchParams.get('reportId');
+
+    const apiHost = window.location.hostname;
+    const API_BASE_URL = `http://${apiHost}:33159`;
 
     // ── Sidebar collapse state ──
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -276,6 +289,10 @@ export default function GovReportsDashboard() {
     const [selectedReportId, setSelectedReportId] = useState(INITIAL_REPORTS[0].id);
     const [selectedRowIds, setSelectedRowIds] = useState([INITIAL_REPORTS[0].id]);
     const [isPinned, setIsPinned] = useState(false);
+
+    // ── Live Sync State ──
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [lastSynced, setLastSynced] = useState('just now');
 
     // ── Filters & Search state ──
     const [searchQuery, setSearchQuery] = useState('');
@@ -295,7 +312,17 @@ export default function GovReportsDashboard() {
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     const [newNoteText, setNewNoteText] = useState('');
     const [escalateReason, setEscalateReason] = useState('High risk to public pedestrian safety');
-    const [workOrderTeam, setWorkOrderTeam] = useState('Electrical Maintenance Division');
+    
+    // ── Unified Work Order Dispatch Modal State ──
+    const [isWorkOrderModalOpen, setIsWorkOrderModalOpen] = useState(false);
+    const [workOrderForm, setWorkOrderForm] = useState({
+        title: '',
+        description: '',
+        priority: 'high',
+        team: 'Team Beta — Engr. Bautista (Roads & Bridges)',
+        assigned_to_id: 3
+    });
+    const [isSubmittingWo, setIsSubmittingWo] = useState(false);
 
     const searchInputRef = useRef(null);
 
@@ -322,6 +349,16 @@ export default function GovReportsDashboard() {
         } catch { /* fallback */ }
     }, []);
 
+    // ── Deep-Link URL Parameter Listener (?reportId=...) ──
+    useEffect(() => {
+        if (!queryReportId || reports.length === 0) return;
+        const target = reports.find(r => r.id?.toString() === queryReportId || r.ticket_id === queryReportId);
+        if (target) {
+            setSelectedReportId(target.id);
+            setSelectedRowIds([target.id]);
+        }
+    }, [queryReportId, reports]);
+
     // ── Keyboard shortcut '/' to focus search ──
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -334,61 +371,79 @@ export default function GovReportsDashboard() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // ── Attempt live API fetch if token exists ──
-    useEffect(() => {
-        const fetchLiveReports = async () => {
-            const token = getAuthToken();
-            if (!token) return;
-            try {
-                const res = await fetch(`http://localhost:33159/api/reports?limit=50&t=${Date.now()}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data) && data.length > 0) {
-                        const mapped = data.map((r, index) => ({
-                            id: r.id || index + 10,
-                            ticket_id: r.ticket_id || `PUL-2026-${String(r.id).padStart(4, '0')}`,
-                            issue: r.description || r.category || 'Citizen reported issue',
-                            barangay: r.barangay ? `Barangay ${r.barangay.replace(/[^0-9]/g, '')}` : 'Barangay 176',
-                            district: 'North Caloocan',
-                            severity: r.urgency === 'critical' ? 'Critical' : r.urgency === 'high' ? 'High' : 'Medium',
-                            status: r.status === 'verified' ? 'Verified' :
-                                    r.status === 'assigned' ? 'Assigned' :
-                                    r.status === 'in_progress' || r.status === 'dispatched' ? 'In progress' :
-                                    r.status === 'resolved' ? 'Resolved' : 'Received',
-                            updated: 'Just now',
-                            report_type: r.ai_category || r.category || 'General',
-                            reporter: {
-                                name: 'Name withheld',
-                                is_private: true,
-                                contact_method: 'Contact via Pulseline'
-                            },
-                            location: {
-                                address: r.location_string || 'North Caloocan City',
-                                lat: r.location_lat || 14.7566,
-                                lng: r.location_lng || 121.0450,
-                                landmark: 'Reported location'
-                            },
-                            evidence: r.image_url ? [
-                                r.image_url.startsWith('http') ? r.image_url : `http://localhost:33159${r.image_url}`
-                            ] : INITIAL_REPORTS[0].evidence,
-                            steps: [
-                                { id: 'received', label: 'Received', time: 'Today', completed: true },
-                                { id: 'verified', label: 'Verified', time: r.status !== 'unverified' ? 'Today' : '—', completed: r.status !== 'unverified' },
-                                { id: 'assigned', label: 'Assigned', time: ['assigned', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—', completed: ['assigned', 'in_progress', 'resolved'].includes(r.status) },
-                                { id: 'in_progress', label: 'In progress', time: ['in_progress', 'resolved'].includes(r.status) ? 'Today' : '—', completed: ['in_progress', 'resolved'].includes(r.status) },
-                                { id: 'resolved', label: 'Resolved', time: r.status === 'resolved' ? 'Today' : '—', completed: r.status === 'resolved' }
-                            ],
-                            activity: INITIAL_REPORTS[0].activity
-                        }));
-                        setReports(mapped);
-                        setSelectedReportId(mapped[0].id);
-                        setSelectedRowIds([mapped[0].id]);
+    // ── Live API Fetch & Real-time Database Synchronization ──
+    const fetchLiveReports = async () => {
+        const token = getAuthToken();
+        if (!token) return;
+        setIsSyncing(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/reports?limit=50&t=${Date.now()}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    const mapped = data.map((r, index) => ({
+                        id: r.id || index + 10,
+                        ticket_id: formatTicketId(r.ticket_id, r.id),
+                        issue: getReportPlainTitle(r),
+                        barangay: r.barangay ? `Barangay ${r.barangay.replace(/[^0-9]/g, '')}` : 'Barangay 176',
+                        district: 'North Caloocan',
+                        severity: r.urgency === 'critical' ? 'Critical' : r.urgency === 'high' ? 'High' : 'Medium',
+                        status: r.status === 'verified' ? 'Verified' :
+                                r.status === 'assigned' || r.status === 'approved_internal' ? 'Assigned' :
+                                r.status === 'in_progress' || r.status === 'dispatched' ? 'In Progress' :
+                                r.status === 'resolved' ? 'Resolved' : 
+                                r.status === 'rejected' ? 'Rejected' : 'Pending Review',
+                        updated: 'Just now',
+                        report_type: r.ai_category || r.category || 'General',
+                        reporter: {
+                            name: 'Name withheld',
+                            is_private: true,
+                            contact_method: 'Contact via Pulseline'
+                        },
+                        location: {
+                            address: r.location_string || 'North Caloocan City',
+                            lat: r.location_lat || 14.7566,
+                            lng: r.location_lng || 121.0450,
+                            landmark: 'Reported location'
+                        },
+                        evidence: r.image_url ? [
+                            r.image_url.startsWith('http') ? r.image_url : `${API_BASE_URL}${r.image_url}`
+                        ] : INITIAL_REPORTS[0].evidence,
+                        steps: [
+                            { id: 'received', label: 'Pending Review', time: 'Today', completed: true },
+                            { id: 'verified', label: 'Verified', time: r.status !== 'unverified' && r.status !== 'pending' ? 'Today' : '—', completed: r.status !== 'unverified' && r.status !== 'pending' },
+                            { id: 'assigned', label: 'Assigned', time: ['assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—', completed: ['assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) },
+                            { id: 'in_progress', label: 'In Progress', time: ['in_progress', 'dispatched', 'resolved'].includes(r.status) ? 'Today' : '—', completed: ['in_progress', 'dispatched', 'resolved'].includes(r.status) },
+                            { id: 'resolved', label: 'Resolved', time: r.status === 'resolved' ? 'Today' : '—', completed: r.status === 'resolved' }
+                        ],
+                        activity: INITIAL_REPORTS[0].activity
+                    }));
+                    setReports(mapped);
+                    setLastSynced(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                    
+                    // If deep-linked report is in dataset, keep it selected
+                    if (queryReportId) {
+                        const target = mapped.find(m => m.id.toString() === queryReportId || m.ticket_id === queryReportId);
+                        if (target) {
+                            setSelectedReportId(target.id);
+                            setSelectedRowIds([target.id]);
+                            return;
+                        }
                     }
+                    setSelectedReportId(mapped[0].id);
+                    setSelectedRowIds([mapped[0].id]);
                 }
-            } catch { /* Fallback to rich reference data */ }
-        };
+            }
+        } catch (err) {
+            console.error("Live fetch failed:", err);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    useEffect(() => {
         fetchLiveReports();
     }, []);
 
@@ -456,50 +511,63 @@ export default function GovReportsDashboard() {
         });
     };
 
-    // ── Action Handlers ──
-    const handleAssignWorkOrder = () => {
-        Swal.fire({
-            title: 'Assign Work Order',
-            html: `
-                <div style="text-align: left; font-size: 13px;">
-                    <p style="margin-bottom: 8px;"><strong>Ticket:</strong> ${selectedReport.ticket_id}</p>
-                    <p style="margin-bottom: 12px;"><strong>Issue:</strong> ${selectedReport.issue}</p>
-                    <label style="display:block; font-weight: bold; margin-bottom: 4px;">Assign To Maintenance Team:</label>
-                    <select id="swal-team-select" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 12px;">
-                        <option value="Electrical Maintenance Division">Electrical Maintenance Division</option>
-                        <option value="Road Repair & Asphalt Crew">Road Repair & Asphalt Crew</option>
-                        <option value="Drainage & Flood Control Unit">Drainage & Flood Control Unit</option>
-                        <option value="Building Safety Inspection Office">Building Safety Inspection Office</option>
-                    </select>
-                    <label style="display:block; font-weight: bold; margin-bottom: 4px;">Priority Level:</label>
-                    <select id="swal-priority-select" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1;">
-                        <option value="immediate">Immediate Dispatch (< 2 hrs)</option>
-                        <option value="high" selected>High Priority (Within 24 hrs)</option>
-                        <option value="scheduled">Scheduled Routine</option>
-                    </select>
-                </div>
-            `,
-            showCancelButton: true,
-            confirmButtonText: 'Create & Dispatch Work Order',
-            confirmButtonColor: '#ff6b00',
-            cancelButtonText: 'Cancel'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Update report status
+    // ── Unified Work Order Dispatch Handlers (Synced with /api/work-orders) ──
+    const handleOpenWorkOrderModal = () => {
+        if (!selectedReport) return;
+        setWorkOrderForm({
+            title: `Repair ${selectedReport.issue || selectedReport.report_type || 'Infrastructure Issue'}`,
+            description: `Field repair work order created via Citizen Reports. Location: ${selectedReport.location?.address || 'Caloocan City'}`,
+            priority: selectedReport.severity === 'Critical' ? 'critical' : selectedReport.severity === 'High' ? 'high' : 'normal',
+            team: 'Team Beta — Engr. Bautista (Roads & Bridges)',
+            assigned_to_id: 3
+        });
+        setIsWorkOrderModalOpen(true);
+    };
+
+    const handleExecuteWorkOrder = async (e) => {
+        if (e) e.preventDefault();
+        if (!selectedReport) return;
+        setIsSubmittingWo(true);
+        const token = getAuthToken();
+        try {
+            const payload = {
+                title: workOrderForm.title || `Repair ${selectedReport.issue || 'Infrastructure Issue'}`,
+                description: workOrderForm.description || 'Dispatched via Citizen Reports processing desk.',
+                wo_type: 'standard',
+                status: 'open',
+                priority: workOrderForm.priority,
+                assigned_to_id: parseInt(workOrderForm.assigned_to_id, 10),
+                report_id: selectedReport.id
+            };
+
+            const res = await fetch(`${API_BASE_URL}/api/work-orders`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                const newWo = await res.json();
+                setIsWorkOrderModalOpen(false);
+
+                // Update report status to In Progress (since backend sets dispatched)
                 setReports(prev => prev.map(r => {
                     if (r.id === selectedReport.id) {
                         return {
                             ...r,
-                            status: 'Assigned',
+                            status: 'In Progress',
                             updated: 'Just now',
                             activity: [
                                 {
                                     id: Date.now(),
                                     icon: Users,
-                                    color: 'text-emerald-500',
-                                    title: `Assigned to ${document.getElementById('swal-team-select')?.value || 'Maintenance Team'}`,
+                                    color: 'text-indigo-500',
+                                    title: `Work Order ${newWo.wo_number || ''} Dispatched (${workOrderForm.team})`,
                                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                    desc: 'Official work order dispatched via PULSO Command.'
+                                    desc: `Official work order created and dispatched with ${workOrderForm.priority.toUpperCase()} priority.`
                                 },
                                 ...r.activity
                             ]
@@ -507,14 +575,34 @@ export default function GovReportsDashboard() {
                     }
                     return r;
                 }));
+
                 Swal.fire({
                     icon: 'success',
-                    title: 'Work Order Assigned!',
-                    text: `Work order dispatched for ${selectedReport.ticket_id}`,
+                    title: 'Work Order Dispatched!',
+                    text: `Work order ${newWo.wo_number || ''} created for ${selectedReport.ticket_id}. Shared database and Command Center map are synchronized.`,
+                    confirmButtonColor: '#ff6b00'
+                });
+                fetchLiveReports();
+            } else {
+                const err = await res.json();
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Dispatch Failed',
+                    text: err.detail || 'Could not create work order on the server.',
                     confirmButtonColor: '#ff6b00'
                 });
             }
-        });
+        } catch (err) {
+            console.error("Failed to dispatch work order:", err);
+            Swal.fire({
+                icon: 'error',
+                title: 'Network Error',
+                text: 'Backend server is unreachable.',
+                confirmButtonColor: '#ff6b00'
+            });
+        } finally {
+            setIsSubmittingWo(false);
+        }
     };
 
     const handleEscalateReport = () => {
@@ -606,11 +694,11 @@ export default function GovReportsDashboard() {
             <div className="flex-1 flex flex-col h-full overflow-hidden">
 
                 {/* ─────────────────────────────────────────────────────────────
-                    2. TOP BAR
+                    2. TOP BAR & UNIFIED WORKFLOW CONTROLS
                 ────────────────────────────────────────────────────────────── */}
-                <header className="h-20 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800/80 px-6 flex items-center justify-between z-20">
-                    {/* Left: Breadcrumbs + Title */}
-                    <div>
+                <header className="min-h-16 h-auto py-2.5 lg:py-0 lg:h-20 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800/80 px-4 lg:px-6 flex items-center justify-between z-20 gap-3 flex-wrap lg:flex-nowrap">
+                    {/* Left: Breadcrumbs + Title + Persistent Role Subtitle */}
+                    <div className="min-w-0">
                         <nav className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 font-medium">
                             <Link to="/gov/my-dashboard" className="hover:text-slate-700 dark:hover:text-slate-300 transition-colors">Home</Link>
                             <span>/</span>
@@ -618,15 +706,60 @@ export default function GovReportsDashboard() {
                             <span>/</span>
                             <span className="text-slate-800 dark:text-slate-200 font-semibold">Citizen reports</span>
                         </nav>
-                        <h1 className="font-heading font-black text-2xl sm:text-[26px] text-slate-900 dark:text-white tracking-tight leading-none mt-1">
-                            Citizen reports
-                        </h1>
+                        <div className="flex items-center gap-2 mt-1">
+                            <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-none">
+                                Citizen reports
+                            </h1>
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
+                                Report Processing & Audit
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden xl:block mt-0.5 truncate max-w-lg">
+                            Administrative Triage — Review citizen submissions, verify evidence, inspect audit trails, and manage compliance.
+                        </p>
                     </div>
 
-                    {/* Right: Controls & User cluster */}
-                    <div className="flex items-center gap-3">
+                    {/* Right: Workflow View Switcher + Controls & User cluster */}
+                    <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 ml-auto">
+                        {/* Segmented View Switcher: Map View ↔ Table View */}
+                        <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const param = selectedReport?.id ? `?reportId=${selectedReport.id}` : '';
+                                    navigate(`/dispatcher${param}`);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer"
+                                title="Switch to Tactical GIS Map View (Field Dispatch & Routing)"
+                                aria-label="Switch to Tactical GIS Map View for Field Dispatch"
+                            >
+                                <MapIcon size={14} />
+                                <span className="hidden sm:inline">Map View</span>
+                            </button>
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-xs border border-slate-200/60 dark:border-slate-600">
+                                <FileText size={14} />
+                                <span className="hidden sm:inline">Table View</span>
+                            </div>
+                        </div>
+
+                        {/* Live Database Sync Indicator */}
+                        <div className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300">
+                            <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-orange-500 animate-ping' : 'bg-emerald-500'}`} />
+                            <span className="font-mono text-[10px] hidden xl:inline">Live Sync</span>
+                            <button
+                                type="button"
+                                onClick={fetchLiveReports}
+                                disabled={isSyncing}
+                                className="p-0.5 hover:text-orange-500 transition-colors cursor-pointer"
+                                title="Force sync with live database"
+                                aria-label="Synchronize live reports"
+                            >
+                                <RefreshCw size={12} className={isSyncing ? 'animate-spin text-orange-500' : ''} />
+                            </button>
+                        </div>
+
                         {/* District Filter Dropdown */}
-                        <div className="relative">
+                        <div className="relative hidden sm:block">
                             <div className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 transition-all">
                                 <MapPin size={14} className="text-[#ff6b00]" />
                                 <span>{districtFilter}</span>
@@ -635,7 +768,7 @@ export default function GovReportsDashboard() {
                         </div>
 
                         {/* Search Input with '/' shortcut */}
-                        <div className="relative w-64">
+                        <div className="relative w-56 lg:w-64">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                                 <Search size={14} />
                             </div>
@@ -678,7 +811,7 @@ export default function GovReportsDashboard() {
                                 <span className="font-heading font-bold text-xs text-slate-900 dark:text-white">
                                     {currentUser.name}
                                 </span>
-                                <span className="text-[10px] font-mono-data text-[#ff6b00] font-semibold">
+                                <span className="text-[10px] text-slate-400">
                                     {currentUser.roleLabel}
                                 </span>
                             </div>
@@ -803,10 +936,10 @@ export default function GovReportsDashboard() {
                 {/* ─────────────────────────────────────────────────────────────
                     4. CONTENT WORKSPACE: REPORTS TABLE (LEFT) + DETAIL PANEL (RIGHT)
                 ────────────────────────────────────────────────────────────── */}
-                <div className="flex-1 flex overflow-hidden p-6 gap-6">
+                <div className="flex-1 flex overflow-hidden p-4 lg:p-6 gap-4 lg:gap-6">
 
                     {/* ── LEFT: REPORTS TABLE ────────────────────────────────── */}
-                    <div className="flex-1 flex flex-col bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden min-w-[500px]">
+                    <div className="flex-1 flex flex-col bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden min-w-0">
 
                         {/* Table Header & Rows Container */}
                         <div className="flex-1 overflow-auto custom-scrollbar">
@@ -925,37 +1058,18 @@ export default function GovReportsDashboard() {
                                                     )}
                                                 </td>
 
-                                                {/* Status Badge (PULSO Tokens) */}
+                                                {/* Status Badge (PULSO Canonical Tokens) */}
                                                 <td className="py-4 px-3 whitespace-nowrap">
-                                                    {report.status === 'Verified' && (
-                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60">
-                                                            <ShieldCheck size={13} className="shrink-0" />
-                                                            <span>Verified</span>
-                                                        </span>
-                                                    )}
-                                                    {report.status === 'Assigned' && (
-                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
-                                                            <CheckSquare size={13} className="shrink-0" />
-                                                            <span>Assigned</span>
-                                                        </span>
-                                                    )}
-                                                    {report.status === 'In progress' && (
-                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800/60">
-                                                            <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse shrink-0" />
-                                                            <span>In progress</span>
-                                                        </span>
-                                                    )}
-                                                    {report.status === 'Received' && (
-                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                                            <span>Received</span>
-                                                        </span>
-                                                    )}
-                                                    {report.status === 'Resolved' && (
-                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800/60">
-                                                            <Check size={13} className="shrink-0" />
-                                                            <span>Resolved</span>
-                                                        </span>
-                                                    )}
+                                                    {(() => {
+                                                        const desc = getStatusDescriptor(report.status);
+                                                        const StatusIcon = desc.icon;
+                                                        return (
+                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold border ${desc.badgeClass}`}>
+                                                                <StatusIcon size={12} className="shrink-0" />
+                                                                <span>{desc.label}</span>
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </td>
 
                                                 {/* Relative Timestamp */}
@@ -1025,7 +1139,7 @@ export default function GovReportsDashboard() {
 
                     {/* ── RIGHT: DETAIL PANEL (Persistent) ───────────────────── */}
                     {selectedReport && (
-                        <aside className="w-[430px] shrink-0 bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col overflow-hidden">
+                        <aside className="w-80 lg:w-96 xl:w-[420px] shrink-0 bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col overflow-hidden">
 
                             {/* Detail Panel Header */}
                             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
@@ -1132,6 +1246,18 @@ export default function GovReportsDashboard() {
                                                     <Copy size={12} />
                                                 </button>
                                             </div>
+                                            {/* Tactical Map Deep-link Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate(`/dispatcher?reportId=${selectedReport.id}`)}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30 text-[11px] font-bold transition-all cursor-pointer mt-1"
+                                                title={`Locate ${selectedReport.ticket_id} on Tactical GIS Command Map`}
+                                                aria-label={`Locate ${selectedReport.ticket_id} on Tactical GIS Command Map`}
+                                            >
+                                                <MapIcon size={12} />
+                                                <span>Locate on Tactical Map</span>
+                                                <ArrowUpRight size={12} />
+                                            </button>
                                         </div>
 
                                         {/* Embedded Map Preview with Pin */}
@@ -1163,11 +1289,12 @@ export default function GovReportsDashboard() {
                                             {/* Locate button */}
                                             <button
                                                 type="button"
-                                                onClick={() => navigate('/dispatcher')}
-                                                title="Open in Full GIS Command Map"
-                                                className="absolute bottom-1.5 right-1.5 p-1 bg-white/90 dark:bg-slate-900/90 rounded border border-slate-200 dark:border-slate-700 text-slate-600 hover:text-[#ff6b00] cursor-pointer"
+                                                onClick={() => navigate(`/dispatcher?reportId=${selectedReport.id}`)}
+                                                title={`Locate ${selectedReport.ticket_id} on Tactical GIS Command Map`}
+                                                aria-label={`Locate ${selectedReport.ticket_id} on Tactical GIS Command Map`}
+                                                className="absolute bottom-1.5 right-1.5 p-1.5 bg-white/95 dark:bg-slate-900/95 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 hover:text-[#ff6b00] shadow-xs cursor-pointer flex items-center gap-1 text-[10px] font-bold"
                                             >
-                                                <ArrowUpRight size={12} />
+                                                <ArrowUpRight size={13} />
                                             </button>
                                         </div>
                                     </div>
@@ -1293,7 +1420,7 @@ export default function GovReportsDashboard() {
                                 {/* 2. Assign Work Order (PULSO Orange Primary) */}
                                 <button
                                     type="button"
-                                    onClick={handleAssignWorkOrder}
+                                    onClick={handleOpenWorkOrderModal}
                                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-xs shadow-md shadow-orange-500/20 transition-all cursor-pointer"
                                 >
                                     <Wrench size={14} />
@@ -1342,6 +1469,224 @@ export default function GovReportsDashboard() {
                             </div>
                         </div>
                     </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ═══════════════════════════════════════════════════════════════════
+                MODALS: UNIFIED WORK ORDER CREATION & FIELD DISPATCH
+            ═══════════════════════════════════════════════════════════════════ */}
+            <AnimatePresence>
+                {isWorkOrderModalOpen && selectedReport && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.94, y: 16 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+                            transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+                            className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden max-w-lg w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="wo-modal-title"
+                        >
+                            {/* Top Accent Gradient Strip */}
+                            <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
+
+                            {/* Modal Header */}
+                            <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                                <div className="flex items-center justify-between gap-3 mb-2.5">
+                                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                                        <Briefcase size={13} className="text-orange-500" />
+                                        <span>MUNICIPAL WORK ORDER DISPATCH</span>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setIsWorkOrderModalOpen(false)}
+                                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        aria-label="Close dialog"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+
+                                <h2 id="wo-modal-title" className="text-xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                                    Create & Dispatch Work Order
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                                    Authorize and deploy engineering field teams with official dispatch parameters.
+                                </p>
+
+                                {/* Incident Summary Lockup */}
+                                <div className="mt-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <span className="font-mono text-xs font-extrabold text-orange-500">
+                                                #{formatTicketId(selectedReport.ticket_id, selectedReport.id)}
+                                            </span>
+                                            {selectedReport.barangay && (
+                                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
+                                                    <span>•</span>
+                                                    <MapPin size={10} className="text-slate-400 shrink-0" />
+                                                    <span>{selectedReport.barangay.startsWith('Barangay') ? selectedReport.barangay : `Brgy. ${selectedReport.barangay}`}</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                                            {getReportPlainTitle(selectedReport)}
+                                        </h4>
+                                    </div>
+                                    {(() => {
+                                        const desc = getStatusDescriptor(selectedReport.status);
+                                        const StatusIcon = desc?.icon || Clock;
+                                        return (
+                                            <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${desc?.badgeClass || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                                                <StatusIcon size={12} className="shrink-0" />
+                                                <span>{desc?.label || selectedReport.status}</span>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                            
+                            {/* Modal Scrollable Form Body */}
+                            <form onSubmit={handleExecuteWorkOrder} className="p-6 overflow-y-auto space-y-4 text-xs">
+                                {/* Issue Verified Location Card */}
+                                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800/80 flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 mt-0.5 border border-orange-500/20">
+                                        <MapPin size={15} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
+                                            Field Operations Site
+                                        </div>
+                                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug break-words">
+                                            {selectedReport.location?.address || selectedReport.location_string || `${selectedReport.location?.lat || selectedReport.location_lat || 14.7566}°N, ${selectedReport.location?.lng || selectedReport.location_lng || 121.0450}°E (Caloocan)`}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 2-Column Responsive Form Controls */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                    {/* Assigned Fleet / Engineer */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <Truck size={13} className="text-orange-500" />
+                                            <span>Assign To Fleet / Lead</span>
+                                        </label>
+                                        <select 
+                                            required
+                                            value={workOrderForm.assigned_to_id || 3}
+                                            onChange={(e) => {
+                                                const teamId = parseInt(e.target.value, 10);
+                                                const teamNames = {
+                                                    2: 'Team Alpha — Engr. Dela Cruz (Electrical & Lighting)',
+                                                    3: 'Team Beta — Engr. Bautista (Roads & Bridges)',
+                                                    4: 'Team Gamma — Engr. Reyes (Drainage & Waterworks)',
+                                                    5: 'Team Delta — Environmental Sanitation Task Force'
+                                                };
+                                                setWorkOrderForm({ 
+                                                    ...workOrderForm, 
+                                                    assigned_to_id: teamId, 
+                                                    team: teamNames[teamId] || 'Team Beta — Roads & Bridges' 
+                                                });
+                                            }}
+                                            className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all cursor-pointer shadow-xs"
+                                        >
+                                            <option value="2">Team Alpha — Engr. Dela Cruz (Electrical & Lighting)</option>
+                                            <option value="3">Team Beta — Engr. Bautista (Roads & Bridges)</option>
+                                            <option value="4">Team Gamma — Engr. Reyes (Drainage & Waterworks)</option>
+                                            <option value="5">Team Delta — Environmental Sanitation Task Force</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Priority Level */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <ShieldCheck size={13} className="text-orange-500" />
+                                            <span>Priority Level</span>
+                                        </label>
+                                        <select 
+                                            value={workOrderForm.priority}
+                                            onChange={(e) => setWorkOrderForm({ ...workOrderForm, priority: e.target.value })}
+                                            className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all cursor-pointer shadow-xs"
+                                        >
+                                            <option value="critical">Critical (Immediate Danger / Safety Hazard)</option>
+                                            <option value="high">High (Urgent Infrastructure Repair)</option>
+                                            <option value="normal">Normal (Standard Dispatch SLA)</option>
+                                            <option value="low">Low (Routine Maintenance Sweep)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Task Title */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                        <Wrench size={13} className="text-orange-500" />
+                                        <span>Work Order Task Title</span>
+                                    </label>
+                                    <input 
+                                        type="text"
+                                        required
+                                        placeholder={`e.g. Repair ${selectedReport.report_type || selectedReport.issue || 'damaged infrastructure'}`}
+                                        value={workOrderForm.title}
+                                        onChange={(e) => setWorkOrderForm({ ...workOrderForm, title: e.target.value })}
+                                        className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all shadow-xs"
+                                    />
+                                </div>
+
+                                {/* Instructions & Action Plan */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                        <FileText size={13} className="text-orange-500" />
+                                        <span>Dispatcher Instructions & Action Plan</span>
+                                    </label>
+                                    <textarea 
+                                        rows="3"
+                                        placeholder="Specify field instructions, required heavy equipment, safety perimeters, or coordinate notes..."
+                                        value={workOrderForm.description}
+                                        onChange={(e) => setWorkOrderForm({ ...workOrderForm, description: e.target.value })}
+                                        className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all shadow-xs resize-none"
+                                    ></textarea>
+                                </div>
+
+                                {/* Information Notice Strip */}
+                                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-slate-700 dark:text-slate-300 text-[11px] flex items-start gap-2.5">
+                                    <Sparkles size={14} className="text-orange-500 shrink-0 mt-0.5" />
+                                    <div className="leading-relaxed">
+                                        Executing dispatch sets report status to <strong className="text-orange-600 dark:text-orange-400 font-bold">In Progress</strong>, logs an audit trail event, and synchronizes across the Tactical GIS Command Map and field crew tablets.
+                                    </div>
+                                </div>
+
+                                {/* Footer Controls */}
+                                <div className="pt-2 flex items-center gap-3 border-t border-slate-100 dark:border-slate-800">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setIsWorkOrderModalOpen(false)}
+                                        disabled={isSubmittingWo}
+                                        className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        disabled={isSubmittingWo}
+                                        className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                                    >
+                                        {isSubmittingWo ? (
+                                            <div className="flex items-center gap-2">
+                                                <RefreshCw size={14} className="animate-spin" />
+                                                <span>Dispatching...</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <Navigation size={14} />
+                                                <span>Confirm & Dispatch Crew</span>
+                                            </div>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
 

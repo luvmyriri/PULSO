@@ -2,10 +2,14 @@ from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Foreig
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from database import Base
+from datetime import datetime
+import random
 import uuid
 
 def generate_ticket_id():
-    return f"RPT-{str(uuid.uuid4().int)[:8]}"
+    current_year = datetime.now().year
+    random_digits = f"{random.randint(1000, 9999)}"
+    return f"PUL-{current_year}-{random_digits}"
 
 def generate_advisory_id():
     return f"PUB-{str(uuid.uuid4().int)[:8]}"

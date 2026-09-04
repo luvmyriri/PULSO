@@ -1267,7 +1267,7 @@ async def resolve_report(
     updated = crud.update_report_status(db, report_id=report_id, status="resolved", actor_id=current_user.id)
     
     # Notify Resident
-    ticket_id = updated.ticket_id or f"RPT-{updated.id}"
+    ticket_id = updated.ticket_id or f"PUL-{datetime.now().year}-{updated.id:04d}"
     db_notif = models.Notification(
         user_id=updated.user_id,
         title="Infrastructure Repaired",
