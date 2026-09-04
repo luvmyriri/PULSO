@@ -34,7 +34,7 @@ import {
     Image as ImageIcon,
     Building2
 } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, HeatmapLayerF } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, HeatmapLayerF, OverlayViewF } from '@react-google-maps/api';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
@@ -42,23 +42,22 @@ import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 import Swal from 'sweetalert2';
 
-const CALOOCAN_CENTER = { lat: 14.7566, lng: 121.0450 };
-const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7505408, lng: 121.0540317 }; // Adjusted to exact Zapote Rd building footprint
+import {
+    NORTH_CALOOCAN_PATH,
+    SOUTH_CALOOCAN_PATH,
+    NORTH_CALOOCAN_CENTROID,
+    SOUTH_CALOOCAN_CENTROID,
+    COMBINED_CALOOCAN_BOUNDS,
+    getCaloocanDistrict,
+    isInsideCaloocan
+} from '../data/caloocanBoundaries';
+
+const CALOOCAN_CENTER = COMBINED_CALOOCAN_BOUNDS.center;
+const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7505408, lng: 121.0540317 }; // Zapote Rd North HQ
+const CALOOCAN_CITY_HALL_SOUTH_LOC = { lat: 14.6469, lng: 120.9844 }; // 8th Ave South City Hall
+const MONUMENTO_CIRCLE_LOC = { lat: 14.6574, lng: 120.9840 }; // Bonifacio Monument Circle
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
 const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry', 'visualization'];
-
-const NORTH_CALOOCAN_BOUNDARY = [
-    { lat: 14.825, lng: 121.060 }, // North Tip (Tala Area)
-    { lat: 14.805, lng: 121.140 }, // NE Corner (Boundary with SJDM/Rizal)
-    { lat: 14.745, lng: 121.140 }, // SE Side (Bagong Silang - Brgy 176)
-    { lat: 14.740, lng: 121.100 }, // Under Bagong Silang (Brgy 177 area)
-    { lat: 14.710, lng: 121.070 }, // Southern Edge (Brgy 178/174 Camarin)
-    { lat: 14.675, lng: 121.040 }, // Deep South Extension (To include Brgy 164/169 areas)
-    { lat: 14.680, lng: 120.990 }, // SW Corner (Expansion towards Valenzuela/Meycauayan)
-    { lat: 14.760, lng: 120.970 }, // West Side (Expansion towards Marilao)
-    { lat: 14.820, lng: 120.970 }, // NW Corner (Marilao Border)
-    { lat: 14.825, lng: 121.030 }  // Back to North Tip
-];
 
 const CALOOCAN_NORTH_BARANGAYS = [
     'All Barangays', 'Brgy. 165', 'Brgy. 166', 'Brgy. 167', 'Brgy. 168', 'Brgy. 169', 
@@ -85,6 +84,125 @@ const STATUS_OPTIONS = [
     'Resolved (Phase 5)',
     'Rejected',
     'Cancelled'
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOM CIVIC-FOCUSED MAP STYLES (Zero POI clutter, Progressive Disclosure)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Shared core rules across dark theme zoom tiers
+const DARK_BASE_RULES = [
+    // 1. Completely suppress all commercial & tourist POIs (malls, hotels, attractions, etc.)
+    { featureType: "poi", stylers: [{ visibility: "off" }] },
+    { featureType: "transit", stylers: [{ visibility: "off" }] },
+    
+    // 2. Flat low-contrast landmass matching PULSO dark palette (#0c1322 / #090e1a)
+    { elementType: "geometry", stylers: [{ color: "#0c1322" }] },
+    { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#0c1322" }] },
+    { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#0b111e" }] },
+    
+    // 3. Flat low-contrast water without decorative texture
+    { featureType: "water", elementType: "geometry", stylers: [{ color: "#070b14" }] },
+    { featureType: "water", elementType: "labels.text", stylers: [{ visibility: "off" }] },
+    
+    // 4. Administrative boundaries (subtle orientation lines)
+    { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#1e293b" }, { weight: 1 }] },
+    { featureType: "administrative.country", elementType: "geometry.stroke", stylers: [{ color: "#334155" }] },
+    { featureType: "administrative.province", elementType: "geometry.stroke", stylers: [{ color: "#243247" }] },
+];
+
+// Tier 1: City-Wide View (Zoom < 13)
+// Show only boundary polygons, district labels, and report markers — no road labels, minimal locality
+const DARK_MAP_STYLE_CITY = [
+    ...DARK_BASE_RULES,
+    { featureType: "road", elementType: "geometry", stylers: [{ color: "#162030" }, { weight: 0.8 }] },
+    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#223147" }, { weight: 1.2 }] },
+    { featureType: "road", elementType: "labels", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "administrative.neighborhood", elementType: "labels", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.land_parcel", stylers: [{ visibility: "off" }] }
+];
+
+// Tier 2: District-Level View (13 <= Zoom < 16)
+// Introduce major road names (highway / arterial) and unclustered report markers
+const DARK_MAP_STYLE_DISTRICT = [
+    ...DARK_BASE_RULES,
+    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#293952" }, { weight: 1.5 }] },
+    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#8193aa" }] },
+    { featureType: "road.highway", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#1c283a" }, { weight: 1.2 }] },
+    { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+    { featureType: "road.arterial", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#141d2c" }, { weight: 0.8 }] },
+    { featureType: "road.local", elementType: "labels", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#7b8ea5" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#546478" }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 2 }] }
+];
+
+// Tier 3: Street-Level View (Zoom >= 16)
+// Precision mode: street names, local roads, and addresses for verifying reports
+const DARK_MAP_STYLE_STREET = [
+    ...DARK_BASE_RULES,
+    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#334562" }, { weight: 2 }] },
+    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
+    { featureType: "road.highway", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#25344c" }, { weight: 1.5 }] },
+    { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#8193aa" }] },
+    { featureType: "road.arterial", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#1c2738" }, { weight: 1.2 }] },
+    { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#6b7c93" }] },
+    { featureType: "road.local", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#6b7c93" }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 2 }] }
+];
+
+// Light Theme Variants
+const LIGHT_BASE_RULES = [
+    { featureType: "poi", stylers: [{ visibility: "off" }] },
+    { featureType: "transit", stylers: [{ visibility: "off" }] },
+    { elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
+    { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
+    { featureType: "water", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+    { featureType: "water", elementType: "labels.text", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#cbd5e1" }] },
+];
+
+const LIGHT_MAP_STYLE_CITY = [
+    ...LIGHT_BASE_RULES,
+    { featureType: "road", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+    { featureType: "road", elementType: "labels", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] },
+    { featureType: "administrative.neighborhood", elementType: "labels", stylers: [{ visibility: "off" }] }
+];
+
+const LIGHT_MAP_STYLE_DISTRICT = [
+    ...LIGHT_BASE_RULES,
+    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#cbd5e1" }] },
+    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
+    { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+    { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+    { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] },
+    { featureType: "road.local", elementType: "labels", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#334155" }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] }
+];
+
+const LIGHT_MAP_STYLE_STREET = [
+    ...LIGHT_BASE_RULES,
+    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#94a3b8" }] },
+    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#1e293b" }] },
+    { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#cbd5e1" }] },
+    { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#334155" }] },
+    { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+    { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#1e293b" }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] }
 ];
 
 const DispatcherDashboard = () => {
@@ -122,6 +240,42 @@ const DispatcherDashboard = () => {
     const [panorama, setPanorama] = useState(null);
     const heatmapLayerRef = useRef(null);
     const [zoomedImage, setZoomedImage] = useState(null);
+    const pinIconCache = useRef(new Map());
+    const iconCacheRef = useRef(new Map());
+    const [photoPinIcons, setPhotoPinIcons] = useState({});
+
+    // Memoized Google Maps Icon Object Cache to prevent MarkerF re-render flicker
+    const getCachedIcon = (url, w, h, ax, ay) => {
+        if (!window.google || !window.google.maps || !url) return undefined;
+        const key = `${url}_${w}_${h}_${ax}_${ay}`;
+        if (!iconCacheRef.current.has(key)) {
+            iconCacheRef.current.set(key, {
+                url: url,
+                scaledSize: new window.google.maps.Size(w, h),
+                anchor: new window.google.maps.Point(ax, ay)
+            });
+        }
+        return iconCacheRef.current.get(key);
+    };
+
+    const [currentZoom, setCurrentZoom] = useState(12);
+    const [currentBounds, setCurrentBounds] = useState(null);
+
+    // Dynamic PULSO Cluster Badge SVG Generator
+    const getClusterBadgeSVG = (count, statusColor = '#ff6b00') => {
+        const size = count > 99 ? 44 : (count > 9 ? 38 : 34);
+        const svgString = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+                <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 2}" fill="#0c1424" stroke="${statusColor}" stroke-width="2.5" />
+                <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 5}" fill="${statusColor}" fill-opacity="0.25" />
+                <text x="${size/2}" y="${size/2 + 4.5}" text-anchor="middle" font-family="monospace, sans-serif" font-size="${count > 99 ? 11 : 13}px" font-weight="800" fill="#ffffff">
+                    ${count}
+                </text>
+            </svg>
+        `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
+
+        return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
+    };
 
     // New State for Work Order Generation Modal
     const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
@@ -443,14 +597,12 @@ const DispatcherDashboard = () => {
     // (Duplicate panorama effect removed — consolidated into the one above)
 
     const checkJurisdiction = (location) => {
-        if (!window.google || !window.google.maps || !window.google.maps.geometry) return true;
-        
-        const polygon = new window.google.maps.Polygon({ paths: NORTH_CALOOCAN_BOUNDARY });
-        const latLng = new window.google.maps.LatLng(location.lat, location.lng);
-        const isIn = window.google.maps.geometry.poly.containsLocation(latLng, polygon);
+        if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return true;
+        const district = getCaloocanDistrict(location.lat, location.lng);
+        const isIn = district !== null;
         
         if (!isIn && !isJurisdictionModalOpen) {
-            setJurisdictionErrorMsg(t('This location is outside North Caloocan City jurisdiction. Visual verification tools and Street View are restricted to authorized areas.'));
+            setJurisdictionErrorMsg(t('This location is outside Caloocan City jurisdiction. Visual verification tools and Street View are restricted to authorized areas.'));
             setIsJurisdictionModalOpen(true);
         }
         return isIn;
@@ -480,27 +632,27 @@ const DispatcherDashboard = () => {
         ? window.matchMedia('(prefers-color-scheme: dark)').matches 
         : theme === 'dark';
 
+    const zoomTier = currentZoom < 13 ? 'city' : currentZoom < 16 ? 'district' : 'street';
+
+    const currentMapStyles = React.useMemo(() => {
+        if (isDarkMode) {
+            if (zoomTier === 'city') return DARK_MAP_STYLE_CITY;
+            if (zoomTier === 'district') return DARK_MAP_STYLE_DISTRICT;
+            return DARK_MAP_STYLE_STREET;
+        } else {
+            if (zoomTier === 'city') return LIGHT_MAP_STYLE_CITY;
+            if (zoomTier === 'district') return LIGHT_MAP_STYLE_DISTRICT;
+            return LIGHT_MAP_STYLE_STREET;
+        }
+    }, [isDarkMode, zoomTier]);
+
     const mapOptions = React.useMemo(() => ({
-        styles: isDarkMode ? [
-            { "elementType": "geometry", "stylers": [{ "color": "#121826" }] },
-            { "elementType": "labels.text.fill", "stylers": [{ "color": "#637282" }] },
-            { "elementType": "labels.text.stroke", "stylers": [{ "color": "#121826" }] },
-            { "featureType": "administrative", "elementType": "geometry.stroke", "stylers": [{ "color": "#2c3e50" }] },
-            { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#232b3d" }] },
-            { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0d1117" }] }
-        ] : [
-            { "elementType": "geometry", "stylers": [{ "color": "#f8fafc" }] },
-            { "elementType": "labels.text.fill", "stylers": [{ "color": "#64748b" }] },
-            { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f8fafc" }] },
-            { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e2e8f0" }] },
-            { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
-            { "featureType": "poi", "stylers": [{ "visibility": "off" }] }
-        ],
+        styles: currentMapStyles,
         disableDefaultUI: true,
         zoomControl: true,
         // streetViewControl is intentionally disabled — we use our own custom toggle button
         streetViewControl: false,
-    }), [isDarkMode]);
+    }), [currentMapStyles]);
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
@@ -934,6 +1086,220 @@ const DispatcherDashboard = () => {
         ]
     }), []);
 
+    // Generate high-performance Canvas Image Pins for Native Google Maps MarkerF
+    // (Size-optimized 80x80 thumbnails, Viewport-aware lazy loading, Zero glitching, 60fps)
+    useEffect(() => {
+        if (!filteredReports || filteredReports.length === 0) return;
+
+        let isMounted = true;
+        let batchTimer = null;
+        const pendingBatch = {};
+
+        const flushBatch = () => {
+            if (!isMounted || Object.keys(pendingBatch).length === 0) return;
+            setPhotoPinIcons(prev => ({ ...prev, ...pendingBatch }));
+        };
+
+        // Lazy-load: prioritize reports currently in visible bounds
+        const reportsToLoad = currentBounds
+            ? filteredReports.filter(r => r.location_lat && r.location_lng && currentBounds.contains({ lat: r.location_lat, lng: r.location_lng }))
+            : filteredReports.slice(0, 50);
+
+        reportsToLoad.forEach(report => {
+            const rawImg = report.image_url || report.photo_url || report.image;
+            if (!rawImg) return;
+
+            [false, true].forEach(isSelected => {
+                const cacheKey = `${report.id}-${isSelected ? 'sel' : 'norm'}`;
+                if (pinIconCache.current.has(cacheKey)) return;
+
+                let thumbUrl = rawImg;
+                if (!rawImg.startsWith('http') && !rawImg.startsWith('data:')) {
+                    const cleanPath = rawImg.startsWith('/') ? rawImg : `/${rawImg}`;
+                    // Use backend 80x80 optimized thumbnail endpoint for 10x faster load and low memory
+                    thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
+                }
+
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    try {
+                        const size = isSelected ? 46 : 36;
+                        const pointerH = isSelected ? 8 : 7;
+                        const totalW = size + 6;
+                        const totalH = size + pointerH + 2;
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = totalW;
+                        canvas.height = totalH;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) return;
+
+                        const cx = totalW / 2;
+                        const cy = size / 2 + 1;
+                        const radius = (size - 4) / 2;
+
+                        let borderColor = '#ff6b00';
+                        if (report.status === 'resolved') borderColor = '#22c55e';
+                        else if (report.status === 'pending' || report.status === 'unverified') {
+                            borderColor = report.ai_urgency === 'CRITICAL' ? '#ef4444' : '#ff6b00';
+                        } else if (report.status === 'rejected') {
+                            borderColor = '#64748b';
+                        } else if (report.status === 'cancelled') {
+                            borderColor = '#0f172a';
+                        }
+
+                        // Pointer Arrow
+                        ctx.beginPath();
+                        ctx.moveTo(cx - 5, cy + radius - 2);
+                        ctx.lineTo(cx + 5, cy + radius - 2);
+                        ctx.lineTo(cx, cy + radius + pointerH);
+                        ctx.closePath();
+                        ctx.fillStyle = borderColor;
+                        ctx.fill();
+
+                        // Outer Glow if Selected
+                        if (isSelected) {
+                            ctx.beginPath();
+                            ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
+                            ctx.fillStyle = 'rgba(255, 107, 0, 0.35)';
+                            ctx.fill();
+                        }
+
+                        // Outer Border Ring (2px thin border per spec)
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+                        ctx.fillStyle = borderColor;
+                        ctx.fill();
+
+                        // Inner background
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                        ctx.fillStyle = '#0c1424';
+                        ctx.fill();
+
+                        // Circular photo clip
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+                        ctx.clip();
+
+                        const aspect = img.width / img.height;
+                        let dw, dh, dx, dy;
+                        if (aspect > 1) {
+                            dh = (radius - 0.5) * 2;
+                            dw = dh * aspect;
+                            dx = cx - dw / 2;
+                            dy = cy - radius + 0.5;
+                        } else {
+                            dw = (radius - 0.5) * 2;
+                            dh = dw / aspect;
+                            dx = cx - radius + 0.5;
+                            dy = cy - dh / 2;
+                        }
+                        ctx.drawImage(img, dx, dy, dw, dh);
+                        ctx.restore();
+
+                        // White inner accent ring
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 1.0;
+                        ctx.stroke();
+
+                        const dataUrl = canvas.toDataURL('image/png');
+                        pinIconCache.current.set(cacheKey, dataUrl);
+                        pendingBatch[cacheKey] = dataUrl;
+
+                        if (batchTimer) clearTimeout(batchTimer);
+                        batchTimer = setTimeout(flushBatch, 100);
+                    } catch (err) {
+                        // Canvas tainted or fallback
+                    }
+                };
+                img.onerror = () => {
+                    // If thumbnail endpoint had an issue, try fallback to original
+                    if (thumbUrl.includes('/api/thumbnails')) {
+                        const fallbackImg = new Image();
+                        fallbackImg.crossOrigin = 'anonymous';
+                        fallbackImg.src = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
+                    }
+                };
+                img.src = thumbUrl;
+            });
+        });
+
+        return () => {
+            isMounted = false;
+            if (batchTimer) clearTimeout(batchTimer);
+        };
+    }, [filteredReports, currentBounds, API_BASE_URL]);
+
+    // Adaptive Clustering Calculation: Clusters nearby reports into count badges at low zoom levels
+    const { individualMarkers, clusterMarkers } = React.useMemo(() => {
+        if (!filteredReports || filteredReports.length === 0) {
+            return { individualMarkers: [], clusterMarkers: [] };
+        }
+
+        // Viewport filtering
+        const visibleReports = currentBounds
+            ? filteredReports.filter(r => r.location_lat && r.location_lng && currentBounds.contains({ lat: r.location_lat, lng: r.location_lng }))
+            : filteredReports.filter(r => r.location_lat && r.location_lng);
+
+        // When zoomed in past threshold (zoom >= 14) and under marker cap (<= 80), show all photo markers
+        if (currentZoom >= 14 && visibleReports.length <= 80) {
+            return { individualMarkers: visibleReports, clusterMarkers: [] };
+        }
+
+        // Dynamic grid degree threshold based on zoom level (~45 screen pixels)
+        const gridDegree = 45 * 360 / (256 * Math.pow(2, Math.max(1, currentZoom)));
+        const grid = new Map();
+
+        visibleReports.forEach(report => {
+            const cellX = Math.floor(report.location_lng / gridDegree);
+            const cellY = Math.floor(report.location_lat / gridDegree);
+            const key = `${cellX}_${cellY}`;
+            if (!grid.has(key)) grid.set(key, []);
+            grid.get(key).push(report);
+        });
+
+        const individualMarkers = [];
+        const clusterMarkers = [];
+
+        grid.forEach((cellReports, cellKey) => {
+            if (cellReports.length === 1 && currentZoom >= 13) {
+                individualMarkers.push(cellReports[0]);
+            } else {
+                let sumLat = 0, sumLng = 0;
+                let hasCritical = false, hasPending = false, hasActive = false;
+
+                cellReports.forEach(r => {
+                    sumLat += r.location_lat;
+                    sumLng += r.location_lng;
+                    if (r.ai_urgency === 'CRITICAL') hasCritical = true;
+                    else if (r.status === 'pending' || r.status === 'unverified') hasPending = true;
+                    else if (r.status === 'dispatched' || r.status === 'approved_internal') hasActive = true;
+                });
+
+                let clusterColor = '#22c55e'; // resolved default
+                if (hasActive) clusterColor = '#ff6b00';
+                if (hasPending) clusterColor = '#ff6b00';
+                if (hasCritical) clusterColor = '#ef4444';
+
+                clusterMarkers.push({
+                    id: `cluster-${cellKey}`,
+                    count: cellReports.length,
+                    lat: sumLat / cellReports.length,
+                    lng: sumLng / cellReports.length,
+                    statusColor: clusterColor,
+                    reports: cellReports
+                });
+            }
+        });
+
+        return { individualMarkers, clusterMarkers };
+    }, [filteredReports, currentZoom, currentBounds]);
+
     // Manual Heatmap Lifecycle Management (Fixes the "Stacking/Persistence" bug)
     useEffect(() => {
         if (!map || !window.google || !window.google.maps || !window.google.maps.visualization) return;
@@ -1051,7 +1417,7 @@ const DispatcherDashboard = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-neutral-bg text-neutral-text font-sans flex text-sm overflow-hidden">
+        <div className="min-h-screen bg-neutral-bg dark:bg-[#070a12] text-neutral-text dark:text-slate-100 font-sans flex text-sm overflow-hidden transition-colors duration-150">
             
             {/* Unified Left Sidebar Navigation */}
             <GovSidebar currentUser={currentUser} />
@@ -1104,13 +1470,13 @@ const DispatcherDashboard = () => {
                 )}
                 
                 {/* Top Header */}
-                <header className="h-16 bg-white flex items-center justify-between px-8 shrink-0 z-40 relative border-b border-neutral-border">
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 z-40 relative border-b border-neutral-border dark:border-slate-800 transition-colors duration-150">
                     {/* Removed bottom header shadow */}
                     <div className="flex items-center gap-6">
-                        <h1 className="text-xl font-display font-bold text-neutral-text">
+                        <h1 className="text-xl font-display font-bold text-neutral-text dark:text-white">
                             LGU Command Center
                         </h1>
-                        <div className="h-6 w-px bg-slate-200"></div>
+                        <div className="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
                         
                         {/* Dashboard Mode Toggle */}
                         <div className="flex bg-neutral-bg dark:bg-slate-950 p-1 rounded-lg border border-neutral-border dark:border-slate-800">
@@ -1317,8 +1683,25 @@ const DispatcherDashboard = () => {
                                                 </div>
                                             </div>
                                             <div className="text-sm text-slate-700 dark:text-slate-300 font-bold truncate mb-1">{report.category || report.ai_category || 'Uncategorized'}</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-3 truncate font-medium">
-                                                <MapPin size={12} className="text-slate-400"/> {report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 mb-3 truncate font-medium">
+                                                <span className="flex items-center gap-1 truncate">
+                                                    <MapPin size={12} className="text-slate-400 shrink-0"/> {report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}
+                                                </span>
+                                                {(() => {
+                                                    if (!report.location_lat || !report.location_lng) return null;
+                                                    const dist = getCaloocanDistrict(report.location_lat, report.location_lng);
+                                                    if (dist === 'north') {
+                                                        return <span className="shrink-0 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">North</span>;
+                                                    }
+                                                    if (dist === 'south') {
+                                                        return <span className="shrink-0 text-[9px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">South</span>;
+                                                    }
+                                                    return (
+                                                        <span className="shrink-0 text-[9px] font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30" title="Coordinates are outside Caloocan boundaries">
+                                                            ⚠️ Outside Caloocan
+                                                        </span>
+                                                    );
+                                                })()}
                                             </div>
                                             
                                             <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
@@ -1412,23 +1795,94 @@ const DispatcherDashboard = () => {
                             <GoogleMap
                                 mapContainerStyle={MAP_CONTAINER_STYLE}
                                 center={CALOOCAN_CENTER}
-                                zoom={14}
+                                zoom={12}
                                 onLoad={map => {
                                     setMap(map);
                                     setPanorama(map.getStreetView());
+                                    if (window.google && window.google.maps) {
+                                        const bounds = new window.google.maps.LatLngBounds(
+                                            new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
+                                            new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
+                                        );
+                                        map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+                                    }
                                 }}
                                 onUnmount={onUnmount}
                                 options={mapOptions}
+                                onZoomChanged={() => {
+                                    if (map) setCurrentZoom(map.getZoom());
+                                }}
+                                onIdle={() => {
+                                    if (map) {
+                                        setCurrentZoom(map.getZoom());
+                                        setCurrentBounds(map.getBounds());
+                                    }
+                                }}
                             >
                              {/* Urban Glow Heatmap Layer - Managed manually via heatmapLayerRef for stability */}
                              {/* (No <HeatmapLayerF> here to prevent stacking) */}
 
-                            {/* Render markers for all reports (Filtered) - Always visible per request */}
-                            {filteredReports.map(report => (
-                                (report.location_lat && report.location_lng) && (
+                            {/* Clustered Report Badges (at low zoom or dense clusters) */}
+                            {clusterMarkers.map(cluster => {
+                                const badgeSize = cluster.count > 99 ? 44 : (cluster.count > 9 ? 38 : 34);
+                                const badgeIcon = getCachedIcon(
+                                    getClusterBadgeSVG(cluster.count, cluster.statusColor),
+                                    badgeSize,
+                                    badgeSize,
+                                    badgeSize / 2,
+                                    badgeSize / 2
+                                );
+
+                                return (
                                     <MarkerF
-                                        key={`map-${report.id}`}
+                                        key={cluster.id}
+                                        position={{ lat: cluster.lat, lng: cluster.lng }}
+                                        zIndex={350}
+                                        title={`${cluster.count} Reports clustered in this zone — click to expand`}
+                                        onClick={() => {
+                                            if (map) {
+                                                map.panTo({ lat: cluster.lat, lng: cluster.lng });
+                                                map.setZoom(Math.min(18, currentZoom + 2));
+                                            }
+                                        }}
+                                        options={{
+                                            optimized: true,
+                                            clickable: true
+                                        }}
+                                        icon={badgeIcon}
+                                    />
+                                );
+                            })}
+
+                            {/* Render Report Photo-Pins (with size-optimized thumbnails, status borders & fallback) */}
+                            {individualMarkers.map(report => {
+                                const isSelected = selectedReport?.id === report.id;
+                                const cacheKey = `${report.id}-${isSelected ? 'sel' : 'norm'}`;
+                                const customIconUrl = photoPinIcons[cacheKey];
+
+                                const size = isSelected ? 46 : 36;
+                                const pointerH = isSelected ? 8 : 7;
+                                const totalW = size + 6;
+                                const totalH = size + pointerH + 2;
+
+                                const iconConfig = customIconUrl 
+                                    ? getCachedIcon(customIconUrl, totalW, totalH, totalW / 2, totalH)
+                                    : getCachedIcon(
+                                        getMarkerSVG(report.category || report.ai_category, report.status, isSelected),
+                                        isSelected ? 44 : 36,
+                                        isSelected ? 50 : 42,
+                                        isSelected ? 22 : 18,
+                                        isSelected ? 50 : 42
+                                    );
+
+                                const ariaTitle = `Report ${report.ticket_id || `RPT-${report.id}`}, ${report.category || report.ai_category || 'Incident'}, ${(report.status || 'PENDING').toUpperCase()} — click to view details`;
+
+                                return (
+                                    <MarkerF
+                                        key={`map-pin-${report.id}`}
                                         position={{ lat: report.location_lat, lng: report.location_lng }}
+                                        zIndex={isSelected ? 500 : 150}
+                                        title={ariaTitle}
                                         onClick={() => {
                                             setSelectedReport(report);
                                             setSelectedMarker(report);
@@ -1438,17 +1892,13 @@ const DispatcherDashboard = () => {
                                             handleStreetViewClick({ lat: report.location_lat, lng: report.location_lng });
                                         }}
                                         options={{
-                                            optimized: false,
+                                            optimized: true,
                                             clickable: true
                                         }}
-                                        icon={window.google && window.google.maps ? {
-                                            url: getMarkerSVG(report.category || report.ai_category, report.status, selectedReport?.id === report.id),
-                                            scaledSize: new window.google.maps.Size(44, 50),
-                                            anchor: new window.google.maps.Point(22, 50)
-                                        } : undefined}
+                                        icon={iconConfig}
                                     />
-                                )
-                            ))}
+                                );
+                            })}
 
                             {/* STREET VIEW PIN OVERLAY: 3D Pins for exploration */}
                             {isStreetViewVisible && panorama && filteredReports.map(report => (
@@ -1656,17 +2106,117 @@ const DispatcherDashboard = () => {
 
 
                             {/* User Position Marker */}
-                            {/* North Caloocan Jurisdiction Boundary Display */}
-                             <PolygonF
-                                paths={NORTH_CALOOCAN_BOUNDARY}
+                            {/* ═══════════════════════════════════════════════════════════════════
+                                AUTHORITATIVE NORTH & SOUTH CALOOCAN BOUNDARY OVERLAYS (OSM PSGC)
+                            ══════════════════════════════════════════════════════════════════════ */}
+                            {/* North Caloocan Jurisdiction Boundary Polygon */}
+                            <PolygonF
+                                paths={NORTH_CALOOCAN_PATH}
                                 options={{
-                                    fillColor: "#6366f1",
+                                    fillColor: "#ff6b00",
                                     fillOpacity: 0.08,
-                                    strokeColor: "#6366f1",
-                                    strokeOpacity: 0.6,
-                                    strokeWeight: 3,
+                                    strokeColor: "#ff6b00",
+                                    strokeOpacity: 0.85,
+                                    strokeWeight: 2.5,
                                     clickable: false,
                                 }}
+                            />
+
+                            {/* South Caloocan Jurisdiction Boundary Polygon */}
+                            <PolygonF
+                                paths={SOUTH_CALOOCAN_PATH}
+                                options={{
+                                    fillColor: "#ff6b00",
+                                    fillOpacity: 0.08,
+                                    strokeColor: "#ff6b00",
+                                    strokeOpacity: 0.85,
+                                    strokeWeight: 2.5,
+                                    clickable: false,
+                                }}
+                            />
+
+                            {/* North Caloocan District Centroid Label */}
+                            <MarkerF
+                                position={NORTH_CALOOCAN_CENTROID}
+                                zIndex={110}
+                                options={{
+                                    clickable: false,
+                                    optimized: true
+                                }}
+                                icon={window.google && window.google.maps ? {
+                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="134" height="32" viewBox="0 0 134 32">
+                                            <rect x="2" y="2" width="130" height="28" rx="8" fill="#0c1424" fill-opacity="0.92" stroke="#ff6b00" stroke-width="1.5" />
+                                            <circle cx="16" cy="16" r="4" fill="#ff6b00" />
+                                            <text x="70" y="20" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.3">NORTH CALOOCAN</text>
+                                        </svg>
+                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
+                                    anchor: new window.google.maps.Point(67, 16)
+                                } : undefined}
+                            />
+
+                            {/* South Caloocan District Centroid Label */}
+                            <MarkerF
+                                position={SOUTH_CALOOCAN_CENTROID}
+                                zIndex={110}
+                                options={{
+                                    clickable: false,
+                                    optimized: true
+                                }}
+                                icon={window.google && window.google.maps ? {
+                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="134" height="32" viewBox="0 0 134 32">
+                                            <rect x="2" y="2" width="130" height="28" rx="8" fill="#0c1424" fill-opacity="0.92" stroke="#ff6b00" stroke-width="1.5" />
+                                            <circle cx="16" cy="16" r="4" fill="#ff6b00" />
+                                            <text x="70" y="20" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.3">SOUTH CALOOCAN</text>
+                                        </svg>
+                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
+                                    anchor: new window.google.maps.Point(67, 16)
+                                } : undefined}
+                            />
+
+                            {/* South Caloocan City Hall HQ Pin */}
+                            <MarkerF 
+                                position={CALOOCAN_CITY_HALL_SOUTH_LOC}
+                                zIndex={300}
+                                options={{
+                                    optimized: false,
+                                    clickable: true
+                                }}
+                                onClick={() => {
+                                    setSelectedMarker({
+                                        id: 'hq-south',
+                                        isHQ: true,
+                                        title: 'Caloocan City Hall (South Main)',
+                                        location_lat: CALOOCAN_CITY_HALL_SOUTH_LOC.lat,
+                                        location_lng: CALOOCAN_CITY_HALL_SOUTH_LOC.lng,
+                                        description: 'South Caloocan Executive & Municipal Hall (8th Ave / Grace Park)'
+                                    });
+                                }}
+                                icon={window.google && window.google.maps ? {
+                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 60" width="50" height="60">
+                                            <defs>
+                                                <linearGradient id="hqSouthGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                    <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+                                                    <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+                                                </linearGradient>
+                                                <filter id="shadowSouth" x="-20%" y="-20%" width="140%" height="140%">
+                                                    <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
+                                                    <feOffset dx="0" dy="2" result="offsetblur" />
+                                                    <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
+                                                    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+                                                </filter>
+                                            </defs>
+                                            <path d="M25 58c0 0 22-20 22-33a22 22 0 0 0-44 0c0 13 22 33 22 33z" fill="url(#hqSouthGrad)" stroke="#ff6b00" stroke-width="2.5" filter="url(#shadowSouth)" />
+                                            <g transform="translate(13, 10) scale(1.1)" fill="#ff6b00">
+                                                <path d="M18 20v-8l-1.5-1.5V6L15 4l-1.5 2v4.5L12 12l-1.5-1.5V6L9 4 7.5 6v4.5L6 12v8h12zM11 16h2v4h-2v-4z"/>
+                                            </g>
+                                        </svg>
+                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
+                                    scaledSize: new window.google.maps.Size(42, 50),
+                                    anchor: new window.google.maps.Point(21, 50)
+                                } : undefined}
                             />
 
                             {/* Caloocan City Hall North Pin — Styled as requested (Castle Icon) */}

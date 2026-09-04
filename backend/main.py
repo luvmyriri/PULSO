@@ -3,7 +3,10 @@ from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import hashlib
+import logging
 import uvicorn
 import shutil
 import httpx
@@ -54,6 +57,7 @@ UPLOAD_DIR = "uploads/reports"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads_root")
 
 # Configure CORS so the Vite frontend and Flutter mobile app can access the backend
 app.add_middleware(
@@ -63,6 +67,52 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# High-Performance Image Thumbnail Endpoint (for GIS map markers)
+# ---------------------------------------------------------------------------
+THUMBNAIL_DIR = "uploads/thumbnails"
+os.makedirs(THUMBNAIL_DIR, exist_ok=True)
+
+@app.get("/api/thumbnails")
+async def get_thumbnail(src: str = Query(..., description="Relative path to upload image"), size: int = 80):
+    """
+    Returns an optimized thumbnail of an image, caching it on disk.
+    Prevents map markers from loading full 5MB+ citizen photos into canvas textures.
+    """
+    try:
+        clean_src = src.lstrip("/")
+        if clean_src.startswith("api/"):
+            clean_src = clean_src[4:]
+        
+        base_dir = os.path.abspath("uploads")
+        full_path = os.path.abspath(clean_src if clean_src.startswith("uploads") else os.path.join("uploads", clean_src))
+        if not full_path.startswith(base_dir) or not os.path.exists(full_path):
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        file_hash = hashlib.md5(f"{clean_src}_{size}".encode('utf-8')).hexdigest()
+        thumb_filename = f"thumb_{file_hash}_{size}x{size}.jpg"
+        thumb_path = os.path.join(THUMBNAIL_DIR, thumb_filename)
+
+        if not os.path.exists(thumb_path):
+            from PIL import Image, ImageOps
+            with Image.open(full_path) as img:
+                img = ImageOps.exif_transpose(img)
+                img = ImageOps.fit(img, (size, size), Image.Resampling.LANCZOS)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                img.save(thumb_path, "JPEG", quality=85, optimize=True)
+
+        return FileResponse(
+            thumb_path,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=31536000, immutable"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Thumbnail generation error: {e}")
+        raise HTTPException(status_code=500, detail="Error generating thumbnail")
 
 # ---------------------------------------------------------------------------
 # Included Routers — Government-Side & Analytics Engine

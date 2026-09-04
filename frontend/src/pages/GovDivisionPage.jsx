@@ -573,26 +573,26 @@ const GovDivisionPage = () => {
     const saveSettings = () => { setSettingsSaved(true); setTimeout(() => setSettingsSaved(false), 2500); };
 
     return (
-        <div className="min-h-screen bg-neutral-bg text-neutral-text font-sans flex text-sm">
+        <div className="min-h-screen bg-neutral-bg dark:bg-[#070a12] text-neutral-text dark:text-slate-100 font-sans flex text-sm transition-colors duration-150">
             <GovSidebar currentUser={currentUser} />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 {/* Header */}
-                <header className="h-16 bg-white flex items-center justify-between px-8 shrink-0 border-b border-neutral-border z-40">
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 border-b border-neutral-border dark:border-slate-800 z-40 transition-colors duration-150">
                     <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${colors.icon}`}>
                             <Icon size={18} />
                         </div>
                         <div>
-                            <h1 className="text-base font-black text-neutral-text leading-tight">{config.title}</h1>
-                            <p className="text-[11px] text-neutral-muted hidden sm:block">{config.subtitle}</p>
+                            <h1 className="text-base font-black text-neutral-text dark:text-white leading-tight">{config.title}</h1>
+                            <p className="text-[11px] text-neutral-muted dark:text-slate-400 hidden sm:block">{config.subtitle}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
                         <button
                             onClick={() => { setLoading(true); fetch(`${API_BASE}${config.apiPath}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.ok ? r.json() : []).then(data => setItems(Array.isArray(data) ? data : [])).catch(() => setItems([])).finally(() => setLoading(false)); }}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-600 hover:text-indigo-600 transition-all"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500 hover:text-[#ff6b00] transition-all"
                             title="Refresh"
                         >
                             <RefreshCw size={14} />
@@ -600,7 +600,7 @@ const GovDivisionPage = () => {
                         {config.apiPath && !isAuditLog && !isTimeline && (
                             <button
                                 onClick={() => setShowNewModal(true)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors bg-indigo-600 hover:bg-indigo-700`}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors bg-[#ff6b00] hover:bg-[#e65c00]`}
                             >
                                 <Plus size={14} /> New
                             </button>

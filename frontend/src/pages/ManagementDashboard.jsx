@@ -357,7 +357,7 @@ const ManagementDashboard = () => {
 
 
     return (
-        <div className="min-h-screen bg-neutral-bg text-neutral-text font-sans flex text-sm">
+        <div className="min-h-screen bg-neutral-bg dark:bg-[#070a12] text-neutral-text dark:text-slate-100 font-sans flex text-sm transition-colors duration-150">
             
             {/* Unified Left Sidebar Navigation — role-aware */}
             <GovSidebar
@@ -371,9 +371,9 @@ const ManagementDashboard = () => {
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 
                 {/* Top Header */}
-                <header className="h-16 bg-white flex items-center justify-between px-8 shrink-0 relative z-40 border-b border-neutral-border">
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 relative z-40 border-b border-neutral-border dark:border-slate-800 transition-colors duration-150">
                     {/* Removed subtle bottom shadow */}
-                    <h1 className="text-xl font-display font-bold text-neutral-text">
+                    <h1 className="text-xl font-display font-bold text-neutral-text dark:text-white">
                         {activeTab === 'overview' && 'Executive Performance Overview'}
                         {activeTab === 'approvals' && 'Engineering Work Order Approvals'}
                         {activeTab === 'procurement' && 'Public Bidding Pipeline (RA 9184)'}

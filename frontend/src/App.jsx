@@ -12,6 +12,8 @@ import ManagementDashboard from './pages/ManagementDashboard';
 import GovDivisionPage   from './pages/GovDivisionPage';
 import GovAnalyticsPage  from './pages/GovAnalyticsPage';
 import PositionDashboard from './pages/PositionDashboard';
+import GovReportsDashboard from './pages/GovReportsDashboard';
+import GovBiDashboard      from './pages/GovBiDashboard';
 import ResetPassword     from './pages/ResetPassword';
 import ScrollToTop       from './components/ScrollToTop';
 import ProtectedRoute, {
@@ -62,15 +64,31 @@ function App() {
                             <ResidentOnly><ResidentDashboard /></ResidentOnly>
                         } />
 
-                        {/* ── GOVERNMENT — UNIVERSAL LANDING ─────────────────── */}
-                        {/*   Every gov role lands here on login                  */}
+                        {/* ── GOVERNMENT — UNIVERSAL LANDING (First navbar menu) ── */}
+                        <Route path="/gov/dashboard" element={
+                            <GovOnly><GovBiDashboard /></GovOnly>
+                        } />
                         <Route path="/gov/my-dashboard" element={
-                            <GovOnly><PositionDashboard /></GovOnly>
+                            <GovOnly><GovBiDashboard /></GovOnly>
                         } />
 
-                        {/* ── COMMAND CENTER (Dispatcher / Admin Clerk) ───────── */}
+                        {/* ── CITIZEN REPORTS (Second navbar menu) ────────────────── */}
+                        <Route path="/gov/reports" element={
+                            <GovOnly><GovReportsDashboard /></GovOnly>
+                        } />
+                        <Route path="/gov/citizen-reports" element={
+                            <Navigate to="/gov/reports" replace />
+                        } />
+
+                        {/* ── COMMAND CENTER & GIS MAP ────────────────────────── */}
                         <Route path="/dispatcher" element={
                             <DispatchOp><DispatcherDashboard /></DispatchOp>
+                        } />
+                        <Route path="/gov/map" element={
+                            <DispatchOp><DispatcherDashboard /></DispatchOp>
+                        } />
+                        <Route path="/gov/position-queue" element={
+                            <GovOnly><PositionDashboard /></GovOnly>
                         } />
 
                         {/* ── EXEC MANAGEMENT DASHBOARD ──────────────────────── */}
@@ -166,9 +184,9 @@ function App() {
                             <AdminOnly><GovDivisionPage /></AdminOnly>
                         } />
 
-                        {/* Analytics Intelligence Engine — admin + exec only */}
+                        {/* Analytics Intelligence BI Engine — government staff & dispatchers */}
                         <Route path="/gov/analytics" element={
-                            <AdminOnly><GovAnalyticsPage /></AdminOnly>
+                            <GovOnly><GovAnalyticsPage /></GovOnly>
                         } />
 
                         {/* ── 404 FALLBACK ────────────────────────────────────── */}

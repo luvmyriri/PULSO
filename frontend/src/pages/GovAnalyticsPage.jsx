@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, HeatmapLayer, CircleF, MarkerF } from '@react-google-maps/api';
 import GovSidebar from '../components/GovSidebar';
+import OrangeSelect from '../components/OrangeSelect';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -334,17 +335,21 @@ export default function GovAnalyticsPage() {
                         <p className="text-slate-400 text-sm mt-0.5">Data-driven insights for budget justification and resource allocation</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <select
+                        <OrangeSelect
                             value={daysBack}
-                            onChange={e => setDaysBack(Number(e.target.value))}
-                            className="bg-slate-900 border border-slate-700 text-slate-300 text-sm rounded-xl px-4 py-2 font-semibold focus:outline-none focus:border-indigo-500"
-                        >
-                            <option value={30}>Last 30 days</option>
-                            <option value={60}>Last 60 days</option>
-                            <option value={90}>Last 90 days</option>
-                            <option value={180}>Last 6 months</option>
-                            <option value={365}>Last year</option>
-                        </select>
+                            onChange={val => setDaysBack(Number(val))}
+                            size="md"
+                            minWidth="160px"
+                            searchable={false}
+                            placeholder="Select period"
+                            options={[
+                                { value: 30, label: 'Last 30 days' },
+                                { value: 60, label: 'Last 60 days' },
+                                { value: 90, label: 'Last 90 days' },
+                                { value: 180, label: 'Last 6 months' },
+                                { value: 365, label: 'Last year' }
+                            ]}
+                        />
                         <button onClick={fetchData}
                             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold text-sm px-4 py-2 rounded-xl transition-colors">
                             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -707,13 +712,21 @@ export default function GovAnalyticsPage() {
                                     <input type="text" placeholder="Search zones..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                                         className="w-full bg-slate-900 border border-slate-700 text-slate-300 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
                                 </div>
-                                <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
-                                    className="bg-slate-900 border border-slate-700 text-slate-300 text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500">
-                                    <option value="">All Categories</option>
-                                    {['pothole','road_damage','drainage','flooding','streetlight','structural','sidewalk','garbage'].map(c => (
-                                        <option key={c} value={c}>{c.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
-                                    ))}
-                                </select>
+                                <OrangeSelect
+                                    value={categoryFilter}
+                                    onChange={setCategoryFilter}
+                                    size="md"
+                                    minWidth="170px"
+                                    searchable={false}
+                                    placeholder="All Categories"
+                                    options={[
+                                        { value: '', label: 'All Categories' },
+                                        ...['pothole','road_damage','drainage','flooding','streetlight','structural','sidewalk','garbage'].map(c => ({
+                                            value: c,
+                                            label: c.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())
+                                        }))
+                                    ]}
+                                />
                             </div>
                             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
                                 <div className="p-4 border-b border-slate-800 flex items-center justify-between">

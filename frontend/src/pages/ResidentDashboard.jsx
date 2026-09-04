@@ -88,18 +88,12 @@ import Branding from '../components/Branding';
 import { useTranslation } from 'react-i18next';
 import IDCameraModal from '../components/IDCameraModal';
 
-const NORTH_CALOOCAN_BOUNDARY = [
-    { lat: 14.825, lng: 121.060 }, // North Tip (Tala Area)
-    { lat: 14.805, lng: 121.140 }, // NE Corner (Boundary with SJDM/Rizal)
-    { lat: 14.745, lng: 121.140 }, // SE Side (Bagong Silang - Brgy 176)
-    { lat: 14.740, lng: 121.100 }, // Under Bagong Silang (Brgy 177 area)
-    { lat: 14.710, lng: 121.070 }, // Southern Edge (Brgy 178/174 Camarin)
-    { lat: 14.675, lng: 121.040 }, // Deep South Extension (To include Brgy 164/169 areas)
-    { lat: 14.680, lng: 120.990 }, // SW Corner (Expansion towards Valenzuela/Meycauayan)
-    { lat: 14.760, lng: 120.970 }, // West Side (Expansion towards Marilao)
-    { lat: 14.820, lng: 120.970 }, // NW Corner (Marilao Border)
-    { lat: 14.825, lng: 121.030 }  // Back to North Tip
-];
+import {
+    NORTH_CALOOCAN_PATH,
+    SOUTH_CALOOCAN_PATH,
+    getCaloocanDistrict,
+    isInsideCaloocan
+} from '../data/caloocanBoundaries';
 
 const LIBRARIES = ['places', 'geometry'];
 
@@ -4174,14 +4168,11 @@ export default function ResidentDashboard() {
     }, []);
 
     const checkJurisdiction = (location) => {
-        if (!window.google || !window.google.maps || !window.google.maps.geometry) return true;
-
-        const polygon = new window.google.maps.Polygon({ paths: NORTH_CALOOCAN_BOUNDARY });
-        const latLng = new window.google.maps.LatLng(location.lat, location.lng);
-        const isIn = window.google.maps.geometry.poly.containsLocation(latLng, polygon);
+        if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return true;
+        const isIn = isInsideCaloocan(location.lat, location.lng);
 
         if (!isIn) {
-            showToast(t('This location is outside North Caloocan City jurisdiction.'));
+            showToast(t('This location is outside Caloocan City jurisdiction.'));
         }
         return isIn;
     };

@@ -1,371 +1,194 @@
 /**
  * GovSidebar.jsx
- * Unified, role-aware left navigation sidebar for all government dashboard pages.
- * Implements the full division + position hierarchy of the City Engineering Office.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Unified, sleek left navigation sidebar for the PULSO Government Command Suite.
+ * Mirrors reference structure (media_1788468722929.png):
+ *   - PULSO COMMAND brand header with official emblem
+ *   - 7 primary menu actions (Reports, Work orders, Assets, Map, Analytics, Directory, Settings)
+ *   - Signature PULSO orange active-state indicator
+ *   - Interactive `< Collapse` toggle with icon-only rail support
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
-    AlertTriangle, LayoutDashboard, ClipboardCheck, Landmark,
-    Megaphone, Users, Briefcase, TrendingUp, Settings, LogOut,
-    HardHat, Ruler, Building2, ShieldCheck, PackageCheck, FlaskConical,
-    Wrench, BarChart as BarChart2, ChevronDown, ChevronRight, Map,
-    ClipboardList, GitBranch, FileCheck, Truck, Eye, UserCog,
-    BookOpen, Activity, FileBarChart2, FileCheck2, Brain, Home
+    LayoutDashboard, ClipboardList, Wrench, Building2, MapPin, BarChart2,
+    Users, Settings, ChevronLeft
 } from 'lucide-react';
-import Branding from './Branding';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Role-based menu visibility
-// ─────────────────────────────────────────────────────────────────────────────
-const GOV_ROLES = [
-    'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
-    'records_officer','division_chief','design_engineer','estimator',
-    'cad_operator','project_engineer','construction_foreman','field_worker',
-    'building_inspector','electrical_inspector','mechanical_inspector',
-    'dispatcher','manager','system_admin',
-];
-
-const SENIOR_ROLES = ['city_engineer','asst_city_engineer','admin_officer','division_chief','manager','system_admin'];
-const EXECUTIVE_ROLES = ['city_engineer','asst_city_engineer','manager','system_admin'];
-const INSPECTOR_ROLES = ['building_inspector','electrical_inspector','mechanical_inspector','city_engineer','asst_city_engineer','manager','system_admin'];
-const PROCUREMENT_ROLES = ['project_engineer','admin_officer','estimator','city_engineer','asst_city_engineer','manager','system_admin'];
-const ADMIN_ONLY = ['system_admin','manager'];
-const DESIGN_ROLES = ['design_engineer','cad_operator','division_chief','city_engineer','asst_city_engineer','system_admin'];
-const SURVEY_ROLES = ['project_engineer','estimator','construction_foreman','division_chief','city_engineer','asst_city_engineer','system_admin'];
-const CONSTRUCTION_ROLES = ['project_engineer','construction_foreman','field_worker','dispatcher','division_chief','city_engineer','asst_city_engineer','system_admin'];
-
-const hasRole = (userRole, allowed) => allowed.includes(userRole);
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Nav Item structure
-// ─────────────────────────────────────────────────────────────────────────────
-const NavItem = ({ icon: Icon, label, to, tab, activeTab, onTabChange, badge, indent = false, external = false }) => {
-    const location = useLocation();
-    const isActive = to
-        ? location.pathname === to || location.pathname.startsWith(to + '/')
-        : activeTab === tab;
-
-    // Premium, fully rounded pill items instead of flat left borders
-    const baseClass = `w-full flex items-center justify-between px-3.5 py-2 rounded-lg font-medium transition-all duration-200 group ${
-        indent ? 'text-[13px] pl-4 text-neutral-muted/90' : 'text-sm'
-    }`;
-    const activeClass = 'bg-primary-light text-primary font-semibold shadow-sm shadow-primary/5';
-    const inactiveClass = 'text-neutral-muted hover:bg-primary-light/30 hover:text-neutral-text';
-
-    const content = (
-        <>
-            <span className="flex items-center gap-3">
-                <Icon 
-                    size={indent ? 15 : 16} 
-                    className={`shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-                        isActive ? 'text-primary' : 'text-neutral-muted group-hover:text-neutral-text'
-                    }`} 
-                />
-                <span className="truncate">{label}</span>
-            </span>
-            {badge !== undefined && badge !== null && (
-                <span className="bg-secondary/15 text-secondary-dark text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 min-w-[20px] text-center transition-all duration-200 group-hover:scale-105">
-                    {badge}
-                </span>
-            )}
-        </>
-    );
-
-    if (to) {
-        return (
-            <Link to={to} className={`${baseClass} ${isActive ? activeClass : inactiveClass}`}>
-                {content}
-            </Link>
-        );
-    }
-
-    return (
-        <button
-            onClick={() => onTabChange?.(tab)}
-            className={`${baseClass} ${isActive ? activeClass : inactiveClass}`}
-        >
-            {content}
-        </button>
-    );
-};
-
-// Collapsible section
-const NavSection = ({ title, icon: Icon, children, defaultOpen = false, color = 'slate' }) => {
+export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
     const location = useLocation();
 
-    // Check if any child NavItem matches the current location
-    const hasActiveChild = React.Children.toArray(children).some(child => {
-        if (!React.isValidElement(child)) return false;
-        const to = child.props.to;
-        return to && (location.pathname === to || location.pathname.startsWith(to + '/'));
-    });
-
-    const storageKey = `pulso_sidebar_${title.replace(/\s+/g, '_')}`;
-    const [open, setOpen] = useState(() => {
-        if (hasActiveChild) return true;
-        const saved = localStorage.getItem(storageKey);
-        if (saved !== null) return saved === 'true';
-        return defaultOpen;
-    });
-
-    // Make sure it automatically opens if a child link becomes active
-    React.useEffect(() => {
-        if (hasActiveChild) {
-            setOpen(true);
-            localStorage.setItem(storageKey, 'true');
+    // Persist collapsed state
+    const [isCollapsed, setIsCollapsed] = useState(() => {
+        try {
+            return localStorage.getItem('pulso_gov_sidebar_collapsed') === 'true';
+        } catch {
+            return false;
         }
-    }, [hasActiveChild, storageKey]);
+    });
 
-    const handleToggle = () => {
-        setOpen(o => {
-            const newState = !o;
-            localStorage.setItem(storageKey, String(newState));
-            return newState;
+    const toggleCollapse = () => {
+        setIsCollapsed(prev => {
+            const next = !prev;
+            try {
+                localStorage.setItem('pulso_gov_sidebar_collapsed', String(next));
+            } catch { /* ignore */ }
+            return next;
         });
     };
 
+    // Authoritative Menu Items
+    const NAV_ITEMS = [
+        {
+            id: 'dashboard',
+            label: 'Dashboard',
+            icon: LayoutDashboard,
+            to: '/gov/dashboard',
+            matches: ['/gov/dashboard', '/gov/my-dashboard']
+        },
+        {
+            id: 'reports',
+            label: 'Reports',
+            icon: ClipboardList,
+            to: '/gov/reports',
+            matches: ['/gov/reports', '/gov/citizen-reports']
+        },
+        {
+            id: 'work-orders',
+            label: 'Work orders',
+            icon: Wrench,
+            to: '/gov/work-orders',
+            matches: ['/gov/work-orders', '/gov/timeline']
+        },
+        {
+            id: 'assets',
+            label: 'Assets',
+            icon: Building2,
+            to: '/gov/projects',
+            matches: ['/gov/projects', '/gov/obo', '/gov/procurement', '/gov/records']
+        },
+        {
+            id: 'map',
+            label: 'Map',
+            icon: MapPin,
+            to: '/gov/map',
+            matches: ['/gov/map', '/dispatcher']
+        },
+        {
+            id: 'analytics',
+            label: 'Analytics',
+            icon: BarChart2,
+            to: '/gov/analytics',
+            matches: ['/gov/analytics', '/management']
+        },
+        {
+            id: 'directory',
+            label: 'Directory',
+            icon: Users,
+            to: '/gov/users',
+            matches: ['/gov/users']
+        },
+        {
+            id: 'settings',
+            label: 'Settings',
+            icon: Settings,
+            to: '/gov/settings',
+            matches: ['/gov/settings', '/gov/audit-logs']
+        }
+    ];
+
     return (
-        <div className="mb-0.5">
-            <button
-                onClick={handleToggle}
-                className="w-full flex items-center justify-between px-3.5 py-2 rounded-lg transition-all duration-200 hover:bg-primary-light/30 group text-sm font-medium text-neutral-muted hover:text-neutral-text"
-            >
-                <span className="flex items-center gap-3">
-                    <Icon size={16} className="text-neutral-muted group-hover:text-neutral-text transition-colors duration-200" />
-                    <span className="truncate">{title}</span>
-                </span>
-                {open
-                    ? <ChevronDown size={14} className="text-neutral-muted/70 group-hover:text-neutral-text transition-transform" />
-                    : <ChevronRight size={14} className="text-neutral-muted/70 group-hover:text-neutral-text transition-transform" />
-                }
-            </button>
-            {open && (
-                <div className="mt-0.5 space-y-0.5 pb-1 border-l border-neutral-border/40 ml-5 pl-2">
-                    {children}
+        <aside
+            className={`flex flex-col justify-between shrink-0 bg-white dark:bg-[#081120] text-slate-800 dark:text-white transition-all duration-300 z-40 relative h-screen ${
+                isCollapsed ? 'w-20' : 'w-60'
+            } border-r border-slate-200 dark:border-slate-800/80 shadow-xs dark:shadow-xl select-none`}
+        >
+            {/* Top Brand Header */}
+            <div>
+                <div className={`h-20 flex items-center px-4 border-b border-slate-200 dark:border-slate-800/80 ${isCollapsed ? 'justify-center' : ''}`}>
+                    <Link
+                        to="/gov/my-dashboard"
+                        className="flex items-center gap-2.5 group overflow-hidden cursor-pointer"
+                        title="City Government of Caloocan - City Engineering Department - PULSO"
+                    >
+                        {/* Official City Engineering Department Logo */}
+                        <img
+                            src="/city-engineering-logo.png"
+                            alt="City Engineering Department Logo"
+                            className="h-9 w-9 aspect-square object-contain drop-shadow-sm rounded-full bg-white border border-slate-200 dark:border-slate-700 shrink-0 group-hover:scale-105 transition-transform duration-200"
+                        />
+                        {!isCollapsed && (
+                            <div className="flex flex-col text-left shrink-0 leading-tight">
+                                <span className="font-heading font-black text-[10px] tracking-tight text-slate-900 dark:text-slate-200 uppercase leading-none">
+                                    CALOOCAN CITY
+                                </span>
+                                <span className="font-heading font-black text-xs text-slate-800 dark:text-white tracking-tight leading-tight mt-0.5">
+                                    City Engineering Dept
+                                </span>
+                                <div className="flex items-center gap-1 text-[9px] font-mono-data text-slate-500 dark:text-slate-400 leading-none mt-0.5">
+                                    <span>powered by:</span>
+                                    <span className="font-heading font-black text-[#ff6b00] uppercase tracking-wider">PULSO</span>
+                                </div>
+                            </div>
+                        )}
+                    </Link>
                 </div>
-            )}
-        </div>
-    );
-};
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Sidebar Component
-// ─────────────────────────────────────────────────────────────────────────────
-const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
-    const navigate = useNavigate();
-    const role = currentUser?.role || 'dispatcher';
-    const scrollContainerRef = useRef(null);
+                {/* Nav Items List */}
+                <nav className="p-3 space-y-1.5 mt-2">
+                    {NAV_ITEMS.map((item) => {
+                        const Icon = item.icon;
+                        const isCurrentActive =
+                            item.matches.some(path => location.pathname === path || location.pathname.startsWith(path + '/')) ||
+                            activeTab === item.id;
 
-    useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
-        // Restore scroll position
-        const savedScrollPos = sessionStorage.getItem('govSidebarScrollPos');
-        if (savedScrollPos) {
-            container.scrollTop = parseInt(savedScrollPos, 10);
-        }
-
-        // Save scroll position on scroll
-        const handleScroll = () => {
-            sessionStorage.setItem('govSidebarScrollPos', container.scrollTop.toString());
-        };
-
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    const handleSignOut = () => {
-        const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
-        const wasGov = user?.role && user.role !== 'resident';
-        localStorage.removeItem('pulso_token');
-        localStorage.removeItem('pulso_user');
-        if (wasGov) {
-            navigate('/gov');
-        } else {
-            navigate('/login');
-        }
-    };
-
-    // Role display label mapping
-    const roleLabels = {
-        city_engineer: 'City Engineer',
-        asst_city_engineer: 'Asst. City Engineer',
-        admin_officer: 'Administrative Officer V',
-        admin_clerk: 'Administrative Clerk',
-        records_officer: 'Records Officer',
-        division_chief: 'Division Chief',
-        design_engineer: 'Design Engineer',
-        estimator: 'Estimator / QS',
-        cad_operator: 'CAD Operator',
-        project_engineer: 'Project Engineer',
-        construction_foreman: 'Construction Foreman',
-        field_worker: 'Field Worker',
-        building_inspector: 'Building Inspector',
-        electrical_inspector: 'Electrical Inspector',
-        mechanical_inspector: 'Mechanical Inspector',
-        dispatcher: 'Dispatcher',
-        manager: 'Manager',
-        system_admin: 'System Administrator',
-    };
-
-    const avatarBg = {
-        city_engineer: 'from-blue-600 to-indigo-700',
-        asst_city_engineer: 'from-blue-500 to-indigo-600',
-        admin_officer: 'from-purple-500 to-purple-700',
-        system_admin: 'from-red-600 to-orange-600',
-        manager: 'from-indigo-500 to-blue-700',
-        dispatcher: 'from-orange-500 to-orange-700',
-        building_inspector: 'from-teal-500 to-cyan-700',
-        electrical_inspector: 'from-yellow-500 to-orange-500',
-        mechanical_inspector: 'from-green-500 to-emerald-700',
-        project_engineer: 'from-emerald-500 to-teal-600',
-        estimator: 'from-violet-500 to-purple-600',
-    };
-    const bg = avatarBg[role] || 'from-slate-500 to-slate-700';
-
-    return (
-        <div className="w-64 bg-white border-r border-neutral-border flex flex-col shrink-0 z-50 relative h-screen">
-            {/* Logo */}
-            <div className="h-20 flex items-center px-5 relative shrink-0 border-b border-neutral-border/50">
-                <Link to="/" className="flex items-center">
-                    <Branding size="h-9" />
-                </Link>
+                        return (
+                            <Link
+                                key={item.id}
+                                to={item.to}
+                                title={item.label}
+                                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-heading text-xs font-bold transition-all duration-150 cursor-pointer group ${
+                                    !isCollapsed ? 'justify-start' : 'justify-center'
+                                } ${
+                                    isCurrentActive
+                                        ? 'bg-[#ff6b00] text-white shadow-md shadow-orange-500/25'
+                                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 font-medium'
+                                }`}
+                            >
+                                <Icon
+                                    size={18}
+                                    className={`shrink-0 transition-colors ${
+                                        isCurrentActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white'
+                                    }`}
+                                />
+                                {!isCollapsed && <span>{item.label}</span>}
+                            </Link>
+                        );
+                    })}
+                </nav>
             </div>
 
-            {/* Navigation */}
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5 custom-scrollbar bg-white">
-
-                {/* ── OPERATIONS ── */}
-                <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-1.5">Operations</div>
-                <NavItem icon={LayoutDashboard} label="My Dashboard" to="/gov/my-dashboard" />
-                {/* Command Center only for dispatcher / admin clerk + senior roles */}
-                {hasRole(role, ['admin_clerk', 'dispatcher', 'admin_officer', ...SENIOR_ROLES]) && (
-                    <NavItem icon={AlertTriangle} label="Command Center" to="/dispatcher" />
-                )}
-                {hasRole(role, SENIOR_ROLES) && (
-                    <NavItem icon={LayoutDashboard} label="Exec Overview" tab="overview" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
-                )}
-
-                {/* ── ANALYTICS INTELLIGENCE (admin + exec only) ── */}
-                {hasRole(role, ['system_admin', 'city_engineer', 'asst_city_engineer']) && (
-                    <>
-                        <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">Intelligence</div>
-                        <NavItem icon={Brain} label="Analytics Command Center" to="/gov/analytics" />
-                    </>
-                )}
-
-                {/* ── WORK & TRIAGE ── */}
-                <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">Triage & Work Orders</div>
-                {hasRole(role, SENIOR_ROLES) && (
-                    <NavItem icon={ClipboardCheck} label="W.O. Approvals" tab="approvals" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
-                )}
-                {hasRole(role, GOV_ROLES) && (
-                    <NavItem icon={GitBranch} label="Work Orders" to="/gov/work-orders" />
-                )}
-                {hasRole(role, GOV_ROLES) && (
-                    <NavItem icon={Activity} label="Process Timeline" to="/gov/timeline" />
-                )}
-
-                {/* ── DIVISIONS ── */}
-                <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">Divisions</div>
-
-                {/* Administrative Division */}
-                {hasRole(role, ['admin_officer','admin_clerk','records_officer','system_admin','manager','city_engineer','asst_city_engineer']) && (
-                    <NavSection title="Administrative" icon={Briefcase} defaultOpen={['admin_officer','admin_clerk','records_officer'].includes(role)}>
-                        <NavItem icon={Users} label="Manage Users" tab="users" activeTab={activeTab} onTabChange={onTabChange} indent to="/gov/users" />
-                        <NavItem icon={BookOpen} label="Records & Registry" to="/gov/records" indent />
-                        <NavItem icon={FileBarChart2} label="Reports Archive" to="/gov/reports-archive" indent />
-                        <NavItem icon={FileCheck2} label="Audit Logs" to="/gov/audit-logs" indent />
-                    </NavSection>
-                )}
-
-                {/* Design Division */}
-                {hasRole(role, DESIGN_ROLES) && (
-                    <NavSection title="Design & Planning" icon={Ruler} defaultOpen={['design_engineer','cad_operator'].includes(role)}>
-                        <NavItem icon={Map} label="LGU Projects" to="/gov/projects" indent />
-                        <NavItem icon={Building2} label="Design Requests" to="/gov/design-requests" indent />
-                        <NavItem icon={FlaskConical} label="Structure Analysis" to="/gov/analysis" indent />
-                    </NavSection>
-                )}
-
-                {/* Survey Division */}
-                {hasRole(role, SURVEY_ROLES) && (
-                    <NavSection title="Survey & Estimation" icon={Eye} defaultOpen={role === 'estimator'}>
-                        <NavItem icon={Map} label="Field Surveys" to="/gov/surveys" indent />
-                        <NavItem icon={ClipboardList} label="Bill of Quantities" to="/gov/boq" indent />
-                        <NavItem icon={PackageCheck} label="Cost Estimation" to="/gov/estimation" indent />
-                    </NavSection>
-                )}
-
-                {/* Construction / Field Division */}
-                {hasRole(role, CONSTRUCTION_ROLES) && (
-                    <NavSection title="Construction & Field" icon={HardHat} defaultOpen={['project_engineer','construction_foreman','field_worker','dispatcher'].includes(role)}>
-                        <NavItem icon={Truck} label="Dispatch & Fleet" to="/dispatcher" indent />
-                        <NavItem icon={Wrench} label="Active Work Orders" to="/gov/work-orders" indent />
-                        <NavItem icon={TrendingUp} label="Predictive Maint." tab="predictive" activeTab={activeTab} onTabChange={onTabChange} badge={2} to="/management" indent />
-                    </NavSection>
-                )}
-
-                {/* OBO Division */}
-                {hasRole(role, INSPECTOR_ROLES) && (
-                    <NavSection title="OBO — Building Official" icon={ShieldCheck} defaultOpen={['building_inspector','electrical_inspector','mechanical_inspector'].includes(role)} color="teal">
-                        <NavItem icon={Building2} label="OBO Inspections" to="/gov/obo" indent />
-                        <NavItem icon={Briefcase} label="Permit Tracking" tab="permits" activeTab={activeTab} onTabChange={onTabChange} to="/management" indent />
-                    </NavSection>
-                )}
-
-                {/* Procurement / BAC */}
-                {hasRole(role, PROCUREMENT_ROLES) && (
-                    <NavSection title="Procurement / BAC" icon={PackageCheck} defaultOpen={['estimator'].includes(role)} color="violet">
-                        <NavItem icon={Landmark} label="RA 9184 Bidding" tab="procurement" activeTab={activeTab} onTabChange={onTabChange} to="/management" indent />
-                        <NavItem icon={ClipboardList} label="Procurement Requests" to="/gov/procurement" indent />
-                    </NavSection>
-                )}
-
-                {/* ── BROADCAST & COMMS ── */}
-                {hasRole(role, SENIOR_ROLES) && (
-                    <>
-                        <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">Communications</div>
-                        <NavItem icon={Megaphone} label="Post Advisory" tab="advisories" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
-                    </>
-                )}
-
-                {/* ── SYSTEM ── */}
-                <div className="text-[11px] font-semibold text-neutral-muted/70 uppercase tracking-[0.15em] mb-1.5 px-3.5 mt-6">System</div>
-                {hasRole(role, ADMIN_ONLY) && (
-                    <NavItem icon={UserCog} label="Role Management" to="/gov/users" />
-                )}
-                <NavItem icon={Settings} label="Settings" to="/gov/settings" />
+            {/* Bottom Rail: Collapse Toggle */}
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800/80">
                 <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg font-medium text-sm transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 mt-1"
+                    type="button"
+                    onClick={toggleCollapse}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-all cursor-pointer ${
+                        !isCollapsed ? 'justify-start' : 'justify-center'
+                    }`}
+                    title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
-                    <LogOut size={16} />
-                    Sign Out
+                    <ChevronLeft
+                        size={18}
+                        className={`shrink-0 transition-transform duration-300 ${
+                            isCollapsed ? 'rotate-180' : ''
+                        }`}
+                    />
+                    {!isCollapsed && <span>Collapse</span>}
                 </button>
             </div>
-
-            {/* User Card */}
-            <div className="p-4 border-t border-neutral-border/50 bg-neutral-bg/30 shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center font-bold text-white text-sm shadow-sm shrink-0 border border-white/20">
-                        {currentUser?.full_name?.charAt(0)?.toUpperCase() || 'G'}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-neutral-text text-sm leading-tight truncate">
-                            {currentUser?.full_name || 'LGU Staff'}
-                        </div>
-                        <div className="text-[11px] text-neutral-muted font-medium truncate mt-0.5">
-                            {roleLabels[role] || role}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </aside>
     );
-};
-
-export default GovSidebar;
+}

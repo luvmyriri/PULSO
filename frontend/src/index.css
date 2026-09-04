@@ -84,6 +84,13 @@ html {
   --accent-hover: #e65c00;
   --muted: #94a3b8;
   --navy-dark: #070a12;
+
+  /* Brand Neutrals Dark Mode Overrides */
+  --color-neutral-bg: #070a12;
+  --color-neutral-card: #0c1424;
+  --color-neutral-border: #1e293b;
+  --color-neutral-text: #f8fafc;
+  --color-neutral-muted: #94a3b8;
 }
 
 @layer base {
@@ -98,6 +105,11 @@ html {
   body.dark {
     background-color: var(--bg);
     color: var(--text);
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: #ff6b00;
   }
 
   /* Global hand cursor for all interactive elements */
