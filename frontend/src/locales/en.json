@@ -28,13 +28,17 @@
         "scope": "Infrastructure Scope",
         "platform": "Infrastructure Scope",
         "howitworks": "How It Works",
+        "howItWorks": "How It Works",
         "solutions": "How It Works",
         "services": "City Services",
         "about": "Engineering Office",
         "report": "Report an Issue",
         "reportIssue": "Report an Issue",
+        "reportAnIssue": "Report an Issue",
         "track": "Track a Report",
         "trackReport": "Track a Report",
+        "map": "Live Map",
+        "hotlines": "Hotlines",
         "login": "Sign In",
         "register": "Register",
         "openDashboard": "Register",
@@ -170,7 +174,9 @@
         "s5_title": "Public Buildings & Facilities",
         "s5_desc": "Structural integrity verification for schools, health centers, and community evacuation halls.",
         "s5_l1": "Annual seismic audits",
-        "s5_l2": "Accessibility compliance"
+        "s5_l2": "Accessibility compliance",
+        "l1": "Live System Status",
+        "l2": "Fast Incident Response"
       },
       "services": {
         "badge": "City Portals",
@@ -199,6 +205,7 @@
       "about": {
         "badge": "About Us",
         "title": "CITY ENGINEERING OFFICE",
+        "desc": "The City Engineering Office of Caloocan plans and maintains public infrastructure to keep citizens safe and services running smoothly.",
         "p1": "The <1>City Engineering Office of Caloocan</1> is tasked with planning, designing, constructing, and maintaining public infrastructure across all 188 barangays.",
         "p2": "Through PULSO, our engineers bridge real-time citizen reports with field work crews to deliver accountable, transparent, and prompt public repairs.",
         "stat1_val": "188",

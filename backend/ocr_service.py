@@ -392,12 +392,12 @@ def extract_barangay(text: str) -> str:
     return ''
 
 # ---------------------------------------------------------------------------
-# North Caloocan Residency Verification
+# Caloocan Residency Verification
 # ---------------------------------------------------------------------------
 
-def verify_north_caloocan_residency(address_text: str, barangay_num: str) -> Tuple[bool, str]:
+def verify_caloocan_residency(address_text: str, barangay_num: str) -> Tuple[bool, str]:
     """
-    Verifies if address is in North Caloocan (Barangays 165–188).
+    Verifies if address is in Caloocan City (Barangays 1–188).
     Also accepts common OCR misspellings: KALOOKAN, KALOOCAN, CALOOCAN.
     """
     u = address_text.upper()
@@ -405,16 +405,14 @@ def verify_north_caloocan_residency(address_text: str, barangay_num: str) -> Tup
         k in u for k in ('CALOOCAN', 'KALOOKAN', 'KALOOCAN', 'CALOOCAN CITY', 'CALOOCAN,')
     )
 
-    # Helper function to check if the extracted brgy integer is in North Caloocan
-    def check_brgy_int(brgy_str: str) -> Tuple[Optional[bool], Optional[str]]:
+    # Helper function to check if the extracted brgy integer is in Caloocan (1-188)
+    def check_brgy_int(brgy_str: str) -> Tuple[Optional[bool], Optional[int]]:
         if not brgy_str:
             return None, None
         try:
             brgy_int = int(re.sub(r'[^0-9]', '', brgy_str))
-            if 165 <= brgy_int <= 188:
+            if 1 <= brgy_int <= 188:
                 return True, brgy_int
-            elif 1 <= brgy_int <= 164:
-                return False, brgy_int
             else:
                 return False, brgy_int
         except (ValueError, TypeError):
@@ -423,33 +421,22 @@ def verify_north_caloocan_residency(address_text: str, barangay_num: str) -> Tup
     if not is_caloocan:
         # Check for Metro Manila (less specific, borderline case)
         if 'METRO MANILA' in u or 'NCR' in u:
-            # Can't verify barangay without city name
             valid, brgy_int = check_brgy_int(barangay_num)
-            
-            # If the directly passed barangay_num had no numbers, fallback to text regex
             if valid is None:
                 valid, brgy_int = check_brgy_int(extract_barangay(u))
-                
             if valid is True:
-                return True, "Likely North Caloocan Resident (barangay in range, Metro Manila detected)."
-                
+                return True, f"Likely Caloocan Resident (barangay {brgy_int} in range, Metro Manila detected)."
         return False, "Verification Failed: Address does not appear to be in Caloocan City."
 
-    # Try checking the originally passed barangay_num
+    # Try checking the passed barangay_num, then fallback to regex extraction
     valid, brgy_int = check_brgy_int(barangay_num)
-    
-    # If the originally passed barangay_num didn't have digits (e.g. "BAGUMBONG")
-    # or was empty, perform a regex fallback on the full address text
     if valid is None:
         valid, brgy_int = check_brgy_int(extract_barangay(u))
 
     if valid is True:
-        return True, f"North Caloocan Resident Verified (Barangay {brgy_int})."
-    elif valid is False:
-        if 1 <= brgy_int <= 164:
-            return False, f"Verification Failed: Barangay {brgy_int} is in South Caloocan, not North Caloocan (165–188)."
-        else:
-            return False, f"Verification Failed: Barangay {brgy_int} is not a valid Caloocan barangay."
+        return True, f"Caloocan Resident Verified (Barangay {brgy_int})."
+    elif valid is False and brgy_int is not None:
+        return False, f"Verification Failed: Barangay {brgy_int} is not a valid Caloocan barangay (1–188)."
 
     # Caloocan found but no clear barangay — partial pass
     return False, "Verification Failed: Caloocan City detected but could not determine barangay number."
@@ -962,12 +949,11 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
     # If the AI yielded a word (like "BAGUMBONG"), extract the integer ourselves before verification
     # so the frontend dropdown gets the actual numbered barangay
     if barangay and not re.search(r'\d', barangay):
-        # AI returned a word like "BAGUMBONG". Pass it through our extraction logic.
         fallback_brgy = extract_barangay(barangay) or extract_barangay(upper_text)
         if fallback_brgy:
             barangay = fallback_brgy
             
-    is_nc, msg = verify_north_caloocan_residency(upper_text, barangay)
+    is_nc, msg = verify_caloocan_residency(upper_text, barangay)
 
     # Priority: AI > Regex Fallback
     # If the AI produces an output (even an empty string), we explicitly respect it.
@@ -1145,6 +1131,19 @@ async def perform_ocrspace_ocr(image_bytes: bytes, filename: str = 'id.jpg') -> 
 # Main Entry Point
 # ---------------------------------------------------------------------------
 
+async def get_ocr_text_with_fallback(image_bytes: bytes, filename: str) -> str:
+    if not image_bytes:
+        return ""
+    try:
+        return await perform_google_vision_ocr(image_bytes)
+    except Exception as e:
+        print(f"[OCR] Google Vision failed for {filename}: {e}. Falling back to OCR.space...")
+        try:
+            return await perform_ocrspace_ocr(image_bytes, filename)
+        except Exception as fallback_e:
+            print(f"[OCR] OCR.space fallback failed for {filename}: {fallback_e}")
+            raise Exception(f"Vision error: {e} | Fallback error: {fallback_e}")
+
 async def perform_ocr(front_bytes: bytes, back_bytes: bytes) -> Dict[str, Any]:
     """
     Main Multi-Side OCR pipeline with concurrent execution.
@@ -1153,10 +1152,10 @@ async def perform_ocr(front_bytes: bytes, back_bytes: bytes) -> Dict[str, Any]:
     """
     start_total = time.time()
     
-    # 1. Concurrent extraction
-    tasks = [perform_google_vision_ocr(front_bytes)]
+    # 1. Concurrent extraction of both sides with fallback logic
+    tasks = [get_ocr_text_with_fallback(front_bytes, 'front.jpg')]
     if back_bytes:
-        tasks.append(perform_google_vision_ocr(back_bytes))
+        tasks.append(get_ocr_text_with_fallback(back_bytes, 'back.jpg'))
     
     # Run both sides in parallel, capture exceptions
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -1187,9 +1186,18 @@ async def perform_ocr(front_bytes: bytes, back_bytes: bytes) -> Dict[str, Any]:
             print(f"[OCR] OCR.space fallback also failed for BACK: {fb_err}")
 
     if not front_text and not back_text:
+        err_details = []
+        for r in results:
+            if isinstance(r, Exception):
+                err_details.append(str(r))
+        
+        err_msg = "OCR failed for both sides. Please ensure images are clear and well-lit."
+        if err_details:
+            err_msg += " System details: " + " | ".join(err_details)
+            
         return {
             "success": False,
-            "error": "OCR failed for both sides (Google Vision + OCR.space). Please ensure images are clear and well-lit.",
+            "error": err_msg,
             "extracted_data": None
         }
 

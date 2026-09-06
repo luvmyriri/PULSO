@@ -3,6 +3,8 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from typing import Optional, List, Union
 from database import Base
+from datetime import datetime
+import random
 import uuid
 import re
 
@@ -44,11 +46,9 @@ class Barangay(Base):
     district    = relationship("District", back_populates="barangays")
 
 def generate_ticket_id():
-    import secrets
-    from datetime import datetime
-    # Prefix with year, month, and day for maximal chronological grouping and uniqueness
-    date_prefix = datetime.now().strftime("%Y%m%d")
-    return f"RPT-{date_prefix}-{secrets.token_hex(8).upper()}"
+    current_year = datetime.now().year
+    random_digits = f"{random.randint(1000, 9999)}"
+    return f"PUL-{current_year}-{random_digits}"
 
 def generate_advisory_id():
     import secrets
@@ -345,6 +345,20 @@ class SystemRole(Base):
     is_template = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+class NewsItem(Base):
+    __tablename__ = "news_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String, index=True)  # Advisories, Events, Infrastructure, General
+    headline = Column(String, nullable=False)
+    excerpt = Column(Text, nullable=False)
+    image_url = Column(String, nullable=True)
+    barangay = Column(String, nullable=True)
+    source_url = Column(String, nullable=True)
+    published_at = Column(DateTime(timezone=True), default=func.now(), index=True)
+    priority = Column(String, default="normal", index=True)  # normal | urgent
+    posted_by = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 # Import gov_models at the end to resolve circular dependency for relationships
 import gov_models
-

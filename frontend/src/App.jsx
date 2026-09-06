@@ -16,7 +16,10 @@ import PositionDashboard from './pages/PositionDashboard';
 import ProjectsWorkspacePage from './pages/ProjectsWorkspacePage';
 import OboInspectionsPage from './pages/OboInspectionsPage';
 import DispatcherDashboard from './pages/DispatcherDashboard';
-import GovAnalyticsPage from './pages/GovAnalyticsPage';
+import GovProjectsPage   from './pages/GovProjectsPage';
+import GovAnalyticsPage  from './pages/GovAnalyticsPage';
+import GovReportsDashboard from './pages/GovReportsDashboard';
+import GovBiDashboard      from './pages/GovBiDashboard';
 import GovernmentWorkspaceRoute from './pages/GovernmentWorkspaceRoute';
 import ProtectedRoute, {
     GOV_ROLES,
@@ -29,8 +32,12 @@ import ProtectedRoute, {
 } from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
+import { initAuthSession } from './utils/authSession';
 import './index.css';
 import './resident/evangelista.css';
+
+// Purge any stale persistent credentials from localStorage
+initAuthSession();
 
 // Convenience wrappers so the JSX below stays readable
 const AnyAuth    = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>;
@@ -78,10 +85,12 @@ function App() {
                             <ResidentOnly><ResidentSurface><ResidentDashboard /></ResidentSurface></ResidentOnly>
                         } />
 
-                        {/* ── GOVERNMENT — UNIVERSAL LANDING ─────────────────── */}
-                        {/*   Every gov role lands here on login                  */}
+                        {/* ── GOVERNMENT — UNIVERSAL LANDING (First navbar menu) ── */}
+                        <Route path="/gov/dashboard" element={
+                            <GovOnly><GovBiDashboard /></GovOnly>
+                        } />
                         <Route path="/gov/my-dashboard" element={
-                            <GovOnly><PositionDashboard /></GovOnly>
+                            <GovOnly><GovBiDashboard /></GovOnly>
                         } />
 
                         {/* Consolidated government workspaces */}
@@ -98,9 +107,23 @@ function App() {
                             <AdminOnly><GovernmentWorkspaceRoute workspace="administration" /></AdminOnly>
                         } />
 
-                        {/* ── COMMAND CENTER / DISPATCH MAP ───────── */}
+                        {/* ── CITIZEN REPORTS (GovReportsDashboard) ────────────────── */}
+                        <Route path="/gov/reports" element={
+                            <GovOnly><GovReportsDashboard /></GovOnly>
+                        } />
+                        <Route path="/gov/citizen-reports" element={
+                            <Navigate to="/gov/reports" replace />
+                        } />
+
+                        {/* ── COMMAND CENTER & GIS MAP ────────────────────────── */}
                         <Route path="/dispatcher" element={
                             <DispatchOp><Navigate to="/gov/operations?view=dispatch" replace /></DispatchOp>
+                        } />
+                        <Route path="/gov/map" element={
+                            <DispatchOp><DispatcherDashboard /></DispatchOp>
+                        } />
+                        <Route path="/gov/position-queue" element={
+                            <GovOnly><PositionDashboard /></GovOnly>
                         } />
 
                         {/* ── EXEC MANAGEMENT DASHBOARD ──────────────────────── */}
@@ -123,7 +146,7 @@ function App() {
 
                         {/* Legacy planning links preserve bookmarks and open the matching workspace view */}
                         <Route path="/gov/projects" element={
-                            <GovOnly><Navigate to="/gov/delivery?view=projects" replace /></GovOnly>
+                            <GovOnly><GovProjectsPage /></GovOnly>
                         } />
 
                         {/* Process Timeline — all gov staff */}
@@ -158,10 +181,6 @@ function App() {
                             <GovOnly><Navigate to="/gov/records-workspace?view=documents" replace /></GovOnly>
                         } />
 
-                        {/* Incoming Citizen Reports - all gov staff can view triage */}
-                        <Route path="/gov/reports" element={
-                            <GovOnly><Navigate to="/gov/operations?view=reports" replace /></GovOnly>
-                        } />
 
                         {/* Reports Archive — admin staff + exec */}
                         <Route path="/gov/reports-archive" element={
@@ -216,9 +235,12 @@ function App() {
                             <AdminOnly><Navigate to="/gov/administration?view=settings" replace /></AdminOnly>
                         } />
 
-                        {/* Analytics Intelligence Engine & GIS Threat Heatmap */}
+                        {/* Analytics Intelligence BI Engine — government staff & dispatchers */}
                         <Route path="/gov/analytics" element={
-                            <GovOnly><Navigate to="/gov/insights?view=analytics" replace /></GovOnly>
+                            <GovOnly><GovAnalyticsPage /></GovOnly>
+                        } />
+                        <Route path="/gov/bi" element={
+                            <GovOnly><GovBiDashboard /></GovOnly>
                         } />
 
                         {/* Predictive Maintenance Engine — all gov staff */}
@@ -235,6 +257,8 @@ function App() {
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </ErrorBoundary>
+
+                <ScrollToTop />
             </BrowserRouter>
         </ThemeProvider>
     );

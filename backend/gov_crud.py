@@ -285,7 +285,7 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
     # For now, relying on timeline as the single source of truth for the resident app.
 
     # Citizen notification
-    ticket = report.ticket_id or f"RPT-{report.id}"
+    ticket = report.ticket_id or f"PUL-{datetime.now().year}-{report.id:04d}"
     notif_map = {
         "pending_approval": ("Report Verified", f"Your report {ticket} has been verified and is pending engineering approval."),
         "approved_internal": ("Report Approved", f"Good news! Your report {ticket} has been approved and is ready for dispatch."),

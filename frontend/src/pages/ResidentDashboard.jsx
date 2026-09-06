@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -40,7 +41,7 @@ import {
     FileText,
     Brain,
     AlertTriangle,
-    Map,
+    Map as MapIcon,
     Home,
     Sun,
     Moon,
@@ -76,33 +77,86 @@ import {
     Landmark,
     Lightbulb,
     Cone,
-    Edit3
+    Edit3,
+    PlusCircle,
+    Flame,
+    Wrench,
+    Sparkles,
+    RotateCcw,
+    CameraOff,
+    Copy,
+    Link2
 } from 'lucide-react';
 
 import { useTheme } from '../contexts/ThemeContext';
 import Swal from 'sweetalert2';
 import Branding from '../components/Branding';
 import { useTranslation } from 'react-i18next';
-import IDCameraModal from '../components/IDCameraModal';
+import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
+import { formatTicketId } from '../utils/reportWorkflow';
 import { API_BASE_URL } from '../utils/apiBase';
 import ClaimReportModal from '../components/modals/ClaimReportModal';
-import { useInteractionHarden } from '../hooks/useInteractionHarden';
 
-
-const NORTH_CALOOCAN_BOUNDARY = [
-    { lat: 14.825, lng: 121.060 }, // North Tip (Tala Area)
-    { lat: 14.805, lng: 121.140 }, // NE Corner (Boundary with SJDM/Rizal)
-    { lat: 14.745, lng: 121.140 }, // SE Side (Bagong Silang - Brgy 176)
-    { lat: 14.740, lng: 121.100 }, // Under Bagong Silang (Brgy 177 area)
-    { lat: 14.710, lng: 121.070 }, // Southern Edge (Brgy 178/174 Camarin)
-    { lat: 14.675, lng: 121.040 }, // Deep South Extension (To include Brgy 164/169 areas)
-    { lat: 14.680, lng: 120.990 }, // SW Corner (Expansion towards Valenzuela/Meycauayan)
-    { lat: 14.760, lng: 120.970 }, // West Side (Expansion towards Marilao)
-    { lat: 14.820, lng: 120.970 }, // NW Corner (Marilao Border)
-    { lat: 14.825, lng: 121.030 }  // Back to North Tip
-];
+import {
+    NORTH_CALOOCAN_PATH,
+    SOUTH_CALOOCAN_PATH,
+    getCaloocanDistrict,
+    isInsideCaloocan
+} from '../data/caloocanBoundaries';
 
 const LIBRARIES = ['places', 'geometry'];
+
+// Government-grade civic map styles (Zero POI/transit clutter, high contrast civic hierarchy)
+const DARK_BASE_RULES = [
+    { featureType: "poi", stylers: [{ visibility: "off" }] },
+    { featureType: "transit", stylers: [{ visibility: "off" }] },
+    { elementType: "geometry", stylers: [{ color: "#0c1322" }] },
+    { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#0c1322" }] },
+    { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#0b111e" }] },
+    { featureType: "water", elementType: "geometry", stylers: [{ color: "#070b14" }] },
+    { featureType: "water", elementType: "labels.text", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#1e293b" }, { weight: 1 }] },
+    { featureType: "administrative.country", elementType: "geometry.stroke", stylers: [{ color: "#334155" }] },
+    { featureType: "administrative.province", elementType: "geometry.stroke", stylers: [{ color: "#243247" }] },
+];
+
+const DARK_CIVIC_MAP_STYLE = [
+    ...DARK_BASE_RULES,
+    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#293952" }, { weight: 1.5 }] },
+    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#8193aa" }] },
+    { featureType: "road.highway", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#1c283a" }, { weight: 1.2 }] },
+    { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+    { featureType: "road.arterial", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#141d2c" }, { weight: 0.8 }] },
+    { featureType: "road.local", elementType: "labels", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#7b8ea5" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#546478" }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 2 }] }
+];
+
+const LIGHT_BASE_RULES = [
+    { featureType: "poi", stylers: [{ visibility: "off" }] },
+    { featureType: "transit", stylers: [{ visibility: "off" }] },
+    { elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
+    { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
+    { featureType: "water", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+    { featureType: "water", elementType: "labels.text", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#cbd5e1" }] },
+];
+
+const LIGHT_CIVIC_MAP_STYLE = [
+    ...LIGHT_BASE_RULES,
+    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#cbd5e1" }] },
+    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
+    { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+    { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+    { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] },
+    { featureType: "road.local", elementType: "labels", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#334155" }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] }
+];
 
 const REPORT_CATEGORIES = (t) => [
     { value: 'Water Supply Network', label: t('landing.solutions.s1_title', { defaultValue: 'Water Supply Network' }) },
@@ -131,17 +185,18 @@ const EMERGENCY_HOTLINES = (t) => [
 
 const QUICK_FUNCTIONS_DATA = (t) => [
     { id: 'report', icon: <Camera size={22} />, label: t('dashboard.quickReport.title', { defaultValue: 'File Report' }), color: 'orange', modal: 'file-report' },
-    { id: 'map', icon: <Map size={22} />, label: t('dashboard.sidebar.map', { defaultValue: 'Barangay Map' }), color: 'blue', modal: 'map' },
+    { id: 'map', icon: <MapIcon size={22} />, label: t('dashboard.sidebar.map', { defaultValue: 'Barangay Map' }), color: 'blue', modal: 'map' },
     { id: 'services', icon: <Handshake size={22} />, label: t('dashboard.sidebar.services', { defaultValue: 'LGU Services' }), color: 'green', modal: 'services' },
     { id: 'knowledge', icon: <BookOpen size={22} />, label: t('dashboard.sidebar.knowledge', { defaultValue: 'Knowledge Base' }), color: 'indigo', modal: 'knowledge' },
     { id: 'track', icon: <Search size={22} />, label: t('dashboard.sidebar.track', { defaultValue: 'Track Issue' }), color: 'teal', tab: 'reports' }
 ];
 
 const NAV_ITEMS = (t) => [
-    { id: 'overview', icon: <Home size={28} strokeWidth={2.5} />, label: t('dashboard.sidebar.overview', { defaultValue: 'Overview' }) },
-    { id: 'reports', icon: <FileText size={28} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My Reports' }) },
-    { id: 'profile', icon: <User size={28} />, label: t('dashboard.sidebar.profile', { defaultValue: 'Profile' }) },
-    { id: 'settings', icon: <Settings size={28} />, label: t('dashboard.sidebar.settings', { defaultValue: 'Settings' }) },
+    { id: 'overview', icon: <Home size={22} strokeWidth={2} />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
+    { id: 'reports', icon: <FileText size={22} strokeWidth={2} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
+    { id: 'report', icon: <Plus size={24} strokeWidth={3} />, label: t('dashboard.sidebar.report', { defaultValue: 'Report' }), isAction: true },
+    { id: 'updates', icon: <Bell size={22} strokeWidth={2} />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
+    { id: 'profile', icon: <User size={22} strokeWidth={2} />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
 ];
 
 const LGU_SERVICES_LIST = (t) => [
@@ -160,41 +215,92 @@ const KNOWLEDGE_BASE_ARTICLES = (t) => [
     { id: 4, title: t('knowledge.art4.title', { defaultValue: 'Noise Ordinance Info' }), category: t('knowledge.cat.community', { defaultValue: 'Community' }), excerpt: t('knowledge.art4.excerpt', { defaultValue: 'Understanding the city wide peace and order regulations.' }) },
 ];
 
-const LeftSidebar = ({ user, handleSetTab, handleSetModal, t }) => (
-    <div className="w-full h-full pb-6 hidden md:block pl-2 pr-4 lg:pr-6 pt-8 lg:pt-10">
-        <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-4 rounded-xl hover:bg-slate-200/50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group">
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative">
-                {user.avatar}
-                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </div>
-            <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-[15px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">{user.name}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{user.barangay}</p>
-            </div>
-        </div>
-        <nav className="space-y-1 mt-4">
-            <div className="px-3 pb-2 text-[13px] font-bold text-slate-500 dark:text-slate-400">{t('dashboard.sidebar.shortcuts', { defaultValue: 'Shortcuts' })}</div>
-            {QUICK_FUNCTIONS_DATA(t).map(func => (
-                <button
-                    key={func.id}
-                    onClick={func.modal ? () => handleSetModal(func.modal) : () => handleSetTab(func.tab)}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors focus:outline-none group text-left"
-                >
-                    <div className={`w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-${func.color}-500 shrink-0 group-hover:bg-white dark:group-hover:bg-slate-700 shadow-sm transition-colors`}>
-                        {func.icon}
+const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogout, t }) => {
+    const navList = [
+        { id: 'overview', icon: <Home size={20} strokeWidth={2} />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
+        { id: 'reports', icon: <FileText size={20} strokeWidth={2} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
+        { id: 'report', icon: <PlusCircle size={20} strokeWidth={2.5} />, label: t('dashboard.sidebar.report', { defaultValue: 'Report an issue' }), isPrimary: true },
+        { id: 'updates', icon: <Bell size={20} strokeWidth={2} />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
+        { id: 'profile', icon: <User size={20} strokeWidth={2} />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
+    ];
+
+    return (
+        <div className="w-full h-full pb-6 hidden lg:flex flex-col justify-between pl-2 pr-4 lg:pr-5 pt-6 border-r border-slate-200/80 dark:border-slate-800">
+            <div>
+                {/* User Identity Snapshot */}
+                <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-5 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 hover:border-orange-500/50 cursor-pointer transition-all group shadow-2xs">
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative">
+                        {user.avatar}
                     </div>
-                    <span className="font-semibold text-[15px] text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{func.label}</span>
-                </button>
-            ))}
-        </nav>
-        <div className="px-4 text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed mt-8">
-            <button onClick={() => handleSetModal('privacy')} className="hover:underline hover:text-orange-500 mr-2 inline-block">{t('footer.privacy', { defaultValue: 'Privacy' })}</button> ·
-            <button onClick={() => handleSetModal('terms')} className="hover:underline hover:text-orange-500 mx-2 inline-block">{t('footer.terms', { defaultValue: 'Terms' })}</button> ·
-            <button onClick={() => handleSetModal('cookies')} className="hover:underline hover:text-orange-500 mx-2 inline-block">{t('footer.cookie', { defaultValue: 'Cookies' })}</button> ·
-            <div className="mt-2 text-slate-400 dark:text-slate-600">PULSO Caloocan North © 2026</div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-[15px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">{user.name}</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.barangay}</p>
+                    </div>
+                </div>
+
+                {/* Persistent Side Navigation Rail (5 Items) */}
+                <nav className="space-y-1.5">
+                    {navList.map(item => {
+                        if (item.isPrimary) {
+                            return (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => handleSetModal('file-report')}
+                                    className="w-full my-2 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-extrabold text-sm tracking-wide shadow-md hover:shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                >
+                                    {item.icon}
+                                    <span>{item.label}</span>
+                                </button>
+                            );
+                        }
+
+                        const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
+
+                        return (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleSetTab(item.id)}
+                                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                                    isActive
+                                        ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] shadow-2xs border border-orange-200/60 dark:border-orange-800/40 font-extrabold'
+                                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white border border-transparent'
+                                }`}
+                            >
+                                <span className={isActive ? 'text-[#ff6b00]' : 'text-slate-400 group-hover:text-slate-600'}>
+                                    {item.icon}
+                                </span>
+                                <span>{item.label}</span>
+                            </button>
+                        );
+                    })}
+
+                    {handleLogout && (
+                        <button
+                            type="button"
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-700 dark:hover:text-red-300 transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 mt-2"
+                        >
+                            <LogOut size={20} strokeWidth={2} className="text-red-500 shrink-0" />
+                            <span>{t('dashboard.sidebar.signOut', { defaultValue: 'Sign Out' })}</span>
+                        </button>
+                    )}
+                </nav>
+            </div>
+
+            {/* Supporting Footer Links */}
+            <div className="px-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed pt-6 border-t border-slate-200/60 dark:border-slate-800/60">
+                <div className="flex flex-wrap gap-2 mb-2">
+                    <button onClick={() => handleSetModal('privacy')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.privacy', { defaultValue: 'Privacy' })}</button> ·
+                    <button onClick={() => handleSetModal('terms')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.terms', { defaultValue: 'Terms' })}</button> ·
+                    <button onClick={() => handleSetModal('cookies')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.cookie', { defaultValue: 'Cookies' })}</button>
+                </div>
+                <div className="text-[11px] text-slate-400 dark:text-slate-600">PULSO Caloocan North © 2026</div>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const RightSidebar = ({
     user,
@@ -206,7 +312,7 @@ const RightSidebar = ({
     map,
     t
 }) => (
-    <div className="w-full h-full pb-6 hidden xl:block pr-2 pl-4 lg:pl-6 pt-8 lg:pt-10">
+    <div className="w-full h-full pb-6 hidden xl:block pr-2 pl-4 lg:pl-6 pt-6">
         <div className="mb-6">
             <h3 className="font-bold text-[13px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 px-1">Your Impact</h3>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 transition-all hover:shadow-md group/trust">
@@ -334,9 +440,441 @@ const RightSidebar = ({
     </div>
 );
 
-const LguFeed = ({ lguUpdates, loadingAdvisories, getIconForCategory, setSelectedPost, setActiveModal, containerVariants, t }) => (
+const ResidentHomeView = ({
+    user,
+    userReports,
+    loadingReports,
+    lguUpdates,
+    loadingAdvisories,
+    processedHazards,
+    handleSetTab,
+    setActiveModal,
+    setSelectedPost,
+    t
+}) => {
+    // 1. Alert Banner Data (Dynamic from urgent advisory or authoritative municipal alert)
+    const topAlert = (lguUpdates && lguUpdates.find(u => u.priority === 'urgent' || u.priority === 'critical')) || {
+        id: 'alert-default',
+        title: 'WALANG PASOK SA JULY 23',
+        description: 'Tuloy ang monitoring ng mga pangunahing kalsada at flood-prone areas.',
+        priority: 'urgent'
+    };
+
+    // 2. Latest Report Data: Most recent user report or realistic active ticket
+    const latestReport = (userReports && userReports.length > 0) ? userReports[0] : {
+        id: 'pul-demo-latest',
+        ticket_id: 'PUL-2026-0822',
+        status: 'assigned',
+        location_string: '10th Ave. cor. C. Garcia St., Grace Park',
+        created_at: new Date(Date.now() - 3600000 * 4).toISOString()
+    };
+
+    const trackerSteps = [
+        { id: 'received', label: 'Received' },
+        { id: 'reviewed', label: 'Reviewed' },
+        { id: 'assigned', label: 'Assigned' },
+        { id: 'in_progress', label: 'In progress' },
+        { id: 'resolved', label: 'Resolved' }
+    ];
+
+    const getStepIndex = (status) => {
+        const s = (status || '').toLowerCase();
+        if (s === 'resolved') return 4;
+        if (s === 'in_progress' || s === 'dispatched') return 3;
+        if (s === 'assigned' || s === 'approved_internal') return 2;
+        if (s === 'reviewed') return 1;
+        return 0; // received / pending
+    };
+
+    const currentStepIndex = getStepIndex(latestReport?.status || 'assigned');
+
+    // 3. Nearby Issues Data
+    const nearbyList = [
+        {
+            id: 'nb-1',
+            title: 'Sira na kanal sa bangketa',
+            address: '8th Ave. near Bagong Barrio Elem. School',
+            distance: '120 m',
+            icon: Wrench
+        },
+        {
+            id: 'nb-2',
+            title: 'Ilaw sa kalsada patay',
+            address: 'Camarin Rd. near Tala St.',
+            distance: '210 m',
+            icon: Zap
+        },
+        {
+            id: 'nb-3',
+            title: 'Tambak ng basura',
+            address: '10th Ave. near P. Burgos St.',
+            distance: '350 m',
+            icon: Cone
+        }
+    ];
+
+    // 4. Services & Emergency Contacts Data
+    const emergencyContacts = [
+        { id: 'ndrrmc', title: 'NDRRMC', num: '911', tel: '911', icon: ShieldCheck },
+        { id: 'pnp', title: 'Caloocan PNP', num: '8892-6166', tel: '0288926166', icon: ShieldAlert },
+        { id: 'bfp', title: 'BFP Caloocan', num: '8896-5700', tel: '0288965700', icon: Flame },
+        { id: 'drrmo', title: 'Caloocan DRRMO', num: '8397-6212', tel: '0283976212', icon: Truck }
+    ];
+
+    // Top city updates for sidebar / teaser
+    const displayUpdates = (lguUpdates && lguUpdates.length > 0) ? lguUpdates.slice(0, 3) : [
+        {
+            id: 'u-1',
+            title: 'Road reblocking sa EDSA-Philcoa flyover',
+            description: 'Hulyo 25–27. Mag-ingat at planuhin ang biyahe.',
+            created_at: new Date().toISOString()
+        },
+        {
+            id: 'u-2',
+            title: 'Maynilad Scheduled Water Interruption',
+            description: 'Brgy. 171, 175, 178 emergency pipe maintenance.',
+            created_at: new Date().toISOString()
+        }
+    ];
+
+    const copyOrCall = (e, tel) => {
+        if (!navigator.userAgent.match(/Mobi|Android|iPhone/i)) {
+            // Desktop helper
+            navigator.clipboard?.writeText(tel);
+        }
+    };
+
+    return (
+        <div className="w-full max-w-[1400px] mx-auto pb-32 lg:pb-10 pt-2 sm:pt-4 px-3.5 sm:px-4 lg:px-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
+                
+                {/* ── LEFT COLUMN (Primary, ~65-70% on desktop) ── */}
+                <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4 sm:gap-5 w-full">
+                    
+                    {/* 1. Alert Banner */}
+                    <div 
+                        onClick={() => {
+                            if (topAlert.title.includes('JULY 23')) {
+                                setActiveModal('services');
+                            } else {
+                                setSelectedPost(topAlert);
+                                setActiveModal('post-details');
+                            }
+                        }}
+                        className="w-full p-3.5 sm:p-4 rounded-2xl bg-orange-50/90 dark:bg-orange-950/40 border border-orange-300 dark:border-orange-800/80 shadow-xs hover:shadow-md transition-all flex items-center justify-between gap-3 cursor-pointer group"
+                    >
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-orange-500/15 dark:bg-orange-500/25 text-[#ff6b00] flex items-center justify-center shrink-0">
+                                <AlertTriangle size={22} className="text-[#ff6b00]" />
+                            </div>
+                            <div className="min-w-0">
+                                <h4 className="font-heading font-black text-xs sm:text-sm text-red-600 dark:text-red-400 tracking-wide uppercase leading-tight">
+                                    {topAlert.title}
+                                </h4>
+                                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium line-clamp-1 mt-0.5">
+                                    {topAlert.description}
+                                </p>
+                            </div>
+                        </div>
+                        <ChevronRight size={18} className="text-orange-500 shrink-0 transform group-hover:translate-x-1 transition-transform" />
+                    </div>
+
+                    {/* 2. Latest Report Card */}
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+                        <div className="p-4 sm:p-5">
+                            {/* Header: Title, Ticket ID, Status Badge */}
+                            <div className="flex items-start justify-between gap-2 mb-4 sm:mb-6">
+                                <div>
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-0.5">
+                                        Latest report
+                                    </span>
+                                    <h3 className="font-mono-data font-black text-base sm:text-lg text-slate-900 dark:text-white tracking-wide">
+                                        {latestReport.ticket_id || 'PUL-2026-0822'}
+                                    </h3>
+                                </div>
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800/80 text-orange-600 dark:text-orange-400 text-xs font-bold capitalize">
+                                    <User size={13} className="shrink-0" />
+                                    <span>{latestReport.status || 'Assigned'}</span>
+                                </div>
+                            </div>
+
+                            {/* 5-Step Horizontal Tracker with Desktop Breathing Room */}
+                            <div className="w-full py-2 sm:py-3 px-0.5 sm:px-3">
+                                <div className="relative flex items-center justify-between w-full">
+                                    {/* Base Inactive Track Line */}
+                                    <div className="absolute top-[12px] sm:top-[15px] left-[12px] sm:left-[20px] right-[12px] sm:right-[20px] h-[3px] bg-slate-200 dark:bg-slate-800 z-0" />
+                                    {/* Active Completed Track Line */}
+                                    <div 
+                                        className="absolute top-[12px] sm:top-[15px] left-[12px] sm:left-[20px] h-[3px] bg-[#ff6b00] transition-all duration-500 z-0" 
+                                        style={{ width: `${(currentStepIndex / (trackerSteps.length - 1)) * 100}%` }}
+                                    />
+
+                                    {/* Steps */}
+                                    {trackerSteps.map((step, idx) => {
+                                        const isCompleted = idx < currentStepIndex;
+                                        const isCurrent = idx === currentStepIndex;
+                                        return (
+                                            <div key={step.id} className="relative z-10 flex flex-col items-center flex-1 min-w-0">
+                                                <div 
+                                                    className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
+                                                        isCompleted
+                                                            ? 'bg-[#ff6b00] text-white shadow-xs'
+                                                            : isCurrent
+                                                                ? 'bg-white dark:bg-slate-900 border-2 border-[#ff6b00] text-[#ff6b00] ring-3 sm:ring-4 ring-orange-500/20'
+                                                                : 'bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-transparent'
+                                                    }`}
+                                                >
+                                                    {isCompleted ? (
+                                                        <Check size={12} strokeWidth={3} className="sm:w-3.5 sm:h-3.5" />
+                                                    ) : isCurrent ? (
+                                                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#ff6b00]" />
+                                                    ) : null}
+                                                </div>
+                                                <span 
+                                                    className={`text-[9px] sm:text-xs mt-1.5 text-center leading-tight max-w-[54px] sm:max-w-none break-words ${
+                                                        idx <= currentStepIndex
+                                                            ? 'text-slate-900 dark:text-white font-bold'
+                                                            : 'text-slate-500 dark:text-slate-400 font-medium'
+                                                    }`}
+                                                >
+                                                    {step.label}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Location Footer Strip */}
+                        <div 
+                            onClick={() => setActiveModal('map')}
+                            className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/40 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] cursor-pointer transition-colors"
+                        >
+                            <div className="flex items-center gap-2 truncate pr-2">
+                                <MapPin size={15} className="text-slate-500 dark:text-slate-400 shrink-0" />
+                                <span className="truncate">{latestReport.location_string || '10th Ave. cor. C. Garcia St., Grace Park'}</span>
+                            </div>
+                            <ChevronRight size={16} className="shrink-0 text-slate-500" />
+                        </div>
+                    </div>
+
+                    {/* 3. Primary "Report an issue" CTA Button */}
+                    <button
+                        type="button"
+                        onClick={() => setActiveModal('file-report')}
+                        className="w-full sm:w-auto self-stretch sm:self-start inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-extrabold text-sm sm:text-base tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[50px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
+                        aria-label="Report an issue"
+                    >
+                        <PlusCircle size={20} className="text-white shrink-0" />
+                        <span>Report an issue</span>
+                    </button>
+
+                    {/* 4. Nearby Issues Card */}
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+                        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                            <MapPin size={18} className="text-[#ff6b00]" />
+                            <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                                Nearby issues
+                            </h3>
+                        </div>
+
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {nearbyList.map(item => {
+                                const ItemIcon = item.icon;
+                                return (
+                                    <div 
+                                        key={item.id}
+                                        onClick={() => setActiveModal('map')}
+                                        className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0 group-hover:text-[#ff6b00] transition-colors">
+                                                <ItemIcon size={18} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-[#ff6b00] transition-colors">
+                                                    {item.title}
+                                                </h4>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                    {item.address}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0 text-xs font-mono font-bold text-[#ff6b00]">
+                                            <span>{item.distance}</span>
+                                            <ChevronRight size={15} className="transform group-hover:translate-x-0.5 transition-transform" />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div 
+                            onClick={() => setActiveModal('map')}
+                            className="p-3 bg-slate-50/50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800 text-center text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] cursor-pointer transition-colors flex items-center justify-center gap-1"
+                        >
+                            <span>View more nearby issues</span>
+                            <ChevronRight size={14} />
+                        </div>
+                    </div>
+
+                </div>
+
+                {/* ── RIGHT COLUMN (Secondary Sidebar Content, ~30-35% on desktop) ── */}
+                <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-4 sm:gap-5 w-full">
+                    
+                    {/* 1. City Updates Card */}
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+                        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Radio size={18} className="text-[#ff6b00]" />
+                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                                    City updates
+                                </h3>
+                            </div>
+                            <button 
+                                onClick={() => handleSetTab('overview')} 
+                                className="text-xs font-bold text-[#ff6b00] hover:underline cursor-pointer"
+                            >
+                                View all
+                            </button>
+                        </div>
+
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {displayUpdates.map((update, uIdx) => (
+                                <div 
+                                    key={update.id || uIdx}
+                                    onClick={() => { setSelectedPost(update); setActiveModal('post-details'); }}
+                                    className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-start justify-between gap-2 cursor-pointer group"
+                                >
+                                    <div className="min-w-0 pr-2">
+                                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors line-clamp-1">
+                                            {update.title}
+                                        </h4>
+                                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                                            {update.description}
+                                        </p>
+                                    </div>
+                                    <ChevronRight size={16} className="text-slate-400 group-hover:text-[#ff6b00] shrink-0 mt-0.5 transform group-hover:translate-x-0.5 transition-transform" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 2. Services & Emergency Contacts Grid */}
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-4 sm:p-5">
+                        <div className="flex items-center gap-2 mb-3.5">
+                            <PhoneCall size={18} className="text-[#ff6b00]" />
+                            <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                                Services &amp; emergency contacts
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                            {emergencyContacts.map(ec => {
+                                const IconComp = ec.icon;
+                                return (
+                                    <a
+                                        key={ec.id}
+                                        href={`tel:${ec.tel}`}
+                                        onClick={(e) => copyOrCall(e, ec.tel)}
+                                        className="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 hover:border-[#ff6b00]/60 hover:bg-orange-50/50 dark:hover:bg-orange-950/20 transition-all text-center group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-white dark:bg-slate-700 text-[#ff6b00] flex items-center justify-center mb-1.5 shadow-2xs group-hover:scale-105 transition-transform">
+                                            <IconComp size={18} />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-slate-900 dark:text-white leading-tight">
+                                            {ec.title}
+                                        </span>
+                                        <span className="text-[11px] font-mono font-bold text-orange-600 dark:text-orange-400 mt-0.5">
+                                            {ec.num}
+                                        </span>
+                                    </a>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
+const LguFeed = ({ lguUpdates, loadingAdvisories, getIconForCategory, setSelectedPost, setActiveModal, handleSetTab, containerVariants, t }) => (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full">
-        <div className="mb-4 hidden md:block relative pb-4">
+        {/* ── CORE RESIDENT ACTIONS ZONE: 4 large tappable cards ── */}
+        <div className="mb-6 w-full">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full">
+                {/* 1. Report an Issue (Primary Action - Filled Orange) */}
+                <button
+                    type="button"
+                    onClick={() => setActiveModal('file-report')}
+                    className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[92px] sm:min-h-[104px] text-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="Report an Issue"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center mb-1.5 shrink-0">
+                        <Camera size={22} className="text-white" />
+                    </div>
+                    <span className="font-heading font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+                        Report an Issue
+                    </span>
+                </button>
+
+                {/* 2. Track My Report */}
+                <button
+                    type="button"
+                    onClick={() => handleSetTab && handleSetTab('reports')}
+                    className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-800 hover:border-[#ff6b00]/60 active:scale-[0.98] text-slate-900 dark:text-white transition-all shadow-xs hover:shadow-md min-h-[92px] sm:min-h-[104px] text-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="Track My Report"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center mb-1.5 shrink-0">
+                        <Search size={22} className="text-[#ff6b00]" />
+                    </div>
+                    <span className="font-heading font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+                        Track My Report
+                    </span>
+                </button>
+
+                {/* 3. News */}
+                <button
+                    type="button"
+                    onClick={() => {
+                        const el = document.getElementById('advisories-feed');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-800 hover:border-[#ff6b00]/60 active:scale-[0.98] text-slate-900 dark:text-white transition-all shadow-xs hover:shadow-md min-h-[92px] sm:min-h-[104px] text-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="News"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center mb-1.5 shrink-0">
+                        <Bell size={22} className="text-[#ff6b00]" />
+                    </div>
+                    <span className="font-heading font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+                        News
+                    </span>
+                </button>
+
+                {/* 4. Other Services */}
+                <button
+                    type="button"
+                    onClick={() => setActiveModal('services')}
+                    className="flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-800 hover:border-[#ff6b00]/60 active:scale-[0.98] text-slate-900 dark:text-white transition-all shadow-xs hover:shadow-md min-h-[92px] sm:min-h-[104px] text-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="Other Services"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center mb-1.5 shrink-0">
+                        <Handshake size={22} className="text-[#ff6b00]" />
+                    </div>
+                    <span className="font-heading font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+                        Other Services
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        {/* ── Official Board & Advisories (Demoted below 4-action grid) ── */}
+        <div id="advisories-feed" className="mb-4 relative pb-2 pt-1">
             <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white flex items-center gap-2 px-1">
                 <ShieldCheck className="text-orange-500" size={24} /> {t('dashboard.overview.latestUpdate', { defaultValue: 'Official Board' })}
             </h2>
@@ -455,11 +993,131 @@ const sanitizeDescription = (text) => {
     return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 };
 
-const ReportCard = ({ report, setZoomedImage, handleCancelReport }) => {
+// ── Mini Pulseline Progress Tracker ───────────────────────────────────────────
+const REPORT_TRACKER_STEPS = [
+    { id: 'received', label: 'Received' },
+    { id: 'verified', label: 'Verified' },
+    { id: 'assigned', label: 'Assigned' },
+    { id: 'in_progress', label: 'In Progress' },
+    { id: 'resolved', label: 'Resolved' }
+];
+
+const getReportTrackerIndex = (status) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'resolved') return 4;
+    if (s === 'in_progress' || s === 'dispatched') return 3;
+    if (s === 'assigned' || s === 'approved_internal') return 2;
+    if (s === 'verified' || s === 'reviewed' || s === 'under_review') return 1;
+    return 0; // pending, unverified, received
+};
+
+const MiniProgressTracker = ({ status, resolutionDays }) => {
+    const isRejected = status === 'rejected';
+    const isCancelled = status === 'cancelled';
+    const isResolved = status === 'resolved';
+    const currentStepIndex = getReportTrackerIndex(status);
+
+    if (isRejected) {
+        return (
+            <div className="flex items-center gap-2 text-xs font-medium text-rose-700 dark:text-rose-300 bg-rose-50/80 dark:bg-rose-950/30 px-3.5 py-2.5 rounded-2xl border border-rose-200/80 dark:border-rose-900/50">
+                <AlertTriangle size={15} className="shrink-0 text-rose-600 dark:text-rose-400" />
+                <span>Verification not accepted — issue details did not meet municipal triage criteria.</span>
+            </div>
+        );
+    }
+
+    if (isCancelled) {
+        return (
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 bg-slate-100/80 dark:bg-slate-900/60 px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <RotateCcw size={15} className="shrink-0 text-slate-500" />
+                <span>Report retracted by resident. Scheduled inspection was cancelled.</span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-full bg-slate-50/80 dark:bg-slate-950/50 rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+            {/* Header Stage Notice */}
+            <div className="flex items-center justify-between text-[11px] mb-3 px-1">
+                <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-200">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse ring-2 ring-orange-500/20 shrink-0" />
+                    <span className="uppercase tracking-wider text-[10px] text-slate-400 dark:text-slate-500 font-mono">Progress:</span>
+                    <span className="text-orange-600 dark:text-orange-400 font-semibold text-xs sm:text-[13px]">
+                        {currentStepIndex === 0 && 'Awaiting intake verification'}
+                        {currentStepIndex === 1 && 'Verified — routing to division'}
+                        {currentStepIndex === 2 && 'Assigned to field maintenance crew'}
+                        {currentStepIndex === 3 && 'Under active field dispatch'}
+                        {currentStepIndex === 4 && `Resolved${resolutionDays !== null ? ` in ${resolutionDays}d` : ''}`}
+                    </span>
+                </div>
+                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/80 font-bold hidden sm:inline-block">
+                    Step {currentStepIndex + 1} of 5
+                </span>
+            </div>
+
+            {/* 5-Step Horizontal Pulse Track */}
+            <div className="relative flex items-center justify-between w-full px-1 pt-1 pb-1">
+                {/* Background Inactive Track */}
+                <div
+                    className="absolute top-[13px] sm:top-[14px] h-[3px] bg-slate-200 dark:bg-slate-800 rounded-full z-0"
+                    style={{ left: '10%', right: '10%' }}
+                />
+
+                {/* Foreground Active Track */}
+                <div
+                    className="absolute top-[13px] sm:top-[14px] h-[3px] bg-gradient-to-r from-orange-500 via-orange-400 to-amber-500 rounded-full transition-all duration-500 z-0"
+                    style={{
+                        left: '10%',
+                        width: `${(Math.min(currentStepIndex, 4) / 4) * 80}%`
+                    }}
+                />
+
+                {REPORT_TRACKER_STEPS.map((step, idx) => {
+                    const isCompleted = idx < currentStepIndex || (isResolved && idx <= 4);
+                    const isCurrent = idx === currentStepIndex && !isResolved;
+                    return (
+                        <div key={step.id} className="relative z-10 flex flex-col items-center flex-1 min-w-0">
+                            <div
+                                className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all aspect-square ${
+                                    isCompleted
+                                        ? 'bg-orange-500 text-white shadow-xs ring-2 ring-orange-500/20'
+                                        : isCurrent
+                                            ? 'bg-white dark:bg-slate-900 border-2 border-orange-500 text-orange-500 ring-4 ring-orange-500/20 shadow-xs'
+                                            : 'bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-transparent'
+                                }`}
+                            >
+                                {isCompleted ? (
+                                    <Check size={12} strokeWidth={3} />
+                                ) : isCurrent ? (
+                                    <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                                ) : (
+                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+                                )}
+                            </div>
+                            <span
+                                className={`text-[9px] sm:text-[11px] mt-1.5 text-center leading-tight truncate max-w-[62px] sm:max-w-none transition-colors ${
+                                    isCompleted
+                                        ? 'text-slate-800 dark:text-slate-200 font-bold'
+                                        : isCurrent
+                                            ? 'text-orange-600 dark:text-orange-400 font-extrabold'
+                                            : 'text-slate-400 dark:text-slate-500 font-medium'
+                                }`}
+                            >
+                                {step.label}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = false, newestReportId }) => {
     const [showFullAddr, setShowFullAddr] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
-    const [showRetractConfirm, setShowRetractConfirm] = useState(false);
     const [isDescExpanded, setIsDescExpanded] = useState(false);
+    const [copiedId, setCopiedId] = useState(false);
 
     const resolutionDays = report.status === 'resolved' && report.updated_at && report.created_at
         ? daysBetween(report.created_at, report.updated_at)
@@ -475,92 +1133,123 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport }) => {
     const isPending = report.status === 'pending' || report.status === 'unverified';
     const isResolved = report.status === 'resolved';
 
+    // Stale report signal: pending for 14+ days (only if not already marked as latest)
+    const daysWaiting = daysBetween(report.created_at, new Date().toISOString());
+    const isStale = !isLatest && isPending && daysWaiting >= 14;
+
+    const handleCopyTicketId = (e) => {
+        e.stopPropagation();
+        if (report.ticket_id) {
+            navigator.clipboard?.writeText(report.ticket_id);
+            setCopiedId(true);
+            setTimeout(() => setCopiedId(false), 2000);
+        }
+    };
+
     return (
-        <div className="group bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col
-                        transition-all duration-200 ease-out
-                        hover:border-orange-500/40 dark:hover:border-orange-500/40 hover:shadow-md hover:shadow-orange-500/5 hover:-translate-y-px
-                        focus-within:border-orange-500/40 relative">
+        <div className={`group bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden flex flex-col transition-all duration-200 ease-out hover:shadow-md hover:-translate-y-px relative ${
+            isLatest
+                ? 'border-slate-300 dark:border-slate-700 shadow-xs'
+                : isStale
+                    ? 'border-slate-300 dark:border-slate-700 shadow-xs'
+                    : 'border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+        }`}>
 
             <div className="flex flex-col sm:flex-row">
-                {/* ── Thumbnail ──────────────────────────────────────────────── */}
-                <div className="relative w-full sm:w-48 sm:min-w-[12rem] h-44 sm:h-auto shrink-0 bg-slate-100 dark:bg-slate-800/80 overflow-hidden">
+                {/* ── 1. Thumbnail with Uniform Aspect Ratio & Lightbox Zoom ─────────── */}
+                <div className="relative w-full sm:w-48 md:w-52 aspect-[16/10] sm:aspect-auto sm:self-stretch shrink-0 bg-slate-100 dark:bg-slate-800/90 overflow-hidden group/thumb cursor-pointer">
                     {report.image_url ? (
                         <button
                             type="button"
-                            onClick={() => setZoomedImage(report.image_url?.startsWith('http') ? report.image_url : `${API_BASE_URL}${report.image_url}`)}
-                            className="w-full h-full block relative group/thumb focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer"
-                            aria-label="View full-size report photo"
+                            onClick={() => setZoomedImage(`${API_BASE_URL}${report.image_url}`)}
+                            className="w-full h-full block relative focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer"
+                            aria-label={`View full-size photo for report ${report.ticket_id}`}
                         >
                             <img
-                                src={report.image_url?.startsWith('http') ? report.image_url : `${API_BASE_URL}${report.image_url}`}
+                                src={`${API_BASE_URL}${report.image_url}`}
                                 alt={`${report.category || 'Report'} photo`}
+                                loading="lazy"
                                 className="w-full h-full object-cover object-center transition-transform duration-500 ease-out group-hover/thumb:scale-105"
                             />
                             {/* Watermark masking gradient at bottom */}
-                            <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
-                            {/* Zoom affordance overlay */}
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/thumb:bg-black/30 transition-colors duration-200">
-                                <div className="p-2 rounded-full bg-black/50 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 text-[11px] font-semibold">
-                                    <Maximize2 size={14} />
-                                    <span>Zoom</span>
-                                </div>
+                            <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 via-black/25 to-transparent pointer-events-none" />
+                            
+                            {/* Quick Zoom Affordance */}
+                            <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold flex items-center gap-1 opacity-90 group-hover/thumb:opacity-100 transition-opacity">
+                                <Maximize2 size={11} />
+                                <span>Zoom</span>
                             </div>
                         </button>
                     ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 gap-1.5 p-4">
-                            <ImageIcon size={28} strokeWidth={1.5} />
-                            <span className="text-[10px] font-semibold uppercase tracking-wider">No Photo</span>
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 gap-1.5 p-4 min-h-[140px]">
+                            <CameraOff size={26} strokeWidth={1.5} />
+                            <span className="text-[10px] font-semibold uppercase tracking-wider">No photo attached</span>
                         </div>
                     )}
                 </div>
 
-                {/* ── Card Body ──────────────────────────────────────────────── */}
-                <div className="flex-1 min-w-0 flex flex-col p-4 sm:p-5 gap-3">
+                {/* ── 2. Card Body with Tightened Hierarchy ───────────────────────────── */}
+                <div className="flex-1 min-w-0 flex flex-col p-4 sm:p-5 gap-2.5">
 
-                    {/* Row 1: Category + Status */}
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                            <h3 className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white leading-snug truncate pr-1">
+                    {/* Row 1: Category + Priority Badges + Status */}
+                    <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
+                            <h3 className="text-[15px] sm:text-base font-bold tracking-tight text-slate-900 dark:text-white leading-snug truncate">
                                 {report.category || report.ai_category || 'Civic Infrastructure Report'}
                             </h3>
+
+                            {/* Priority Indicators */}
+                            {isLatest && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/70 dark:bg-white/10 backdrop-blur-md text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-white/15 shadow-xs">
+                                    <Sparkles size={11} className="text-slate-600 dark:text-slate-300" />
+                                    <span>Latest Report</span>
+                                </span>
+                            )}
+                            {isStale && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/70 dark:bg-white/10 backdrop-blur-md text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-white/15 shadow-xs">
+                                    <Clock size={11} className="text-slate-600 dark:text-slate-300" />
+                                    <span>Longest Waiting ({daysWaiting}d)</span>
+                                </span>
+                            )}
+                            {(report.is_claimed || report.claimed_by_user_id || report.claimed_at) && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800/60 shadow-xs">
+                                    <Link2 size={11} className="text-orange-500" />
+                                    <span>Claimed Ticket</span>
+                                </span>
+                            )}
                         </div>
+
                         <StatusBadge status={report.status} />
                     </div>
 
-                    {/* Row 2: Ticket ID (monospace) + Submission Date */}
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 tracking-wide select-all">
-                            {report.ticket_id}
-                        </span>
-                        <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                    {/* Row 2: Ticket ID (Click to copy) + Date + Relative Time (Tightly Grouped) */}
+                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                        <button
+                            type="button"
+                            onClick={handleCopyTicketId}
+                            title="Click to copy ticket ID"
+                            className="font-mono text-[11px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-orange-50 dark:hover:bg-orange-950/40 text-slate-800 dark:text-slate-200 hover:text-orange-600 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer select-all"
+                            aria-label={`Copy ticket ID ${report.ticket_id}`}
+                        >
+                            <span>{report.ticket_id}</span>
+                            {copiedId ? (
+                                <Check size={11} className="text-emerald-500" />
+                            ) : (
+                                <Copy size={11} className="text-slate-400 group-hover:text-orange-500" />
+                            )}
+                        </button>
+                        <span className="text-slate-400 dark:text-slate-600">•</span>
+                        <span className="font-mono text-slate-600 dark:text-slate-400">
                             {new Date(report.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
-                        {(report.is_claimed || report.claimed_by_user_id || report.claimed_at) && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60">
-                                Claimed Ticket
-                            </span>
-                        )}
+                        <span className="text-slate-400 dark:text-slate-500 text-[10px]">
+                            ({formatRelativeTime(report.created_at)})
+                        </span>
                     </div>
 
-                    {/* Row 3: Description snippet (Cleaned & sanitized) */}
-                    {cleanDescription && (
-                        <div className="text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                            <span>{displayDescription}</span>
-                            {isLongDescription && (
-                                <button
-                                    type="button"
-                                    onClick={() => setIsDescExpanded(!isDescExpanded)}
-                                    className="ml-1 text-orange-600 dark:text-orange-400 font-semibold hover:underline text-[12px] inline"
-                                >
-                                    {isDescExpanded ? 'Show less' : 'Read more'}
-                                </button>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Row 4: Location — with expand affordance */}
+                    {/* Row 3: Location (Pin + Expand affordance) */}
                     <div className="flex items-start gap-1.5 text-[12px] text-slate-500 dark:text-slate-400">
-                        <MapPin size={14} className="shrink-0 mt-0.5 text-orange-500/70" />
+                        <MapPin size={14} className="shrink-0 mt-0.5 text-orange-500" />
                         <span
                             className={`${showFullAddr ? '' : 'truncate'} cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 transition-colors font-medium`}
                             onClick={() => setShowFullAddr(v => !v)}
@@ -570,18 +1259,30 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport }) => {
                         </span>
                     </div>
 
-                    {/* Rejection Notice Banner */}
-                    {report.status === 'rejected' && (
-                        <div className="flex items-center gap-2 text-[11px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-500/20">
-                            <AlertTriangle size={14} className="shrink-0 text-rose-600 dark:text-rose-400" />
-                            <span>Verification not accepted — issue details did not meet criteria.</span>
+                    {/* Row 4: Description (Cleaned & Sanitized with Read More) */}
+                    {cleanDescription && (
+                        <div className="text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                            <span>{displayDescription}</span>
+                            {isLongDescription && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDescExpanded(!isDescExpanded)}
+                                    className="ml-1 text-orange-600 dark:text-orange-400 font-semibold hover:underline text-[12px] inline cursor-pointer"
+                                >
+                                    {isDescExpanded ? 'Show less' : 'Read more'}
+                                </button>
+                            )}
                         </div>
                     )}
 
-                    {/* ── Footer: Timeline + Actions ──────────────────────────────── */}
-                    <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                    {/* Row 5: Mini Pulseline Step Tracker */}
+                    <MiniProgressTracker
+                        status={report.status}
+                        resolutionDays={resolutionDays}
+                    />
 
-                        {/* Timeline chip */}
+                    {/* ── Row 6: Footer with Actions & Timeline Summary ──────────────── */}
+                    <div className="mt-1 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
                             <Clock size={12} className="shrink-0" />
                             {isResolved && resolutionDays !== null ? (
@@ -589,97 +1290,61 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport }) => {
                                     Resolved in {resolutionDays} {resolutionDays === 1 ? 'day' : 'days'}
                                 </span>
                             ) : (
-                                <span>{isPending ? 'Awaiting LGU review' : 'Under active dispatch'}</span>
+                                <span>
+                                    {isPending ? 'Queued for LGU triage' : 'Under active field dispatch'}
+                                </span>
                             )}
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 shrink-0 relative">
+                        <div className="flex items-center gap-2 shrink-0">
+                            {/* Retract Action (Cautionary Outline, Secondary Weight) */}
+                            {isPending && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleCancelReport(report)}
+                                    aria-label={`Retract report ${report.ticket_id}`}
+                                    className="text-[12px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300
+                                               border border-rose-200 dark:border-rose-900/70 hover:border-rose-400 dark:hover:border-rose-700
+                                               bg-transparent hover:bg-rose-50/80 dark:hover:bg-rose-950/40
+                                               px-3 py-1.5 rounded-xl transition-all duration-150 flex items-center gap-1.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                                >
+                                    <RotateCcw size={12} strokeWidth={2.5} />
+                                    <span>Retract</span>
+                                </button>
+                            )}
 
-                            {/* View Details Toggle Button */}
+                            {/* View Proof Action (if resolved) */}
+                            {isResolved && report.resolution_image_url && (
+                                <button
+                                    type="button"
+                                    onClick={() => setZoomedImage(`${API_BASE_URL}${report.resolution_image_url}`)}
+                                    aria-label={`View photo proof for report ${report.ticket_id}`}
+                                    className="text-[12px] font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-white
+                                               border border-emerald-300 dark:border-emerald-600/40
+                                               bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20
+                                               px-3 py-1.5 rounded-xl transition-all duration-150 flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    <ImageIcon size={13} />
+                                    <span>View Proof</span>
+                                </button>
+                            )}
+
+                            {/* View Details Primary Action */}
                             <button
                                 type="button"
                                 onClick={() => setShowDetails(!showDetails)}
-                                className="text-[12px] font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white
-                                           border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600
-                                           bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80
-                                           px-3 py-1.5 rounded-lg transition-all duration-150 flex items-center gap-1.5 focus:outline-none"
+                                aria-label={`${showDetails ? 'Hide' : 'View'} details for report ${report.ticket_id}`}
+                                className={`text-[12px] font-bold px-3.5 py-1.5 rounded-xl transition-all duration-150 flex items-center gap-1.5 cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
+                                    showDetails
+                                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
+                                        : 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/20 hover:shadow-md'
+                                }`}
                             >
-                                <Eye size={13} />
+                                <Eye size={13} strokeWidth={2.5} />
                                 <span>{showDetails ? 'Hide Details' : 'View Details'}</span>
+                                <ChevronDown size={13} className={`transform transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`} />
                             </button>
-
-                            {/* Resolved View Proof Action */}
-                            {isResolved && (
-                                report.resolution_image_url ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setZoomedImage(report.resolution_image_url?.startsWith('http') ? report.resolution_image_url : `${API_BASE_URL}${report.resolution_image_url}`)}
-                                        className="text-[12px] font-semibold text-emerald-800 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-white
-                                                   border border-emerald-200 dark:border-emerald-500/30 hover:border-emerald-300
-                                                   bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20
-                                                   px-3 py-1.5 rounded-lg transition-all duration-150 flex items-center gap-1.5 focus:outline-none"
-                                    >
-                                        <ImageIcon size={13} />
-                                        <span>View Proof</span>
-                                    </button>
-                                ) : (
-                                    <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500 italic">No proof image</span>
-                                )
-                            )}
-
-                            {/* Pending Retract Action with Popover Confirmation */}
-                            {isPending && (
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowRetractConfirm(!showRetractConfirm)}
-                                        className="text-[12px] font-semibold text-rose-700 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300
-                                                   border border-rose-200 dark:border-rose-900/60 hover:border-rose-300 dark:hover:border-rose-700
-                                                   bg-rose-50/60 dark:bg-rose-950/30 hover:bg-rose-100/80 dark:hover:bg-rose-900/40
-                                                   px-3 py-1.5 rounded-lg transition-all duration-150 focus:outline-none"
-                                    >
-                                        Retract
-                                    </button>
-
-                                    {/* Retract Popover */}
-                                    <AnimatePresence>
-                                        {showRetractConfirm && (
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.95, y: 5 }}
-                                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                exit={{ opacity: 0, scale: 0.95, y: 5 }}
-                                                className="absolute bottom-full right-0 mb-2 p-3 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/80 rounded-xl shadow-xl z-30 w-60 text-left"
-                                            >
-                                                <p className="text-[12px] font-bold text-slate-900 dark:text-white mb-1">Retract this report?</p>
-                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5 leading-tight">
-                                                    This will cancel LGU inspection for ticket {report.ticket_id}.
-                                                </p>
-                                                <div className="flex items-center gap-2 justify-end">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowRetractConfirm(false)}
-                                                        className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-md transition-colors"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setShowRetractConfirm(false);
-                                                            handleCancelReport(report.id);
-                                                        }}
-                                                        className="px-2.5 py-1 text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-md shadow-xs transition-colors"
-                                                    >
-                                                        Yes, Retract
-                                                    </button>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            )}
-
                         </div>
                     </div>
                 </div>
@@ -692,7 +1357,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport }) => {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/50 p-4 sm:p-5 overflow-hidden"
+                        className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/60 p-4 sm:p-5 overflow-hidden"
                     >
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-[12px]">
                             {/* Complete Address */}
@@ -710,8 +1375,18 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport }) => {
                                 <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                                     GPS Coordinates
                                 </span>
-                                <p className="font-mono text-slate-700 dark:text-slate-300 font-semibold">
-                                    {report.lat && report.lng ? `${parseFloat(report.lat).toFixed(5)}, ${parseFloat(report.lng).toFixed(5)}` : 'N/A'}
+                                <p className="font-mono text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-2">
+                                    <span>{report.lat && report.lng ? `${parseFloat(report.lat).toFixed(5)}, ${parseFloat(report.lng).toFixed(5)}` : 'N/A'}</span>
+                                    {report.lat && report.lng && (
+                                        <button
+                                            type="button"
+                                            onClick={() => navigator.clipboard?.writeText(`${report.lat}, ${report.lng}`)}
+                                            title="Copy coordinates"
+                                            className="text-slate-400 hover:text-orange-500 p-0.5"
+                                        >
+                                            <Copy size={11} />
+                                        </button>
+                                    )}
                                 </p>
                             </div>
 
@@ -752,146 +1427,363 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport }) => {
     );
 };
 
-const MyReports = ({ userReports, loadingReports, handleSetModal, onOpenClaimModal, containerVariants, setZoomedImage, reportStatusFilter, setReportStatusFilter, handleCancelReport, t }) => {
+// ── Skeleton Loader Card for High Perceived Performance ─────────────────────────
+const ReportCardSkeleton = () => (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col sm:flex-row animate-pulse">
+        <div className="w-full sm:w-52 h-44 sm:h-auto aspect-[16/10] sm:aspect-auto bg-slate-200 dark:bg-slate-800 shrink-0" />
+        <div className="flex-1 p-4 sm:p-5 flex flex-col gap-3">
+            <div className="flex justify-between items-center gap-4">
+                <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-1/3" />
+                <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-20" />
+            </div>
+            <div className="flex gap-2">
+                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-24" />
+                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-20" />
+            </div>
+            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
+            <div className="h-14 bg-slate-100 dark:bg-slate-800/60 rounded-xl w-full" />
+            <div className="flex justify-between items-center pt-2 mt-auto">
+                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-32" />
+                <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-xl w-28" />
+            </div>
+        </div>
+    </div>
+);
+
+const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenClaimModal, containerVariants, setZoomedImage, reportStatusFilter, setReportStatusFilter, handleCancelReport, t }) => {
     const [currentPage, setCurrentPage] = useState(1);
+    const [searchQuery, setSearchQuery] = useState('');
     const itemsPerPage = 4;
 
     const filterOptions = [
-        { id: 'all', label: 'All Reports' },
-        { id: 'pending', label: 'Pending' },
-        { id: 'in_progress', label: 'In Progress' },
-        { id: 'resolved', label: 'Resolved' },
-        { id: 'rejected', label: 'Rejected' },
-        { id: 'cancelled', label: 'Cancelled' },
+        {
+            id: 'all',
+            label: t('dashboard.reports.filterAll', { defaultValue: 'All Reports' }),
+            icon: FileText,
+            activeText: 'text-orange-600 dark:text-orange-400',
+            activeBadge: 'bg-orange-500 text-white',
+            idleBadge: 'bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
+            iconColor: 'text-orange-500 dark:text-orange-400'
+        },
+        {
+            id: 'pending',
+            label: t('dashboard.reports.filterPending', { defaultValue: 'Pending' }),
+            icon: Clock,
+            activeText: 'text-amber-600 dark:text-amber-400',
+            activeBadge: 'bg-amber-500 text-white',
+            idleBadge: 'bg-amber-100/90 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/20',
+            iconColor: 'text-amber-500 dark:text-amber-400'
+        },
+        {
+            id: 'in_progress',
+            label: t('dashboard.reports.filterInProgress', { defaultValue: 'In Progress' }),
+            icon: Wrench,
+            activeText: 'text-sky-600 dark:text-sky-400',
+            activeBadge: 'bg-sky-500 text-white',
+            idleBadge: 'bg-sky-100/90 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 ring-1 ring-sky-500/20',
+            iconColor: 'text-sky-500 dark:text-sky-400'
+        },
+        {
+            id: 'resolved',
+            label: t('dashboard.reports.filterResolved', { defaultValue: 'Resolved' }),
+            icon: CheckCircle2,
+            activeText: 'text-emerald-600 dark:text-emerald-400',
+            activeBadge: 'bg-emerald-500 text-white',
+            idleBadge: 'bg-emerald-100/90 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20',
+            iconColor: 'text-emerald-500 dark:text-emerald-400'
+        },
+        {
+            id: 'rejected',
+            label: t('dashboard.reports.filterRejected', { defaultValue: 'Rejected' }),
+            icon: AlertTriangle,
+            activeText: 'text-rose-600 dark:text-rose-400',
+            activeBadge: 'bg-rose-500 text-white',
+            idleBadge: 'bg-rose-100/90 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 ring-1 ring-rose-500/20',
+            iconColor: 'text-rose-500 dark:text-rose-400'
+        },
+        {
+            id: 'cancelled',
+            label: t('dashboard.reports.filterCancelled', { defaultValue: 'Cancelled' }),
+            icon: RotateCcw,
+            activeText: 'text-slate-700 dark:text-slate-300',
+            activeBadge: 'bg-slate-600 text-white',
+            idleBadge: 'bg-slate-200/80 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
+            iconColor: 'text-slate-400 dark:text-slate-500'
+        },
     ];
 
-    const filteredReports = reportStatusFilter === 'all'
-        ? userReports
-        : userReports.filter(r => {
-            if (reportStatusFilter === 'in_progress') {
-                return ['dispatched', 'approved_internal'].includes(r.status);
-            }
-            if (reportStatusFilter === 'pending') {
-                return ['pending', 'unverified'].includes(r.status);
-            }
-            return r.status === reportStatusFilter;
-        });
+    // Compute newest report ID for priority indicator
+    const newestReportId = userReports.length > 0
+        ? [...userReports].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]?.id
+        : null;
+
+    // Combined filtering: tab filter + in-page text search
+    const filteredReports = userReports.filter(r => {
+        // Tab Status Filter
+        if (reportStatusFilter === 'in_progress') {
+            if (!['dispatched', 'approved_internal', 'in_progress'].includes(r.status)) return false;
+        } else if (reportStatusFilter === 'pending') {
+            if (!['pending', 'unverified'].includes(r.status)) return false;
+        } else if (reportStatusFilter !== 'all') {
+            if (r.status !== reportStatusFilter) return false;
+        }
+
+        // In-page Text Search Filter
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase().trim();
+            const matchId = (r.ticket_id || '').toLowerCase().includes(q);
+            const matchCat = (r.category || r.ai_category || '').toLowerCase().includes(q);
+            const matchLoc = (r.location_string || '').toLowerCase().includes(q);
+            const matchDesc = (r.description || r.notes || '').toLowerCase().includes(q);
+            return matchId || matchCat || matchLoc || matchDesc;
+        }
+
+        return true;
+    });
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [reportStatusFilter]);
+    }, [reportStatusFilter, searchQuery]);
 
     const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
     const paginatedReports = filteredReports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    // Context-sensitive Empty State Message Generator
+    const getEmptyStateContent = () => {
+        if (userReports.length === 0) {
+            return {
+                title: "No infrastructure reports filed yet",
+                desc: "Help keep Caloocan safe and functional. Report broken streetlights, water pipe leaks, road potholes, or drainage issues directly to city maintenance crews.",
+                showCta: true
+            };
+        }
+        if (searchQuery.trim()) {
+            return {
+                title: `No reports matching "${searchQuery}"`,
+                desc: "Check for typos or try clearing your search keyword to view all submitted reports.",
+                showClearSearch: true
+            };
+        }
+        switch (reportStatusFilter) {
+            case 'pending':
+                return {
+                    title: "No pending reports",
+                    desc: "All your filed reports have been reviewed and advanced to engineering dispatch!"
+                };
+            case 'in_progress':
+                return {
+                    title: "No reports currently in progress",
+                    desc: "Reports advance to active dispatch once verified by city engineering evaluators."
+                };
+            case 'resolved':
+                return {
+                    title: "No resolved reports yet",
+                    desc: "Our field crews will upload verified photo proof here once repairs are completed."
+                };
+            case 'rejected':
+                return {
+                    title: "No rejected reports — nice!",
+                    desc: "All of your submitted infrastructure reports have met city verification criteria."
+                };
+            case 'cancelled':
+                return {
+                    title: "No cancelled reports on file",
+                    desc: "You haven't retracted any submitted reports."
+                };
+            default:
+                return {
+                    title: "No reports found",
+                    desc: "Try selecting another status tab or submit a new report."
+                };
+        }
+    };
+
+    const emptyState = getEmptyStateContent();
 
     return (
         <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full bg-slate-50/60 dark:bg-slate-950 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 p-6 md:p-8 transition-colors shadow-xs"
+            className="w-full bg-slate-50/60 dark:bg-slate-950 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 p-5 sm:p-7 md:p-8 transition-colors shadow-xs overflow-hidden"
         >
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            {/* Header: Title + Submit Action Button */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
                     <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        {t('dashboard.reports.history', { defaultValue: 'My Reports & History' })}
+                        {t('dashboard.reports.history', { defaultValue: 'Report History' })}
                     </h2>
                     <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        {t('dashboard.reports.historyDesc', { defaultValue: 'Track civic infrastructure reports submitted for Caloocan City.' })}
+                        {t('dashboard.reports.historyDesc', { defaultValue: 'Track the status and progress of all your submitted infrastructure issues.' })}
                     </p>
                 </div>
                 <button
                     type="button"
                     onClick={() => handleSetModal('file-report')}
-                    className="bg-orange-500 hover:bg-orange-600 active:scale-[0.97] text-white px-4 py-2.5 rounded-xl font-semibold text-[13px] transition-all duration-150 flex items-center gap-2 shrink-0 shadow-md shadow-orange-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer"
+                    className="bg-orange-500 hover:bg-orange-600 active:scale-[0.97] text-white px-4 py-2.5 rounded-xl font-bold text-[13px] transition-all duration-150 flex items-center gap-2 shrink-0 shadow-md shadow-orange-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer"
                 >
-                    <Plus size={15} strokeWidth={2.5} />
-                    <span>{t('dashboard.quickReport.submitBtn', { defaultValue: 'Submit New Report' })}</span>
+                    <Plus size={16} strokeWidth={2.5} />
+                    <span>{t('dashboard.quickReport.submitBtn', { defaultValue: 'Submit a Report' })}</span>
                 </button>
             </div>
 
-            {/* Filter Tab Bar */}
-            <div className="flex gap-1 p-1.5 bg-slate-200/70 dark:bg-slate-900/80 rounded-2xl mb-6 overflow-x-auto border border-slate-200 dark:border-slate-800 w-full sm:max-w-fit flex-nowrap">
-                {filterOptions.map(opt => {
-                    const count = opt.id === 'all'
-                        ? userReports.length
-                        : userReports.filter(r => {
-                            if (opt.id === 'in_progress') return ['dispatched', 'approved_internal'].includes(r.status);
-                            if (opt.id === 'pending') return ['pending', 'unverified'].includes(r.status);
-                            return r.status === opt.id;
-                        }).length;
+            {/* Filter Row: Horizontally Scrollable Segmented Capsule + Matching Search Input */}
+            <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 sm:gap-4 mb-6 w-full min-w-0">
+                {/* Modern Segmented Control Capsule */}
+                <div className="inline-flex items-center gap-1 p-1.5 bg-slate-200/60 dark:bg-slate-900/90 rounded-full border border-slate-200/90 dark:border-slate-800/90 shadow-inner overflow-x-auto custom-scrollbar min-w-0 max-w-full w-fit">
+                    {filterOptions.map(opt => {
+                        const IconComponent = opt.icon;
+                        const count = opt.id === 'all'
+                            ? userReports.length
+                            : userReports.filter(r => {
+                                if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress'].includes(r.status);
+                                if (opt.id === 'pending') return ['pending', 'unverified'].includes(r.status);
+                                return r.status === opt.id;
+                            }).length;
 
-                    const isActive = reportStatusFilter === opt.id;
-                    const isEmpty = count === 0;
+                        const isActive = reportStatusFilter === opt.id;
 
-                    return (
-                        <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => !isEmpty && setReportStatusFilter(opt.id)}
-                            disabled={isEmpty}
-                            className={`px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-all duration-150 flex items-center gap-2 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-orange-500
-                                ${isActive
-                                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200/80 dark:ring-slate-700'
-                                    : isEmpty
-                                        ? 'opacity-40 cursor-default text-slate-400 dark:text-slate-600'
-                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/50 cursor-pointer'
+                        return (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setReportStatusFilter(opt.id)}
+                                className={`group relative px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-[12px] font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer select-none ${
+                                    isActive
+                                        ? `${opt.activeText}`
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'
                                 }`}
+                            >
+                                {/* Animated Spring Pill Sliding Indicator */}
+                                {isActive && (
+                                    <motion.span
+                                        layoutId="activeReportFilterPill"
+                                        transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                                        className="absolute inset-0 bg-white dark:bg-slate-800 rounded-full shadow-xs ring-1 ring-slate-200/90 dark:ring-slate-700/80 -z-0"
+                                    />
+                                )}
+
+                                {/* Icon & Label */}
+                                <span className="relative z-10 flex items-center gap-1.5">
+                                    <IconComponent
+                                        size={14}
+                                        className={`transition-colors shrink-0 ${
+                                            isActive ? opt.iconColor : 'opacity-70 group-hover:opacity-100'
+                                        }`}
+                                        strokeWidth={isActive ? 2.3 : 2}
+                                    />
+                                    <span>{opt.label}</span>
+                                </span>
+
+                                {/* Micro Count Pill */}
+                                <span
+                                    className={`relative z-10 px-2 py-0.5 min-w-[20px] text-center rounded-full text-[10.5px] font-mono font-bold transition-all duration-200 ${
+                                        isActive
+                                            ? `${opt.activeBadge} shadow-2xs`
+                                            : count === 0
+                                                ? 'text-slate-400/80 dark:text-slate-600 bg-transparent px-1'
+                                                : `${opt.idleBadge}`
+                                    }`}
+                                >
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Cohesive Matching In-Page Search Filter */}
+                <div className="relative w-full sm:w-64 md:w-72 lg:w-80 shrink-0 self-end sm:self-auto">
+                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search by ID, category, street..."
+                        className="w-full pl-9.5 pr-8 py-2 sm:py-2.5 text-xs bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 rounded-full text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all shadow-2xs"
+                    />
+                    {searchQuery && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            aria-label="Clear search"
                         >
-                            <span>{opt.label}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-colors
-                                ${isActive
-                                    ? 'bg-orange-500 text-white shadow-xs'
-                                    : isEmpty
-                                        ? 'text-slate-400 dark:text-slate-700 bg-transparent'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                                }`}>
-                                {count}
-                            </span>
+                            <X size={13} />
                         </button>
-                    );
-                })}
+                    )}
+                </div>
             </div>
 
-            {/* Card List */}
+            {/* Card List / Skeleton Loading / Tailored Empty State */}
             <div className="space-y-3.5">
                 {loadingReports ? (
-                    <div className="flex flex-col items-center gap-3 py-16 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-slate-900/40">
-                        <Loader2 size={28} className="animate-spin text-orange-500" />
-                        <span className="text-[13px] font-mono text-slate-400 dark:text-slate-500">Synchronizing report history...</span>
+                    <div className="space-y-3.5">
+                        <ReportCardSkeleton />
+                        <ReportCardSkeleton />
+                        <ReportCardSkeleton />
                     </div>
                 ) : filteredReports.length === 0 ? (
-                    <div className="flex flex-col items-center gap-4 py-20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-slate-900/40">
-                        <FileText size={32} className="text-slate-300 dark:text-slate-700" strokeWidth={1.5} />
-                        <div className="text-center">
-                            <p className="text-[15px] font-semibold text-slate-700 dark:text-slate-300">No reports found in this category</p>
-                            <p className="text-[13px] text-slate-400 dark:text-slate-500 mt-1">Try another filter or submit a new infrastructure issue.</p>
+                    <div className="flex flex-col items-center gap-4 py-16 sm:py-20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-slate-900/40 px-4 text-center">
+                        <div className="w-14 h-14 rounded-2xl bg-orange-50 dark:bg-orange-950/40 text-orange-500 border border-orange-200/80 dark:border-orange-800/60 flex items-center justify-center shadow-xs">
+                            <FileText size={28} strokeWidth={1.75} />
                         </div>
+                        <div className="max-w-md">
+                            <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">
+                                {emptyState.title}
+                            </h3>
+                            <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                {emptyState.desc}
+                            </p>
+                        </div>
+                        {emptyState.showCta && (
+                            <button
+                                type="button"
+                                onClick={() => handleSetModal('file-report')}
+                                className="mt-2 bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shadow-orange-500/20 cursor-pointer flex items-center gap-2"
+                            >
+                                <Plus size={15} strokeWidth={2.5} />
+                                <span>Report an Issue Now</span>
+                            </button>
+                        )}
+                        {emptyState.showClearSearch && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery('')}
+                                className="mt-2 text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
+                            >
+                                Clear search filter
+                            </button>
+                        )}
                     </div>
-                ) : paginatedReports.map((report) => (
-                    <ReportCard
-                        key={report.id}
-                        report={report}
-                        setZoomedImage={setZoomedImage}
-                        handleCancelReport={handleCancelReport}
-                    />
-                ))}
+                ) : (
+                    paginatedReports.map((report) => (
+                        <ReportCard
+                            key={report.id}
+                            report={report}
+                            setZoomedImage={setZoomedImage}
+                            handleCancelReport={handleCancelReport}
+                            isLatest={report.id === newestReportId}
+                            newestReportId={newestReportId}
+                        />
+                    ))
+                )}
             </div>
 
-            {/* Pagination */}
+            {/* Pagination Controls */}
             {filteredReports.length > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 mt-6 border-t border-slate-200/80 dark:border-slate-800">
                     <div className="font-mono text-[12px] text-slate-500 dark:text-slate-400">
                         Showing {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredReports.length)} of {filteredReports.length} records
                     </div>
                     {totalPages > 1 && (
-                        <div className="flex items-center gap-1 bg-slate-200/70 dark:bg-slate-900/80 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-900/80 p-1 rounded-full border border-slate-200/90 dark:border-slate-800 shadow-inner">
                             <button
                                 type="button"
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed"
+                                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed aspect-square"
+                                aria-label="Previous page"
                             >
                                 <ChevronLeft size={15} strokeWidth={2.5} />
                             </button>
@@ -901,10 +1793,10 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, onOpenClaimMod
                                     key={i}
                                     type="button"
                                     onClick={() => setCurrentPage(i + 1)}
-                                    className={`w-8 h-8 flex items-center justify-center rounded-lg font-mono text-[12px] font-semibold transition-all cursor-pointer ${
+                                    className={`w-8 h-8 flex items-center justify-center rounded-full font-mono text-[12px] font-semibold transition-all cursor-pointer aspect-square ${
                                         currentPage === i + 1
-                                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                                        : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/50'
+                                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold ring-1 ring-slate-200/80 dark:ring-slate-700/80'
+                                            : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/50'
                                     }`}
                                 >
                                     {i + 1}
@@ -915,7 +1807,8 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, onOpenClaimMod
                                 type="button"
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed"
+                                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed aspect-square"
+                                aria-label="Next page"
                             >
                                 <ChevronRight size={15} strokeWidth={2.5} />
                             </button>
@@ -927,7 +1820,7 @@ const MyReports = ({ userReports, loadingReports, handleSetModal, onOpenClaimMod
     );
 };
 
-const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, containerVariants, userReports = [], showToast, t }) => {
+const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, containerVariants, userReports = [], showToast, handleLogout, t }) => {
     const [editingField, setEditingField] = useState(null); // 'email' | 'phone' | null
     const [tempValues, setTempValues] = useState({ email: user.email || '', phone: user.phone || '' });
     const [activeTooltip, setActiveTooltip] = useState(null); // 'verified' | 'name' | 'barangay' | 'address' | null
@@ -1082,6 +1975,18 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
                             <span className="truncate">{user.barangay || 'Caloocan City'}</span>
                         </div>
                     </div>
+
+                    {/* Sign Out Button for Mobile / Desktop Profile View */}
+                    {handleLogout && (
+                        <button
+                            type="button"
+                            onClick={handleLogout}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/80 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 font-bold text-xs uppercase tracking-wider transition-all shadow-2xs cursor-pointer active:scale-95"
+                        >
+                            <LogOut size={15} />
+                            <span>{t('dashboard.sidebar.signOut', { defaultValue: 'Sign Out' })}</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* ── Right Column: Form Sections ──────────────────────── */}
@@ -2167,6 +3072,7 @@ const ResidentModals = ({
     reportToCancel, setReportToCancel, confirmCancelReport,
     isSubmitConfirmOpen, setIsSubmitConfirmOpen, actuallySubmitReport,
     setZoomedImage,
+    photoPinIcons, getCachedIcon, theme,
     t
 }) => {
     const [isListening, setIsListening] = useState(false);
@@ -2654,18 +3560,65 @@ const ResidentModals = ({
                         <div className="flex flex-col h-full bg-white dark:bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800">
                             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
                                 <div><h2 className="text-2xl font-black text-slate-900 dark:text-white">Nearby Hazards</h2><p className="text-slate-500 dark:text-slate-400 font-medium">Live technical incidents board</p></div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 border border-slate-200 dark:border-slate-700 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"><X size={20} /></button>
+                                <button onClick={() => { setActiveModal(null); setIsSelectingLocation(false); }} className="p-2 border border-slate-200 dark:border-slate-700 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"><X size={20} /></button>
                             </div>
                             <div className="flex-1 relative">
+                                {isSelectingLocation && (
+                                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-orange-600/95 backdrop-blur-md text-white px-4 py-2 rounded-full shadow-2xl font-bold text-xs flex items-center gap-2 border border-orange-400/40 pointer-events-auto animate-pulse">
+                                        <MapPin size={14} /> Tap anywhere inside Caloocan to set report location
+                                    </div>
+                                )}
                                 {isLoaded && (
-                                    <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={reportLocation} zoom={13} options={mapOptions}>
+                                    <GoogleMap
+                                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                                        center={reportLocation}
+                                        zoom={13}
+                                        options={mapOptions}
+                                        onClick={(e) => {
+                                            if (isSelectingLocation && e.latLng) {
+                                                const newPos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+                                                if (checkJurisdiction(newPos.lat, newPos.lng)) {
+                                                    setReportLocation(newPos);
+                                                    reverseGeocode(newPos.lat, newPos.lng);
+                                                    setIsSelectingLocation(false);
+                                                    setActiveModal('file-report');
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        {/* Authoritative North Caloocan Jurisdiction Boundary Polygon */}
+                                        <PolygonF
+                                            paths={NORTH_CALOOCAN_PATH}
+                                            options={{
+                                                fillColor: "#ff6b00",
+                                                fillOpacity: 0.08,
+                                                strokeColor: "#ff6b00",
+                                                strokeOpacity: 0.85,
+                                                strokeWeight: 2,
+                                                clickable: false,
+                                            }}
+                                        />
+
+                                        {/* Authoritative South Caloocan Jurisdiction Boundary Polygon */}
+                                        <PolygonF
+                                            paths={SOUTH_CALOOCAN_PATH}
+                                            options={{
+                                                fillColor: "#ff6b00",
+                                                fillOpacity: 0.08,
+                                                strokeColor: "#ff6b00",
+                                                strokeOpacity: 0.85,
+                                                strokeWeight: 2,
+                                                clickable: false,
+                                            }}
+                                        />
+
                                         {/* Animated Wave Sonar Overlay for User Location */}
                                         <OverlayViewF
                                             position={reportLocation}
                                             mapPaneName="overlayMouseTarget"
                                             getPixelPositionOffset={() => ({ x: -24, y: -24 })}
                                         >
-                                            <div className="relative flex items-center justify-center w-12 h-12">
+                                            <div className="relative flex items-center justify-center w-12 h-12 pointer-events-none">
                                                 {/* Wave Ring 1 */}
                                                 <div className="absolute inset-0 rounded-full bg-blue-500/25 animate-wave-ring" style={{ animationDelay: '0s' }} />
                                                 {/* Wave Ring 2 */}
@@ -2676,23 +3629,214 @@ const ResidentModals = ({
                                                 <div className="relative z-10 w-5 h-5 bg-blue-500 rounded-full border-[3px] border-white shadow-lg shadow-blue-500/50" />
                                             </div>
                                         </OverlayViewF>
-                                        {processedHazards.map(h => <MarkerF key={h.id} position={{ lat: h.lat, lng: h.lng }} onClick={() => setSelectedHazard(h)} icon={{ url: getMarkerSVG(h.category, h.status), scaledSize: new window.google.maps.Size(40, 46) }} />)}
+
+                                        {/* Government-Grade Pin Markers (with photo-pin thumbnails and crisp SVG fallback) */}
+                                        {processedHazards.map(h => {
+                                            const isSelected = selectedHazard?.id === h.id;
+                                            const cacheKey = `${h.id}-${isSelected ? 'sel' : 'norm'}`;
+                                            const customIconUrl = photoPinIcons ? photoPinIcons[cacheKey] : null;
+
+                                            const size = isSelected ? 46 : 36;
+                                            const pointerH = isSelected ? 8 : 7;
+                                            const totalW = size + 6;
+                                            const totalH = size + pointerH + 2;
+
+                                            const iconConfig = customIconUrl && getCachedIcon
+                                                ? getCachedIcon(customIconUrl, totalW, totalH, totalW / 2, totalH)
+                                                : (getCachedIcon
+                                                    ? getCachedIcon(
+                                                        getMarkerSVG(h.category, h.status, isSelected),
+                                                        isSelected ? 44 : 36,
+                                                        isSelected ? 50 : 42,
+                                                        isSelected ? 22 : 18,
+                                                        isSelected ? 50 : 42
+                                                    )
+                                                    : {
+                                                        url: getMarkerSVG(h.category, h.status, isSelected),
+                                                        scaledSize: new window.google.maps.Size(isSelected ? 44 : 36, isSelected ? 50 : 42),
+                                                        anchor: new window.google.maps.Point(isSelected ? 22 : 18, isSelected ? 50 : 42)
+                                                    }
+                                                );
+
+                                            return (
+                                                <MarkerF
+                                                    key={`hazard-${h.id}`}
+                                                    position={{ lat: h.lat, lng: h.lng }}
+                                                    zIndex={isSelected ? 500 : 150}
+                                                    title={`${h.title} (${(h.status || 'PENDING').toUpperCase()})`}
+                                                    onClick={() => setSelectedHazard(h)}
+                                                    options={{
+                                                        optimized: true,
+                                                        clickable: true
+                                                    }}
+                                                    icon={iconConfig}
+                                                />
+                                            );
+                                        })}
+
+                                        {/* STREET VIEW PIN OVERLAY: 3D Pins for exploration */}
+                                        {svLocation && panorama && processedHazards.map(h => (
+                                            (h.lat && h.lng) && (
+                                                <MarkerF
+                                                    key={`sv-pin-${h.id}`}
+                                                    map={panorama}
+                                                    position={{ lat: h.lat, lng: h.lng }}
+                                                    onClick={() => setSelectedHazard(h)}
+                                                    options={{
+                                                        optimized: false,
+                                                        clickable: true
+                                                    }}
+                                                    icon={window.google && window.google.maps ? {
+                                                        url: getMarkerSVG(h.category, h.status, selectedHazard?.id === h.id),
+                                                        scaledSize: new window.google.maps.Size(46, 52),
+                                                        anchor: new window.google.maps.Point(23, 52)
+                                                    } : undefined}
+                                                />
+                                            )
+                                        ))}
+
+                                        {/* Sleek Government-Grade InfoWindow */}
                                         {selectedHazard && (
-                                            <InfoWindowF position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }} onCloseClick={() => setSelectedHazard(null)}>
+                                            <InfoWindowF
+                                                position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }}
+                                                onCloseClick={() => setSelectedHazard(null)}
+                                                options={{
+                                                    pixelOffset: new window.google.maps.Size(0, -40),
+                                                    zIndex: 1000
+                                                }}
+                                            >
                                                 {(() => {
                                                     const catColor = getCategoryColor(selectedHazard.category);
+                                                    const isDark = theme === 'dark';
                                                     return (
-                                                        <div style={{ background: 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)', borderRadius: '16px', padding: '18px', minWidth: '230px', border: '1px solid rgba(255,255,255,0.07)', margin: '-10px', boxShadow: '0 25px 50px rgba(0,0,0,0.7)', fontFamily: 'Inter,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
-                                                            <button onClick={() => setSelectedHazard(null)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>×</button>
-                                                            <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: `${catColor}20`, border: `1px solid ${catColor}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px', color: catColor }}><AlertTriangle size={20} /></div>
-                                                            <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.12em', color: selectedHazard.status === 'resolved' ? '#4ade80' : '#fb923c', background: selectedHazard.status === 'resolved' ? 'rgba(74,222,128,0.12)' : 'rgba(251,146,60,0.12)', padding: '3px 12px', borderRadius: '999px', marginBottom: '10px', textTransform: 'uppercase' }}>{selectedHazard.status}</div>
-                                                            <h4 style={{ fontWeight: 700, fontSize: '15px', color: '#f1f5f9', lineHeight: '1.35', margin: '0 0 4px', padding: '0 20px' }}>{selectedHazard.title}</h4>
-                                                            <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.15em', color: catColor, marginBottom: '12px', textTransform: 'uppercase' }}>{selectedHazard.category}</p>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '999px', padding: '5px 14px', marginBottom: '14px' }}>
-                                                                <span style={{ color: catColor, display: 'flex' }}><MapPin size={12} /></span>
-                                                                <span style={{ fontSize: '12px', fontWeight: 700, color: '#cbd5e1' }}>{selectedHazard.dynamicDistance || selectedHazard.distance} away</span>
+                                                        <div style={{
+                                                            background: isDark ? 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)' : '#ffffff',
+                                                            borderRadius: '16px',
+                                                            padding: '16px',
+                                                            minWidth: '230px',
+                                                            maxWidth: '280px',
+                                                            border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+                                                            margin: '-10px',
+                                                            boxShadow: isDark ? '0 25px 50px rgba(0,0,0,0.7)' : '0 10px 25px rgba(0,0,0,0.1)',
+                                                            fontFamily: 'Inter,sans-serif',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            textAlign: 'center',
+                                                            position: 'relative'
+                                                        }}>
+                                                            <button
+                                                                onClick={() => setSelectedHazard(null)}
+                                                                style={{
+                                                                    position: 'absolute',
+                                                                    top: '10px',
+                                                                    right: '10px',
+                                                                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                                                                    border: 'none',
+                                                                    borderRadius: '50%',
+                                                                    width: '26px',
+                                                                    height: '26px',
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    color: isDark ? '#94a3b8' : '#64748b'
+                                                                }}
+                                                            >×</button>
+
+                                                            {selectedHazard.image ? (
+                                                                <div style={{ width: '56px', height: '56px', borderRadius: '14px', overflow: 'hidden', marginBottom: '10px', border: `2px solid ${catColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                                                                    <img
+                                                                        src={selectedHazard.image.startsWith('http') ? selectedHazard.image : `${API_BASE_URL}${selectedHazard.image.startsWith('/') ? selectedHazard.image : `/${selectedHazard.image}`}`}
+                                                                        alt={selectedHazard.title}
+                                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <div style={{
+                                                                    width: '44px',
+                                                                    height: '44px',
+                                                                    borderRadius: '50%',
+                                                                    background: `${catColor}20`,
+                                                                    border: `1.5px solid ${catColor}50`,
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    marginBottom: '10px',
+                                                                    color: catColor
+                                                                }}>
+                                                                    <AlertTriangle size={20} />
+                                                                </div>
+                                                            )}
+
+                                                            {selectedHazard.ticket_id && (
+                                                                <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', color: '#94a3b8', marginBottom: '4px', fontFamily: 'monospace' }}>
+                                                                    {selectedHazard.ticket_id}
+                                                                </div>
+                                                            )}
+
+                                                            <div style={{
+                                                                fontSize: '10px',
+                                                                fontWeight: 800,
+                                                                letterSpacing: '0.12em',
+                                                                color: selectedHazard.status === 'resolved' ? '#4ade80' : selectedHazard.status === 'pending' ? '#f87171' : '#fb923c',
+                                                                background: selectedHazard.status === 'resolved' ? 'rgba(74,222,128,0.12)' : selectedHazard.status === 'pending' ? 'rgba(248,113,113,0.12)' : 'rgba(251,146,60,0.12)',
+                                                                padding: '3px 12px',
+                                                                borderRadius: '999px',
+                                                                marginBottom: '8px',
+                                                                textTransform: 'uppercase'
+                                                            }}>
+                                                                {selectedHazard.status}
                                                             </div>
-                                                            <button onClick={() => handleStreetViewClick({ lat: selectedHazard.lat, lng: selectedHazard.lng })} style={{ width: '100%', padding: '11px 0', background: `linear-gradient(135deg,${catColor},${catColor}dd)`, border: 'none', borderRadius: '12px', color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: `0 4px 20px ${catColor}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+
+                                                            <h4 style={{
+                                                                fontWeight: 700,
+                                                                fontSize: '14px',
+                                                                color: isDark ? '#f1f5f9' : '#0f172a',
+                                                                lineHeight: '1.35',
+                                                                margin: '0 0 4px',
+                                                                padding: '0 12px'
+                                                            }}>{selectedHazard.title}</h4>
+
+                                                            <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.12em', color: catColor, marginBottom: '10px', textTransform: 'uppercase' }}>
+                                                                {selectedHazard.category}
+                              </p>
+
+                                                            <div style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '6px',
+                                                                background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                                                                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
+                                                                borderRadius: '999px',
+                                                                padding: '4px 12px',
+                                                                marginBottom: '12px'
+                                                            }}>
+                                                                <span style={{ color: catColor, display: 'flex' }}><MapPin size={12} /></span>
+                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: isDark ? '#cbd5e1' : '#475569' }}>
+                                                                    {selectedHazard.dynamicDistance || selectedHazard.distance} away
+                                                                </span>
+                                                            </div>
+
+                                                            <button
+                                                                onClick={() => handleStreetViewClick({ lat: selectedHazard.lat, lng: selectedHazard.lng })}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '10px 0',
+                                                                    background: `linear-gradient(135deg, ${catColor}, ${catColor}dd)`,
+                                                                    border: 'none',
+                                                                    borderRadius: '12px',
+                                                                    color: 'white',
+                                                                    fontSize: '12px',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    boxShadow: `0 4px 16px ${catColor}40`,
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    gap: '6px'
+                                                                }}
+                                                            >
                                                                 <Eye size={14} /> Open Street View
                                                             </button>
                                                         </div>
@@ -2700,6 +3844,7 @@ const ResidentModals = ({
                                                 })()}
                                             </InfoWindowF>
                                         )}
+
                                         {/* Street View Overlay */}
                                         {svLocation && (
                                             <>
@@ -2910,7 +4055,7 @@ const ResidentModals = ({
                                 </div>
                                 {selectedPost.has_image && selectedPost.image_url && (
                                     <div className="mt-4 sm:mt-6 rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
-                                        <img src={selectedPost.image_url?.startsWith('http') ? selectedPost.image_url : `${API_BASE_URL}${selectedPost.image_url}`} alt="Advisory Content" className="w-full object-cover" />
+                                        <img src={`${API_BASE_URL}${selectedPost.image_url}`} alt="Advisory Content" className="w-full object-cover" />
                                     </div>
                                 )}
                                 <div className="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -2995,48 +4140,78 @@ const ResidentModals = ({
         )}
 
         {/* --- Custom High-Fidelity Retract Confirmation Modal --- */}
-        {reportToCancel && (
-            <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[1000] bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
-                onClick={() => setReportToCancel(null)}
-            >
+        {reportToCancel && (() => {
+            const reportObj = typeof reportToCancel === 'object' ? reportToCancel : null;
+            const reportId = reportObj ? reportObj.id : reportToCancel;
+            const ticketId = reportObj?.ticket_id || reportId;
+
+            return (
                 <motion.div
-                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full max-w-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-[32px] overflow-hidden shadow-2xl p-8 sm:p-10 flex flex-col items-center text-center space-y-6"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[1000] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4"
+                    onClick={() => setReportToCancel(null)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Escape') setReportToCancel(null);
+                    }}
+                    tabIndex={-1}
                 >
-                    <div className="w-24 h-24 rounded-full border-4 border-orange-500/30 bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.1)] relative">
-                        <div className="absolute inset-0 rounded-full animate-ping bg-orange-500/10" style={{ animationDuration: '3s' }}></div>
-                        <AlertTriangle size={48} className="text-orange-500" strokeWidth={1.5} />
-                    </div>
+                    <motion.div
+                        initial={{ scale: 0.92, opacity: 0, y: 15 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.92, opacity: 0, y: 15 }}
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="retract-dialog-title"
+                        className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl p-6 sm:p-8 flex flex-col items-center text-center space-y-5"
+                    >
+                        {/* Cautionary Icon Badge */}
+                        <div className="w-16 h-16 rounded-full border-4 border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-sm relative">
+                            <AlertTriangle size={32} strokeWidth={2} />
+                        </div>
 
-                    <div className="space-y-2">
-                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Cancel Report?</h3>
-                        <p className="text-slate-600 dark:text-slate-400 text-[15px] font-medium leading-relaxed px-4">
-                            Are you sure you want to retract this report? This action <span className="text-orange-600 dark:text-orange-400 font-bold">cannot be undone</span> and will be logged in your activity history.
-                        </p>
-                    </div>
+                        {/* Text & Ticket Badge */}
+                        <div className="space-y-2">
+                            <h3 id="retract-dialog-title" className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                                Retract This Report?
+                            </h3>
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
+                                <span>{ticketId}</span>
+                                {reportObj?.category && (
+                                    <>
+                                        <span className="text-slate-400">•</span>
+                                        <span className="font-sans font-medium text-slate-600 dark:text-slate-400 truncate max-w-[180px]">{reportObj.category}</span>
+                                    </>
+                                )}
+                            </div>
+                            <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-[13px] font-medium leading-relaxed pt-1">
+                                Are you sure you want to retract this report? This will cancel the scheduled LGU inspection and remove the ticket from active engineering dispatch. This action <span className="text-rose-600 dark:text-rose-400 font-bold">cannot be undone</span>.
+                            </p>
+                        </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 w-full pt-4">
-                        <button
-                            onClick={() => confirmCancelReport(reportToCancel)}
-                            className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl shadow-lg shadow-orange-500/20 active:scale-95 transition-all text-[15px] uppercase tracking-wider"
-                        >
-                            Yes, Retract it!
-                        </button>
-                        <button
-                            onClick={() => setReportToCancel(null)}
-                            className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black rounded-2xl active:scale-95 transition-all text-[15px] border border-slate-200 dark:border-slate-700 uppercase tracking-wider"
-                        >
-                            Cancel
-                        </button>
-                    </div>
+                        {/* Actions: Destructive Rose + Safe Cancel */}
+                        <div className="flex flex-col-reverse sm:flex-row gap-2.5 w-full pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setReportToCancel(null)}
+                                className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl active:scale-95 transition-all text-xs sm:text-sm border border-slate-200 dark:border-slate-700 cursor-pointer"
+                                aria-label="Keep report and close modal"
+                            >
+                                Keep Report
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => confirmCancelReport(reportId)}
+                                className="flex-1 py-3 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md shadow-rose-600/25 active:scale-95 transition-all text-xs sm:text-sm cursor-pointer"
+                                aria-label={`Confirm retracting report ${ticketId}`}
+                            >
+                                Yes, Retract Report
+                            </button>
+                        </div>
+                    </motion.div>
                 </motion.div>
-            </motion.div>
-        )}
+            );
+        })()}
     </AnimatePresence>
     );
 };
@@ -3124,7 +4299,7 @@ const TopNavigation = ({
     // 1. Navigation & Quick Actions
     const quickActions = [
         { label: 'File Infrastructure Report', category: 'Action', icon: <Camera size={16} />, onClick: () => { handleSetModal('file-report'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('File Report'); } },
-        { label: 'Barangay Hazard Map', category: 'Action', icon: <Map size={16} />, onClick: () => { handleSetModal('map'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('Barangay Map'); } },
+        { label: 'Barangay Hazard Map', category: 'Action', icon: <MapIcon size={16} />, onClick: () => { handleSetModal('map'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('Barangay Map'); } },
         { label: 'LGU Online Services', category: 'Action', icon: <Handshake size={16} />, onClick: () => { handleSetModal('services'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('LGU Services'); } },
         { label: 'Knowledge Base & Guides', category: 'Action', icon: <BookOpen size={16} />, onClick: () => { handleSetModal('knowledge'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('Knowledge Base'); } },
         { label: 'My Report History', category: 'Navigation', icon: <FileText size={16} />, onClick: () => { handleSetTab('reports'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('My Reports'); } },
@@ -3201,8 +4376,8 @@ const TopNavigation = ({
         setIsMobileSearchOpen(false);
     };
 
-    const renderSearchDropdown = () => (
-        <div className="w-full max-h-[75vh] overflow-y-auto custom-scrollbar p-2 divide-y divide-slate-100 dark:divide-slate-800/80">
+    const renderSearchDropdown = (isMobile = false) => (
+        <div className={`w-full ${isMobile ? 'p-1 sm:p-2' : 'max-h-[75vh] overflow-y-auto custom-scrollbar p-2'} divide-y divide-slate-100 dark:divide-slate-800/80`}>
             {/* If Query is Empty -> Show Shortcuts and Recent Searches */}
             {!q ? (
                 <div>
@@ -3402,14 +4577,18 @@ const TopNavigation = ({
     );
 
     return (
-        <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 w-full border-b border-slate-200/80 dark:border-slate-800 transition-colors">
-            <div className="max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
+        <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800 transition-colors">
+            <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-1 sm:gap-2">
 
                 {/* Left Area: Logo & Search */}
-                <div className="flex items-center gap-2 sm:gap-4 shrink-0 relative" ref={searchRef}>
-                    <a href="/dashboard" className="flex items-center gap-2 group focus:outline-none shrink-0" onClick={(e) => { e.preventDefault(); handleSetTab('overview'); }}>
-                        <Branding size="h-8 sm:h-9" showText={false} />
-                        <span className="font-extrabold text-xl sm:text-2xl tracking-tight text-orange-500 hidden min-[400px]:inline-block">PULSO</span>
+                <div className="flex items-center gap-1 sm:gap-4 shrink-0 relative" ref={searchRef}>
+                    <a
+                        href="/dashboard"
+                        className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl shrink-0 cursor-pointer"
+                        onClick={(e) => { e.preventDefault(); handleSetTab('overview'); }}
+                        aria-label="Caloocan City - City Engineering Department - Powered by PULSO"
+                    >
+                        <Branding size="h-7 w-7 xs:h-8 xs:w-8 sm:h-10 sm:w-10" showText={true} />
                     </a>
 
                     {/* Desktop Search Bar */}
@@ -3454,44 +4633,45 @@ const TopNavigation = ({
                     {/* Mobile Search Trigger Icon */}
                     <button
                         onClick={() => setIsMobileSearchOpen(true)}
-                        className="md:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="md:hidden w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0"
                         title="Search"
                         aria-label="Open Search"
                     >
-                        <Search size={16} />
+                        <Search size={14} className="sm:w-4 sm:h-4" />
                     </button>
                 </div>
 
-                {/* Center Navigation Tabs (Visible on Desktop / Tablet md+) */}
-                <nav className="hidden md:flex items-center justify-center gap-1 lg:gap-4 h-full flex-1 max-w-[540px]">
-                    {navItems.map(item => (
+                {/* Center Header Space (Navigation is persistently handled in Left Rail on Desktop and Bottom Bar on Mobile) */}
+                <div className="flex-1" />
+
+                {/* Right Area: Language Toggle, Profile, Theme, Notifications */}
+                <div className="flex items-center justify-end gap-1 xs:gap-1.5 sm:gap-2.5 shrink-0">
+
+                    {/* Language Toggle Pill [ EN | FIL ] */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-full p-0.5 border border-slate-200 dark:border-slate-700/60 shadow-2xs shrink-0">
                         <button
-                            key={item.id}
-                            onClick={() => handleSetTab(item.id)}
-                            className={`relative h-full px-3 lg:px-6 flex flex-col items-center justify-center transition-colors group focus:outline-none 
-                                ${activeTab === item.id
-                                    ? 'text-orange-500'
-                                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                                }`}
+                            type="button"
+                            onClick={() => i18n?.changeLanguage('en')}
+                            className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-extrabold transition-all cursor-pointer ${
+                                !i18n?.language?.startsWith('tl') && !i18n?.language?.startsWith('fil')
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                            }`}
                         >
-                            <div className="relative">
-                                {React.cloneElement(item.icon, {
-                                    size: 22,
-                                    className: `transition-transform duration-200 ${activeTab === item.id ? 'stroke-[2.5px]' : 'group-hover:scale-110'}`
-                                })}
-                            </div>
-                            <span className="text-[11px] font-semibold mt-0.5 whitespace-nowrap truncate max-w-[100px] lg:max-w-[140px] px-1">{item.label}</span>
-
-                            {/* Active Tab Indicator */}
-                            {activeTab === item.id && (
-                                <motion.div layoutId="activeTabBottom" className="absolute bottom-0 left-0 right-0 h-[3px] bg-orange-500 rounded-t-full" />
-                            )}
+                            EN
                         </button>
-                    ))}
-                </nav>
-
-                {/* Right Area: Profile, Theme, Notifications */}
-                <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => i18n?.changeLanguage('tl')}
+                            className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-extrabold transition-all cursor-pointer ${
+                                i18n?.language?.startsWith('tl') || i18n?.language?.startsWith('fil')
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                        >
+                            FIL
+                        </button>
+                    </div>
 
                     {/* Theme Toggle menu item */}
                     <div className="hidden lg:flex bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700/50">
@@ -3503,21 +4683,21 @@ const TopNavigation = ({
                     {/* Mobile Quick Theme Switcher */}
                     <button
                         onClick={() => changeTheme(theme === 'dark' ? 'light' : 'dark')}
-                        className="lg:hidden w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none"
+                        className="lg:hidden w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none shrink-0"
                         title={`Toggle ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
                     >
-                        {theme === 'dark' ? <Sun size={16} className="text-orange-400" /> : <Moon size={16} />}
+                        {theme === 'dark' ? <Sun size={14} className="sm:w-4 sm:h-4 text-orange-400" /> : <Moon size={14} className="sm:w-4 sm:h-4" />}
                     </button>
 
-                    <div className="relative">
+                    <div className="relative shrink-0">
                         <button
-                            className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none"
+                            className="relative w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none shrink-0"
                             onClick={() => setShowNotifications(!showNotifications)}
                             aria-label="Notifications"
                         >
-                            <Bell size={17} />
+                            <Bell size={14} className="sm:w-4 sm:h-4" />
                             {notifications.length > 0 && notifications.some(n => !n.is_read && !n.is_hidden) && (
-                                <span className="absolute top-[6px] right-[8px] w-2 h-2 bg-red-500 rounded-full ring-2 ring-slate-100 dark:ring-slate-800"></span>
+                                <span className="absolute top-[4px] sm:top-[6px] right-[5px] sm:right-[8px] w-1.5 sm:w-2 h-1.5 sm:h-2 bg-red-500 rounded-full ring-2 ring-slate-100 dark:ring-slate-800"></span>
                             )}
                         </button>
 
@@ -3543,7 +4723,7 @@ const TopNavigation = ({
                                     </div>
                                     <div className="space-y-1 max-h-[350px] overflow-y-auto custom-scrollbar">
                                         {notifications.filter(n => !n.is_hidden).length === 0 ? (
-                                            <div className="p-4 text-center text-sm text-slate-500">No new notifications</div>
+                                             <div className="p-4 text-center text-sm text-slate-500">No new notifications</div>
                                         ) : (
                                             notifications.filter(n => !n.is_hidden).map(notification => (
                                                 <div key={notification.id} className="relative group block w-full">
@@ -3594,58 +4774,80 @@ const TopNavigation = ({
 
                     <button
                         onClick={handleLogout}
-                        className="hidden sm:flex w-8 h-8 sm:w-9 sm:h-9 items-center justify-center bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full transition-colors focus:outline-none"
+                        className="flex w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 items-center justify-center bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full transition-colors focus:outline-none shrink-0 cursor-pointer active:scale-95"
                         title="Sign Out"
                         aria-label="Sign Out"
                     >
-                        <LogOut size={16} />
+                        <LogOut size={13} className="sm:w-4 sm:h-4" />
                     </button>
 
-                    <button onClick={() => handleSetTab('profile')} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold text-xs sm:text-sm flex items-center justify-center text-white shadow-xs shrink-0 hover:opacity-90 transition-opacity focus:outline-none cursor-pointer" aria-label="Profile">
+                    <button onClick={() => handleSetTab('profile')} className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold text-[11px] sm:text-sm flex items-center justify-center text-white shadow-xs shrink-0 hover:opacity-90 transition-opacity focus:outline-none cursor-pointer" aria-label="Profile">
                         {user.avatar}
                     </button>
                 </div>
             </div>
 
-            {/* Full-Screen Mobile Search Overlay */}
-            <AnimatePresence>
-                {isMobileSearchOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="md:hidden fixed inset-0 z-[100] bg-white dark:bg-slate-900 flex flex-col p-4"
-                    >
-                        <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
-                            <div className="flex-1 flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2.5">
-                                <Search size={18} className="text-slate-400 mr-2 shrink-0" />
-                                <input
-                                    type="text"
-                                    autoFocus
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder={t('dashboard.topNav.searchPlaceholder', { defaultValue: 'Search PULSO...' })}
-                                    className="bg-transparent border-none outline-none text-sm w-full text-slate-900 dark:text-white placeholder-slate-400"
-                                />
-                                {searchQuery && (
-                                    <button onClick={() => setSearchQuery('')} className="text-slate-400 p-1">
-                                        <X size={16} />
-                                    </button>
-                                )}
-                            </div>
-                            <button
-                                onClick={() => setIsMobileSearchOpen(false)}
-                                className="text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white px-2 py-1"
+            {/* High-Fidelity Mobile Search Portal (Matches Web Search Dropdown Card & Unconstrained Viewport) */}
+            {typeof document !== 'undefined' && createPortal(
+                <AnimatePresence>
+                    {isMobileSearchOpen && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="md:hidden fixed inset-0 z-[9999] bg-slate-950/70 backdrop-blur-md flex flex-col justify-start p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+                            onClick={() => setIsMobileSearchOpen(false)}
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, y: -12, opacity: 0 }}
+                                animate={{ scale: 1, y: 0, opacity: 1 }}
+                                exit={{ scale: 0.95, y: -12, opacity: 0 }}
+                                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full max-w-lg mx-auto bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[85dvh] overflow-hidden"
                             >
-                                Cancel
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto pt-2">
-                            {renderSearchDropdown()}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                                {/* Search Header Bar */}
+                                <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                                    <div className="flex-1 flex items-center bg-slate-100 dark:bg-slate-800 rounded-2xl px-3.5 py-2.5">
+                                        <Search size={16} className="text-slate-400 mr-2 shrink-0" />
+                                        <input
+                                            type="text"
+                                            autoFocus
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder={t('dashboard.topNav.searchPlaceholder', { defaultValue: 'Search PULSO...' })}
+                                            className="bg-transparent border-none outline-none text-sm w-full text-slate-900 dark:text-white placeholder-slate-400 font-medium"
+                                        />
+                                        {searchQuery && (
+                                            <button 
+                                                onClick={() => setSearchQuery('')} 
+                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
+                                                title="Clear search query"
+                                            >
+                                                <X size={15} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMobileSearchOpen(false)}
+                                        className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white px-2 py-1.5 cursor-pointer shrink-0"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+
+                                {/* Results Container (Card with exact parity to Web Dropdown) */}
+                                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-1 sm:p-2">
+                                    {renderSearchDropdown(true)}
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </header>
     );
 };
@@ -3654,7 +4856,6 @@ export default function ResidentDashboard() {
     const { t, i18n } = useTranslation();
     const { theme, changeTheme } = useTheme();
     const navigate = useNavigate();
-    const { throttleAction, isCooldown } = useInteractionHarden();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
     const [claimModalInitialTicket, setClaimModalInitialTicket] = useState('');
@@ -3688,12 +4889,9 @@ export default function ResidentDashboard() {
         }
     }, [activeModal]);
 
-    // Auth State - Initialize synchronously from localStorage to prevent race conditions on reload
-    const [token, setToken] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser, setCurrentUser] = useState(() => {
-        const storedUser = localStorage.getItem('pulso_user');
-        return storedUser ? JSON.parse(storedUser) : null;
-    });
+    // Auth State - Initialize synchronously from session to prevent race conditions on reload
+    const [token, setToken] = useState(() => getAuthToken());
+    const [currentUser, setCurrentUser] = useState(() => getAuthUser());
 
     useEffect(() => {
         if (!token || !currentUser) {
@@ -3723,31 +4921,39 @@ export default function ResidentDashboard() {
     }, []);
 
     const checkJurisdiction = (location) => {
-        if (!window.google || !window.google.maps || !window.google.maps.geometry) return true;
-
-        const polygon = new window.google.maps.Polygon({ paths: NORTH_CALOOCAN_BOUNDARY });
-        const latLng = new window.google.maps.LatLng(location.lat, location.lng);
-        const isIn = window.google.maps.geometry.poly.containsLocation(latLng, polygon);
+        if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return true;
+        const isIn = isInsideCaloocan(location.lat, location.lng);
 
         if (!isIn) {
-            showToast(t('This location is outside North Caloocan City jurisdiction.'));
+            showToast(t('This location is outside Caloocan City jurisdiction.'));
         }
         return isIn;
     };
 
     const mapOptions = React.useMemo(() => ({
-        styles: theme === 'dark' ? [
-            { "elementType": "geometry", "stylers": [{ "color": "#121826" }] },
-            { "elementType": "labels.text.fill", "stylers": [{ "color": "#637282" }] },
-            { "elementType": "labels.text.stroke", "stylers": [{ "color": "#121826" }] },
-            { "featureType": "administrative", "elementType": "geometry.stroke", "stylers": [{ "color": "#2c3e50" }] },
-            { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#232b3d" }] },
-            { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0d1117" }] }
-        ] : [],
+        styles: theme === 'dark' ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE,
         disableDefaultUI: true,
         zoomControl: true,
         gestureHandling: 'greedy',
     }), [theme]);
+
+    const pinIconCache = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
+    const iconCacheRef = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
+    const [photoPinIcons, setPhotoPinIcons] = useState({});
+
+    // Memoized Google Maps Icon Object Cache to prevent MarkerF re-render flicker
+    const getCachedIcon = (url, w, h, ax, ay) => {
+        if (!window.google || !window.google.maps || !url) return undefined;
+        const key = `${url}_${w}_${h}_${ax}_${ay}`;
+        if (!iconCacheRef.current.has(key)) {
+            iconCacheRef.current.set(key, {
+                url: url,
+                scaledSize: new window.google.maps.Size(w, h),
+                anchor: new window.google.maps.Point(ax, ay)
+            });
+        }
+        return iconCacheRef.current.get(key);
+    };
 
     const [map, setMap] = useState(null);
     const [panorama, setPanorama] = useState(null);
@@ -3834,9 +5040,7 @@ export default function ResidentDashboard() {
     const [reportStatusFilter, setReportStatusFilter] = useState('all');
 
     const handleLogout = () => {
-        sessionStorage.clear();
-        localStorage.removeItem('pulso_token');
-        localStorage.removeItem('pulso_user');
+        clearAuthSession();
         window.location.href = '/login';
     };
 
@@ -3857,24 +5061,12 @@ export default function ResidentDashboard() {
 
     const fetchUserReports = async (userId) => {
         try {
-            setLoadingReports(true);
-            let response = await fetch(`${API_BASE_URL}/api/me/reports`, {
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            const response = await fetch(`${API_BASE_URL}/api/reports/user/${userId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (!response.ok && userId) {
-                response = await fetch(`${API_BASE_URL}/api/reports/user/${userId}`, {
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-                });
-            }
-            const result = await handleApiError(response);
-            if (result.ok) {
-                const reportList = Array.isArray(result.data) 
-                    ? result.data 
-                    : (result.data?.reports || []);
-                setUserReports(reportList);
-                setUser(prev => ({ ...prev, reportsCount: reportList.length }));
-            } else {
-                showToast(result.message);
+            if (response.ok) {
+                const data = await response.json();
+                setUserReports(data);
             }
         } catch (error) {
             console.error("PULSO: Error fetching reports:", error);
@@ -3930,7 +5122,7 @@ export default function ResidentDashboard() {
         }
 
         // Logic to navigate or show full details
-        if (notif.message.includes('RPT-')) {
+        if (notif.message && (notif.message.includes('PUL-') || notif.message.includes('RPT-'))) {
             // It's a report-related notification
             setActiveTab('reports');
             setReportStatusFilter('all');
@@ -4006,45 +5198,52 @@ export default function ResidentDashboard() {
     };
 
     // SVG Marker Pin Generator for Map Symbols
-    const getMarkerSVG = (category, status) => {
-        let color = getCategoryColor(category);
-        let svgIcon = '';
+    // Beautiful Dynamic SVG Pin Generator (matching government DispatcherDashboard)
+    const getMarkerSVG = (category, status, isSelected = false) => {
+        let color = '#f97316'; // Default Active
         const cat = (category || '').toLowerCase();
+        const isPublicFacility = cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public');
 
-        // Match specific category keywords to their designated HEX colors and icons
-        if (cat.includes('road') || cat.includes('bridge')) {
-            svgIcon = `<path d="M12 2a6 6 0 0 0-6 6v2H4v2h16v-2h-2V8a6 6 0 0 0-6-6zm0 2a4 4 0 0 1 4 4v2H8V8a4 4 0 0 1 4-4z" fill="white"/>`;
-        } else if (cat.includes('water') || cat.includes('drainage') || cat.includes('flood')) {
+        if (status === 'resolved') color = '#22c55e';
+        else if (status === 'pending' || status === 'unverified') color = '#ef4444';
+        else if (status === 'rejected') color = '#64748b';
+        else if (status === 'cancelled') color = '#0f172a';
+        
+        // Overwrite color for Public Facilities
+        if (isPublicFacility) {
+            color = isSelected ? '#16a34a' : '#22c55e';
+        }
+        
+        let svgIcon = ''; 
+        
+        // Crisp, solid vector shapes corresponding to report classifications
+        if (cat.includes('flood') || cat.includes('water') || cat.includes('drain')) {
+            // Droplet
             svgIcon = `<path d="M12 22a7.5 7.5 0 0 0 7.5-7.5c0-4.14-7.5-12.5-7.5-12.5S4.5 10.36 4.5 14.5A7.5 7.5 0 0 0 12 22z" fill="white"/>`;
-        } else if (cat.includes('lighting') || cat.includes('street') || cat.includes('electric')) {
+        } else if (cat.includes('electric') || cat.includes('wire') || cat.includes('power') || cat.includes('light') || cat.includes('street')) {
+            // Zap
             svgIcon = `<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/>`;
-        } else if (cat.includes('safety') || cat.includes('regulatory') || cat.includes('emergency')) {
-            color = '#ef4444'; // red (Shield)
-            svgIcon = `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="white"/>`;
-        } else if (cat.includes('facilit') || cat.includes('build') || cat.includes('park')) {
-            color = '#22c55e'; // green (Building)
-            svgIcon = `<path d="M3 21h18v-2H3v2zm9-18L2 9h2v10h16V9h2L12 3zm-3 14v-4h6v4H9z" fill="white"/>`;
+        } else if (cat.includes('road') || cat.includes('pothole') || cat.includes('bridge') || cat.includes('infrastructure')) {
+            // Hardhat / Cone
+            svgIcon = `<path d="M12 2a6 6 0 0 0-6 6v2H4v2h16v-2h-2V8a6 6 0 0 0-6-6zm0 2a4 4 0 0 1 4 4v2H8V8a4 4 0 0 1 4-4z" fill="white"/>`;
+        } else if (isPublicFacility) {
+            // Building/Facility icon
+            svgIcon = `<path d="M4 22V4c0-1.1.9-2 2-2h12a2 2 0 0 1 2 2v18H4zm4-4h2v-2H8v2zm0-4h2v-2H8v2zm0-4h2V8H8v2zm4 8h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2V8h-2v2zm4 8h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2V8h-2v2z" fill="white"/>`;
         } else {
-            // Default generic warning
+            // Alert triangle
             svgIcon = `<path d="M12 2L1 21h22L12 2zm0 3.5l7 13.5H5l7-13.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z" fill="white"/>`;
         }
 
-        const statusColor = status === 'resolved' ? '#22c55e' : (status === 'pending' ? '#ef4444' : '#f97316');
-
         const svgString = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 46 50" width="46" height="50">
-                <!-- Large Pin Body (Offset to make room for badge) -->
-                <g transform="translate(3, 4)">
-                    <path d="M20 44c0 0 16-15.5 16-24a16 16 0 0 0-32 0c0 8.5 16 24 16 24z" fill="${color}" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0px 3px 2px rgba(0,0,0,0.3))" />
-                    <!-- Dark Inner Circle background -->
-                    <circle cx="20" cy="18" r="11" fill="rgba(0,0,0,0.15)"/>
-                    <!-- Centered White Icon -->
-                    <g transform="translate(10, 8) scale(0.8)">
-                        ${svgIcon}
-                    </g>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 46" width="40" height="46">
+                <!-- Large Pin Body -->
+                <path d="M20 44c0 0 16-15.5 16-24a16 16 0 0 0-32 0c0 8.5 16 24 16 24z" fill="${color}" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0px 3px 2px rgba(0,0,0,0.3))" />
+                <!-- Dark Inner Circle background -->
+                <circle cx="20" cy="18" r="11" fill="rgba(0,0,0,0.18)"/>
+                <!-- Centered White Icon -->
+                <g transform="translate(10, 8) scale(0.8)">
+                    ${svgIcon}
                 </g>
-                <!-- Status Badge Indicator top right -->
-                <circle cx="36" cy="10" r="7" fill="${statusColor}" stroke="#ffffff" stroke-width="2.5" filter="drop-shadow(0px 2px 2px rgba(0,0,0,0.2))"/>
             </svg>
         `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
 
@@ -4073,14 +5272,33 @@ export default function ResidentDashboard() {
         const myReportMarkers = (userReports || []).map(r => {
             const lat = parseFloat(r.location_lat || r.lat);
             const lng = parseFloat(r.location_lng || r.lng);
+
+            let image = r.image_url || r.photo_url;
+            if (!image && r.image_paths) {
+                if (typeof r.image_paths === 'string') {
+                    try {
+                        const parsed = JSON.parse(r.image_paths);
+                        image = Array.isArray(parsed) ? parsed[0] : parsed;
+                    } catch (e) {
+                        image = r.image_paths;
+                    }
+                } else if (Array.isArray(r.image_paths)) {
+                    image = r.image_paths[0];
+                }
+            }
+
+            const formattedTicket = formatTicketId(r.ticket_id, r.id);
             return {
-                id: r.id || `user-report-${r.ticket_id}`,
+                id: r.id || `user-report-${formattedTicket}`,
+                ticket_id: formattedTicket,
                 lat,
                 lng,
-                title: r.description || `Resident Report - ${r.ticket_id}`,
+                title: r.description || `Resident Report - ${formattedTicket}`,
                 category: r.category || r.ai_category || 'Resident Report',
                 status: (r.status || 'pending').toLowerCase(),
-                location: r.location_string || 'N/A'
+                location: r.location_string || 'N/A',
+                image: image,
+                ai_urgency: r.ai_urgency || r.urgency
             };
         }).filter(r => !isNaN(r.lat) && !isNaN(r.lng));
 
@@ -4094,6 +5312,146 @@ export default function ResidentDashboard() {
             };
         }).sort((a, b) => a.distanceValue - b.distanceValue);
     }, [reportLocation, userReports, isLoaded]);
+
+    // Generate photo-pins for hazards with images (matching government DispatcherDashboard)
+    useEffect(() => {
+        if (!processedHazards || processedHazards.length === 0) return;
+
+        let batchTimer = null;
+        const pendingBatch = {};
+
+        const flushBatch = () => {
+            if (Object.keys(pendingBatch).length > 0) {
+                setPhotoPinIcons(prev => ({ ...prev, ...pendingBatch }));
+            }
+        };
+
+        processedHazards.forEach(hazard => {
+            const rawImg = hazard.image;
+            if (!rawImg) return;
+
+            [false, true].forEach(isSelected => {
+                const cacheKey = `${hazard.id}-${isSelected ? 'sel' : 'norm'}`;
+                if (pinIconCache.current.has(cacheKey)) return;
+
+                let thumbUrl = rawImg;
+                if (!rawImg.startsWith('http') && !rawImg.startsWith('data:')) {
+                    const cleanPath = rawImg.startsWith('/') ? rawImg : `/${rawImg}`;
+                    thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
+                }
+
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    try {
+                        const size = isSelected ? 46 : 36;
+                        const pointerH = isSelected ? 8 : 7;
+                        const totalW = size + 6;
+                        const totalH = size + pointerH + 2;
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = totalW;
+                        canvas.height = totalH;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) return;
+
+                        const cx = totalW / 2;
+                        const cy = size / 2 + 1;
+                        const radius = (size - 4) / 2;
+
+                        let borderColor = '#ff6b00';
+                        if (hazard.status === 'resolved') borderColor = '#22c55e';
+                        else if (hazard.status === 'pending' || hazard.status === 'unverified') {
+                            borderColor = hazard.ai_urgency === 'CRITICAL' ? '#ef4444' : '#ff6b00';
+                        } else if (hazard.status === 'rejected') {
+                            borderColor = '#64748b';
+                        } else if (hazard.status === 'cancelled') {
+                            borderColor = '#0f172a';
+                        }
+
+                        // Pointer Arrow
+                        ctx.beginPath();
+                        ctx.moveTo(cx - 5, cy + radius - 2);
+                        ctx.lineTo(cx + 5, cy + radius - 2);
+                        ctx.lineTo(cx, cy + radius + pointerH);
+                        ctx.closePath();
+                        ctx.fillStyle = borderColor;
+                        ctx.fill();
+
+                        // Outer Glow if Selected
+                        if (isSelected) {
+                            ctx.beginPath();
+                            ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
+                            ctx.fillStyle = 'rgba(255, 107, 0, 0.35)';
+                            ctx.fill();
+                        }
+
+                        // Outer Border Ring
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+                        ctx.fillStyle = borderColor;
+                        ctx.fill();
+
+                        // Inner background
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                        ctx.fillStyle = '#0c1424';
+                        ctx.fill();
+
+                        // Circular photo clip
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+                        ctx.clip();
+
+                        const aspect = img.width / img.height;
+                        let dw, dh, dx, dy;
+                        if (aspect > 1) {
+                            dh = (radius - 0.5) * 2;
+                            dw = dh * aspect;
+                            dx = cx - dw / 2;
+                            dy = cy - radius + 0.5;
+                        } else {
+                            dw = (radius - 0.5) * 2;
+                            dh = dw / aspect;
+                            dx = cx - radius + 0.5;
+                            dy = cy - dh / 2;
+                        }
+                        ctx.drawImage(img, dx, dy, dw, dh);
+                        ctx.restore();
+
+                        // White inner accent ring
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 1.0;
+                        ctx.stroke();
+
+                        const dataUrl = canvas.toDataURL('image/png');
+                        pinIconCache.current.set(cacheKey, dataUrl);
+                        pendingBatch[cacheKey] = dataUrl;
+
+                        if (batchTimer) clearTimeout(batchTimer);
+                        batchTimer = setTimeout(flushBatch, 100);
+                    } catch (err) {
+                        // fallback to svg
+                    }
+                };
+                img.onerror = () => {
+                    if (thumbUrl.includes('/api/thumbnails')) {
+                        const fallbackImg = new Image();
+                        fallbackImg.crossOrigin = 'anonymous';
+                        fallbackImg.src = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
+                    }
+                };
+                img.src = thumbUrl;
+            });
+        });
+
+        return () => {
+            if (batchTimer) clearTimeout(batchTimer);
+        };
+    }, [processedHazards]);
 
 
     // Auto-fetch location on mount and periodic updates for proximity tracking
@@ -4509,7 +5867,7 @@ export default function ResidentDashboard() {
     }));
 
     return (
-        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors flex flex-col overflow-hidden">
+        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors flex flex-col lg:overflow-hidden">
 
             {/* Global Toast Notification */}
             <AnimatePresence>
@@ -4596,6 +5954,9 @@ export default function ResidentDashboard() {
                 setIsSubmitConfirmOpen={setIsSubmitConfirmOpen}
                 actuallySubmitReport={actuallySubmitReport}
                 setZoomedImage={setZoomedImage}
+                photoPinIcons={photoPinIcons}
+                getCachedIcon={getCachedIcon}
+                theme={theme}
             />
 
             {activeModal === 'all-notifications' && (
@@ -4709,133 +6070,130 @@ export default function ResidentDashboard() {
                 setReportStatusFilter={setReportStatusFilter}
             />
 
-            {/* Main Layout Grid (Responsive 1/2/3-Column Layout) */}
-            <main className="flex-1 overflow-hidden w-full flex flex-col relative">
+            {/* Main Layout Grid (Responsive 2-Column Content + Persistent Side Nav) */}
+            <main className="flex-1 w-full flex flex-col relative lg:overflow-hidden">
 
-                <div className="max-w-[1600px] mx-auto w-full px-0 sm:px-4 h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)]">
+                <div className="max-w-[1700px] mx-auto w-full px-0 sm:px-4 flex flex-col lg:flex-row lg:h-[calc(100vh-4rem)] flex-1">
+
+                    {/* Persistent Desktop Left Side Navigation Rail (≥1024px) */}
+                    <aside className="w-60 xl:w-64 shrink-0 hidden lg:block h-full overflow-y-auto custom-scrollbar border-r border-slate-200/80 dark:border-slate-800">
+                        <LeftSidebar
+                            user={user}
+                            activeTab={activeTab}
+                            handleSetTab={handleSetTab}
+                            handleSetModal={handleSetModal}
+                            handleLogout={handleLogout}
+                            t={t}
+                        />
+                    </aside>
 
                     {/* Content switcher based on tabs */}
-                    {(activeTab === 'overview' || activeTab === 'home') && (
-                        <div className="w-full h-full flex flex-col md:flex-row items-center md:items-start justify-center gap-0 lg:gap-6 xl:gap-8">
+                    <div className="flex-1 min-w-0 w-full lg:h-full lg:overflow-y-auto custom-scrollbar">
+                        {(activeTab === 'overview' || activeTab === 'home') && (
+                            <ResidentHomeView
+                                user={user}
+                                userReports={userReports}
+                                loadingReports={loadingReports}
+                                lguUpdates={lguUpdates}
+                                loadingAdvisories={loadingAdvisories}
+                                processedHazards={processedHazards}
+                                handleSetTab={handleSetTab}
+                                setActiveModal={setActiveModal}
+                                setSelectedPost={setSelectedPost}
+                                t={t}
+                            />
+                        )}
 
-                            {/* Left Column (Shortcuts) - 280px to 320px on Desktop */}
-                            <aside className="w-[280px] lg:w-[300px] xl:w-[320px] shrink-0 hidden md:block h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar">
-                                <LeftSidebar
-                                    user={user}
-                                    handleSetTab={handleSetTab}
+                        {activeTab === 'reports' && (
+                            <div className="w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1550px] mx-auto pb-32 lg:pb-8 pt-3 sm:pt-6 px-3.5 sm:px-6">
+                                <MyReports
+                                    userReports={userReports}
+                                    loadingReports={loadingReports}
                                     handleSetModal={handleSetModal}
+                                    onOpenClaimModal={() => setIsClaimModalOpen(true)}
+                                    containerVariants={containerVariants}
+                                    setZoomedImage={setZoomedImage}
+                                    reportStatusFilter={reportStatusFilter}
+                                    setReportStatusFilter={setReportStatusFilter}
+                                    handleCancelReport={handleCancelReport}
                                     t={t}
                                 />
-                            </aside>
-
-                            {/* Mobile Layout Shortcuts Strip (Touch-Optimized Horizontal Carousel) */}
-                            <div className="md:hidden w-full px-3 sm:px-4 pt-3 pb-2.5 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 shrink-0 relative z-20 shadow-xs">
-                                <div className="flex items-center justify-between mb-2 px-1">
-                                    <h3 className="font-extrabold text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                        {t('dashboard.overview.shortcuts', { defaultValue: 'Quick Shortcuts' })}
-                                    </h3>
-                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">Swipe →</span>
-                                </div>
-                                <div className="flex overflow-x-auto gap-2.5 pb-2 snap-x hide-scrollbar -mx-1 px-1">
-                                    {quickFunctions.map((func) => (
-                                        <button
-                                            key={func.id}
-                                            onClick={func.action}
-                                            className="min-w-[80px] max-w-[88px] flex flex-col items-center justify-center p-2 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 snap-start active:scale-95 transition-all shadow-2xs hover:border-orange-500/50 group"
-                                        >
-                                            <div className={`w-11 h-11 rounded-xl bg-white dark:bg-slate-700 flex items-center justify-center mb-1 text-${func.color}-500 shadow-2xs border border-slate-100 dark:border-slate-600 group-hover:scale-105 transition-transform`}>
-                                                {func.icon}
-                                            </div>
-                                            <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200 text-center leading-tight line-clamp-2">{func.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
                             </div>
+                        )}
 
-                            {/* Center Column (Main Feed) - Responsive width with mobile bottom padding */}
-                            <div className="flex-1 w-full min-w-0 max-w-[680px] h-full overflow-y-auto custom-scrollbar pb-28 md:pb-8 pt-4 md:pt-8 lg:pt-10 px-3 sm:px-4 md:px-2">
+                        {activeTab === 'updates' && (
+                            <div className="w-full max-w-3xl mx-auto pb-32 lg:pb-8 pt-3 sm:pt-6 px-3.5 sm:px-6">
                                 <LguFeed
                                     lguUpdates={lguUpdates}
                                     loadingAdvisories={loadingAdvisories}
                                     getIconForCategory={getIconForCategory}
                                     setSelectedPost={setSelectedPost}
                                     setActiveModal={setActiveModal}
+                                    handleSetTab={handleSetTab}
                                     containerVariants={containerVariants}
                                     t={t}
                                 />
                             </div>
+                        )}
 
-                            {/* Right Column (Widgets) - 320px on Desktop */}
-                            <aside className="w-[320px] shrink-0 hidden xl:block h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar">
-                                <RightSidebar
+                        {activeTab === 'profile' && (
+                            <div className="w-full max-w-4xl mx-auto pb-32 lg:pb-8 pt-3 sm:pt-6 px-3.5 sm:px-6">
+                                <ProfileView
                                     user={user}
-                                    handleSetModal={handleSetModal}
+                                    setUser={setUser}
+                                    handleUpdateProfile={handleUpdateProfile}
+                                    updatingProfile={updatingProfile}
+                                    containerVariants={containerVariants}
                                     userReports={userReports}
-                                    loadingReports={loadingReports}
-                                    processedHazards={processedHazards}
-                                    setSelectedHazard={setSelectedHazard}
-                                    map={map}
+                                    showToast={showToast}
+                                    handleLogout={handleLogout}
                                     t={t}
                                 />
-                            </aside>
+                            </div>
+                        )}
 
-                        </div>
-                    )}
-
-                    {/* Full Width Tab Views Container */}
-                    {activeTab !== 'overview' && activeTab !== 'home' && (
-                        <div className="w-full h-full overflow-y-auto custom-scrollbar flex flex-col items-center pb-28 md:pb-8 pt-6 sm:pt-8 lg:pt-10 px-3 sm:px-6">
-                            {activeTab === 'reports' && (
-                                <div className="w-full max-w-5xl">
-                                    <MyReports
-                                        userReports={userReports}
-                                        loadingReports={loadingReports}
-                                        handleSetModal={handleSetModal}
-                                        onOpenClaimModal={() => setIsClaimModalOpen(true)}
-                                        containerVariants={containerVariants}
-                                        setZoomedImage={setZoomedImage}
-                                        reportStatusFilter={reportStatusFilter}
-                                        setReportStatusFilter={setReportStatusFilter}
-                                        handleCancelReport={handleCancelReport}
-                                        t={t}
-                                    />
-                                </div>
-                            )}
-                            {activeTab === 'profile' && (
-                                <div className="w-full max-w-4xl">
-                                    <ProfileView
-                                        user={user}
-                                        setUser={setUser}
-                                        handleUpdateProfile={handleUpdateProfile}
-                                        updatingProfile={updatingProfile}
-                                        containerVariants={containerVariants}
-                                        userReports={userReports}
-                                        showToast={showToast}
-                                        t={t}
-                                    />
-                                </div>
-                            )}
-                            {activeTab === 'settings' && (
-                                <div className="w-full max-w-4xl">
-                                    <SettingsView
-                                        user={user}
-                                        handleLogout={handleLogout}
-                                        containerVariants={containerVariants}
-                                        token={token}
-                                        showToast={showToast}
-                                        t={t}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
+                        {activeTab === 'settings' && (
+                            <div className="w-full max-w-4xl mx-auto pb-32 lg:pb-8 pt-3 sm:pt-6 px-3.5 sm:px-6">
+                                <SettingsView
+                                    user={user}
+                                    handleLogout={handleLogout}
+                                    containerVariants={containerVariants}
+                                    token={token}
+                                    showToast={showToast}
+                                    t={t}
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </main>
 
             {/* ── Mobile Bottom Navigation Bar (Ultra-responsive, glassmorphism, touch-optimized) ── */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around">
+            <nav 
+                className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] h-16 px-2 flex items-center justify-around select-none"
+                style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+            >
                 {navItems.map((item) => {
-                    const isActive = activeTab === item.id;
+                    if (item.id === 'report') {
+                        return (
+                            <button
+                                key="report"
+                                type="button"
+                                onClick={() => handleSetModal('file-report')}
+                                className="flex flex-col items-center justify-center -mt-6 group focus:outline-none cursor-pointer"
+                                aria-label="Report an issue"
+                            >
+                                <div className="w-12 h-12 rounded-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-90 text-white shadow-lg flex items-center justify-center border-3 border-white dark:border-slate-900 transition-transform group-hover:scale-105">
+                                    <Plus size={26} strokeWidth={3} />
+                                </div>
+                                <span className="text-[10px] font-extrabold text-[#ff6b00] mt-0.5">
+                                    {item.label}
+                                </span>
+                            </button>
+                        );
+                    }
+
+                    const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
                     return (
                         <button
                             key={item.id}
@@ -4866,134 +6224,147 @@ export default function ResidentDashboard() {
                 })}
             </nav>
 
-            {/* ── PULSO Resident AI Assistant FAB ────────────────────────────── */}
-            <div className="fixed bottom-20 md:bottom-8 right-4 md:right-6 z-[50] flex flex-col items-end gap-4">
-                <AnimatePresence>
-                    {isAIChatOpen && (
-                        <>
-                            {/* Backdrop for maximized mode or mobile modal */}
-                            {(isAIMaximized || window.innerWidth < 640) && (
-                                <motion.div
-                                    key="resident-ai-backdrop"
-                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[99]"
-                                    onClick={() => setIsAIChatOpen(false)}
-                                />
+            {/* ── PULSO Resident AI Assistant Modal & Backdrop ────────────────── */}
+            <AnimatePresence>
+                {isAIChatOpen && (
+                    <>
+                        {/* Backdrop for maximized mode or mobile modal */}
+                        <motion.div
+                            key="resident-ai-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className={`fixed inset-0 bg-black/60 backdrop-blur-xs z-[990] ${
+                                isAIMaximized ? 'block' : 'sm:hidden'
+                            }`}
+                            onClick={() => {
+                                if (isAIMaximized && window.innerWidth >= 640) {
+                                    setIsAIMaximized(false);
+                                } else {
+                                    setIsAIChatOpen(false);
+                                    setIsAIMaximized(false);
+                                }
+                            }}
+                        />
+
+                        <motion.div
+                            key="resident-ai-chat"
+                            initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                            className={`fixed z-[1000] bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col transition-all duration-300 ${
+                                isAIMaximized
+                                    ? 'inset-0 sm:inset-6 md:inset-10 lg:inset-14 rounded-none sm:rounded-3xl h-[100dvh] sm:h-auto max-h-none'
+                                    : 'inset-x-3 bottom-[5.25rem] sm:inset-auto sm:bottom-24 sm:right-6 w-auto sm:w-[390px] h-[72dvh] sm:h-[530px] max-h-[580px] rounded-2xl'
+                            }`}
+                        >
+                            {/* Header */}
+                            <div className="p-3.5 sm:p-4 bg-gradient-to-r from-[#e65100] via-[#f97316] to-[#ea580c] flex justify-between items-center shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                                        <Brain size={18} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-white text-sm leading-tight">PULSEAI</h4>
+                                        <p className="text-[10px] text-orange-100 font-semibold uppercase tracking-wider">Community Helper · 24/7</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAIMaximized(prev => !prev)}
+                                        title={isAIMaximized ? 'Minimize' : 'Maximize'}
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+                                    >
+                                        {isAIMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
+                                        title="Close"
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Suggested quick-actions (Horizontally scrollable on mobile, saving vertical space) */}
+                            {aiMessages.length === 1 && (
+                                <div className="px-3 py-2 bg-orange-50/90 dark:bg-slate-800/90 border-b border-orange-100 dark:border-slate-700 flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+                                    {['How to file a report?', 'My report status', 'City hotlines', 'Evacuation routes'].map(q => (
+                                        <button
+                                            key={q}
+                                            type="button"
+                                            onClick={() => { setAiQuery(q); }}
+                                            className="text-[11px] font-semibold whitespace-nowrap text-[#ea580c] dark:text-orange-300 bg-white dark:bg-slate-700 border border-orange-200 dark:border-orange-900/40 px-3 py-1 rounded-full hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] transition-colors shrink-0 cursor-pointer shadow-2xs"
+                                        >
+                                            {q}
+                                        </button>
+                                    ))}
+                                </div>
                             )}
 
-                            <motion.div
-                                key="resident-ai-chat"
-                                initial={{ opacity: 0, scale: 0.92, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.92, y: 20 }}
-                                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-                                className={`bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col transition-all duration-300 ${isAIMaximized
-                                        ? 'fixed inset-3 sm:inset-8 md:inset-12 z-[100] rounded-3xl'
-                                        : 'fixed inset-x-3 bottom-20 sm:inset-auto sm:bottom-24 sm:right-6 w-auto sm:w-[380px] h-[72vh] sm:h-[520px] max-h-[560px] rounded-2xl z-[100]'
-                                    }`}
-                            >
-                                {/* Header */}
-                                <div className="p-3.5 sm:p-4 bg-gradient-to-r from-[#e65100] via-[#f97316] to-[#ea580c] flex justify-between items-center shrink-0">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                                            <Brain size={18} className="text-white" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-white text-sm">PULSEAI</h4>
-                                            <p className="text-[10px] text-orange-100 font-semibold uppercase tracking-wider">Community Helper · 24/7</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            onClick={() => setIsAIMaximized(prev => !prev)}
-                                            title={isAIMaximized ? 'Minimize' : 'Maximize'}
-                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors"
-                                        >
-                                            {isAIMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                                        </button>
-                                        <button
-                                            onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
-                                            title="Close"
-                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors"
-                                        >
-                                            <X size={15} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Suggested quick-actions */}
-                                {aiMessages.length === 1 && (
-                                    <div className="px-3 py-2 bg-orange-50/80 dark:bg-slate-800 border-b border-orange-100 dark:border-slate-700 flex gap-1.5 flex-wrap shrink-0">
-                                        {['How to file a report?', 'My report status', 'City hotlines', 'Evacuation routes'].map(q => (
-                                            <button
-                                                key={q}
-                                                onClick={() => { setAiQuery(q); }}
-                                                className="text-[10px] font-semibold text-[#ea580c] dark:text-orange-300 bg-white dark:bg-slate-700 border border-orange-200 dark:border-orange-900/40 px-2.5 py-1 rounded-full hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] transition-colors"
-                                            >
-                                                {q}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Messages */}
-                                <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
-                                    {aiMessages.map((msg, i) => (
-                                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            {msg.role === 'assistant' && (
-                                                <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0 shadow-xs">
-                                                    <Brain size={12} className="text-white" />
-                                                </div>
-                                            )}
-                                            <div className={`${isAIMaximized ? 'max-w-[70%]' : 'max-w-[85%]'
-                                                } p-3 rounded-2xl text-[13px] font-medium leading-relaxed ${msg.role === 'user'
-                                                    ? 'bg-[#f05a00] text-white rounded-br-xs shadow-xs'
-                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-xs'
-                                                }`}>
-                                                {msg.text}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {isAILoading && (
-                                        <div className="flex justify-start">
-                                            <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0">
+                            {/* Messages Area */}
+                            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+                                {aiMessages.map((msg, i) => (
+                                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        {msg.role === 'assistant' && (
+                                            <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0 shadow-xs">
                                                 <Brain size={12} className="text-white" />
                                             </div>
-                                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-xs flex gap-1">
-                                                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
-                                                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                                            </div>
+                                        )}
+                                        <div className={`${isAIMaximized ? 'max-w-[85%] sm:max-w-[70%]' : 'max-w-[85%]'
+                                            } p-3 rounded-2xl text-[13px] font-medium leading-relaxed ${msg.role === 'user'
+                                                ? 'bg-[#f05a00] text-white rounded-br-xs shadow-xs'
+                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-xs border border-slate-200/50 dark:border-slate-700/50'
+                                            }`}>
+                                            {msg.text}
                                         </div>
-                                    )}
-                                    <div ref={aiChatEndRef} />
-                                </div>
-
-                                {/* Input */}
-                                <form onSubmit={handleResidentAIChat} className="p-2.5 sm:p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shrink-0">
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={aiQuery}
-                                            onChange={e => setAiQuery(e.target.value)}
-                                            placeholder="Ask PULSEAI..."
-                                            className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-3.5 py-2 sm:py-2.5 text-xs sm:text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-[#f05a00] outline-none placeholder:text-slate-400"
-                                        />
-                                        <button
-                                            type="submit"
-                                            disabled={isAILoading}
-                                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#f05a00] hover:bg-[#d94e00] flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0 shadow-sm cursor-pointer"
-                                        >
-                                            <Search size={15} />
-                                        </button>
                                     </div>
-                                </form>
-                            </motion.div>
-                        </>
-                    )}
-                </AnimatePresence>
+                                ))}
+                                {isAILoading && (
+                                    <div className="flex justify-start">
+                                        <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0">
+                                            <Brain size={12} className="text-white" />
+                                        </div>
+                                        <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-xs flex gap-1 border border-slate-200/50 dark:border-slate-700/50">
+                                            <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
+                                            <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                            <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={aiChatEndRef} />
+                            </div>
 
-                {/* Pulsing FAB button */}
+                            {/* Input Form with safe bottom area */}
+                            <form onSubmit={handleResidentAIChat} className="p-2.5 sm:p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={aiQuery}
+                                        onChange={e => setAiQuery(e.target.value)}
+                                        placeholder="Ask PULSEAI..."
+                                        className="flex-1 bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-[#f05a00]/30 rounded-xl px-3.5 py-2.5 text-xs sm:text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-[#f05a00] outline-none placeholder:text-slate-400"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={isAILoading || !aiQuery.trim()}
+                                        className="w-10 h-10 rounded-xl bg-[#f05a00] hover:bg-[#d94e00] flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0 shadow-sm cursor-pointer"
+                                    >
+                                        <Search size={16} />
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* ── Floating FAB Button (Hidden when maximized on mobile) ── */}
+            <div className={`fixed bottom-20 md:bottom-8 right-4 md:right-6 z-[60] ${isAIChatOpen && isAIMaximized ? 'hidden' : 'block'}`}>
                 <motion.button
                     onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                     whileHover={{ scale: 1.05 }}
@@ -5047,6 +6418,20 @@ export default function ResidentDashboard() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* ── Contextual Claim Guest Report Modal ── */}
+            <ClaimReportModal
+                isOpen={isClaimModalOpen}
+                onClose={() => setIsClaimModalOpen(false)}
+                onSuccess={() => {
+                    if (currentUser?.id) {
+                        fetchUserReports(currentUser.id);
+                    }
+                }}
+                initialTicketId={claimModalInitialTicket}
+                initialTrackingToken={claimModalInitialToken}
+                token={token}
+            />
         </div>
     );
 }

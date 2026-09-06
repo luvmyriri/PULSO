@@ -1,15 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown, Calendar, ChevronRight, UserCheck } from 'lucide-react';
+import { User, Phone, Lock, UploadCloud, CheckCircle, Loader2, X, ZoomIn, Info, Mail, ShieldCheck, AlertCircle, Camera, Eye, EyeOff, Sun, Moon, Monitor, Home, RotateCw, Database, ChevronDown, Calendar, ChevronRight, UserCheck, Bell, FileCheck, MapPin, Check } from 'lucide-react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
-import Spline from '@splinetool/react-spline';
 import { useTheme } from '../contexts/ThemeContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import Branding from '../components/Branding';
+import ThemeToggle from '../components/ThemeToggle';
 import IDCameraModal from '../components/IDCameraModal';
-import TermsModal from '../components/TermsModal';
-
+import LegalModal from '../components/LegalModal';
+import { clearAuthSession } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ function parseOcrAddress(raw, data) {
 
     // ─── 3. Extract leading House Number (if no Block/Lot found) ────────────
     if (!blockLot) {
-        const houseRe = /^(#?\d+[-–/]?[A-Za-z]?)\s/;
+        const houseRe = /^(#?\d+[-–\/]?[A-Za-z]?)\s/;
         const houseMatch = s.match(houseRe);
         if (houseMatch) {
             houseNo = houseMatch[1].replace(/^#/, '');
@@ -63,7 +63,7 @@ function parseOcrAddress(raw, data) {
 
     // ─── 4. Extract Street (before or after subdivision) ────────────────────
     // Street has suffix: St., Ave., Rd., Blvd., Dr., Lane, Highway, Ext.
-    const streetRe = /\b((?:[A-Za-z0-9#.-]+\s+)*(?:[A-Za-z0-9#.-]+)\s+(?:STREET|ST\.?|AVENUE|AVE\.?|ROAD|RD\.?|BOULEVARD|BLVD\.?|DRIVE|DR\.?|LANE|LN\.?|HIGHWAY|HWY\.?|EXTENSION|EXT\.?|LOOP|WALK|WAY|CIRCLE|CIR\.?))\b/i;
+    const streetRe = /\b((?:[A-Za-z0-9#.\-]+\s+)*(?:[A-Za-z0-9#.\-]+)\s+(?:STREET|ST\.?|AVENUE|AVE\.?|ROAD|RD\.?|BOULEVARD|BLVD\.?|DRIVE|DR\.?|LANE|LN\.?|HIGHWAY|HWY\.?|EXTENSION|EXT\.?|LOOP|WALK|WAY|CIRCLE|CIR\.?))\b/i;
     const streetMatch = s.match(streetRe);
     if (streetMatch) {
         street = streetMatch[1].replace(/\s+/g, ' ').trim();
@@ -73,7 +73,7 @@ function parseOcrAddress(raw, data) {
     }
 
     // ─── 5. Extract Subdivision / Village / Estate ───────────────────────────
-    const subdivRe = /\b((?:[A-Za-z0-9#.-]+\s+)*(?:[A-Za-z0-9#.-]+\s+)?(?:HOMES?(?:\s+\d+[A-Z]?)?|VILLAGE|VILL(?:AGE)?\.?|HEIGHTS?|SUBD(?:\.?|IVISION)?|SUBDIVISION|VILLE|ESTATE|PARK(?:\s+\d+)?|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+)?|FAIRVIEW|TOWNVILLE|RESIDENCES?|COMPOUND|ROYALE|VERDE|PALMS?|GARDENS?|GROVE|OAKS?|PINES|HILLS?|VISTAS?))\b/i;
+    const subdivRe = /\b((?:[A-Za-z0-9#.\-]+\s+)*(?:[A-Za-z0-9#.\-]+\s+)?(?:HOMES?(?:\s+\d+[A-Z]?)?|VILLAGE|VILL(?:AGE)?\.?|HEIGHTS?|SUBD(?:\.?|IVISION)?|SUBDIVISION|VILLE|ESTATE|PARK(?:\s+\d+)?|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+)?|FAIRVIEW|TOWNVILLE|RESIDENCES?|COMPOUND|ROYALE|VERDE|PALMS?|GARDENS?|GROVE|OAKS?|PINES|HILLS?|VISTAS?))\b/i;
     const subdivMatch = s.match(subdivRe);
     if (subdivMatch) {
         subdivision = subdivMatch[1].replace(/\s+/g, ' ').trim();
@@ -88,12 +88,10 @@ function parseOcrAddress(raw, data) {
             // Remove exact barangay name 
             const bn = data.barangay.replace(/^Barangay\s*/i, '').trim();
             if (bn) s = s.replace(new RegExp(`\\b${bn.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`, 'gi'), '');
-        } catch {
-            // Ignore barangay name removal errors
-        }
+        } catch(_) {}
     }
     s = s.replace(/\b(?:CALOOCAN|KALOOKAN|CITY|NCR|METRO\s+MANILA|MANILA|DISTRICT|ZONE|THIRD\s*DISTRICT)\b/gi, '');
-    s = s.replace(/[,/\s]+$/, '').replace(/^[,/\s]+/, '').replace(/\s{2,}/g, ' ').trim();
+    s = s.replace(/[,\/\s]+$/, '').replace(/^[,\/\s]+/, '').replace(/\s{2,}/g, ' ').trim();
 
     // ─── 7. If street still empty, use cleaned remainder ────────────────────
     if (!street && s) {
@@ -214,7 +212,19 @@ function mapOcrToForm(data) {
         mapped.barangay = '';
     }
 
-    mapped.municipality = 'Caloocan City - North';
+    if (mapped.barangay) {
+        const numMatch = mapped.barangay.match(/\d+/);
+        if (numMatch) {
+            const num = parseInt(numMatch[0], 10);
+            if (num >= 1 && num <= 164) mapped.municipality = 'Caloocan City - South';
+            else if (num >= 165 && num <= 188) mapped.municipality = 'Caloocan City - North';
+            else mapped.municipality = 'Caloocan City';
+        } else {
+            mapped.municipality = 'Caloocan City';
+        }
+    } else {
+        mapped.municipality = 'Caloocan City';
+    }
     mapped.province = 'Metro Manila';
     mapped.postalCode = data.postal_code || getPostalCodeForBarangay(mapped.barangay) || '1421'; // Default to 1421 for North Caloocan if detection fails
     return mapped;
@@ -527,30 +537,6 @@ export default function Register() {
     const navigate = useNavigate();
     const { theme, changeTheme } = useTheme();
 
-    const DARK_SCENE  = 'https://prod.spline.design/us1Y6xfaQLiI2cim/scene.splinecode';
-    const LIGHT_SCENE = 'https://prod.spline.design/nrFjYzbJnF7GU92z/scene.splinecode';
-    const [currentScene, setCurrentScene] = React.useState(DARK_SCENE);
-
-    React.useEffect(() => {
-        const updateScene = () => {
-            if (theme === 'dark') {
-                setCurrentScene(DARK_SCENE);
-            } else if (theme === 'light') {
-                setCurrentScene(LIGHT_SCENE);
-            } else {
-                const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                setCurrentScene(isSystemDark ? DARK_SCENE : LIGHT_SCENE);
-            }
-        };
-        updateScene();
-
-        if (theme === 'system') {
-            const mq = window.matchMedia('(prefers-color-scheme: dark)');
-            const listener = (e) => setCurrentScene(e.matches ? DARK_SCENE : LIGHT_SCENE);
-            mq.addEventListener('change', listener);
-            return () => mq.removeEventListener('change', listener);
-        }
-    }, [theme]);
     const [step, setStep] = React.useState(1);
     const [isScanning, setIsScanning] = React.useState(false);
     const [scanError, setScanError] = React.useState('');
@@ -559,6 +545,7 @@ export default function Register() {
     // Camera state
     const [cameraOpen, setCameraOpen] = React.useState(false);
     const [activeCameraSide, setActiveCameraSide] = React.useState('front');
+    const [legalModal, setLegalModal] = React.useState({ isOpen: false, tab: 'privacy' });
 
     const [formData, setFormData] = React.useState({
         idFront: null,
@@ -576,7 +563,7 @@ export default function Register() {
         subdivision: '',
         street: '',
         barangay: '',
-        municipality: 'Caloocan City - North',
+        municipality: 'Caloocan City',
         province: 'Metro Manila',
         district: '',
         postalCode: '',
@@ -598,9 +585,8 @@ export default function Register() {
     const [showPassword, setShowPassword] = React.useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
     const [hasScanned, setHasScanned] = React.useState(false);
-    // Face verification state (reserved for future implementation)
-    const [_isFaceVerified, setIsFaceVerified] = React.useState(false);
-    const [_faceMatchConfidence, setFaceMatchConfidence] = React.useState('');
+    const [isFaceVerified, setIsFaceVerified] = React.useState(false);
+    const [faceMatchConfidence, setFaceMatchConfidence] = React.useState(''); // 'high', 'medium', 'na'
     
     // Verification State
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -610,9 +596,6 @@ export default function Register() {
     const [resending, setResending] = useState(false);
     const [resendTimer, setResendTimer] = useState(0);
     const [canResend, setCanResend] = useState(true);
-    const [agreedToTerms, setAgreedToTerms] = React.useState(false);
-    const [isTermsModalOpen, setIsTermsModalOpen] = React.useState(false);
-    const [termsModalType, setTermsModalType] = React.useState('terms'); // 'terms' | 'privacy'
     const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
     React.useEffect(() => {
@@ -688,11 +671,18 @@ export default function Register() {
                     setAgeError("");
                 }
             }
-            // Auto-fill postal code when barangay changes
+            // Auto-fill postal code and municipality when barangay changes
             if (name === 'barangay' && value) {
                 const postal = getPostalCodeForBarangay(value);
                 if (postal) {
                     next.postalCode = postal;
+                }
+                const numMatch = value.match(/\d+/);
+                if (numMatch) {
+                    const num = parseInt(numMatch[0], 10);
+                    if (num >= 1 && num <= 164) next.municipality = 'Caloocan City - South';
+                    else if (num >= 165 && num <= 188) next.municipality = 'Caloocan City - North';
+                    else next.municipality = 'Caloocan City';
                 }
             }
             return next;
@@ -769,18 +759,24 @@ export default function Register() {
             }
 
             if (!data.is_north_caloocan) {
-                setScanError(data.verification_message || 'Verification Failed: You must be a resident of North Caloocan (Barangay 165–188) to register.');
+                setScanError(data.verification_message || 'Verification Failed: You must be a resident of Caloocan City to register.');
                 return;
             }
 
-            // Map OCR data → form fields
+            // Map OCR data → form fields (only auto-fill idType, barangay, postalCode, and municipality)
             const mapped = mapOcrToForm(data);
-            setFormData(prev => ({ ...prev, ...mapped }));
+            setFormData(prev => ({
+                ...prev,
+                idType: mapped.idType,
+                barangay: mapped.barangay,
+                postalCode: mapped.postalCode,
+                municipality: mapped.municipality
+            }));
             
             if (result.engine === 'mock') {
                 setVerifiedBadge(`DEV MOCK — ${data.id_type.toUpperCase()} Verified`);
             } else {
-                setVerifiedBadge(`${data.id_type ? data.id_type.toUpperCase() : 'ID'} — North Caloocan Verified`);
+                setVerifiedBadge(`${data.id_type ? data.id_type.toUpperCase() : 'ID'} — Caloocan City Verified`);
             }
             setHasScanned(true); // lock the scan button — scan complete
             if (autoNext) setStep(2);
@@ -795,7 +791,6 @@ export default function Register() {
         }
     };
 
-    // eslint-disable-next-line no-unused-vars
     const handleSkip = () => { 
         // Obsolete: Skipping is no longer allowed for PULSO registration.
         setScanError('Identity verification is required to continue.'); 
@@ -877,7 +872,7 @@ export default function Register() {
             setResendTimer(60);
             setCanResend(false);
             setTimeout(() => setVerifySuccess(''), 5000);
-        } catch {
+        } catch (err) {
             setVerifyError("Failed to resend code.");
         } finally {
             setResending(false);
@@ -906,8 +901,7 @@ export default function Register() {
             };
             const res = await axios.post(`${API_BASE_URL}/api/auth/register`, payload);
             if (res.status === 200 || res.status === 201) {
-                localStorage.removeItem('pulso_token');
-                localStorage.removeItem('pulso_user');
+                clearAuthSession();
                 setResendTimer(60);
                 setCanResend(false);
                 setStep(4);
@@ -923,90 +917,123 @@ export default function Register() {
     const step2Valid = formData.firstName && formData.lastName && formData.dob && formData.barangay && !ageError;
 
     return (
-        <div className="relative min-h-screen w-full bg-slate-50 dark:bg-[#020617] overflow-hidden font-sans text-slate-800 dark:text-slate-200 transition-colors duration-700">
+        <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] font-sans text-slate-900 dark:text-white flex flex-col justify-between transition-colors duration-300 overflow-x-hidden">
 
-            {/* ── 3D Background System ──────────── */}
-            <div className="absolute inset-0 z-0 pointer-events-auto">
-                {/* Light scene */}
-                <div className={`absolute inset-0 transition-opacity duration-1000 ${currentScene === LIGHT_SCENE ? 'opacity-100 z-10 scale-[0.85] lg:scale-100 origin-center' : 'opacity-0 z-0'}`}>
-                    <ErrorBoundary fallback={<div className="w-full h-full bg-slate-100 dark:bg-slate-900" />}>
-                        <Spline scene={LIGHT_SCENE} />
-                    </ErrorBoundary>
+            {/* ── Background Seal Watermark (Inherited from Landing Page) ───── */}
+            <div
+                className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 flex items-center justify-end"
+                aria-hidden="true"
+            >
+                <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
+                    <div className="absolute inset-0 rounded-full border-2 border-orange-500/30 dark:border-white/20 animate-pulse" style={{ animationDuration: '6s' }} />
+                    <div className="absolute inset-[-18px] sm:inset-[-24px] rounded-full border border-dashed border-[#ff6b00]/40 dark:border-[#ff6b00]/30" />
+                    <div className="absolute inset-[-36px] sm:inset-[-50px] rounded-full border border-slate-400/25 dark:border-white/10" />
+
+                    <img
+                        src="/engineering-logo.jpg"
+                        alt="Official Caloocan City Seal Watermark"
+                        className="w-full h-full object-contain rounded-full drop-shadow-sm dark:brightness-105"
+                        loading="eager"
+                    />
+
+                    <div className="absolute inset-0 rounded-full bg-radial from-transparent via-transparent to-white/40 dark:to-[#070a12]/50 pointer-events-none" />
                 </div>
-                {/* Dark scene */}
-                <div className={`absolute inset-0 transition-opacity duration-1000 ${currentScene === DARK_SCENE ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
-                    <ErrorBoundary fallback={<div className="w-full h-full bg-slate-100 dark:bg-slate-900" />}>
-                        <Spline scene={DARK_SCENE} />
-                    </ErrorBoundary>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-white/60 via-transparent to-transparent dark:from-[#020617]/80 dark:via-transparent dark:to-transparent pointer-events-none z-20" />
-                <div className="absolute inset-0 bg-gradient-to-t from-white/40 via-transparent to-transparent dark:from-[#020617]/40 dark:via-transparent dark:to-transparent pointer-events-none z-20" />
             </div>
 
-            {/* ── Navigation Header ────── */}
-            <nav className="absolute top-0 left-0 w-full p-8 flex justify-between items-center z-50">
-                <div className="flex items-center gap-3">
-                    <Branding size="h-10" showText={false} />
-                    <div>
-                        <span className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white">PULSO</span>
-                        <span className="ml-2 px-2 py-0.5 bg-slate-900/5 dark:bg-white/10 backdrop-blur-md rounded text-[10px] font-bold tracking-widest text-orange-600 dark:text-orange-400 uppercase border border-slate-900/5 dark:border-white/10">
-                            New Resident
-                        </span>
-                    </div>
-                </div>
+            {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
+            <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 w-full flex justify-between items-center">
+                {/* Logo on top-left linking to home */}
+                <Link
+                    to="/"
+                    className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
+                    title="Caloocan City PULSO Home"
+                >
+                    <Branding size="h-9 w-9 sm:h-10 sm:w-10" />
+                </Link>
 
-                <div className="flex items-center gap-6">
-                    <div className="hidden md:flex items-center gap-6 text-sm font-medium pr-6 border-r border-slate-200 dark:border-white/10">
-                        <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-white transition-colors font-semibold">
-                            <Home size={15} /> Home
-                        </button>
-                    </div>
-                    <div className="flex bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-full p-1 border border-slate-200 dark:border-white/10 shadow-sm">
-                        <button onClick={() => changeTheme('light')} className={`p-2 rounded-full transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Sun size={14} /></button>
-                        <button onClick={() => changeTheme('system')} className={`p-2 rounded-full transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Monitor size={14} /></button>
-                        <button onClick={() => changeTheme('dark')} className={`p-2 rounded-full transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-700 shadow-md text-orange-500 scale-110' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><Moon size={14} /></button>
-                    </div>
+                {/* Right side: Theme Toggle & Home Navigation */}
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                    <ThemeToggle />
+                    <Link
+                        to="/"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                        title="Return to Home Section"
+                    >
+                        <Home size={14} className="text-[#ff6b00]" />
+                        <span className="hidden sm:inline">Home</span>
+                    </Link>
                 </div>
-            </nav>
+            </header>
 
-            {/* ── Main Content Grid ─────── */}
-            <main className="relative z-10 grid lg:grid-cols-12 min-h-screen items-center pt-28 pb-32 px-6 lg:px-12 xl:px-24 w-full gap-8">
-                
-                {/* Left: Hero Text */}
-                <div className="lg:col-span-5 text-center lg:text-left mb-8 lg:mb-0 max-w-2xl mx-auto lg:mx-0">
-                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8 }}>
-                        <div className="flex items-center justify-center lg:justify-start gap-2 mb-4 text-orange-600 dark:text-orange-500">
-                            <User size={18} />
-                            <span className="text-sm font-bold tracking-[0.3em] uppercase">Join The Network</span>
-                        </div>
-                        <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 dark:text-white leading-[1.1] mb-6 tracking-tighter">
-                            BECOME THE <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-orange-600">EYES & EARS</span>
-                        </h1>
-                        <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 font-medium max-w-lg mx-auto lg:mx-0">
-                            Sign up to gain access to the resident dashboard. Report incidents, track local hazards, and collaborate with your community.
-                        </p>
-                    </motion.div>
-                </div>
-
-                {/* Right: Registration Panel (Landscape-oriented form) */}
-                <div className="lg:col-span-7 w-full max-w-2xl lg:max-w-none mx-auto lg:pl-4">
-                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }}>
-                        <div className="relative group">
-                            <div className="absolute -inset-1 bg-gradient-to-r from-orange-600/20 to-blue-600/20 rounded-[2rem] blur-xl opacity-30 dark:opacity-40 group-hover:opacity-60 transition duration-1000" />
-                            <div className="relative bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 lg:p-10 shadow-2xl min-h-[400px] flex flex-col justify-center">
-                    {/* Stepper */}
-                    <div className="flex items-center mb-6 relative px-1">
-                        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 dark:bg-slate-700 -translate-y-1/2 z-0 rounded-full" />
-                        <div className={`absolute top-1/2 left-0 h-0.5 bg-orange-500 -translate-y-1/2 z-0 rounded-full transition-all duration-500 ${step === 1 ? 'w-0' : step === 2 ? 'w-1/3' : step === 3 ? 'w-2/3' : 'w-full'}`} />
-                        {[1, 2, 3, 4].map(s => (
-                            <div key={s} className={`relative z-10 flex items-center justify-center w-9 h-9 rounded-full font-bold text-sm border-2 transition-all duration-300 mr-auto last:mr-0
-                                ${step > s ? 'bg-orange-500 border-orange-500 text-white shadow-md' :
-                                  step === s ? 'bg-orange-500 border-orange-500 text-white shadow-lg ring-4 ring-orange-200 dark:ring-orange-900' :
-                                  'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-400'}`}>
-                                {step > s ? <CheckCircle size={16} /> : s}
+            {/* ── Main Content Grid (5-col / 7-col ratio in max-w-7xl) ────── */}
+            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-6 sm:py-10 lg:py-14 flex-1 flex flex-col justify-center">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+                    
+                    {/* Left: Professional Community Spotlight Panel (5 cols) */}
+                    <div className="lg:col-span-5 text-left max-w-xl mx-auto lg:mx-0 w-full">
+                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
+                            
+                            {/* Super-Badge */}
+                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
+                                <span>🏛 CITY OF CALOOCAN • CITIZEN VERIFICATION</span>
                             </div>
-                        ))}
+                            
+                            {/* 800-weight Display Title */}
+                            <h1 className="font-heading font-black text-3xl sm:text-4xl lg:text-5xl text-slate-900 dark:text-white leading-[1.12] mb-4 tracking-tight">
+                                Become the <span className="text-[#ff6b00]">Eyes &amp; Ears</span> of Your Community.
+                            </h1>
+                            
+                            {/* Subtitle */}
+                            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-normal leading-relaxed mb-6 max-w-xl">
+                                Join PULSO to report municipal infrastructure hazards, track field repair dispatches in real-time, and collaborate directly with City Engineering crews across Caloocan.
+                            </p>
+
+
+                        </motion.div>
                     </div>
+
+                    {/* Right: Registration Form Wizard Panel (7 cols) */}
+                    <div className="lg:col-span-7 w-full max-w-2xl lg:max-w-none mx-auto">
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
+                            <div className="relative bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-8 lg:p-10 shadow-xl transition-colors duration-300">
+                                
+                                {/* Stepper: Segmented Step Bar */}
+                                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-6 p-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+                                    {[
+                                        { num: 1, label: 'Identity' },
+                                        { num: 2, label: 'Details' },
+                                        { num: 3, label: 'Credentials' },
+                                        { num: 4, label: 'Verify' },
+                                    ].map((s) => {
+                                        const isActive = step === s.num;
+                                        const isDone = step > s.num;
+                                        return (
+                                            <div
+                                                key={s.num}
+                                                className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-center transition-all ${
+                                                    isActive
+                                                        ? 'bg-[#ff6b00] text-white shadow-xs font-bold'
+                                                        : isDone
+                                                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-200 dark:border-emerald-800/40'
+                                                        : 'text-slate-500 dark:text-slate-400 font-medium'
+                                                }`}
+                                            >
+                                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono-data shrink-0 ${
+                                                    isActive
+                                                        ? 'bg-white text-[#ff6b00] font-black'
+                                                        : isDone
+                                                        ? 'bg-emerald-500 text-white'
+                                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                                }`}>
+                                                    {isDone ? <Check size={11} /> : s.num}
+                                                </span>
+                                                <span className="text-[11px] sm:text-xs truncate hidden sm:inline">
+                                                    {s.label}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
 
                     {/* Step title */}
                     <div className="mb-5">
@@ -1018,7 +1045,7 @@ export default function Register() {
                             {step === 5 && 'Registration Complete!'}
                         </h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                            {step === 1 && 'Upload a valid Philippine government-issued ID to auto-fill your details.'}
+                            {step === 1 && 'Upload a valid Philippine government-issued ID to verify your identity.'}
                             {step === 2 && 'Review and complete your personal information.'}
                             {step === 3 && 'Set up your login credentials.'}
                             {step === 4 && 'Enter the 6-digit code sent to your email.'}
@@ -1029,193 +1056,235 @@ export default function Register() {
                         {/* ── STEP 1: ID Upload ── */}
                         {step === 1 && (
                             <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
-                                <div className="grid grid-cols-2 gap-3 mb-4">
-                                    {/* Front */}
-                                    <div className="relative group aspect-[1.58/1] w-full rounded-2xl overflow-hidden bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 shadow-inner">
+                                
+                                {/* ID Cards Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                                    
+                                    {/* ID Front Card */}
+                                    <div className={`relative group rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
+                                        formData.idFront 
+                                            ? 'border-solid bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/40 shadow-xs' 
+                                            : 'border-dashed border-slate-300 dark:border-slate-700 hover:border-[#ff6b00] dark:hover:border-[#ff6b00] bg-slate-50/60 dark:bg-slate-800/40'
+                                    }`}>
                                         <input type="file" id="idFront" accept="image/*" onChange={e => handleFileUpload(e, 'idFront')} className="hidden" />
-                                        <label htmlFor="idFront" className={`flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-2xl cursor-pointer transition-all relative
-                                            ${formData.idFront ? 'border-green-400 bg-green-50/30 dark:bg-green-900/10' : 'border-slate-300 dark:border-slate-600 hover:border-orange-400 bg-transparent'}`}>
+                                        
+                                        {/* Card Header */}
+                                        <div className="flex items-center justify-between p-3.5 border-b border-slate-200/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/60">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${formData.idFront ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'}`}>
+                                                    {formData.idFront ? <CheckCircle size={15} /> : <FileCheck size={15} />}
+                                                </div>
+                                                <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">ID Front</span>
+                                            </div>
+                                            
+                                            <span className={`text-[10px] font-mono-data font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                                formData.idFront ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] dark:text-orange-300 border border-orange-200 dark:border-orange-800'
+                                            }`}>
+                                                {formData.idFront ? 'Ready' : 'Required'}
+                                            </span>
+                                        </div>
+
+                                        {/* Card Content Area */}
+                                        <div className="p-4 flex flex-col items-center justify-center min-h-[160px] relative">
                                             {previews.front ? (
-                                                <>
-                                                    <motion.div 
-                                                        animate={isScanning ? { rotateY: [0, 180, 360], rotateZ: formData.idFrontRotation } : { rotateZ: formData.idFrontRotation }} 
-                                                        transition={isScanning ? { rotateY: { duration: 3, repeat: Infinity, ease: "linear" }, rotateZ: { duration: 0.3 } } : { duration: 0.3 }}
-                                                        className="absolute inset-0 w-full h-full transform-gpu flex items-center justify-center p-3" 
-                                                        style={{ perspective: 1000, transformStyle: 'preserve-3d' }}
-                                                    >
-                                                        <img src={previews.front} alt="Front" className="max-w-full max-h-full object-contain opacity-90 group-hover:opacity-60 transition-opacity rounded-lg shadow-sm" />
-                                                        {isScanning && <div className="absolute inset-2 bg-orange-500/10 mix-blend-overlay rounded-lg" />}
-                                                    </motion.div>
+                                                <div className="relative w-full h-36 rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center group/preview">
+                                                    <motion.img 
+                                                        src={previews.front} 
+                                                        alt="Front ID" 
+                                                        animate={{ rotate: formData.idFrontRotation }}
+                                                        transition={{ duration: 0.3 }}
+                                                        className="max-w-full max-h-full object-contain" 
+                                                    />
+                                                    
                                                     {isScanning && (
-                                                        <motion.div 
-                                                            className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent shadow-[0_0_20px_rgba(249,115,22,1)] z-30"
-                                                            animate={{ top: ['0%', '100%', '0%'] }}
-                                                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                                        />
+                                                        <div className="absolute inset-0 bg-orange-500/20 backdrop-blur-[1px] flex items-center justify-center">
+                                                            <div className="w-full h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent absolute top-0 animate-pulse" />
+                                                            <span className="text-xs font-bold text-white bg-slate-900/80 px-3 py-1 rounded-full shadow">Scanning...</span>
+                                                        </div>
                                                     )}
-                                                    <button type="button" onClick={e => handleRemoveID(e, 'idFront')} className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full z-20 shadow">
-                                                        <X size={14} />
-                                                    </button>
+
+                                                    {/* Hover Overlay Controls */}
                                                     {!isScanning && (
-                                                        <div className="absolute inset-0 flex items-center justify-center transition-opacity bg-black/40 cursor-pointer z-10"
-                                                             onClick={e => { e.preventDefault(); e.stopPropagation(); setZoomedSide('idFront'); }}>
-                                                            <ZoomIn size={28} className="text-white" />
-                                                        </div>
-                                                    )}
-                                                    <div className="absolute bottom-0 left-0 right-0 bg-green-500/90 text-white text-xs font-bold py-1.5 text-center flex items-center justify-center gap-1 z-20">
-                                                        <CheckCircle size={12}/> ID Front ✓
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div className="flex flex-col items-center justify-center text-center p-4">
-                                                        <div className="relative mb-4">
-                                                            <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                                            <UploadCloud size={32} className="text-slate-400 group-hover:text-orange-500 relative transition-all duration-300 group-hover:scale-110" />
-                                                        </div>
-                                                        <span className="text-[11px] font-black text-slate-500 group-hover:text-slate-900 dark:group-hover:text-white transition-colors uppercase tracking-[0.2em] mb-4">ID Front</span>
-                                                        <div className="flex gap-2">
-                                                            <div className="px-4 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider hover:bg-slate-200 dark:hover:bg-white/10 transition-all shadow-sm">
-                                                                Upload File
-                                                            </div>
+                                                        <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                             <button 
-                                                                onClick={(e) => openCamera(e, 'front')}
-                                                                className="px-4 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-wider hover:bg-orange-500 hover:text-white dark:hover:text-white transition-all flex items-center gap-1.5 shadow-sm group/cam"
+                                                                type="button" 
+                                                                onClick={() => setZoomedSide('idFront')}
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm cursor-pointer"
+                                                                title="Zoom View"
                                                             >
-                                                                <Camera size={12} className="group-hover/cam:scale-110 transition-transform" /> Take Photo
+                                                                <ZoomIn size={16} />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={e => { e.preventDefault(); setFormData(prev => ({ ...prev, idFrontRotation: (prev.idFrontRotation || 0) + 90 })); }}
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm cursor-pointer"
+                                                                title="Rotate Image"
+                                                            >
+                                                                <RotateCw size={16} />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={e => handleRemoveID(e, 'idFront')}
+                                                                className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full transition-all cursor-pointer"
+                                                                title="Remove Image"
+                                                            >
+                                                                <X size={16} />
                                                             </button>
                                                         </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center text-center py-2">
+                                                    <UploadCloud size={32} className="text-slate-400 dark:text-slate-500 mb-2" />
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3">Upload a clear photo of your ID Front</p>
+                                                    
+                                                    <div className="flex gap-2 w-full justify-center">
+                                                        <label htmlFor="idFront" className="flex-1 max-w-[125px] cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs">
+                                                            <UploadCloud size={13} className="text-[#ff6b00]" /> Upload
+                                                        </label>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={(e) => openCamera(e, 'front')}
+                                                            className="flex-1 max-w-[125px] bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/60 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                                                        >
+                                                            <Camera size={13} /> Camera
+                                                        </button>
                                                     </div>
-                                                </>
+                                                </div>
                                             )}
-                                        </label>
+                                        </div>
                                     </div>
 
-                                    {/* Back */}
-                                    <div className="relative group aspect-[1.58/1] w-full rounded-2xl overflow-hidden bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 shadow-inner">
+                                    {/* ID Back Card */}
+                                    <div className={`relative group rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
+                                        formData.idBack 
+                                            ? 'border-solid bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/40 shadow-xs' 
+                                            : 'border-dashed border-slate-300 dark:border-slate-700 hover:border-[#ff6b00] dark:hover:border-[#ff6b00] bg-slate-50/60 dark:bg-slate-800/40'
+                                    }`}>
                                         <input type="file" id="idBack" accept="image/*" onChange={e => handleFileUpload(e, 'idBack')} className="hidden" />
-                                        <label htmlFor="idBack" className={`flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-2xl cursor-pointer transition-all relative
-                                            ${formData.idBack ? 'border-green-400 bg-green-50/30 dark:bg-green-900/10' : 'border-slate-300 dark:border-slate-600 hover:border-orange-400 bg-transparent'}`}>
+                                        
+                                        {/* Card Header */}
+                                        <div className="flex items-center justify-between p-3.5 border-b border-slate-200/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/60">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${formData.idBack ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'}`}>
+                                                    {formData.idBack ? <CheckCircle size={15} /> : <FileCheck size={15} />}
+                                                </div>
+                                                <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">ID Back</span>
+                                            </div>
+                                            
+                                            <span className={`text-[10px] font-mono-data font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                                formData.idBack ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] dark:text-orange-300 border border-orange-200 dark:border-orange-800'
+                                            }`}>
+                                                {formData.idBack ? 'Ready' : 'Required'}
+                                            </span>
+                                        </div>
+
+                                        {/* Card Content Area */}
+                                        <div className="p-4 flex flex-col items-center justify-center min-h-[160px] relative">
                                             {previews.back ? (
-                                                <>
-                                                    <motion.div 
-                                                        animate={isScanning ? { rotateY: [0, 180, 360], rotateZ: formData.idBackRotation } : { rotateZ: formData.idBackRotation }} 
-                                                        transition={isScanning ? { rotateY: { duration: 3, repeat: Infinity, ease: "linear" }, rotateZ: { duration: 0.3 } } : { duration: 0.3 }}
-                                                        className="absolute inset-0 w-full h-full transform-gpu flex items-center justify-center p-3" 
-                                                        style={{ perspective: 1000, transformStyle: 'preserve-3d' }}
-                                                    >
-                                                        <img src={previews.back} alt="Back" className="max-w-full max-h-full object-contain opacity-90 group-hover:opacity-60 transition-opacity rounded-lg shadow-sm" />
-                                                        {isScanning && <div className="absolute inset-2 bg-orange-500/10 mix-blend-overlay rounded-lg" />}
-                                                    </motion.div>
+                                                <div className="relative w-full h-36 rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center group/preview">
+                                                    <motion.img 
+                                                        src={previews.back} 
+                                                        alt="Back ID" 
+                                                        animate={{ rotate: formData.idBackRotation }}
+                                                        transition={{ duration: 0.3 }}
+                                                        className="max-w-full max-h-full object-contain" 
+                                                    />
+                                                    
                                                     {isScanning && (
-                                                        <motion.div 
-                                                            className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent shadow-[0_0_20px_rgba(249,115,22,1)] z-30"
-                                                            animate={{ top: ['0%', '100%', '0%'] }}
-                                                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                                        />
+                                                        <div className="absolute inset-0 bg-orange-500/20 backdrop-blur-[1px] flex items-center justify-center">
+                                                            <div className="w-full h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent absolute top-0 animate-pulse" />
+                                                            <span className="text-xs font-bold text-white bg-slate-900/80 px-3 py-1 rounded-full shadow">Scanning...</span>
+                                                        </div>
                                                     )}
-                                                    <button type="button" onClick={e => handleRemoveID(e, 'idBack')} className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full z-20 shadow">
-                                                        <X size={14} />
-                                                    </button>
+
+                                                    {/* Hover Overlay Controls */}
                                                     {!isScanning && (
-                                                        <div className="absolute inset-0 flex items-center justify-center transition-opacity bg-black/40 cursor-pointer z-10"
-                                                             onClick={e => { e.preventDefault(); e.stopPropagation(); setZoomedSide('idBack'); }}>
-                                                            <ZoomIn size={28} className="text-white" />
-                                                        </div>
-                                                    )}
-                                                    <div className="absolute bottom-0 left-0 right-0 bg-green-500/90 text-white text-xs font-bold py-1.5 text-center flex items-center justify-center gap-1 z-20">
-                                                        <CheckCircle size={12}/> ID Back ✓
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div className="flex flex-col items-center justify-center text-center p-4">
-                                                        <div className="relative mb-4">
-                                                            <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                                            <UploadCloud size={32} className="text-slate-400 group-hover:text-orange-500 relative transition-all duration-300 group-hover:scale-110" />
-                                                        </div>
-                                                        <span className="text-[11px] font-black text-slate-500 group-hover:text-slate-900 dark:group-hover:text-white transition-colors uppercase tracking-[0.2em] mb-4">ID Back</span>
-                                                        <div className="flex gap-2">
-                                                            <div className="px-4 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider hover:bg-slate-200 dark:hover:bg-white/10 transition-all shadow-sm">
-                                                                Upload File
-                                                            </div>
+                                                        <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                             <button 
-                                                                onClick={(e) => openCamera(e, 'back')}
-                                                                className="px-4 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-wider hover:bg-orange-500 hover:text-white dark:hover:text-white transition-all flex items-center gap-1.5 shadow-sm group/cam"
+                                                                type="button" 
+                                                                onClick={() => setZoomedSide('idBack')}
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm cursor-pointer"
+                                                                title="Zoom View"
                                                             >
-                                                                <Camera size={12} className="group-hover/cam:scale-110 transition-transform" /> Take Photo
+                                                                <ZoomIn size={16} />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={e => { e.preventDefault(); setFormData(prev => ({ ...prev, idBackRotation: (prev.idBackRotation || 0) + 90 })); }}
+                                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all backdrop-blur-sm cursor-pointer"
+                                                                title="Rotate Image"
+                                                            >
+                                                                <RotateCw size={16} />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={e => handleRemoveID(e, 'idBack')}
+                                                                className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full transition-all cursor-pointer"
+                                                                title="Remove Image"
+                                                            >
+                                                                <X size={16} />
                                                             </button>
                                                         </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center text-center py-2">
+                                                    <UploadCloud size={32} className="text-slate-400 dark:text-slate-500 mb-2" />
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3">Upload a clear photo of your ID Back</p>
+                                                    
+                                                    <div className="flex gap-2 w-full justify-center">
+                                                        <label htmlFor="idBack" className="flex-1 max-w-[125px] cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs">
+                                                            <UploadCloud size={13} className="text-[#ff6b00]" /> Upload
+                                                        </label>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={(e) => openCamera(e, 'back')}
+                                                            className="flex-1 max-w-[125px] bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/60 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                                                        >
+                                                            <Camera size={13} /> Camera
+                                                        </button>
                                                     </div>
-                                                </>
+                                                </div>
                                             )}
-                                        </label>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Tips */}
-                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl p-3 mb-4 text-xs text-blue-700 dark:text-blue-400">
-                                    <strong>Tips for best results:</strong> Lay ID on a flat surface with good lighting. Avoid glare and shadows. Ensure all text is clearly readable.
+                                {/* Tips Box Callout - Neutral Glassmorphism */}
+                                <div className="bg-slate-50/70 dark:bg-slate-800/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-700/70 text-slate-700 dark:text-slate-300 rounded-xl p-3 text-xs flex items-start gap-2.5 mb-5 shadow-2xs">
+                                    <div className="w-5 h-5 rounded-md bg-slate-200/70 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0 mt-0.5">
+                                        <Info size={14} />
+                                    </div>
+                                    <div className="leading-relaxed">
+                                        <span className="font-bold text-slate-900 dark:text-white mr-1">Tips for best results:</span>
+                                        <span>Lay ID flat under bright lighting. Avoid glare, shadows, or covering text. Ensure all details are clearly legible.</span>
+                                    </div>
                                 </div>
 
-                                {/* Error */}
+                                {/* Error Banner */}
                                 {scanError && (
-                                    <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 flex gap-2 items-start text-sm text-red-700 dark:text-red-400">
-                                        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                                    <div className="mb-5 bg-red-500/10 border border-red-500/20 rounded-xl p-3.5 flex gap-3 items-start text-xs text-red-600 dark:text-red-400 font-medium">
+                                        <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-500" />
                                         <span>{scanError}</span>
                                     </div>
                                 )}
 
-                                <div className="space-y-4 mb-4">
-                                    {/* Verification Disclaimer */}
-                                    <div className="flex gap-3 items-start p-3 bg-slate-100/50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors hover:bg-slate-100 dark:hover:bg-white/[0.08]">
-                                        <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
-                                            <Info size={16} className="text-orange-500" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-0.5">Verification Disclaimer</p>
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-bold">Please double check all extracted details after the biometric ID scan. You are responsible for ensuring the accuracy of your personal information before final submission.</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Terms and Conditions Checkbox */}
-                                    <label className="flex items-center gap-3 cursor-pointer group select-none px-1">
-                                        <div className="relative">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={agreedToTerms}
-                                                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                                                className="sr-only peer" 
-                                            />
-                                            <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white/50 dark:bg-slate-900/50 transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500 flex items-center justify-center peer-focus:ring-2 peer-focus:ring-orange-500/30">
-                                                <div className={`transition-all duration-300 ${agreedToTerms ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
-                                                    <div className="w-1.5 h-3 border-r-2 border-b-2 border-white rotate-45 mb-1" />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <span className="text-[11px] text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors font-bold leading-tight">
-                                            I agree to the <button type="button" onClick={() => { setTermsModalType('terms'); setIsTermsModalOpen(true); }} className="text-orange-500 hover:text-orange-600 underline">Terms of Service</button> and <button type="button" onClick={() => { setTermsModalType('privacy'); setIsTermsModalOpen(true); }} className="text-orange-500 hover:text-orange-600 underline">Privacy Policy</button>
-                                        </span>
-                                    </label>
-                                </div>
-
-                                <div className="flex flex-col gap-3">
+                                {/* Action Buttons */}
+                                <div className="flex flex-col gap-2.5">
                                     <button
                                         type="button"
                                         onClick={handleScanID}
-                                        disabled={!formData.idFront || !formData.idBack || isScanning || !agreedToTerms}
-                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group/btn"
+                                        disabled={!formData.idFront || !formData.idBack || isScanning}
+                                        className="w-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                                     >
                                         {isScanning ? (
-                                            <><Loader2 size={18} className="animate-spin" /> Identifying ID Side & Type...</>
+                                            <><Loader2 size={18} className="animate-spin" /> {scanStatus}</>
                                         ) : (
-                                            <>
-                                                <ShieldCheck size={18} className="group-hover/btn:scale-110 transition-transform" /> 
-                                                Scan Documents & Continue
-                                            </>
+                                            <><ShieldCheck size={18} /> Scan Documents &amp; Continue <ChevronRight size={16} /></>
                                         )}
                                     </button>
-                                    <p className="text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest">Both Front and Back required for maximum AI accuracy</p>
+                                    <p className="text-[10px] text-center font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Both Front and Back images are required for verification</p>
                                 </div>
                             </motion.div>
                         )}
@@ -1292,7 +1361,7 @@ export default function Register() {
                                     <InputField label="Block & Lot" name="blockLot" value={formData.blockLot} onChange={handleChange} />
                                     <InputField label="Building / Subdivision / Village" name="subdivision" value={formData.subdivision} onChange={handleChange} className="col-span-2 md:col-span-1" />
                                     <InputField label="Street / Avenue / Corner / Road" name="street" value={formData.street} onChange={handleChange} className="col-span-2" />
-                                    <CustomSelect label="Barangay" name="barangay" value={formData.barangay} onChange={handleChange} options={Array.from({ length: 24 }, (_, i) => `Barangay ${165 + i}`)} required />
+                                    <CustomSelect label="Barangay" name="barangay" value={formData.barangay} onChange={handleChange} options={Array.from({ length: 188 }, (_, i) => `Barangay ${1 + i}`)} required />
                                     <InputField label="City" name="municipality" value={formData.municipality} onChange={handleChange} readOnly />
                                     <InputField label="Province" name="province" value={formData.province} onChange={handleChange} readOnly />
                                     <div className="relative">
@@ -1323,7 +1392,7 @@ export default function Register() {
                                         type="button"
                                         onClick={nextStep}
                                         disabled={!step2Valid}
-                                        className="w-2/3 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-2/3 bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                                     >
                                         Next Step
                                     </button>
@@ -1427,7 +1496,7 @@ export default function Register() {
                                         <button
                                             type="submit"
                                             disabled={!formData.email || !formData.mobile || !formData.password || formData.password !== formData.confirmPassword || registering}
-                                            className="w-2/3 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                            className="w-2/3 bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                                         >
                                             {registering ? <><Loader2 size={17} className="animate-spin" /> Creating Account...</> : 'Create My Account'}
                                         </button>
@@ -1480,7 +1549,7 @@ export default function Register() {
                                         type="button"
                                         onClick={handleVerifyCode}
                                         disabled={otp.some(d => !d) || verifying}
-                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-6"
+                                        className="w-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 mb-6 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                                     >
                                         {verifying ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> : 'Confirm Account'}
                                     </button>
@@ -1519,7 +1588,7 @@ export default function Register() {
                                     <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Account Verified!</h3>
                                     <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">Your PULSO account has been successfully verified. Welcome to the community!</p>
                                 </div>
-                                <Link to="/login" className="mt-2 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white px-8 py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md flex items-center gap-2">
+                                <Link to="/login" className="mt-2 bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white px-8 py-3.5 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 flex items-center gap-2 cursor-pointer">
                                     Proceed to Login
                                 </Link>
                             </motion.div>
@@ -1531,30 +1600,57 @@ export default function Register() {
                         <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800/50 text-center relative z-20">
                             <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
                                 Already have an account?{' '}
-                                <Link to="/login" className="text-orange-600 dark:text-orange-400 font-bold hover:underline decoration-2 underline-offset-4">Sign In</Link>
+                                <Link to="/login" className="text-[#ff6b00] font-bold hover:underline decoration-2 underline-offset-4">Sign In</Link>
                             </p>
                         </div>
                     )}
                 </div>
-            </div>
-        </motion.div>
+            </motion.div>
+        </div>
     </div>
 </main>
 
-            {/* ── Bottom Info Bar ───────────────── */}
-            <div className="absolute bottom-0 left-0 w-full bg-white/60 dark:bg-[#020617]/70 backdrop-blur-md border-t border-slate-200 dark:border-white/5 py-4 px-8 flex flex-col md:flex-row justify-between items-center gap-4 z-50 transition-colors">
-                <div className="flex items-center gap-6 overflow-hidden max-w-4xl">
-                    <span className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-[0.2em] whitespace-nowrap">Notice:</span>
-                    <div className="text-[10px] font-bold text-slate-500 dark:text-slate-600 uppercase tracking-[0.3em] whitespace-nowrap animate-marquee">
-                        YOUR PRIVACY IS PROTECTED UNDER THE PHILIPPINE DATA PRIVACY ACT (RA 10173) • AUTHORIZED RESIDENTS ONLY • PULSO CITIZEN PLATFORM • CITY OF CALOOCAN
+            {/* ── Standard Civic Legal Footer Strip ───────────────────────── */}
+            <footer className="relative z-10 w-full bg-slate-100/80 dark:bg-[#060911] border-t border-slate-200/80 dark:border-slate-800/80 py-3.5 text-slate-500 dark:text-slate-400 text-[11px] transition-colors">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+                    <span>
+                        &copy; {new Date().getFullYear()} LGU Caloocan City. Encrypted under Data Privacy Act (RA 10173).
+                    </span>
+                    <div className="flex items-center gap-4 font-semibold">
+                        <button 
+                            type="button" 
+                            onClick={() => setLegalModal({ isOpen: true, tab: 'privacy' })} 
+                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+                        >
+                            Privacy Policy
+                        </button>
+                        <span>•</span>
+                        <button 
+                            type="button" 
+                            onClick={() => setLegalModal({ isOpen: true, tab: 'terms' })} 
+                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+                        >
+                            Terms of Service
+                        </button>
+                        <span>•</span>
+                        <a 
+                            href="/#hotlines" 
+                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+                        >
+                            LGU Engineering Directory
+                        </a>
                     </div>
                 </div>
-                <div className="flex items-center gap-6 text-[10px] font-black text-slate-400 dark:text-slate-500 tracking-[0.2em]">
-                    <span>CALOOCAN NORTH DISTRICT • PHILIPPINES</span>
-                    <div className="h-3 w-[1px] bg-slate-200 dark:bg-white/10" />
-                    <span className="text-orange-600/50 dark:text-orange-500/50">v4.2.1</span>
-                </div>
-            </div>
+            </footer>
+
+            {/* Legal Modal */}
+            <LegalModal
+                isOpen={legalModal.isOpen}
+                onClose={() => setLegalModal(prev => ({ ...prev, isOpen: false }))}
+                initialTab={legalModal.tab}
+            />
+
+
 
             {/* Zoom modal */}
             <AnimatePresence>
@@ -1643,16 +1739,6 @@ export default function Register() {
                 onCapture={handleCameraCapture}
                 side={activeCameraSide}
             />
-
-            <AnimatePresence>
-                {isTermsModalOpen && (
-                    <TermsModal 
-                        isOpen={isTermsModalOpen} 
-                        onClose={() => setIsTermsModalOpen(false)} 
-                        type={termsModalType} 
-                    />
-                )}
-            </AnimatePresence>
         </div>
     );
 }

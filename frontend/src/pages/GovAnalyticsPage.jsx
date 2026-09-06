@@ -13,8 +13,10 @@ import {
 import { GoogleMap, useJsApiLoader, HeatmapLayer, CircleF, MarkerF, PolygonF } from '@react-google-maps/api';
 import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
+import OrangeSelect from '../components/OrangeSelect';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 
 import { API_BASE_URL } from '../utils/apiBase';
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -130,7 +132,7 @@ export default function GovAnalyticsPage({ workspace }) {
         ? window.matchMedia('(prefers-color-scheme: dark)').matches 
         : theme === 'dark';
     const navigate = useNavigate();
-    const token = localStorage.getItem('pulso_token');
+    const token = getAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     const [summary, setSummary] = useState(null);
@@ -157,7 +159,7 @@ export default function GovAnalyticsPage({ workspace }) {
     const [categoryFilter, setCategoryFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [mapRef, setMapRef] = useState(null);
-    const [currentUser] = useState(() => JSON.parse(localStorage.getItem('pulso_user') || '{}'));
+    const [currentUser] = useState(() => getAuthUser() || {});
     const [toast, setToast] = useState(null);
     const [fetchError, setFetchError] = useState(null);
     const [generatingBrief, setGeneratingBrief] = useState(false);
@@ -435,17 +437,21 @@ export default function GovAnalyticsPage({ workspace }) {
                         <p className="text-slate-400 text-sm mt-0.5">Data-driven insights for budget justification and resource allocation</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <select
+                        <OrangeSelect
                             value={daysBack}
-                            onChange={e => setDaysBack(Number(e.target.value))}
-                            className={`border text-sm rounded-xl px-4 py-2 font-semibold focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}
-                        >
-                            <option value={30}>Last 30 days</option>
-                            <option value={60}>Last 60 days</option>
-                            <option value={90}>Last 90 days</option>
-                            <option value={180}>Last 6 months</option>
-                            <option value={365}>Last year</option>
-                        </select>
+                            onChange={val => setDaysBack(Number(val))}
+                            size="md"
+                            minWidth="160px"
+                            searchable={false}
+                            placeholder="Select period"
+                            options={[
+                                { value: 30, label: 'Last 30 days' },
+                                { value: 60, label: 'Last 60 days' },
+                                { value: 90, label: 'Last 90 days' },
+                                { value: 180, label: 'Last 6 months' },
+                                { value: 365, label: 'Last year' }
+                            ]}
+                        />
                         <button onClick={fetchData}
                             className={`flex items-center gap-2 border font-bold text-sm px-4 py-2 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}>
                             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -1033,21 +1039,26 @@ export default function GovAnalyticsPage({ workspace }) {
                                     <input type="text" placeholder="Search zones..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                                         className="w-full bg-slate-900 border border-slate-700 text-slate-300 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
                                 </div>
-                                <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
-                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 ${
-                                        isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'
-                                    }`}>
-                                    <option value="">All Categories</option>
-                                    {[
+                                <OrangeSelect
+                                    value={categoryFilter}
+                                    onChange={setCategoryFilter}
+                                    size="md"
+                                    minWidth="170px"
+                                    searchable={false}
+                                    placeholder="All Categories"
+                                    options={[
+                                        { value: '', label: 'All Categories' },
                                         { value: 'roads_bridges', label: 'Roads & Bridges' },
                                         { value: 'water_drainage', label: 'Water & Drainage' },
                                         { value: 'street_lighting', label: 'Street Lighting' },
                                         { value: 'public_safety_regulatory', label: 'Public Safety & Regulatory' },
-                                        { value: 'public_facilities', label: 'Public Facilities' }
-                                    ].map(c => (
-                                        <option key={c.value} value={c.value}>{c.label}</option>
-                                    ))}
-                                </select>
+                                        { value: 'public_facilities', label: 'Public Facilities' },
+                                        ...['pothole','road_damage','drainage','flooding','streetlight','structural','sidewalk','garbage'].map(c => ({
+                                            value: c,
+                                            label: c.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())
+                                        }))
+                                    ]}
+                                />
                             </div>
                             <div className={`border rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                                 <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>

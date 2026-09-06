@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text, or_
+from sqlalchemy import func, text, or_, case
 from sqlalchemy.exc import IntegrityError
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import models, gov_models, schemas
 import json
@@ -359,7 +360,7 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
         db.commit()
         
         # Notification messages for each status transition
-        ticket = db_report.ticket_id or f"RPT-{db_report.id}"
+        ticket = db_report.ticket_id or f"PUL-{datetime.now().year}-{db_report.id:04d}"
         status_messages = {
             "pending_approval": (
                 "Report Verified",
@@ -769,3 +770,70 @@ def create_work_order(db: Session, wo: schemas.WorkOrderCreate, assigned_by_id: 
     db.commit()
     
     return db_wo
+
+# ---------------------------------------------------------------------------
+# City News & Announcements CRUD
+# ---------------------------------------------------------------------------
+
+def get_news(db: Session, category: Optional[str] = None, page: int = 1, limit: int = 10):
+    query = db.query(models.NewsItem)
+    
+    if category and category.lower() != 'all':
+        query = query.filter(models.NewsItem.category.ilike(f"%{category}%"))
+    
+    # Priority sorting: urgent items pinned first (0), then normal (1), followed by published_at desc
+    priority_order = case(
+        (models.NewsItem.priority == 'urgent', 0),
+        else_=1
+    )
+    
+    total = query.count()
+    offset = (page - 1) * limit
+    items = query.order_by(priority_order, models.NewsItem.published_at.desc()).offset(offset).limit(limit).all()
+    
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": total_pages
+    }
+
+def create_news(db: Session, news_data: schemas.NewsItemCreate, image_url: Optional[str] = None, posted_by: Optional[str] = None):
+    data = news_data.model_dump()
+    if image_url:
+        data["image_url"] = image_url
+    if posted_by:
+        data["posted_by"] = posted_by
+    if not data.get("published_at"):
+        from datetime import datetime, timezone
+        data["published_at"] = datetime.now(timezone.utc)
+        
+    db_item = models.NewsItem(**data)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+def update_news(db: Session, news_id: int, update_data: schemas.NewsItemUpdate, image_url: Optional[str] = None):
+    db_item = db.query(models.NewsItem).filter(models.NewsItem.id == news_id).first()
+    if not db_item:
+        return None
+    data = update_data.model_dump(exclude_unset=True)
+    if image_url:
+        data["image_url"] = image_url
+    for k, v in data.items():
+        setattr(db_item, k, v)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+def delete_news(db: Session, news_id: int) -> bool:
+    db_item = db.query(models.NewsItem).filter(models.NewsItem.id == news_id).first()
+    if not db_item:
+        return False
+    db.delete(db_item)
+    db.commit()
+    return True
+

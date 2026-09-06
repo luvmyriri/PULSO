@@ -47,17 +47,17 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
+import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
 
 import { API_BASE_URL } from '../utils/apiBase';
 
 const ManagementDashboard = ({ workspace }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [token] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser] = useState(() => {
-        const storedUser = localStorage.getItem('pulso_user');
-        return storedUser ? JSON.parse(storedUser) : null;
-    });
+    const [token] = useState(() => getAuthToken() || localStorage.getItem('pulso_token'));
+    const [currentUser] = useState(() => getAuthUser() || (() => {
+        try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
+    })());
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'overview');
 
 
@@ -259,19 +259,33 @@ const ManagementDashboard = ({ workspace }) => {
     ];
 
     return (
-        <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 overflow-hidden">
-            <GovSidebar activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} />
+        <div className="min-h-screen bg-neutral-bg dark:bg-[#070a12] text-neutral-text dark:text-slate-100 font-sans flex text-sm transition-colors duration-150">
             
-            <div className="flex-1 flex flex-col min-w-0">
-                <header className="h-16 bg-white dark:bg-slate-900/50 border-b dark:border-slate-800 flex items-center justify-between px-8 shrink-0 relative z-40">
-                    <h1 className="text-xl font-black">{
-                        activeTab === 'overview' ? 'Management Dashboard' :
-                        activeTab === 'archive' ? 'Reports Archive' :
-                        activeTab === 'documents' ? 'Document Registry' :
-                        activeTab === 'audit' ? 'Audit Command' : 
-                        activeTab === 'timeline' ? 'Process Timeline' :
-                        activeTab.charAt(0).toUpperCase() + activeTab.slice(1)
-                    }</h1>
+            {/* Unified Left Sidebar Navigation — role-aware */}
+            <GovSidebar
+                currentUser={currentUser}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+            />
+
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                
+                {/* Top Header */}
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 relative z-40 border-b border-neutral-border dark:border-slate-800 transition-colors duration-150">
+                    <h1 className="text-xl font-display font-bold text-neutral-text dark:text-white">
+                        {activeTab === 'overview' && 'Executive Performance Overview'}
+                        {activeTab === 'approvals' && 'Engineering Work Order Approvals'}
+                        {activeTab === 'procurement' && 'Public Bidding Pipeline (RA 9184)'}
+                        {activeTab === 'permits' && 'OBO Permit Tracking Masterlist'}
+                        {activeTab === 'predictive' && 'AI Predictive Maintenance Alerts'}
+                        {activeTab === 'advisories' && 'Post a Public Advisory'}
+                        {activeTab === 'users' && 'Registered Users'}
+                        {activeTab === 'archive' && 'Reports Archive'}
+                        {activeTab === 'documents' && 'Document Registry'}
+                        {activeTab === 'audit' && 'Audit Command'}
+                        {activeTab === 'timeline' && 'Process Timeline'}
+                    </h1>
                     
                     <div className="flex items-center gap-4">
                         <select value={dateRange} onChange={e => setDateRange(e.target.value)} className="bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-xs font-bold">
@@ -282,8 +296,17 @@ const ManagementDashboard = ({ workspace }) => {
                             <Download size={14} /> Export Audit
                         </button>
                         <ThemeToggle />
-                        <button onClick={() => { localStorage.clear(); navigate('/gov'); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
-                            <LogOut size={18} />
+                        <button
+                            onClick={() => { 
+                                const user = getAuthUser();
+                                const wasGov = user?.role && user.role !== 'resident';
+                                clearAuthSession();
+                                navigate(wasGov ? '/gov' : '/login'); 
+                            }}
+                            className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                            title="Sign Out"
+                        >
+                            <LogOut size={18}/>
                         </button>
                     </div>
                 </header>

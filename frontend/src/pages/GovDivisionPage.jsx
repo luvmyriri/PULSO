@@ -25,6 +25,7 @@ import ComplianceReminder from '../components/ComplianceReminder';
 import './planning-delivery-workspace.css';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 
 // Section 4.6 - Final Turnover & Audit Components
 import PunchListMobile from './PunchListMobile';
@@ -38,7 +39,7 @@ const PAGE_CONFIG = {
         title: 'Work Orders',
         subtitle: 'Track and manage all engineering work orders assigned across field teams.',
         icon: GitBranch,
-        color: 'blue',
+        color: 'orange',
         apiPath: '/api/gov/work-orders',
         statuses: ['pending','assigned','in_progress','completed','cancelled'],
     },
@@ -46,7 +47,7 @@ const PAGE_CONFIG = {
         title: 'Projects',
         subtitle: 'Manage infrastructure projects from request through completion.',
         icon: Map,
-        color: 'indigo',
+        color: 'orange',
         apiPath: '/api/gov/projects',
         statuses: ['request_received','survey_in_progress','design_in_progress','approved_by_city_engineer','in_progress','resolved','closed_completion_certified'],
     },
@@ -54,7 +55,7 @@ const PAGE_CONFIG = {
         title: 'OBO Inspections',
         subtitle: 'Office of the Building Official — building, electrical & mechanical permit applications.',
         icon: ShieldCheck,
-        color: 'teal',
+        color: 'orange',
         apiPath: '/api/gov/obo',
         statuses: ['application_received','inspection_scheduled','inspection_complete','permit_issued','failed_inspection'],
     },
@@ -62,7 +63,7 @@ const PAGE_CONFIG = {
         title: 'Procurement',
         subtitle: 'Manage procurement requests from draft through endorsement.',
         icon: PackageCheck,
-        color: 'violet',
+        color: 'orange',
         apiPath: '/api/gov/procurement',
         statuses: ['draft','submitted','validated','sent_to_procurement'],
     },
@@ -78,7 +79,7 @@ const PAGE_CONFIG = {
         title: 'Audit Logs',
         subtitle: 'Immutable audit trail for all government actions in the system (FR-10).',
         icon: FileCheck,
-        color: 'red',
+        color: 'orange',
         apiPath: '/api/gov/audit-logs',
         statuses: [],
     },
@@ -86,7 +87,7 @@ const PAGE_CONFIG = {
         title: 'Records & Registry',
         subtitle: 'Administrative records management for the City Engineering Office.',
         icon: BookOpen,
-        color: 'purple',
+        color: 'orange',
         apiPath: '/api/gov/records',
         statuses: [],
     },
@@ -95,7 +96,7 @@ const PAGE_CONFIG = {
         title: 'Design work',
         subtitle: 'Manage design requests, drawings, and review work for active projects.',
         icon: Ruler,
-        color: 'indigo',
+        color: 'orange',
         apiPath: '/api/gov/design-requests',
         statuses: ['request_received','survey_in_progress','design_in_progress','approved_by_city_engineer'],
     },
@@ -103,7 +104,7 @@ const PAGE_CONFIG = {
         title: 'Engineering analysis',
         subtitle: 'Review structural and civil engineering analysis for active projects.',
         icon: FlaskConical,
-        color: 'blue',
+        color: 'orange',
         apiPath: '/api/gov/analysis',
         statuses: ['survey_in_progress','design_in_progress','approved_by_city_engineer'],
     },
@@ -111,7 +112,7 @@ const PAGE_CONFIG = {
         title: 'Field surveys',
         subtitle: 'Manage survey assignments, field observations, and submitted results.',
         icon: Eye,
-        color: 'green',
+        color: 'orange',
         apiPath: '/api/gov/surveys',
         statuses: ['assigned','in_progress','survey_in_progress'],
     },
@@ -119,7 +120,7 @@ const PAGE_CONFIG = {
         title: 'Bill of quantities',
         subtitle: 'Prepare material, labor, and equipment quantities for active projects.',
         icon: ClipboardList,
-        color: 'amber',
+        color: 'orange',
         apiPath: '/api/gov/boq',
         statuses: [],
     },
@@ -127,7 +128,7 @@ const PAGE_CONFIG = {
         title: 'Cost planning',
         subtitle: 'Review project quantities and cost estimates before procurement.',
         icon: PackageCheck,
-        color: 'violet',
+        color: 'orange',
         apiPath: '/api/gov/estimation',
         statuses: ['draft','submitted','validated','sent_to_procurement'],
     },
@@ -143,7 +144,7 @@ const PAGE_CONFIG = {
         title: 'Reports Archive',
         subtitle: 'Closed, resolved, and rejected citizen infrastructure reports for administrative records.',
         icon: FileBarChart2,
-        color: 'purple',
+        color: 'orange',
         apiPath: '/api/gov/reports-archive',
         statuses: ['resolved','rejected','closed'],
     },
@@ -159,7 +160,7 @@ const PAGE_CONFIG = {
         title: 'Role Management',
         subtitle: 'Assign and manage Plantilla position roles for all LGU system users.',
         icon: UserCog,
-        color: 'slate',
+        color: 'orange',
         apiPath: '/api/gov/users',
         statuses: [],
     },
@@ -167,7 +168,7 @@ const PAGE_CONFIG = {
         title: 'System Settings',
         subtitle: 'Configure system parameters for the PULSO platform.',
         icon: Settings,
-        color: 'slate',
+        color: 'orange',
         apiPath: null,
         statuses: [],
     },
@@ -287,10 +288,16 @@ const STATUS_COLORS = {
     inspection_complete: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
     permit_issued: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
     failed_inspection: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    draft: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    draft: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
     submitted: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
     validated: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     sent_to_procurement: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+    dispatched: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    approved_internal: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+    pending_approval: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    received: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+    report_received: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+    survey_complete: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
 };
 
 const colorMap = {
@@ -425,7 +432,7 @@ const TimelineEvent = ({ entry }) => {
 
     if (entry.report_id) {
         contextLabel = `Citizen Report #${entry.report_id}`;
-        contextColor = 'bg-rose-500';
+        contextColor = 'bg-orange-500';
     } else if (entry.work_order_id) {
         contextLabel = `Work Order #${entry.work_order_id}`;
         contextColor = 'bg-blue-500';
@@ -434,6 +441,8 @@ const TimelineEvent = ({ entry }) => {
         contextColor = 'bg-indigo-500';
     }
 
+    const normalizedStatus = (entry.status || '').toLowerCase();
+    const statusClass = STATUS_COLORS[normalizedStatus] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
     const statusText = (entry.status || '').replace(/_/g, ' ').toUpperCase();
     const dateObj = entry.created_at ? new Date(entry.created_at) : new Date();
     const dateStr = dateObj.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -455,9 +464,11 @@ const TimelineEvent = ({ entry }) => {
                         <span className={`px-2 py-0.5 rounded-md text-[9px] font-black tracking-widest uppercase text-white ${contextColor}`}>
                             {contextLabel}
                         </span>
-                        <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
                             <span className="text-slate-300 dark:text-slate-700">→</span>
-                            <span className="text-slate-900 dark:text-slate-200">{statusText}</span>
+                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black tracking-widest uppercase ${statusClass}`}>
+                                {statusText}
+                            </span>
                         </span>
                     </div>
                     <div className="sm:hidden text-[10px] font-medium text-slate-400">
@@ -564,17 +575,44 @@ const AuditRow = ({ entry, index }) => {
         return text.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     };
 
+    const getTypeColor = (type) => {
+        const t = (type || '').toLowerCase();
+        if (t.includes('procurement')) return 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400';
+        if (t.includes('status')) return 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400';
+        if (t.includes('maintenance') || t.includes('update')) return 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400';
+        if (t.includes('auth') || t.includes('login')) return 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400';
+        if (t.includes('report') || t.includes('citizen')) return 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400';
+        if (t.includes('work') || t.includes('order')) return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400';
+        if (t.includes('project')) return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400';
+        if (t.includes('create') || t.includes('insert')) return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
+        if (t.includes('delete') || t.includes('remove')) return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400';
+        return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
+    };
+
+    const badgeColor = getTypeColor(entry.trigger_type);
+
     return (
-        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors text-xs border-b border-slate-50 dark:border-slate-800/50 last:border-0">
-            <td className="p-3 font-mono text-slate-400 text-[10px] w-12">{index}</td>
-            <td className="p-3">
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-[9px] uppercase tracking-wider">
+        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors text-xs border-b border-slate-50 dark:border-slate-800/50 last:border-0 group cursor-default">
+            <td className="p-4 font-mono font-bold text-slate-400 dark:text-slate-500 text-[10px] w-12">{index}</td>
+            <td className="p-4">
+                <span className={`px-2.5 py-1 rounded-full font-black text-[9px] uppercase tracking-wider ${badgeColor}`}>
                     {toTitleCase(entry.trigger_type)}
                 </span>
             </td>
-            <td className="p-3 font-semibold text-slate-900 dark:text-slate-100 min-w-[300px]">{beautifyAction(entry.action)}</td>
-            <td className="p-3 text-slate-700 dark:text-slate-300 font-medium">{getActorName()}</td>
-            <td className="p-3 text-slate-400 dark:text-slate-500 whitespace-nowrap italic">{entry.created_at ? new Date(entry.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+            <td className="p-4 font-bold text-slate-800 dark:text-slate-200 min-w-[300px] leading-relaxed">
+                {beautifyAction(entry.action)}
+            </td>
+            <td className="p-4">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black text-slate-500 dark:text-slate-400 shrink-0">
+                        {getActorName().charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-slate-600 dark:text-slate-300 font-medium text-xs">{getActorName()}</span>
+                </div>
+            </td>
+            <td className="p-4 text-slate-400 dark:text-slate-500 text-xs font-medium">
+                {entry.created_at ? new Date(entry.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+            </td>
         </tr>
     );
 };
@@ -585,10 +623,10 @@ const AuditRow = ({ entry, index }) => {
 const GovDivisionPage = ({ workspace, activePathOverride }) => {
     const location = useLocation();
     const navigate = useNavigate();
-    const [token] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser] = useState(() => {
+    const [token] = useState(() => getAuthToken() || localStorage.getItem('pulso_token'));
+    const [currentUser] = useState(() => getAuthUser() || (() => {
         try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
-    });
+    })());
     const isDeliveryWorkspace = location.pathname === '/gov/delivery';
     const requestedDeliveryView = new URLSearchParams(location.search).get('view') || 'projects';
     const availableDeliveryViews = DELIVERY_VIEWS.filter((view) => !view.roles || view.roles.includes(currentUser?.role));
@@ -1068,21 +1106,21 @@ const GovDivisionPage = ({ workspace, activePathOverride }) => {
     const saveSettings = () => { setSettingsSaved(true); setTimeout(() => setSettingsSaved(false), 2500); };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-300 font-sans flex text-sm">
+        <div className="min-h-screen bg-neutral-bg dark:bg-[#070a12] text-neutral-text dark:text-slate-100 font-sans flex text-sm transition-colors duration-150">
             <GovSidebar currentUser={currentUser} />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 {/* Header */}
-                <header className="h-16 bg-white dark:bg-slate-900 flex items-center justify-between px-8 shrink-0 border-b border-slate-200 dark:border-slate-800 z-40 shadow-sm">
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 border-b border-neutral-border dark:border-slate-800 z-40 transition-colors duration-150">
                     <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${colors.icon}`}>
                             <HeaderIcon size={18} />
                         </div>
                         <div>
-                            <h1 className="text-base font-black text-slate-900 dark:text-white leading-tight">
+                            <h1 className="text-base font-black text-neutral-text dark:text-white leading-tight">
                                 {isDeliveryWorkspace ? 'Projects and delivery' : config.title}
                             </h1>
-                            <p className="text-[11px] text-slate-500 hidden sm:block">
+                            <p className="text-[11px] text-neutral-muted dark:text-slate-400 hidden sm:block">
                                 {isDeliveryWorkspace ? 'Plan, survey, design, cost, and procure in one workspace.' : config.subtitle}
                             </p>
                         </div>
@@ -1091,7 +1129,7 @@ const GovDivisionPage = ({ workspace, activePathOverride }) => {
                         <ThemeToggle />
                         <button
                             onClick={() => { setLoading(true); fetch(`${API_BASE_URL}${config.apiPath}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.ok ? r.json() : []).then(data => setItems(Array.isArray(data) ? data : [])).catch(() => setItems([])).finally(() => setLoading(false)); }}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-600 hover:text-indigo-600 transition-all"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500 hover:text-[#ff6b00] transition-all"
                             title="Refresh"
                         >
                             <RefreshCw size={14} />
@@ -1099,7 +1137,7 @@ const GovDivisionPage = ({ workspace, activePathOverride }) => {
                         {config.apiPath && !isAuditLog && !isTimeline && (
                             <button
                                 onClick={() => setShowNewModal(true)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors bg-indigo-600 hover:bg-indigo-700`}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors bg-[#ff6b00] hover:bg-[#e65c00]`}
                             >
                                 <Plus size={14} /> New
                             </button>
@@ -1579,11 +1617,11 @@ const GovDivisionPage = ({ workspace, activePathOverride }) => {
                                                     <tr>
                                                         {isAuditLog ? (
                                                             <>
-                                                                <th className="p-3">ID</th>
-                                                                <th className="p-3">Type</th>
-                                                                <th className="p-3">Action</th>
-                                                                <th className="p-3">Actor</th>
-                                                                <th className="p-3">Timestamp</th>
+                                                                <th className="p-4">ID</th>
+                                                                <th className="p-4">Type</th>
+                                                                <th className="p-4">Action</th>
+                                                                <th className="p-4">Actor</th>
+                                                                <th className="p-4">Timestamp</th>
                                                             </>
                                                         ) : isRecords ? (
                                                             <>

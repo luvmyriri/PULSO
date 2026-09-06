@@ -392,3 +392,45 @@ class KYCStatusResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ---------------------------------------------------------------------------
+# News & City Announcements Schemas
+# ---------------------------------------------------------------------------
+
+class NewsItemBase(BaseModel):
+    category: str
+    headline: str
+    excerpt: str
+    image_url: Optional[str] = None
+    barangay: Optional[str] = None
+    source_url: Optional[str] = None
+    priority: Optional[str] = "normal"
+
+class NewsItemCreate(NewsItemBase):
+    published_at: Optional[datetime] = None
+
+class NewsItemUpdate(BaseModel):
+    category: Optional[str] = None
+    headline: Optional[str] = None
+    excerpt: Optional[str] = None
+    image_url: Optional[str] = None
+    barangay: Optional[str] = None
+    source_url: Optional[str] = None
+    priority: Optional[str] = None
+    published_at: Optional[datetime] = None
+
+class NewsItemResponse(NewsItemBase):
+    id: int
+    published_at: datetime
+    posted_by: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class NewsListResponse(BaseModel):
+    items: List[NewsItemResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
