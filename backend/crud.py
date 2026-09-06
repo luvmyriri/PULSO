@@ -186,11 +186,23 @@ def get_reports(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Report).order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_reports_by_user(db: Session, resident_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.Report).filter(models.Report.resident_id == resident_id).order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
+    return db.query(models.Report).filter(
+        or_(
+            models.Report.resident_id == resident_id,
+            models.Report.claimed_by_user_id == resident_id
+        )
+    ).order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
 
-def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, ai_analysis: dict = None):
+def create_report(
+    db: Session,
+    report: schemas.ReportCreate,
+    resident_id: Optional[int] = None,
+    ai_analysis: Optional[dict] = None,
+    tracking_token_hash: Optional[str] = None
+) -> models.Report:
     from sqlalchemy.exc import IntegrityError
     import logging
+    from typing import Optional
     
     attempts = 0
     max_attempts = 5
@@ -198,6 +210,9 @@ def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, a
     while attempts < max_attempts:
         try:
             report_data = report.model_dump()
+            if tracking_token_hash:
+                report_data["tracking_token_hash"] = tracking_token_hash
+                
             if ai_analysis:
                 report_data["ai_category"] = ai_analysis.get("category")
                 report_data["ai_urgency"] = ai_analysis.get("urgency")
@@ -206,19 +221,16 @@ def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, a
                 report_data["severity_score"] = ai_analysis.get("severity_score", 0.0)
                 report_data["ai_metadata"] = json.dumps(ai_analysis) if ai_analysis else None
                 
-            # Now that Report model has barangay_id, we no longer need to pop it.
-            pass
-            
             if not report_data.get("location_barangay"):
                 # 1. Try to extract from location_string first (e.g., "Plus Code | Address | Barangay Name")
                 loc_str = report_data.get("location_string", "")
                 if loc_str and "Barangay" in loc_str:
-                    match = re.search(r"(Barangay\s+[^|]+)", loc_str, re.IGNORECASE)
+                    match = re.search(r"(Barangay\s+[^|,]+)", loc_str, re.IGNORECASE)
                     if match:
                         report_data["location_barangay"] = match.group(1).strip()
                 
                 # 2. Fallback to reporter's home barangay if still missing
-                if not report_data.get("location_barangay"):
+                if not report_data.get("location_barangay") and resident_id:
                     res = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
                     if res:
                         if res.barangay_ref:
@@ -241,14 +253,14 @@ def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, a
                     report_data["barangay_id"] = brgy.id
             
             # If still missing barangay_id, check if resident has one
-            if not report_data.get("barangay_id"):
+            if not report_data.get("barangay_id") and resident_id:
                 res = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
                 if res and res.barangay_id:
                     report_data["barangay_id"] = res.barangay_id
 
-            # Explicitly generate ticket_id if it failed previously or to be safe
-            # models.Report.ticket_id has a default=generate_ticket_id, 
-            # but setting it explicitly ensures it's fresh in each retry.
+            if not report_data.get("reporter_type"):
+                report_data["reporter_type"] = "registered" if resident_id else "guest"
+
             new_ticket_id = models.generate_ticket_id()
             db_report = models.Report(**report_data, resident_id=resident_id, ticket_id=new_ticket_id)
             db.add(db_report)
@@ -256,14 +268,15 @@ def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, a
             db.refresh(db_report)
             
             # Initial Timeline Entry
-            _append_timeline(db, report_id=db_report.id, status="pending", note="Report successfully filed via mobile. Awaiting verification.")
+            _append_timeline(db, report_id=db_report.id, status="pending", note="Report logged and queued for engineering assessment.", is_public=True)
+            db.commit()
             
             return db_report
         except IntegrityError as e:
             db.rollback()
             error_msg = str(e).lower()
             # Stricter check: only retry if the TICKET_ID constraint is specifically mentioned
-            if "ix_reports_ticket_id" in error_msg or "unique constraint \"reports_ticket_id_key\"" in error_msg:
+            if "ix_reports_ticket_id" in error_msg or "unique constraint \"reports_ticket_id_key\"" in error_msg or "reports_ticket_id_key" in error_msg:
                 attempts += 1
                 logging.getLogger(__name__).warning(f"Ticket ID collision detected (msg: {error_msg}). ID: {new_ticket_id}. Retry {attempts}/{max_attempts}")
                 continue

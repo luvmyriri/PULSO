@@ -4,8 +4,9 @@ import { Users, Search, UserCheck, UserX, AlertTriangle, RefreshCw, Mail, Phone,
 import { API_BASE_URL } from '../utils/apiBase';
 import { getToken } from '../utils/auth';
 import GovSidebar from '../components/GovSidebar';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 
-export default function ResidentAccountManagementPage() {
+export default function ResidentAccountManagementPage({ workspace }) {
     const token = getToken();
     const [currentUser] = useState(() => {
         try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
@@ -136,6 +137,8 @@ export default function ResidentAccountManagementPage() {
                     </div>
                 </div>
             </div>
+
+            {workspace && <GovernmentWorkspaceTabs workspace={workspace} currentUser={currentUser} />}
 
             {/* Filters */}
             <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4">

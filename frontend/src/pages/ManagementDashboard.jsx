@@ -45,11 +45,12 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
 
 import { API_BASE_URL } from '../utils/apiBase';
 
-const ManagementDashboard = () => {
+const ManagementDashboard = ({ workspace }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const [token] = useState(() => localStorage.getItem('pulso_token'));
@@ -286,6 +287,8 @@ const ManagementDashboard = () => {
                         </button>
                     </div>
                 </header>
+
+                {workspace && <GovernmentWorkspaceTabs workspace={workspace} currentUser={currentUser} />}
 
                 <main className="flex-1 overflow-y-auto p-8">
                     <AnimatePresence mode="wait">

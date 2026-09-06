@@ -4,6 +4,7 @@ import { Users, Search, Filter, UserCheck, UserX, Shield, AlertTriangle, Refresh
 import { API_BASE_URL } from '../utils/apiBase';
 import { getToken } from '../utils/auth';
 import GovSidebar from '../components/GovSidebar';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 
 const GOV_ROLES = [
     { value: 'admin_officer', label: 'Admin Officer' },
@@ -26,7 +27,7 @@ const GOV_ROLES = [
     { value: 'system_admin', label: 'System Administrator' },
 ];
 
-export default function GovernmentUserManagementPage() {
+export default function GovernmentUserManagementPage({ workspace }) {
     const token = getToken();
     const [currentUser] = useState(() => {
         try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
@@ -254,6 +255,8 @@ export default function GovernmentUserManagementPage() {
                     </div>
                 </div>
             </div>
+
+                {workspace && <GovernmentWorkspaceTabs workspace={workspace} currentUser={currentUser} />}
 
                 {/* Create Role Modal */}
                 {isCreatingRole && (

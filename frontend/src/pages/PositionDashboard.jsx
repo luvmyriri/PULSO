@@ -11,7 +11,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     AlertTriangle, CheckCircle2, Clock, ChevronRight, ChevronDown,
@@ -22,6 +21,9 @@ import {
     CircleDot, AlertCircle, CheckSquare, Brain
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
+import GovSystemBanner from '../components/GovSystemBanner';
+import GovBiDashboard from '../components/GovBiDashboard';
+import './position-dashboard.css';
 
 import { API_BASE_URL } from '../utils/apiBase';
 
@@ -450,26 +452,18 @@ const ROLE_CONFIG = {
     },
 };
 
-const URGENCY_COLORS = {
-    high: 'bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-800',
-    medium: 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800',
-    low: 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700',
-};
-
-const URGENCY_BADGE = {
-    high: 'bg-red-500 text-white',
-    medium: 'bg-orange-400 text-white',
-    low: 'bg-slate-400 text-white',
-};
-
-const COLOR_MAP = {
-    blue: 'text-blue-600 dark:text-blue-400', indigo: 'text-indigo-600 dark:text-indigo-400',
-    purple: 'text-purple-600 dark:text-purple-400', teal: 'text-teal-600 dark:text-teal-400',
-    emerald: 'text-emerald-600 dark:text-emerald-400', green: 'text-green-600 dark:text-green-400',
-    orange: 'text-orange-600 dark:text-orange-400', red: 'text-red-600 dark:text-red-400',
-    yellow: 'text-yellow-600 dark:text-yellow-400', violet: 'text-violet-600 dark:text-violet-400',
-    amber: 'text-amber-600 dark:text-amber-400', cyan: 'text-cyan-600 dark:text-cyan-400',
-    slate: 'text-slate-600 dark:text-slate-400',
+const actionTargetFor = (action) => {
+    if (!action.endpoint) {
+        return action.label.includes('Advisory') ? '/gov/operations?view=updates' : null;
+    }
+    if (action.endpoint.includes('/reports')) return '/gov/operations?view=reports';
+    if (action.endpoint.includes('/work-orders')) return '/gov/operations?view=work-orders';
+    if (action.endpoint.includes('/projects')) return '/gov/delivery?view=projects';
+    if (action.endpoint.includes('/procurement')) return '/gov/delivery?view=procurement';
+    if (action.endpoint.includes('/obo')) return '/gov/obo';
+    if (action.endpoint.includes('/users')) return '/gov/administration?view=staff';
+    if (action.endpoint.includes('/audit-logs')) return '/gov/records-workspace?view=audit';
+    return null;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -477,19 +471,20 @@ const COLOR_MAP = {
 // ─────────────────────────────────────────────────────────────────────────────
 const ActionCard = ({ action, token }) => {
     const [count, setCount] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
+    const [status, setStatus] = useState(action.endpoint ? 'loading' : 'unavailable');
 
     useEffect(() => {
-        if (!action.endpoint || !token) { setLoading(false); return; }
-        fetch(`${API_BASE_URL}${action.endpoint}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : {})
+        if (!action.endpoint || !token) return undefined;
+        const controller = new AbortController();
+        fetch(`${API_BASE_URL}${action.endpoint}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+        })
+            .then((response) => {
+                if (!response.ok) throw new Error(`Request failed with ${response.status}`);
+                return response.json();
+            })
             .then(data => {
-                // Handle different response formats:
-                // 1. Array: [...items]
-                // 2. Object with items: {items: [...], total: X}
-                // 3. Object with users: {users: [...], total: X}
-                // 4. Object with single value: {total: X} or {count: X}
                 if (Array.isArray(data)) {
                     setCount(data.length);
                 } else if (data.items) {
@@ -503,58 +498,48 @@ const ActionCard = ({ action, token }) => {
                 } else {
                     setCount(0);
                 }
+                setStatus('ready');
             })
-            .catch(() => setCount(null))
-            .finally(() => setLoading(false));
+            .catch((error) => {
+                if (error.name !== 'AbortError') {
+                    setCount(null);
+                    setStatus('error');
+                }
+            });
+
+        return () => controller.abort();
     }, [action.endpoint, token]);
 
     const Icon = action.icon;
-    const hasItems = count !== null && count > 0;
+    const navTarget = actionTargetFor(action);
+    const content = (
+        <>
+            <span className="gov-action-row__signal" aria-hidden="true" />
+            <span className="gov-action-row__icon" aria-hidden="true">
+                <Icon size={18} strokeWidth={1.8} />
+            </span>
+            <span className="gov-action-row__copy">
+                <strong>{action.label}</strong>
+                <span>{action.action}</span>
+            </span>
+            <span className="gov-action-row__state" aria-live="polite">
+                {status === 'loading' && <span className="gov-action-row__loading">Loading</span>}
+                {status === 'ready' && <strong>{count}</strong>}
+                {status === 'error' && <span className="is-error">Unavailable</span>}
+                {status === 'unavailable' && <span>Open</span>}
+            </span>
+            {navTarget && <ChevronRight size={17} aria-hidden="true" />}
+        </>
+    );
 
-    // Derive navigation target from endpoint pattern
-    const getNavTarget = () => {
-        if (!action.endpoint) return null;
-        if (action.endpoint.includes('/reports')) return '/dispatcher';
-        if (action.endpoint.includes('/work-orders')) return '/gov/work-orders';
-        if (action.endpoint.includes('/projects')) return '/gov/projects';
-        if (action.endpoint.includes('/procurement')) return '/gov/procurement';
-        if (action.endpoint.includes('/obo')) return '/gov/obo';
-        if (action.endpoint.includes('/users')) return '/gov/users';
-        if (action.endpoint.includes('/audit-logs')) return '/gov/audit-logs';
-        return null;
-    };
-
-    const navTarget = getNavTarget();
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            onClick={() => navTarget && navigate(navTarget)}
-            className={`rounded-2xl border p-4 flex items-center justify-between gap-4 transition-all hover:shadow-md ${URGENCY_COLORS[action.urgency]} ${navTarget ? 'cursor-pointer' : ''}`}
-        >
-            <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/60 dark:bg-slate-800/60 flex items-center justify-center shrink-0 shadow-sm">
-                    <Icon size={18} className={URGENCY_BADGE[action.urgency].replace('bg-', 'text-').replace('text-white', action.urgency === 'high' ? 'text-red-600' : action.urgency === 'medium' ? 'text-orange-500' : 'text-slate-500')} />
-                </div>
-                <div>
-                    <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight">{action.label}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{action.action}</div>
-                </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-                {loading ? (
-                    <div className="w-6 h-6 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
-                ) : count !== null ? (
-                    <span className={`text-lg font-black px-2 py-0.5 rounded-xl ${hasItems ? URGENCY_BADGE[action.urgency] : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
-                        {count}
-                    </span>
-                ) : (
-                    <span className="text-xs text-slate-400">—</span>
-                )}
-                {navTarget && <ChevronRight size={16} className="text-slate-400" />}
-            </div>
-        </motion.div>
+    return navTarget ? (
+        <Link to={navTarget} className="gov-action-row" data-urgency={action.urgency}>
+            {content}
+        </Link>
+    ) : (
+        <div className="gov-action-row" data-urgency={action.urgency}>
+            {content}
+        </div>
     );
 };
 
@@ -562,26 +547,14 @@ const ActionCard = ({ action, token }) => {
 // Workflow Step list
 // ─────────────────────────────────────────────────────────────────────────────
 const WorkflowGuide = ({ steps }) => (
-    <div className="space-y-2">
+    <ol className="gov-workflow-list">
         {steps.map((step, i) => (
-            <div key={i} className="flex items-start gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 mt-0.5 bg-gradient-to-br ${
-                    step.color === 'green' ? 'from-green-500 to-emerald-600' :
-                    step.color === 'red' ? 'from-red-500 to-red-600' :
-                    step.color === 'blue' ? 'from-blue-500 to-blue-700' :
-                    step.color === 'indigo' ? 'from-indigo-500 to-indigo-700' :
-                    step.color === 'orange' ? 'from-orange-400 to-orange-600' :
-                    step.color === 'teal' ? 'from-teal-500 to-teal-700' :
-                    step.color === 'violet' ? 'from-violet-500 to-violet-700' :
-                    step.color === 'purple' ? 'from-purple-500 to-purple-700' :
-                    'from-slate-500 to-slate-700'
-                }`}>
-                    {i + 1}
-                </div>
-                <div className="text-sm text-slate-700 dark:text-slate-300 leading-snug pt-0.5">{step.step}</div>
-            </div>
+            <li key={step.step}>
+                <span className="gov-workflow-list__step" aria-hidden="true">{i + 1}</span>
+                <span>{step.step}</span>
+            </li>
         ))}
-    </div>
+    </ol>
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -589,39 +562,80 @@ const WorkflowGuide = ({ steps }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 const StatsBar = ({ token }) => {
     const [stats, setStats] = useState(null);
+    const [status, setStatus] = useState('loading');
+    const [updatedAt, setUpdatedAt] = useState(null);
+    const [requestVersion, setRequestVersion] = useState(0);
+
     useEffect(() => {
-        if (!token) return;
-        fetch(`${API_BASE_URL}/api/gov/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : null)
-            .then(setStats)
-            .catch(() => {});
-    }, [token]);
+        if (!token) return undefined;
+        const controller = new AbortController();
+        fetch(`${API_BASE_URL}/api/gov/dashboard/stats`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+        })
+            .then((response) => {
+                if (!response.ok) throw new Error(`Request failed with ${response.status}`);
+                return response.json();
+            })
+            .then((data) => {
+                setStats(data);
+                setUpdatedAt(new Date());
+                setStatus('ready');
+            })
+            .catch((error) => {
+                if (error.name !== 'AbortError') setStatus('error');
+            });
 
-    const items = stats ? [
-        { label: 'Open Work Orders', value: stats.open_work_orders || 0, icon: GitBranch, color: 'text-blue-600' },
-        { label: 'Active Projects', value: stats.active_projects || 0, icon: Map, color: 'text-indigo-600' },
-        { label: 'Pending Procurement', value: stats.pending_procurement || 0, icon: PackageCheck, color: 'text-violet-600' },
-        { label: 'OBO Applications', value: stats.obo_pending || 0, icon: ShieldCheck, color: 'text-teal-600' },
-    ] : [];
+        return () => controller.abort();
+    }, [token, requestVersion]);
 
-    return stats ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            {items.map((item, i) => {
+    const items = [
+        { label: 'Open work orders', value: stats?.open_work_orders ?? null, icon: GitBranch },
+        { label: 'Active projects', value: stats?.active_projects ?? null, icon: Map },
+        { label: 'Pending procurement', value: stats?.pending_procurement ?? null, icon: PackageCheck },
+        { label: 'Permit applications', value: stats?.obo_pending ?? null, icon: ShieldCheck },
+    ];
+
+    if (status === 'error') {
+        return (
+            <GovSystemBanner
+                type="partial_data"
+                title="Work summary unavailable."
+                message="The workspaces are still available from navigation."
+                actionLabel="Retry"
+                onAction={() => {
+                    setStatus('loading');
+                    setRequestVersion((version) => version + 1);
+                }}
+            />
+        );
+    }
+
+    return (
+        <section className="gov-work-summary" aria-labelledby="work-summary-heading" aria-busy={status === 'loading'}>
+            <div className="gov-section-heading gov-section-heading--summary">
+                <div>
+                    <p className="gov-eyebrow">Office workload</p>
+                    <h2 id="work-summary-heading">Current work summary</h2>
+                </div>
+                <p>{updatedAt ? `Updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Loading current totals'}</p>
+            </div>
+            <div className="gov-work-summary__grid">
+                {items.map((item) => {
                 const Icon = item.icon;
                 return (
-                    <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                            <Icon size={18} className={item.color} />
-                        </div>
-                        <div>
-                            <div className="text-lg font-black text-slate-900 dark:text-white leading-tight">{item.value}</div>
-                            <div className="text-[10px] text-slate-500 font-bold">{item.label}</div>
-                        </div>
+                    <div key={item.label} className="gov-work-summary__item">
+                        <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+                        <strong className={item.value === null && status !== 'loading' ? 'is-unavailable' : undefined}>
+                            {status === 'loading' ? '…' : item.value ?? 'Not provided'}
+                        </strong>
+                        <span>{item.label}</span>
                     </div>
                 );
             })}
-        </div>
-    ) : null;
+            </div>
+        </section>
+    );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -640,120 +654,76 @@ const PositionDashboard = () => {
 
     const role = currentUser?.role || 'dispatcher';
     const config = ROLE_CONFIG[role] || ROLE_CONFIG['dispatcher'];
+    const firstName = currentUser?.full_name?.split(' ')[0] || 'Officer';
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-300 font-sans flex text-sm">
+        <div className="gov-workspace-shell">
             <GovSidebar currentUser={currentUser} />
 
-            <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                {/* Header */}
-                <header className="h-16 bg-white dark:bg-slate-900/80 flex items-center justify-between px-8 shrink-0 border-b border-slate-100 dark:border-slate-800 z-40">
+            <div className="gov-workspace">
+                <GovSystemBanner autoOffline={true} />
+                <header className="gov-workspace-header">
                     <div>
-                        <h1 className="font-black text-base text-slate-900 dark:text-white">
-                            {currentUser ? `Welcome, ${currentUser.full_name?.split(' ')[0] || 'Officer'}` : 'My Dashboard'}
-                        </h1>
-                        <p className="text-[11px] text-slate-500">
-                            {config.label} · {config.division}
-                        </p>
+                        <p className="gov-eyebrow">Government workspace</p>
+                        <h1>My work</h1>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className={`px-3 py-1 rounded-full text-[11px] font-black text-white bg-gradient-to-r ${config.gradient}`}>
-                            {config.division}
-                        </div>
+                    <div className="gov-workspace-header__scope" aria-label="Current role and division">
+                        <span>{config.division}</span>
+                        <strong>{config.label}</strong>
                     </div>
                 </header>
 
-                {/* Scrollable Content */}
-                <main className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                    <div className="w-full mx-auto">
-
-                        {/* Role Banner */}
-                        <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className={`rounded-2xl p-6 mb-6 bg-gradient-to-br ${config.gradient} text-white shadow-lg`}
-                        >
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                                <div>
-                                    <div className="text-xs font-bold uppercase tracking-widest opacity-75 mb-1">{config.division}</div>
-                                    <h2 className="text-xl font-black leading-tight">{config.label}</h2>
-                                    <p className="text-sm opacity-80 mt-1 max-w-lg">{config.description}</p>
-                                </div>
-                                <div className="text-right hidden sm:block">
-                                    <div className="text-3xl font-black opacity-20">{role.substring(0, 2).toUpperCase()}</div>
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        {/* System-wide Stats */}
+                <main className="gov-my-work">
+                    <div className="gov-my-work__content">
                         <StatsBar token={token} />
 
-                        {/* Two columns */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Executive Business Intelligence Graph Dashboard */}
+                        <GovBiDashboard token={token} currentUser={currentUser} />
 
-                            {/* Left column — My Pending Actions */}
-                            <div className="lg:col-span-2 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2">
-                                        <Bell size={16} className="text-red-500" />
-                                        My Pending Actions
-                                    </h3>
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Requires your action</span>
+                        <div className="gov-my-work__grid">
+                            <section className="gov-action-queue" aria-labelledby="pending-actions-heading">
+                                <div className="gov-section-heading">
+                                    <div>
+                                        <p className="gov-eyebrow">Personal queue</p>
+                                        <h2 id="pending-actions-heading">Needs your attention</h2>
+                                    </div>
+                                    <span>Based on your role</span>
                                 </div>
 
-                                <div className="space-y-2">
-                                    {config.myActions.map((action, i) => (
-                                        <ActionCard key={i} action={action} token={token} />
+                                <div className="gov-action-queue__list">
+                                    {config.myActions.map((action) => (
+                                        <ActionCard key={action.label} action={action} token={token} />
                                     ))}
                                     {config.myActions.length === 0 && (
-                                        <div className="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
-                                            <CheckCircle2 size={36} className="mx-auto mb-2 opacity-30" />
-                                            <p className="font-bold">No pending actions for this role.</p>
+                                        <div className="gov-queue-empty">
+                                            <CheckCircle2 size={26} aria-hidden="true" />
+                                            <div>
+                                                <strong>No pending actions</strong>
+                                                <p>Nothing currently requires this role.</p>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
+                            </section>
 
-                                {/* Quick Actions */}
-                                <div className="mt-4">
-                                    <h3 className="font-black text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                                        <ArrowRight size={16} className="text-indigo-500" />
-                                        Quick Actions
-                                    </h3>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        {config.quickActions.map((qa, i) => {
-                                            const Icon = qa.icon;
-                                            return (
-                                                <Link
-                                                    key={i}
-                                                    to={qa.to}
-                                                    className="flex items-center gap-2 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:border-indigo-400 dark:hover:border-indigo-600 hover:shadow-sm transition-all group"
-                                                >
-                                                    <Icon size={16} className="text-indigo-500 group-hover:text-indigo-600 shrink-0" />
-                                                    <span className="font-bold text-slate-700 dark:text-slate-300 text-xs leading-tight">{qa.label}</span>
-                                                </Link>
-                                            );
-                                        })}
+                            <aside className="gov-process-rail" aria-label="Role process guidance">
+                                <section aria-labelledby="workflow-heading">
+                                    <div className="gov-section-heading gov-section-heading--compact">
+                                        <div>
+                                            <p className="gov-eyebrow">Role guide</p>
+                                            <h2 id="workflow-heading">How your work moves</h2>
+                                        </div>
+                                        <Activity size={17} aria-hidden="true" />
                                     </div>
-                                </div>
-                            </div>
-
-                            {/* Right column — Workflow Guide */}
-                            <div className="space-y-4">
-                                <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2">
-                                    <Activity size={16} className="text-indigo-500" />
-                                    My Workflow
-                                </h3>
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Process Guide for {config.label}</p>
                                     <WorkflowGuide steps={config.workflow} />
-                                </div>
+                                </section>
 
-                                {/* Inter-position Approval Chain hint */}
-                                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-4">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2">Approval Chain</p>
+                                <section className="gov-approval-chain" aria-labelledby="approval-chain-heading">
+                                    <p className="gov-eyebrow">Handoff context</p>
+                                    <h2 id="approval-chain-heading">Approval chain</h2>
                                     <ApprovalChainHint role={role} />
-                                </div>
-                            </div>
+                                </section>
+                            </aside>
                         </div>
                     </div>
                 </main>
@@ -789,16 +759,14 @@ const APPROVAL_CHAINS = {
 const ApprovalChainHint = ({ role }) => {
     const chain = APPROVAL_CHAINS[role] || ['Standard LGU workflow applies'];
     return (
-        <div className="space-y-1">
-            {chain.map((step, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${step.startsWith('→ YOU') ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
-                    <span className={step.startsWith('→ YOU') ? 'font-black text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}>
-                        {step}
-                    </span>
-                </div>
+        <ol className="gov-approval-chain__list">
+            {chain.map((step) => (
+                <li key={step} className={step.startsWith('→ YOU') ? 'is-current' : undefined}>
+                    <span className="gov-approval-chain__marker" aria-hidden="true" />
+                    <span>{step.replace('→ YOU', 'Your action:')}</span>
+                </li>
             ))}
-        </div>
+        </ol>
     );
 };
 

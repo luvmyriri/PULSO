@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Union
 from jose import JWTError, jwt
 import bcrypt
 from fastapi import Depends, HTTPException, status
@@ -9,6 +9,15 @@ from database import get_db
 
 import os
 
+# Import security token helpers
+from utils.security import (
+    generate_tracking_token,
+    generate_tracking_token_128bit,
+    normalize_tracking_token,
+    hash_tracking_token,
+    verify_tracking_token,
+)
+
 # Secret key for JWT — loaded from environment for security
 # During development, we use a stable fallback to prevent 401s on server reload
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "PULSO_CORE_ENGINE_DEV_SECURE_TOKEN_2024_LGU_CALOOCAN")
@@ -16,6 +25,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+oauth2_optional_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
 
 def verify_password(plain_password, hashed_password):
@@ -95,3 +105,40 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     import logging
     logging.getLogger(__name__).warning(f"Auth failed: User {email} not found in any table")
     raise credentials_exception
+
+
+def get_optional_current_user(
+    token: Optional[str] = Depends(oauth2_optional_scheme),
+    db: Session = Depends(get_db)
+) -> Optional[Union[object, None]]:
+    """
+    Optional FastAPI authentication dependency.
+    
+    - If a valid Bearer JWT is present: returns the Official or verified Resident instance.
+    - If no header or an invalid/expired token is supplied: returns None (Guest mode).
+    - Never raises 401/403 exceptions.
+    """
+    if not token or not token.strip():
+        return None
+        
+    import models
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            return None
+    except (JWTError, Exception):
+        return None
+
+    # 1. Probe Official table first
+    official = db.query(models.Official).filter(models.Official.email == email).first()
+    if official:
+        return official
+        
+    # 2. Probe Resident table
+    resident = db.query(models.Resident).filter(models.Resident.email == email).first()
+    if resident and resident.is_verified:
+        return resident
+
+    return None

@@ -39,21 +39,20 @@ import {
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, HeatmapLayerF } from '@react-google-maps/api';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import OrangeSelect from '../components/OrangeSelect';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../utils/apiBase';
 import { handleApiError } from '../utils/apiFetch';
-
+import './citizen-reports.css';
 
 const CALOOCAN_CENTER = { lat: 14.7566, lng: 121.0450 };
 const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7566, lng: 121.0450 };
 const CALOOCAN_CITY_HALL_SOUTH_LOC = { lat: 14.6495, lng: 120.9775 }; 
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
 const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry', 'visualization'];
-
-// DEPRECATED: Legacy manual coordinates. Now using Google Maps Data-Driven Styling (DDS) for visual boundary.
 const CALOOCAN_CITY_PLACE_ID = 'ChIJXxuEGbWxlzMRGi0EJeJw5wU';
 
 // ─── Map Style Constants ───────────────────────────────────────────────────
@@ -337,7 +336,7 @@ const StrategicProcessFlow = ({ report }) => {
     );
 };
 
-const DispatcherDashboard = () => {
+const DispatcherDashboard = ({ workspace = 'operations', currentUser: propCurrentUser }) => {
     // Core Map & Dashboard State (Top-level to avoid TDZ errors)
     const [map, setMapInstance] = useState(null);
     const [panorama, setPanorama] = useState(null);
@@ -1574,13 +1573,13 @@ const DispatcherDashboard = () => {
         : [];
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-300 font-sans flex text-sm overflow-hidden">
+        <div className="citizen-reports-page">
             
             {/* Unified Left Sidebar Navigation */}
             <GovSidebar currentUser={currentUser} />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+            <div className="citizen-reports-shell">
 
                 {/* ── Tactical Mission Banner ── shown only when deep-linked from Analytics */}
                 {tacticalContext && (
@@ -1668,17 +1667,22 @@ const DispatcherDashboard = () => {
                     </div>
                 )}
                 
-                {/* Top Header */}
-                <header className="h-16 bg-white dark:bg-slate-900/50 flex items-center justify-between px-8 shrink-0 z-40 relative">
-                    {/* Removed bottom header shadow */}
-                    <div className="flex items-center gap-6">
-                        <h1 className="text-xl font-display font-bold text-slate-900 dark:text-white">
-                            LGU Command Center
-                        </h1>
-                        <div className="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
-                        
-                        {/* Action Hub — Specialized Command Navigation */}
-                        <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                {/* Top Header - Civic Aperture */}
+                <header className="citizen-reports-topbar">
+                    <div>
+                        <h1>Service operations</h1>
+                        <p>Live spatial intelligence, incident triage, and field fleet deployment for Caloocan City.</p>
+                    </div>
+                    
+                    <div className="citizen-reports-topbar__actions">
+                        {/* Fleet count badge */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--gov-rule)] bg-[var(--gov-surface)] text-xs font-semibold text-[var(--gov-text-secondary)]">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[var(--gov-text)] font-bold">{fleetStatus.length}</span> Field Teams Active
+                        </div>
+
+                        {/* Action Hub — Mode Switcher */}
+                        <div className="inline-flex items-center p-1 bg-[var(--gov-canvas)] border border-[var(--gov-rule)] rounded-lg text-xs font-semibold">
                             <button
                                 onClick={() => { 
                                     setDashboardMode('triage'); 
@@ -1687,9 +1691,13 @@ const DispatcherDashboard = () => {
                                     setActionHubTab('incoming');
                                     setSelectedReport(null); 
                                 }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${actionHubTab === 'incoming' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                    actionHubTab === 'incoming' 
+                                        ? 'bg-[var(--gov-surface)] text-[var(--gov-text)] shadow-xs border border-[var(--gov-rule)]' 
+                                        : 'text-[var(--gov-text-secondary)] hover:text-[var(--gov-text)]'
+                                }`}
                             >
-                                <AlertTriangle size={16} className={actionHubTab === 'incoming' ? 'text-orange-500' : ''}/>
+                                <AlertTriangle size={14} className={actionHubTab === 'incoming' ? 'text-amber-500' : ''} />
                                 Incident Triage
                             </button>
                             <button
@@ -1700,9 +1708,13 @@ const DispatcherDashboard = () => {
                                     setActionHubTab('approvals');
                                     setSelectedReport(null); 
                                 }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${actionHubTab === 'approvals' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                    actionHubTab === 'approvals' 
+                                        ? 'bg-[var(--gov-surface)] text-[var(--gov-text)] shadow-xs border border-[var(--gov-rule)]' 
+                                        : 'text-[var(--gov-text-secondary)] hover:text-[var(--gov-text)]'
+                                }`}
                             >
-                                <CheckCircle size={16} className={actionHubTab === 'approvals' ? 'text-emerald-500' : ''} />
+                                <CheckCircle size={14} className={actionHubTab === 'approvals' ? 'text-emerald-500' : ''} />
                                 Approval Queue
                             </button>
                             <button
@@ -1713,9 +1725,13 @@ const DispatcherDashboard = () => {
                                     setActionHubTab('active');
                                     setSelectedReport(null); 
                                 }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${actionHubTab === 'active' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                    actionHubTab === 'active' 
+                                        ? 'bg-[var(--gov-surface)] text-[var(--gov-text)] shadow-xs border border-[var(--gov-rule)]' 
+                                        : 'text-[var(--gov-text-secondary)] hover:text-[var(--gov-text)]'
+                                }`}
                             >
-                                <Truck size={16} className={actionHubTab === 'active' ? 'text-blue-500' : ''} />
+                                <Truck size={14} className={actionHubTab === 'active' ? 'text-blue-500' : ''} />
                                 Fleet Manager
                             </button>
                             <button
@@ -1726,35 +1742,35 @@ const DispatcherDashboard = () => {
                                     setActionHubTab('master');
                                     setSelectedReport(null); 
                                 }}
-                                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-bold transition-all ${actionHubTab === 'master' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                    actionHubTab === 'master' 
+                                        ? 'bg-[var(--gov-surface)] text-[var(--gov-text)] shadow-xs border border-[var(--gov-rule)]' 
+                                        : 'text-[var(--gov-text-secondary)] hover:text-[var(--gov-text)]'
+                                }`}
                             >
-                                <History size={16} className={actionHubTab === 'master' ? 'text-indigo-500' : ''} />
+                                <History size={14} className={actionHubTab === 'master' ? 'text-indigo-500' : ''} />
                                 Master View
                             </button>
                         </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <span className="text-sm font-semibold text-slate-500 dark:text-slate-400"><span className="text-slate-900 dark:text-white">{fleetStatus.length}</span> Teams Available</span>
-                        </div>
+
                         <ThemeToggle />
                     </div>
                 </header>
 
+                <GovernmentWorkspaceTabs workspace={workspace || 'operations'} currentUser={currentUser} />
+
                 {/* Dashboard Canvas */}
                 <main className="flex-1 flex overflow-hidden relative">
                     {/* Left Inner Sidebar - Live Incident Feed */}
-                <AnimatePresence>
-                    {isSidebarOpen && (
-                        <motion.div 
-                            initial={{ x: -320, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: -320, opacity: 0 }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative"
-                        >
+                    <AnimatePresence>
+                        {isSidebarOpen && (
+                            <motion.div 
+                                initial={{ x: -320, opacity: 0 }}
+                                animate={{ x: 0, opacity: 1 }}
+                                exit={{ x: -320, opacity: 0 }}
+                                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                                className="w-80 bg-[var(--gov-surface)] border-r border-[var(--gov-rule)] flex flex-col z-30 shrink-0 relative"
+                            >
                             {/* Removed right subtle shadow */}
                             <div className="p-4 relative flex flex-col gap-3">
                                 {/* Removed bottom shadow */}
@@ -2884,21 +2900,19 @@ const DispatcherDashboard = () => {
                 </div>
 
                 {/* Right Sidebar - Selected Details or AI Validation Queue */}
-                <div className="w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative">
-                    {/* Removed left sidebar inner shadow */}
-                    <div className="flex relative">
-                        {/* Removed lower shadow */}
+                <div className="w-80 bg-[var(--gov-surface)] border-l border-[var(--gov-rule)] flex flex-col z-30 shrink-0 relative">
+                    <div className="flex relative border-b border-[var(--gov-rule)] bg-[var(--gov-surface)]">
                         {dashboardMode === 'triage' && (
                             <button 
                                 onClick={() => setActiveTab('queue')}
-                                className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'queue' ? 'border-orange-500 text-orange-600 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors ${activeTab === 'queue' ? 'border-[var(--gov-action)] text-[var(--gov-text)]' : 'border-transparent text-[var(--gov-text-secondary)] hover:text-[var(--gov-text)]'}`}
                             >
                                 Triage Queue
                             </button>
                         )}
                         <button 
                             onClick={() => setActiveTab('fleet')}
-                            className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'fleet' ? 'border-orange-500 text-orange-600 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors ${activeTab === 'fleet' ? 'border-[var(--gov-action)] text-[var(--gov-text)]' : 'border-transparent text-[var(--gov-text-secondary)] hover:text-[var(--gov-text)]'}`}
                         >
                             Field Fleets
                         </button>

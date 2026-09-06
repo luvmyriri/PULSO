@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, HeatmapLayer, CircleF, MarkerF, PolygonF } from '@react-google-maps/api';
 import GovSidebar from '../components/GovSidebar';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -123,7 +124,7 @@ const ClusterCard = ({ cluster, onSelect, selected }) => {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function GovAnalyticsPage() {
+export default function GovAnalyticsPage({ workspace }) {
     const { theme } = useTheme();
     const isDarkMode = theme === 'system' 
         ? window.matchMedia('(prefers-color-scheme: dark)').matches 
@@ -456,6 +457,8 @@ export default function GovAnalyticsPage() {
                         </button>
                     </div>
                 </div>
+
+                {workspace && <GovernmentWorkspaceTabs workspace={workspace} currentUser={currentUser} />}
 
                 <div className="flex-1 flex flex-col overflow-hidden">
                     {/* KPI Strip */}

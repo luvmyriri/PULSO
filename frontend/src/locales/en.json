@@ -25,133 +25,547 @@
     "landing": {
       "nav": {
         "home": "Home",
-        "platform": "Platform",
-        "solutions": "Solutions",
-        "about": "About LGU",
-        "login": "Login"
+        "scope": "Infrastructure Scope",
+        "platform": "Infrastructure Scope",
+        "howitworks": "How It Works",
+        "solutions": "How It Works",
+        "services": "City Services",
+        "about": "Engineering Office",
+        "report": "Report an Issue",
+        "reportIssue": "Report an Issue",
+        "track": "Track a Report",
+        "trackReport": "Track a Report",
+        "login": "Sign In",
+        "register": "Register",
+        "openDashboard": "Register",
+        "staff": "Staff Gateway",
+        "staffGateway": "Staff Gateway"
       },
       "hero": {
-        "status": "SYSTEM ONLINE • CALOOCAN NORTH",
-        "title1": "Smart Infrastructure,",
-        "title2": "Smarter City.",
-        "subtitle": "A public platform helping citizens report infrastructure hazards in real-time. Powering a faster, safer, and more responsive Caloocan North through technology.",
+        "tag": "PUBLIC UTILITY MONITORING FOR CALOOCAN CITY",
+        "title1": "PUBLIC WORKS",
+        "title2": "MONITORING & REPAIR",
+        "title3": "PORTAL",
+        "subtitle": "Improving everyday life for Caloocan City residents by helping engineers spot utility hazards early, resolve outages faster, and maintain reliable public services.",
+        "reportCta": "Report an Issue",
+        "noAccountRequired": "No account required",
+        "trackCta": "Track a Report",
+        "trackSubtext": "Lookup via Ticket ID & Token",
+        "staffGateway": "Staff Gateway",
         "register": "Register",
-        "docs": "View Portal Guide"
+        "openDashboard": "Register",
+        "exploreFeatures": "Explore Features",
+        "docs": "Documentation",
+        "status": "Active Operations"
+      },
+      "cinematic": {
+        "ariaLabel": "PULSO Caloocan Public Works Service",
+        "report": "Report an Issue",
+        "noAccountRequired": "No account required",
+        "reportSubtext": "No account required",
+        "track": "Track a Report",
+        "staff": "Staff Gateway",
+        "explore": "See how PULSO works",
+        "slideControls": "Hero slides",
+        "previous": "Previous slide",
+        "next": "Next slide",
+        "showSlide": "Show {{number}}: {{label}}",
+        "slides": {
+          "observe": {
+            "label": "Observe",
+            "eyebrow": "Public works reporting · Caloocan City",
+            "title1": "See the problem.",
+            "title2": "Start the response.",
+            "body": "Report road, drainage, lighting, and utility issues across Caloocan—and follow every update.",
+            "alt": "Wide aerial view across Caloocan with neighborhoods and roads."
+          },
+          "report": {
+            "label": "Report",
+            "eyebrow": "From the street to the right city team",
+            "title1": "When the street speaks, the city",
+            "title2": "should listen.",
+            "body": "Show the issue, add the location, and follow the city response from one clear record.",
+            "alt": "A Caloocan public works maintenance crew on a street inspection."
+          },
+          "follow": {
+            "label": "Follow",
+            "eyebrow": "One report · One clear public record",
+            "title1": "Your report",
+            "title2": "moves",
+            "title3": "the city.",
+            "body": "Share the evidence. Mark the place. See what happens next.",
+            "alt": "Caloocan landscape with neighborhoods leading toward the city horizon."
+          }
+        }
+      },
+      "emergency": {
+        "badge": "Life / Safety Emergency",
+        "notice": "For life-threatening emergencies, open flood hazards, or downed live power cables, please call the 24/7 hotline immediately.",
+        "call911": "Dial 911",
+        "rescueHotline": "Caloocan Rescue: (02) 888-1234"
+      },
+      "quickSteps": {
+        "step1Title": "Pin Location & Boundary",
+        "step1Desc": "Tag the exact spot across North or South Caloocan via GPS or interactive map.",
+        "step2Title": "Upload Photo Evidence",
+        "step2Desc": "Capture true-color photos with automatic non-blocking advisory AI triage.",
+        "step3Title": "Follow Live Resolution",
+        "step3Desc": "Track the 6-stage repair timeline publicly or link it seamlessly to your account."
+      },
+      "mobileNav": {
+        "home": "Home",
+        "track": "Track",
+        "report": "Report",
+        "updates": "Updates",
+        "account": "Account"
       },
       "features": {
-        "title": "Optimized for the Community",
-        "subtitle": "A specialized platform empowering Caloocan North residents to actively participate in infrastructure maintenance and safety monitoring.",
-        "f1_title": "GEOSPATIAL TRIAGE",
-        "f1_desc": "Precise mapping of reports to pinpoint infrastructure issues across the city.",
-        "f2_title": "OFFICIAL VERIFICATION",
-        "f2_desc": "Integrated human and AI verification ensuring every report is legitimate and prioritized.",
-        "f3_title": "PROACTIVE CARE",
-        "f3_desc": "Continuous infrastructure monitoring to identify issues before they become major failures."
-      },
-      "solutions": {
-        "badge": "Integrated Solutions",
-        "title": "Targeted Responses for Critical Infrastructure.",
-        "subtitle": "PULSO categorizes reports automatically, routing specific hazards to specialized engineering teams instantly.",
-        "s1_title": "Roads & Bridges",
-        "s1_desc": "Pothole patching, sidewalk repairs, and structural monitoring for city and barangay road networks.",
-        "s1_l1": "Local Road Repair",
-        "s1_l2": "Pavement Markings",
-        "s2_title": "Water & Drainage",
-        "s2_desc": "Cleaning of clogged canals, manhole maintenance, and flood control for the city's drainage system.",
-        "s2_l1": "Drainage De-clogging",
-        "s2_l2": "Flood Control",
-        "s3_title": "Street Lighting",
-        "s3_desc": "Installation and repair of streetlights, electrical wiring, and lamp posts to ensure nighttime safety.",
-        "s3_l1": "Bulb Replacement",
-        "s3_l2": "Grid Safety",
-        "s4_title": "Public Safety & Regulatory",
-        "s4_desc": "Building inspections, disaster debris clearing, and safety compliance for city infrastructure.",
-        "s4_l1": "Structural Safety",
-        "s4_l2": "Debris Clearing",
-        "s5_title": "Public Facilities",
-        "s5_desc": "Maintenance of public schools, health centers, recreational plazas, and city-owned buildings.",
-        "s5_l1": "Facility Repair",
-        "s5_l2": "Park Maintenance"
-      },
-      "about": {
-        "badge": "About Caloocan LGU",
-        "title": "A Modern Governance Initiative.",
-        "p1": "The City Government of Caloocan launched the PULSO Project to bridge the gap between citizens and engineering operations. By crowdsourcing infrastructure data, we transform every smartphone into a vital city sensor.",
-        "p2": "Moving away from archaic, paper-based reporting, Caloocan North is embracing proactive, data-driven governance. Our goal is not just to fix problems faster, but to predict and prevent them entirely.",
-        "stat1_val": "13",
-        "stat1_lbl": "Barangays",
-        "stat2_val": "24/7",
-        "stat2_lbl": "Monitoring",
-        "stat3_val": "<2h",
-        "stat3_lbl": "Response Target",
-        "analytics": "System Analytics",
-        "analytics_desc": "Real-time resolution metrics strictly monitored by the LGU.",
-        "metric1": "Hazard Reports Resolved",
-        "metric2": "Preventative Dispatch Rate",
-        "metric3": "Resident Portal Adoption",
-        "portal_btn": "View Open Data Portal"
+        "badge": "Infrastructure Scope",
+        "title": "TYPES OF PUBLIC INFRASTRUCTURE",
+        "subtitle": "Public infrastructure managed across Caloocan City by the City Engineering Department.",
+        "f1_title": "Horizontal Infrastructure",
+        "f1_desc": "Roads, local bridges, alleys, pathways, and parking areas.",
+        "f2_title": "Vertical Infrastructure",
+        "f2_desc": "City halls, public schools, local health centers, multipurpose gyms, and municipal warehouses.",
+        "f3_title": "Drainage & Water Systems",
+        "f3_desc": "Open canals, underground lateral storm drains, sewer lines, and declogging networks.",
+        "f4_title": "Public Spaces",
+        "f4_desc": "City parks, plazas, monuments, and open recreational grounds."
       },
       "howitworks": {
-        "badge": "How It Works",
-        "title": "Report an Issue in 5 Simple Steps.",
-        "subtitle": "PULSO optimizes the entire process from citizen report to verified resolution — powered by AI triage and real-time response.",
-        "s1_title": "Register & Verify",
-        "s1_desc": "Create your resident account and verify your residency with a government-issued ID. Only verified Caloocan North residents can submit reports.",
-        "s2_title": "Capture at the Scene",
-        "s2_desc": "Take a clear photo of the infrastructure hazard on-site. Your GPS coordinates are automatically tagged for pinpoint accuracy.",
-        "s3_title": "AI Triage",
-        "s3_desc": "Gemini AI instantly analyzes your photo and description, categorizes the issue, assigns an urgency score, and generates a ticket.",
-        "s4_title": "Official Verification",
-        "s4_desc": "A city official reviews the AI-verified ticket, confirms priority, and assigns the nearest qualified field crew.",
-        "s5_title": "Crew Resolves",
-        "s5_desc": "Field crews complete the repair and upload Proof of Repair photos. You get notified once your report is marked resolved."
+        "badge": "Simple Process",
+        "title": "HOW PULSO WORKS",
+        "subtitle": "From reporting a problem to completing repairs in Caloocan City.",
+        "s1_title": "1. Problem Logged",
+        "s1_desc": "Citizens or sensors report a utility issue on the city map.",
+        "s2_title": "2. Site Inspection",
+        "s2_desc": "City inspectors verify the location with photos and GPS tags.",
+        "s3_title": "3. Smart Priority",
+        "s3_desc": "PULSO ranks urgency so critical repairs get fixed first.",
+        "s4_title": "4. Crew Assigned",
+        "s4_desc": "Engineers send work orders and materials to field teams.",
+        "s5_title": "5. Repair Done",
+        "s5_desc": "Crews complete the repair and update the map status."
+      },
+      "solutions": {
+        "badge": "Utility Sectors",
+        "title": "ESSENTIAL CITY SERVICES",
+        "subtitle": "Comprehensive engineering support across critical civic systems.",
+        "s1_title": "Water Supply & Distribution",
+        "s1_desc": "Monitor water pressure, detect pipe leaks, and check main distribution lines.",
+        "s1_l1": "Live pressure telemetry",
+        "s1_l2": "Rapid leak containment",
+        "s2_title": "Power & Street Lighting",
+        "s2_desc": "Track underground power cables and fix street light outages fast.",
+        "s2_l1": "Grid outage mapping",
+        "s2_l2": "Night streetlight patrols",
+        "s3_title": "Roads & Bridges",
+        "s3_desc": "Pavement condition indexing, pothole patching, and bridge structural inspections.",
+        "s3_l1": "Continuous road surveys",
+        "s3_l2": "Heavy vehicle route monitoring",
+        "s4_title": "Public Safety & Hazards",
+        "s4_desc": "Emergency hazard removal, fallen tree clearing, and landslide embankment stabilization.",
+        "s4_l1": "24/7 disaster response",
+        "s4_l2": "High-risk slope sensors",
+        "s5_title": "Public Buildings & Facilities",
+        "s5_desc": "Structural integrity verification for schools, health centers, and community evacuation halls.",
+        "s5_l1": "Annual seismic audits",
+        "s5_l2": "Accessibility compliance"
       },
       "services": {
-        "badge": "LGU City Services",
-        "title": "Access Caloocan City Services Online.",
-        "subtitle": "Beyond infrastructure reporting, Caloocan City offers these digital services for residents. Powered by the City Services Portal.",
-        "senior_title": "Senior Citizen ID (OSCA)",
-        "senior_desc": "Register for your official PVC ID card to access senior citizen benefits and services under OSCA.",
-        "senior_l1": "New Senior Registration",
-        "senior_l2": "PVC Card Replacement",
-        "senior_l3": "ID Status Tracking",
-        "pwd_title": "PWD Registration",
-        "pwd_desc": "Register for your official PVC ID card to access PWD benefits and services from the city government.",
-        "pwd_l1": "Register as PWD",
-        "pwd_l2": "PWD ID Verifier",
-        "pwd_l3": "ID Status Tracking",
-        "solo_title": "Solo Parent Registration",
-        "solo_desc": "Register for your Solo Parent ID card to access benefits and services under RA 8972 (Solo Parents Welfare Act).",
-        "solo_l1": "New Solo Parent Registration",
-        "solo_l2": "ID Status Tracking",
-        "gad_title": "GAD Plan & Budget",
-        "gad_desc": "For barangays: Submit and track your Gender and Development Plan, Budget, and Accomplishment Reports.",
-        "gad_l1": "Submit GAD Report",
-        "gad_l2": "Check Report Status",
-        "portal_link": "Visit City Services Portal"
+        "badge": "City Portals",
+        "title": "CALOOCAN PUBLIC SERVICES GATEWAY",
+        "subtitle": "Direct access to specialized citizen welfare and city administration portals.",
+        "senior_title": "Senior Citizen Portal",
+        "senior_desc": "Senior ID registration and verification records.",
+        "senior_l1": "New Application",
+        "senior_l2": "Verification Desk",
+        "senior_l3": "QR Code Status",
+        "pwd_title": "PWD Welfare Portal",
+        "pwd_desc": "Assistance directory for Persons with Disability.",
+        "pwd_l1": "Online Registration",
+        "pwd_l2": "Verification Registry",
+        "pwd_l3": "ID Validation Check",
+        "solo_title": "Solo Parent Portal",
+        "solo_desc": "Benefits tracking and single parent support.",
+        "solo_l1": "Apply Online",
+        "solo_l2": "Application Tracker",
+        "gad_title": "GAD Plan Portal",
+        "gad_desc": "Gender and Development project directory.",
+        "gad_l1": "Plan Directory",
+        "gad_l2": "Approval Registry",
+        "portal_link": "View All Caloocan Online Services"
+      },
+      "about": {
+        "badge": "About Us",
+        "title": "CITY ENGINEERING OFFICE",
+        "p1": "The <1>City Engineering Office of Caloocan</1> is tasked with planning, designing, constructing, and maintaining public infrastructure across all 188 barangays.",
+        "p2": "Through PULSO, our engineers bridge real-time citizen reports with field work crews to deliver accountable, transparent, and prompt public repairs.",
+        "stat1_val": "188",
+        "stat1_lbl": "Barangays Covered",
+        "stat2_val": "24/7",
+        "stat2_lbl": "Operations Monitoring",
+        "stat3_val": "<24h",
+        "stat3_lbl": "Triage Target",
+        "performance_title": "System Performance",
+        "metric1_lbl": "Utility Map Accuracy",
+        "metric2_lbl": "Risk Detection Rate"
       },
       "footer": {
-        "desc": "The Digital Heartbeat of Caloocan North. An advanced Public Utility and Infrastructure Locator System engineered for proactive city management.",
-        "portals": "Portals",
-        "p_resident": "Resident Portal",
-        "p_engineering": "Engineering Dashboard",
-        "p_admin": "LGU Administrator",
-        "p_api": "Public APIs",
-        "p_resident_app": "Resident Mobile App",
-        "platform": "Platform",
-        "cityservices": "City Services",
-        "cs_senior": "Senior Citizen ID (OSCA)",
-        "cs_pwd": "PWD Registration",
-        "cs_solo": "Solo Parent ID",
-        "cs_gad": "GAD Plan & Budget",
-        "contact": "Contact Engineering",
-        "address": "Caloocan City Hall,<br />Zapote Street, Barangay 177,<br />Caloocan City 1400, Metro Manila",
-        "hours": "Mon – Fri, 8:00 AM – 5:00 PM",
-        "hours_label": "Office Hours",
-        "copyright": "PULSO Infrastructure Network. Designed for Caloocan LGU.",
+        "desc": "PULSO: Transparent City Engineering Management & Public Works Reporting for Caloocan City.",
+        "portals_header": "Portals",
+        "resident_portal": "Resident Portal",
+        "gov_gateway": "Government Gateway",
+        "dispatch_ops": "Dispatch Operations",
+        "track_report": "Track a Report",
+        "report_issue": "Report an Issue",
+        "office_header": "Office",
+        "office_dept": "City Engineering Department",
+        "office_hall": "Caloocan City Hall",
+        "office_road": "Camarin Road, Caloocan City",
+        "contact_header": "Contact",
+        "rights": "City Government of Caloocan. All rights reserved.",
         "privacy": "Privacy Policy",
         "terms": "Terms of Service",
-        "cookie": "Cookie Settings"
+        "cookies": "Cookie Policy"
+      }
+    },
+    "reportWizard": {
+      "title": "Report an Issue",
+      "subtitle": "Submit an infrastructure repair request directly to the Caloocan City Engineering Department.",
+      "guestBadge": "Open Citizen Intake · No Sign-in Required",
+      "stepCounter": "Step {{current}} of {{total}}",
+      "saveDraft": "Draft saved automatically",
+      "draftResumed": "Draft successfully restored from your previous session.",
+      "draftFound": "You have an unfinished report draft. Would you like to resume?",
+      "resumeDraft": "Resume Draft",
+      "startFresh": "Start Fresh",
+      "emergencyBanner": {
+        "title": "Is this an immediate life-threatening emergency?",
+        "body": "For active fires, severe medical crises, active crimes, or live fallen power lines during floods, call emergency hotlines directly. PULSO is for municipal infrastructure repair and engineering triage.",
+        "call911": "Call 911 (National Emergency)",
+        "callCDRRMO": "Call 888-1234 (Caloocan CDRRMO)",
+        "callMaynilad": "Maynilad: 1626",
+        "callMeralco": "Meralco: 16211",
+        "dismiss": "I understand, this is a non-emergency utility repair"
+      },
+      "nav": {
+        "back": "Back",
+        "next": "Continue",
+        "submit": "Submit Official Report",
+        "submitting": "Submitting...",
+        "cancel": "Cancel",
+        "step": "Step",
+        "edit": "Edit"
+      },
+      "steps": {
+        "step1": "Category",
+        "step2": "Location",
+        "step3": "Evidence",
+        "step4": "Details",
+        "step5": "Contact",
+        "step6": "Review",
+        "step7": "Submit",
+        "category": "Category",
+        "location": "Location",
+        "evidence": "Evidence",
+        "details": "Details",
+        "contact": "Contact",
+        "review": "Review"
+      },
+      "step1Category": {
+        "title": "Select Issue Category",
+        "subtitle": "What kind of public infrastructure requires repair or inspection?",
+        "selectPlaceholder": "Choose category...",
+        "categories": {
+          "roads_bridges": {
+            "label": "Roads & Bridges",
+            "desc": "Potholes, broken asphalt, damaged bridges, sidewalk cracks"
+          },
+          "drainage_flooding": {
+            "label": "Water & Drainage",
+            "desc": "Clogged storm drains, missing manhole covers, flash flooding, burst pipes"
+          },
+          "streetlights_electrical": {
+            "label": "Street Lighting & Power",
+            "desc": "Dark lampposts, flickering lights, dangling low-voltage lines, damaged poles"
+          },
+          "public_facilities": {
+            "label": "Public Facilities & Buildings",
+            "desc": "Damaged health centers, public school defects, broken playground gear"
+          },
+          "public_safety": {
+            "label": "Public Safety & Hazards",
+            "desc": "Fallen roadside trees, hazardous debris on carriageway, unstable retaining walls"
+          },
+          "traffic_signage": {
+            "label": "Traffic & Road Signs",
+            "desc": "Broken traffic signals, missing regulatory street signage, bent guardrails"
+          }
+        },
+        "validationError": "Please select an infrastructure category to continue."
+      },
+      "step2Location": {
+        "title": "Pin Incident Location",
+        "subtitle": "Point to the exact spot in Caloocan City where the issue is located.",
+        "searchPlaceholder": "Search street name, landmark, or barangay in Caloocan...",
+        "useMyLocation": "Use My Current GPS Location",
+        "locating": "Acquiring accurate GPS...",
+        "locationSuccess": "GPS location tagged (accuracy: {{accuracy}}m)",
+        "locationError": "Unable to acquire GPS. Please search or drag the pin manually.",
+        "boundaryChecking": "Verifying Caloocan City boundaries...",
+        "insideBoundary": "Verified within Caloocan City ({{district}})",
+        "outsideBoundaryWarning": "Selected location is outside Caloocan City jurisdiction",
+        "outsideBoundaryDesc": "PULSO can only dispatch work orders within Caloocan City borders. Please reposition the pin within city boundaries.",
+        "landmarkLabel": "Specific Landmark / Notes (Optional)",
+        "landmarkPlaceholder": "e.g. In front of Caloocan High School, beside Gate 2",
+        "barangayLabel": "Barangay / District",
+        "coordinatesLabel": "GPS Coordinates",
+        "listAlternative": "Need text mode? Enter address manually",
+        "validationError": "Please pin a location within Caloocan City boundaries to continue."
+      },
+      "step3Evidence": {
+        "title": "Upload Photo Evidence",
+        "subtitle": "Clear photos help engineering teams assess materials and dispatch the correct equipment.",
+        "dropzone": "Drag & drop photo here, or click to browse",
+        "openCamera": "Take Photo with Camera",
+        "chooseFile": "Select Image from Device",
+        "uploadLimits": "PNG, JPG, WebP up to 10MB per image",
+        "safetyWarningTitle": "Safety First",
+        "safetyWarningDesc": "Never step into moving traffic or approach live electrical cables to take a photo.",
+        "removePhoto": "Remove photo",
+        "replacePhoto": "Replace photo",
+        "previewAlt": "Uploaded evidence preview",
+        "aiScanning": "AI Assistant analyzing photo evidence...",
+        "aiCategoryDetected": "AI detected {{category}} (Confidence: {{confidence}}%)",
+        "aiConfidenceLow": "AI scan inconclusive. Your manual category selection remains active.",
+        "aiAcceptSuggestion": "Apply AI Category",
+        "aiKeepSelected": "Keep Selected Category",
+        "fileSizeError": "File size exceeds 10MB limit (Selected: {{size}}MB).",
+        "fileTypeError": "Unsupported file format. Please upload JPEG, PNG, or WebP.",
+        "validationError": "Photo evidence is recommended. You may proceed or attach a photo."
+      },
+      "step4Details": {
+        "title": "Describe the Problem",
+        "subtitle": "Provide clear details on the size, duration, and safety hazard to help crews prepare.",
+        "descriptionLabel": "Detailed Description",
+        "descriptionPlaceholder": "Describe the hazard (e.g. Deep pothole in southbound lane causing vehicles to swerve into oncoming traffic. Has been worsening over the past 3 days)...",
+        "descriptionHelp": "{{current}} / 5000 characters (minimum 10 required)",
+        "urgencyLabel": "Perceived Urgency",
+        "urgencyOptions": {
+          "low": "Low — Minor cosmetic or non-blocking defect",
+          "medium": "Medium — Moderate inconvenience or recurring issue",
+          "high": "High — Impeding traffic, pedestrian safety, or water flow",
+          "critical": "Critical — Immediate hazard to public safety"
+        },
+        "duplicateBannerTitle": "Similar Active Report Found Nearby",
+        "duplicateBannerDesc": "A report in this category is already active within {{distance}}m of your pin (Ticket: {{ticketId}}).",
+        "duplicateViewBtn": "View Active Ticket",
+        "duplicateAttachBtn": "Attach Evidence to Existing Report",
+        "duplicateProceedBtn": "Continue Submitting as New Report",
+        "validationError": "Please provide a description of at least 10 characters."
+      },
+      "step5Contact": {
+        "title": "Contact & Notification Preferences",
+        "subtitle": "Choose how you would like to receive progress updates for this report.",
+        "guestOption": {
+          "title": "Anonymous Guest (No account required)",
+          "desc": "No email or phone stored. You will receive a private tracking token to check status online."
+        },
+        "emailOption": {
+          "title": "Email & SMS Notifications",
+          "desc": "Receive automated notifications when work crews are assigned and repairs are completed."
+        },
+        "signInOption": {
+          "title": "Sign in to Resident Account",
+          "desc": "Link this report directly to your resident dashboard for unified tracking."
+        },
+        "authenticatedBadge": "Submitting as Registered Resident: {{name}}",
+        "emailLabel": "Email Address",
+        "emailPlaceholder": "juan@example.com",
+        "phoneLabel": "Mobile Number",
+        "phonePlaceholder": "0917 123 4567",
+        "privacyNotice": "Your contact information is protected under the Data Privacy Act of 2012 (RA 10173) and will never be shared on public boards.",
+        "signInLink": "Already have an account? Sign in here",
+        "validationEmailError": "Please enter a valid email address.",
+        "validationPhoneError": "Please enter a valid 11-digit Philippine mobile number (e.g. 0917 123 4567)."
+      },
+      "step6Review": {
+        "title": "Review & Consent",
+        "subtitle": "Please verify your report details before submitting to the engineering queue.",
+        "sectionCategory": "Issue Category",
+        "sectionLocation": "Location & Coordinates",
+        "sectionEvidence": "Evidence Attached",
+        "sectionDetails": "Description & Details",
+        "sectionContact": "Contact Preferences",
+        "editAction": "Edit",
+        "noPhotoProvided": "No photo attached (manual report)",
+        "anonymousReporter": "Anonymous Guest (Tracking via Private Token)",
+        "notifyReporter": "SMS / Email Alerts ({{contact}})",
+        "consentCheckbox": "I declare that the information provided in this report is true and accurate. I understand that submitting false or malicious emergency reports is prohibited under Philippine law.",
+        "privacyStatement": "Photos and location data will be used solely for municipal engineering triage and repair. Personal contact info is never published on public boards.",
+        "validationConsentError": "You must certify the truthfulness of your report before submitting."
+      },
+      "step7Submitting": {
+        "title": "Submitting Your Report",
+        "uploading": "Uploading photo evidence securely...",
+        "triaging": "Initiating AI geospatial triage...",
+        "generatingToken": "Generating cryptographic tracking credentials...",
+        "finalizing": "Finalizing ticket docket...",
+        "errorTitle": "Submission Failed",
+        "errorDesc": "We encountered an issue transmitting your report. Your draft has been saved.",
+        "retryBtn": "Retry Submission"
+      }
+    },
+    "receipt": {
+      "title": "Report Successfully Logged",
+      "subtitle": "Your report has been received by the Caloocan City Engineering Department.",
+      "ticketIdLabel": "Official Ticket ID",
+      "timestampLabel": "Submission Timestamp",
+      "statusLabel": "Current Status",
+      "statusReceived": "Received & Queued for Triage",
+      "trackingTokenSection": {
+        "title": "Your Private Tracking Code",
+        "subtitle": "Save this code! You will need it along with your Ticket ID to check updates publicly or link this report to an account later.",
+        "tokenWarning": "Keep this secret. Anyone with this code can view public milestones for this ticket.",
+        "copyToken": "Copy Tracking Code",
+        "tokenCopied": "Copied to Clipboard!",
+        "copyUrl": "Copy Tracking URL",
+        "urlCopied": "Link Copied!"
+      },
+      "qrSection": {
+        "title": "Mobile QR Quick Pass",
+        "desc": "Scan with your phone camera to quickly open this ticket on mobile.",
+        "downloadQr": "Download QR Code"
+      },
+      "actions": {
+        "trackNow": "Track This Report Now",
+        "saveToAccount": "Save to My Reports (Link to Account)",
+        "saveToAccountDesc": "Create an account or sign in to keep all your tickets in one place and get live notifications.",
+        "returnHome": "Return to Home",
+        "reportAnother": "Submit Another Report"
+      },
+      "nextSteps": {
+        "title": "What Happens Next?",
+        "step1": "1. AI and dispatch engineers verify the location and severity within 2 hours.",
+        "step2": "2. An engineering work order is created and assigned to the relevant district field team.",
+        "step3": "3. Field crews inspect and complete repairs, uploading photographic proof of resolution.",
+        "step4": "4. The ticket is marked resolved and closed on the public registry."
+      }
+    },
+    "track": {
+      "header": {
+        "title": "Track Public Infrastructure Report",
+        "subtitle": "Follow the live engineering progress and milestone timeline for any Caloocan City ticket.",
+        "badge": "Civic Aperture · Transparent Public Works"
+      },
+      "lookup": {
+        "title": "Ticket Lookup",
+        "subtitle": "Enter your Ticket ID and Secret Tracking Token from your receipt.",
+        "ticketLabel": "Ticket ID",
+        "ticketPlaceholder": "e.g. RPT-20260902-8F92E1B4 or PULSO-10492",
+        "tokenLabel": "Secret Tracking Token",
+        "tokenPlaceholder": "TRK-XXXX-XXXX-XXXX-XXXX",
+        "submitBtn": "Track Report",
+        "searching": "Searching Civic Registry...",
+        "errorNotFound": "Report not found or invalid tracking credentials. Please check your Ticket ID and Token."
+      },
+      "result": {
+        "ticketHeader": "Ticket Details",
+        "categoryLabel": "Category",
+        "barangayLabel": "Barangay / Area",
+        "submittedOn": "Reported On",
+        "lastUpdated": "Last Updated",
+        "currentStageLabel": "Current Operational Stage",
+        "publicSummary": "Location Summary",
+        "privacyNotice": "Public Privacy Mode Active: Reporter details, private contact info, and internal staff notes are protected and redacted.",
+        "pulseLineTitle": "PulseLine 6-Stage Progress",
+        "timelineTitle": "Public Milestone Timeline",
+        "claimPrompt": "Is this your report? Link it to your account for unified management",
+        "claimBtn": "Claim This Report"
+      },
+      "stages": {
+        "received": {
+          "label": "Received",
+          "description": "Report logged and queued for engineering triage."
+        },
+        "under_review": {
+          "label": "Under Review",
+          "description": "Dispatch engineers verifying jurisdiction, severity, and field requirements."
+        },
+        "validated": {
+          "label": "Validated",
+          "description": "Issue confirmed and authorized for work order creation."
+        },
+        "assigned": {
+          "label": "Assigned",
+          "description": "Work order dispatched to District Maintenance Crew."
+        },
+        "in_progress": {
+          "label": "In Progress",
+          "description": "Field team actively conducting on-site repairs and maintenance."
+        },
+        "resolved": {
+          "label": "Resolved",
+          "description": "Repairs complete; verified with on-site resolution evidence."
+        },
+        "closed": {
+          "label": "Closed",
+          "description": "Final closeout archived in the city engineering registry."
+        }
+      }
+    },
+    "residentDashboard": {
+      "header": {
+        "title": "Resident Portal & My Reports",
+        "subtitle": "Manage all your authored and claimed public infrastructure tickets.",
+        "claimAction": "+ Claim Guest Report"
+      },
+      "tabs": {
+        "all": "All Reports",
+        "active": "Active",
+        "needs_information": "Needs Information",
+        "resolved": "Resolved",
+        "ariaLabel": "Report status filter tabs"
+      },
+      "emptyStates": {
+        "all": {
+          "title": "No Reports Found",
+          "desc": "You haven't submitted or claimed any infrastructure reports yet.",
+          "action": "Report an Issue"
+        },
+        "active": {
+          "title": "No Active Reports",
+          "desc": "All your reported issues have been processed or resolved.",
+          "action": "Report New Hazard"
+        },
+        "needs_information": {
+          "title": "No Actions Required",
+          "desc": "None of your reports currently require additional information or photos."
+        },
+        "resolved": {
+          "title": "No Resolved Reports Yet",
+          "desc": "Completed repairs with photographic proof of resolution will appear here."
+        }
+      },
+      "claimModal": {
+        "triggerBtn": "Claim Guest Ticket",
+        "title": "Link Guest Report to Your Account",
+        "subtitle": "Enter the Ticket ID and private tracking token from your guest submission receipt to claim ownership.",
+        "ticketLabel": "Ticket ID",
+        "ticketPlaceholder": "e.g. RPT-20260902-8F92E1B4",
+        "tokenLabel": "Private Tracking Token",
+        "tokenPlaceholder": "TRK-XXXX-XXXX-XXXX-XXXX",
+        "submitBtn": "Claim & Link Report",
+        "claiming": "Linking Report...",
+        "cancelBtn": "Cancel",
+        "successTitle": "Report Linked Successfully!",
+        "successDesc": "This ticket has been added to your dashboard. You will now receive in-app notifications on all status changes.",
+        "viewReportBtn": "View Report in Dashboard",
+        "error403": "Invalid tracking token. Please double-check the token code on your receipt.",
+        "error409": "This report has already been claimed by another resident account.",
+        "error404": "Ticket ID not found. Please verify the ticket number.",
+        "error500": "Unable to claim report due to a server error. Please try again later."
       }
     },
     "register": {
@@ -185,7 +599,12 @@
         "profile": "Profile",
         "settings": "Settings",
         "help": "Help & Support",
-        "signOut": "Sign Out"
+        "signOut": "Sign Out",
+        "map": "Barangay Map",
+        "services": "LGU Services",
+        "knowledge": "Knowledge Base",
+        "track": "Track Issue",
+        "shortcuts": "Shortcuts"
       },
       "overview": {
         "greeting": "Good morning, {{name}}!",
@@ -233,7 +652,11 @@
         "regAddress": "Registered Address (Barangay)",
         "barangay": "Barangay",
         "memberSince": "Member Since",
-        "update": "Update Information"
+        "update": "Update Information",
+        "resAddress": "Residential Address",
+        "connectivity": "Contact Connectivity",
+        "secureEmail": "Secure Email",
+        "mobileNumber": "Mobile Number"
       },
       "settings": {
         "portal": "Security Portal",
@@ -294,7 +717,56 @@
         "r3u2": "Maintenance crew replaced bulbs. Issue closed.",
         "alertSuccess": "Report successfully submitted to the Engineering Office!",
         "newReportText": "Report securely transmitted."
+      },
+      "footer": {
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Service",
+        "cookie": "Cookie Policy"
+      },
+      "privacy": {
+        "s1_title": "1. Information Collection",
+        "s1_desc": "PULSO collects data relevant to infrastructure reporting, including precise GPS coordinates, photographic evidence, and resident account details for verification purposes."
+      },
+      "terms": {
+        "s1_title": "1. Integrity Clause",
+        "s1_desc": "Residents are accountable for the accuracy of their reports. Fraudulent reporting will result in immediate Trust Score reduction and possible service restrictions."
+      },
+      "topNav": {
+        "searchPlaceholder": "Search PULSO...",
+        "recentSearches": "Recent Searches"
       }
-    }
+    },
+    "knowledge": {
+      "cat": {
+        "tech": "Tech Guide",
+        "emergency": "Emergency",
+        "publicWorks": "Public Works",
+        "community": "Community"
+      },
+      "art1": {
+        "title": "How AI Reporting Works",
+        "excerpt": "Learn how Gemini AI verifies your incident reports in real-time."
+      },
+      "art2": {
+        "title": "Flood Evacuation Routes",
+        "excerpt": "Safe zones and routes for residents in Low-lying North Caloocan areas."
+      },
+      "art3": {
+        "title": "Engineering Permit Guide",
+        "excerpt": "Step-by-step guide on applying for building and excavation permits in Caloocan North."
+      },
+      "art4": {
+        "title": "Noise Ordinance Info",
+        "excerpt": "Understanding the city wide peace and order regulations."
+      }
+    },
+    "footer": {
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "cookie": "Cookies"
+    },
+    "Synchronizing Data...": "Synchronizing Data...",
+    "No new advisories today": "No new advisories today",
+    "All Notifications": "All Notifications"
   }
 }

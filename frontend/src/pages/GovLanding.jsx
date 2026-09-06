@@ -14,6 +14,7 @@ import { useInteractionHarden } from '../hooks/useInteractionHarden';
 export default function GovLanding() {
     const { theme, changeTheme } = useTheme();
     const navigate = useNavigate();
+    const captchaPaused = import.meta.env.DEV;
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -58,7 +59,7 @@ export default function GovLanding() {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        if (!captchaToken) {
+        if (!captchaPaused && !captchaToken) {
             setError('Please complete the security puzzle to proceed.');
             return;
         }
@@ -68,7 +69,7 @@ export default function GovLanding() {
                 const formData = new URLSearchParams();
                 formData.append('username', email);
                 formData.append('password', password);
-                formData.append('captcha_token', captchaToken || '');
+                if (!captchaPaused) formData.append('captcha_token', captchaToken || '');
 
                 const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
                     method: 'POST',
@@ -356,7 +357,7 @@ export default function GovLanding() {
                                                 </div>
                                                 
                                                 <AnimatePresence>
-                                                    {email && password && (
+                                                    {email && password && !captchaPaused && (
                                                         <motion.div 
                                                             initial={{ opacity: 0, height: 0 }}
                                                             animate={{ opacity: 1, height: 'auto' }}
@@ -374,6 +375,16 @@ export default function GovLanding() {
                                                         </motion.div>
                                                     )}
                                                 </AnimatePresence>
+
+                                                {captchaPaused && (
+                                                    <div
+                                                        role="status"
+                                                        className="mb-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+                                                    >
+                                                        <ShieldCheck size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+                                                        <span><strong>Security check paused.</strong> Local development only; account credentials are still required.</span>
+                                                    </div>
+                                                )}
 
                                                 <button
                                                     type="submit"

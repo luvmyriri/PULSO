@@ -1,0 +1,441 @@
+/* ==========================================================================
+   PULSO GovSystemBanner
+   Civic Aperture Operational System Banners (Light / Dark Parity)
+   States: Offline, Permission Changed, Emergency Access, Partial Data
+   ========================================================================== */
+
+.gov-system-banner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    font-size: 13px;
+    line-height: 18px;
+    border-bottom: 1px solid var(--gov-rule, #c9d4d9);
+    border-left: 3px solid transparent;
+    transition: background-color 150ms ease, border-color 150ms ease;
+    z-index: 40;
+}
+
+.gov-system-banner__content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+}
+
+.gov-system-banner__icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gov-system-banner__text {
+    min-width: 0;
+    color: var(--gov-text, #132238);
+}
+
+.gov-system-banner__title {
+    font-weight: 700;
+    font-family: Archivo, Inter, sans-serif;
+    margin-right: 6px;
+    letter-spacing: -0.01em;
+}
+
+.gov-system-banner__message {
+    color: var(--gov-text-secondary, #465d6c);
+    font-weight: 500;
+}
+
+.gov-system-banner__timestamp {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark .gov-system-banner__timestamp {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.gov-system-banner__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.gov-system-banner__btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 150ms ease;
+    white-space: nowrap;
+}
+
+.gov-system-banner__btn-action:focus-visible,
+.gov-system-banner__btn-dismiss:focus-visible {
+    outline: 3px solid var(--gov-focus, #2563eb);
+    outline-offset: 1px;
+}
+
+.gov-system-banner__btn-dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 4px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--gov-text-secondary, #465d6c);
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.gov-system-banner__btn-dismiss:hover {
+    color: var(--gov-text, #132238);
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.dark .gov-system-banner__btn-dismiss:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* State 1: Offline Mode (Amber / Gold Warning) */
+.gov-system-banner--offline {
+    background: #fef8ee;
+    border-bottom-color: #fbd38d;
+    border-left-color: var(--gov-warning, #b45309);
+    color: #744210;
+}
+
+.gov-system-banner--offline .gov-system-banner__icon {
+    color: var(--gov-warning, #b45309);
+}
+
+.gov-system-banner--offline .gov-system-banner__title {
+    color: #744210;
+}
+
+.gov-system-banner--offline .gov-system-banner__message {
+    color: #975a16;
+}
+
+.gov-system-banner--offline .gov-system-banner__btn-action {
+    background: #eedfae;
+    color: #744210;
+    border-color: #e2c974;
+}
+
+.gov-system-banner--offline .gov-system-banner__btn-action:hover {
+    background: #e3cc81;
+}
+
+.dark .gov-system-banner--offline {
+    background: #231908;
+    border-bottom-color: #4a3410;
+    border-left-color: var(--gov-warning, #fdb022);
+    color: #fef3c7;
+}
+
+.dark .gov-system-banner--offline .gov-system-banner__icon {
+    color: var(--gov-warning, #fdb022);
+}
+
+.dark .gov-system-banner--offline .gov-system-banner__title {
+    color: #fef3c7;
+}
+
+.dark .gov-system-banner--offline .gov-system-banner__message {
+    color: #fde68a;
+}
+
+.dark .gov-system-banner--offline .gov-system-banner__btn-action {
+    background: #3d2b0e;
+    color: #fef3c7;
+    border-color: #5c4217;
+}
+
+.dark .gov-system-banner--offline .gov-system-banner__btn-action:hover {
+    background: #4f3712;
+}
+
+/* State 2: Permission Changed (Field Blue / Cyan Informational) */
+.gov-system-banner--permission-changed,
+.gov-system-banner--permission_changed,
+.gov-system-banner--permission {
+    background: #f0f7fb;
+    border-bottom-color: #b9dbe8;
+    border-left-color: var(--gov-action, #0b4f6c);
+    color: #083e55;
+}
+
+.gov-system-banner--permission-changed .gov-system-banner__icon,
+.gov-system-banner--permission_changed .gov-system-banner__icon,
+.gov-system-banner--permission .gov-system-banner__icon {
+    color: var(--gov-action, #0b4f6c);
+}
+
+.gov-system-banner--permission-changed .gov-system-banner__title,
+.gov-system-banner--permission_changed .gov-system-banner__title,
+.gov-system-banner--permission .gov-system-banner__title {
+    color: #083e55;
+}
+
+.gov-system-banner--permission-changed .gov-system-banner__message,
+.gov-system-banner--permission_changed .gov-system-banner__message,
+.gov-system-banner--permission .gov-system-banner__message {
+    color: #1e5670;
+}
+
+.gov-system-banner--permission-changed .gov-system-banner__btn-action,
+.gov-system-banner--permission_changed .gov-system-banner__btn-action,
+.gov-system-banner--permission .gov-system-banner__btn-action {
+    background: var(--gov-action, #0b4f6c);
+    color: #ffffff;
+    border-color: var(--gov-action, #0b4f6c);
+}
+
+.gov-system-banner--permission-changed .gov-system-banner__btn-action:hover,
+.gov-system-banner--permission_changed .gov-system-banner__btn-action:hover,
+.gov-system-banner--permission .gov-system-banner__btn-action:hover {
+    background: var(--gov-action-strong, #083e55);
+}
+
+.dark .gov-system-banner--permission-changed,
+.dark .gov-system-banner--permission_changed,
+.dark .gov-system-banner--permission {
+    background: #092033;
+    border-bottom-color: #1a425f;
+    border-left-color: var(--gov-action, #82c7d8);
+    color: #e0f2fe;
+}
+
+.dark .gov-system-banner--permission-changed .gov-system-banner__icon,
+.dark .gov-system-banner--permission_changed .gov-system-banner__icon,
+.dark .gov-system-banner--permission .gov-system-banner__icon {
+    color: var(--gov-action, #82c7d8);
+}
+
+.dark .gov-system-banner--permission-changed .gov-system-banner__title,
+.dark .gov-system-banner--permission_changed .gov-system-banner__title,
+.dark .gov-system-banner--permission .gov-system-banner__title {
+    color: #e0f2fe;
+}
+
+.dark .gov-system-banner--permission-changed .gov-system-banner__message,
+.dark .gov-system-banner--permission_changed .gov-system-banner__message,
+.dark .gov-system-banner--permission .gov-system-banner__message {
+    color: #bae6fd;
+}
+
+.dark .gov-system-banner--permission-changed .gov-system-banner__btn-action,
+.dark .gov-system-banner--permission_changed .gov-system-banner__btn-action,
+.dark .gov-system-banner--permission .gov-system-banner__btn-action {
+    background: var(--gov-action, #82c7d8);
+    color: #071a2b;
+    border-color: var(--gov-action, #82c7d8);
+}
+
+.dark .gov-system-banner--permission-changed .gov-system-banner__btn-action:hover,
+.dark .gov-system-banner--permission_changed .gov-system-banner__btn-action:hover,
+.dark .gov-system-banner--permission .gov-system-banner__btn-action:hover {
+    background: var(--gov-action-strong, #a5d9e5);
+}
+
+/* State 3: Emergency Access / Break-Glass Mode (Critical Red / Rose High-Visibility) */
+.gov-system-banner--emergency-access,
+.gov-system-banner--emergency_access,
+.gov-system-banner--emergency {
+    background: #fdf2f2;
+    border-bottom-color: #f8b4b4;
+    border-left-color: var(--gov-critical, #b42318);
+    color: #771d1d;
+}
+
+.gov-system-banner--emergency-access .gov-system-banner__icon,
+.gov-system-banner--emergency_access .gov-system-banner__icon,
+.gov-system-banner--emergency .gov-system-banner__icon {
+    color: var(--gov-critical, #b42318);
+}
+
+.gov-system-banner--emergency-access .gov-system-banner__title,
+.gov-system-banner--emergency_access .gov-system-banner__title,
+.gov-system-banner--emergency .gov-system-banner__title {
+    color: #991b1b;
+    font-weight: 800;
+}
+
+.gov-system-banner--emergency-access .gov-system-banner__message,
+.gov-system-banner--emergency_access .gov-system-banner__message,
+.gov-system-banner--emergency .gov-system-banner__message {
+    color: #b91c1c;
+}
+
+.gov-system-banner--emergency-access .gov-system-banner__btn-action,
+.gov-system-banner--emergency_access .gov-system-banner__btn-action,
+.gov-system-banner--emergency .gov-system-banner__btn-action {
+    background: var(--gov-critical, #b42318);
+    color: #ffffff;
+    border-color: var(--gov-critical, #b42318);
+}
+
+.gov-system-banner--emergency-access .gov-system-banner__btn-action:hover,
+.gov-system-banner--emergency_access .gov-system-banner__btn-action:hover,
+.gov-system-banner--emergency .gov-system-banner__btn-action:hover {
+    background: #91180f;
+}
+
+.dark .gov-system-banner--emergency-access,
+.dark .gov-system-banner--emergency_access,
+.dark .gov-system-banner--emergency {
+    background: #310d0d;
+    border-bottom-color: #631919;
+    border-left-color: var(--gov-critical, #fda29b);
+    color: #fee2e2;
+}
+
+.dark .gov-system-banner--emergency-access .gov-system-banner__icon,
+.dark .gov-system-banner--emergency_access .gov-system-banner__icon,
+.dark .gov-system-banner--emergency .gov-system-banner__icon {
+    color: var(--gov-critical, #fda29b);
+}
+
+.dark .gov-system-banner--emergency-access .gov-system-banner__title,
+.dark .gov-system-banner--emergency_access .gov-system-banner__title,
+.dark .gov-system-banner--emergency .gov-system-banner__title {
+    color: #fee2e2;
+    font-weight: 800;
+}
+
+.dark .gov-system-banner--emergency-access .gov-system-banner__message,
+.dark .gov-system-banner--emergency_access .gov-system-banner__message,
+.dark .gov-system-banner--emergency .gov-system-banner__message {
+    color: #fca5a5;
+}
+
+.dark .gov-system-banner--emergency-access .gov-system-banner__btn-action,
+.dark .gov-system-banner--emergency_access .gov-system-banner__btn-action,
+.dark .gov-system-banner--emergency .gov-system-banner__btn-action {
+    background: #5c1818;
+    color: #fee2e2;
+    border-color: #832626;
+}
+
+.dark .gov-system-banner--emergency-access .gov-system-banner__btn-action:hover,
+.dark .gov-system-banner--emergency_access .gov-system-banner__btn-action:hover,
+.dark .gov-system-banner--emergency .gov-system-banner__btn-action:hover {
+    background: #731e1e;
+}
+
+/* State 4: Partial Data / Stale Cache (Slate / Mineral Neutral) */
+.gov-system-banner--partial-data,
+.gov-system-banner--partial_data,
+.gov-system-banner--partial {
+    background: #f1f5f9;
+    border-bottom-color: #cbd5e1;
+    border-left-color: var(--gov-rule, #94a3b8);
+    color: #1e293b;
+}
+
+.gov-system-banner--partial-data .gov-system-banner__icon,
+.gov-system-banner--partial_data .gov-system-banner__icon,
+.gov-system-banner--partial .gov-system-banner__icon {
+    color: var(--gov-text-secondary, #465d6c);
+}
+
+.gov-system-banner--partial-data .gov-system-banner__title,
+.gov-system-banner--partial_data .gov-system-banner__title,
+.gov-system-banner--partial .gov-system-banner__title {
+    color: #1e293b;
+}
+
+.gov-system-banner--partial-data .gov-system-banner__message,
+.gov-system-banner--partial_data .gov-system-banner__message,
+.gov-system-banner--partial .gov-system-banner__message {
+    color: #475569;
+}
+
+.gov-system-banner--partial-data .gov-system-banner__btn-action,
+.gov-system-banner--partial_data .gov-system-banner__btn-action,
+.gov-system-banner--partial .gov-system-banner__btn-action {
+    background: #e2e8f0;
+    color: #1e293b;
+    border-color: #cbd5e1;
+}
+
+.gov-system-banner--partial-data .gov-system-banner__btn-action:hover,
+.gov-system-banner--partial_data .gov-system-banner__btn-action:hover,
+.gov-system-banner--partial .gov-system-banner__btn-action:hover {
+    background: #cbd5e1;
+}
+
+.dark .gov-system-banner--partial-data,
+.dark .gov-system-banner--partial_data,
+.dark .gov-system-banner--partial {
+    background: #0f1c29;
+    border-bottom-color: #233e54;
+    border-left-color: var(--gov-rule, #335166);
+    color: #e2e8f0;
+}
+
+.dark .gov-system-banner--partial-data .gov-system-banner__icon,
+.dark .gov-system-banner--partial_data .gov-system-banner__icon,
+.dark .gov-system-banner--partial .gov-system-banner__icon {
+    color: var(--gov-text-secondary, #b9c7cf);
+}
+
+.dark .gov-system-banner--partial-data .gov-system-banner__title,
+.dark .gov-system-banner--partial_data .gov-system-banner__title,
+.dark .gov-system-banner--partial .gov-system-banner__title {
+    color: #f1f5f9;
+}
+
+.dark .gov-system-banner--partial-data .gov-system-banner__message,
+.dark .gov-system-banner--partial_data .gov-system-banner__message,
+.dark .gov-system-banner--partial .gov-system-banner__message {
+    color: #94a3b8;
+}
+
+.dark .gov-system-banner--partial-data .gov-system-banner__btn-action,
+.dark .gov-system-banner--partial_data .gov-system-banner__btn-action,
+.dark .gov-system-banner--partial .gov-system-banner__btn-action {
+    background: #1c3246;
+    color: #f1f5f9;
+    border-color: #2b4963;
+}
+
+.dark .gov-system-banner--partial-data .gov-system-banner__btn-action:hover,
+.dark .gov-system-banner--partial_data .gov-system-banner__btn-action:hover,
+.dark .gov-system-banner--partial .gov-system-banner__btn-action:hover {
+    background: #25425c;
+}
+
+@media (max-width: 768px) {
+    .gov-system-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .gov-system-banner__actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}

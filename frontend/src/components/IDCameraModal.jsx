@@ -176,12 +176,7 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
 
         canvas.toBlob((blob) => {
             if (blob) {
-                // Name file with GPS coordinates for on-site proof
-                const lat = metadata?.lat?.toFixed(6) || '0.000000';
-                const lng = metadata?.lng?.toFixed(6) || '0.000000';
-                const ts = Math.floor(Date.now() / 1000);
-                const gpsFilename = `PULSO_${lat}_${lng}_${ts}.jpg`;
-                const file = new File([blob], gpsFilename, { type: 'image/jpeg' });
+                const file = new File([blob], `captured_report_metadata.jpg`, { type: 'image/jpeg' });
                 onCapture(file);
                 onClose();
             }
@@ -252,17 +247,6 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
                                 <X size={20} className="hidden sm:block" />
                             </button>
                         </div>
-
-                        {/* Early Advice Banner */}
-                        {side !== 'ISSUE' && (
-                            <div className="bg-orange-500/10 border-b border-orange-500/20 px-4 py-2.5 flex items-center gap-3">
-                                <AlertCircle size={16} className="text-orange-500 shrink-0" />
-                                <p className="text-[11px] font-bold text-orange-200 leading-tight">
-                                    <span className="text-orange-500 uppercase">Early Advice:</span> Verify all scanned details manually.
-                                    The OCR engine is in experimental development.
-                                </p>
-                            </div>
-                        )}
 
                         {/* Camera Preview */}
                         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">

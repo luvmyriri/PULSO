@@ -1,357 +1,516 @@
 /**
- * GovSidebar.jsx
- * Unified, role-aware left navigation sidebar for all government dashboard pages.
- * Implements the full division + position hierarchy of the City Engineering Office.
+ * Government navigation shared by every staff workspace.
+ *
+ * The sidebar mirrors the route guards in App.jsx for discoverability only.
+ * Backend authorization remains the source of truth for every route and action.
  */
 
-import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-    AlertTriangle, LayoutDashboard, ClipboardCheck, Landmark,
-    Megaphone, Users, Briefcase, TrendingUp, Settings, LogOut,
-    HardHat, Ruler, Building2, ShieldCheck, PackageCheck, FlaskConical,
-    Wrench, BarChart as BarChart2, ChevronDown, ChevronRight, Map,
-    ClipboardList, GitBranch, FileCheck, Truck, Eye, UserCog,
-    BookOpen, Activity, FileBarChart2, FileCheck2, Brain, Home, FileText, Shield
+    Activity,
+    BarChart3,
+    Bell,
+    ChevronDown,
+    ClipboardCheck,
+    FileArchive,
+    FileClock,
+    FileText,
+    FolderKanban,
+    History,
+    Home,
+    Inbox,
+    LogOut,
+    Map,
+    Menu,
+    PanelLeftClose,
+    PanelLeftOpen,
+    Settings,
+    ShieldCheck,
+    Smartphone,
+    UserCog,
+    Users,
+    Wrench,
+    X,
 } from 'lucide-react';
-import Branding from './Branding';
-import { checkPermission, canAccessModule, hasPIIAccess } from '../utils/rbac_utils';
+import { GOV_ROLES, SENIOR_ROLES, ADMIN_ONLY } from './ProtectedRoute';
+import { checkPermission } from '../utils/rbac_utils';
+import NotificationCenter from './NotificationCenter';
+import './gov-sidebar.css';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Role-based menu visibility (updated for granular RBAC)
-// ─────────────────────────────────────────────────────────────────────────────
-const ROLE_EXECUTIVE = ['city_engineer', 'asst_city_engineer'];
-const ROLE_ADMIN = ['system_admin', 'admin_officer', 'records_officer'];
-const ROLE_SENIOR = ['division_chief', 'division_chief_arch', 'division_chief_structural', 'division_chief_electrical', 'project_engineer', 'design_engineer', 'manager'];
-const ROLE_STAFF = ['cad_operator', 'estimator', 'construction_foreman', 'field_worker', 'building_inspector', 'electrical_inspector', 'mechanical_inspector', 'admin_clerk'];
-const ROLE_INSPECTOR = ['building_inspector', 'electrical_inspector', 'mechanical_inspector'];
-const ROLE_DESIGN = ['design_engineer', 'cad_operator', 'division_chief', 'division_chief_arch'];
-const ROLE_SURVEY = ['project_engineer', 'estimator', 'construction_foreman', 'division_chief_structural'];
-const ROLE_PROCUREMENT = ['project_engineer', 'admin_officer', 'estimator'];
-const ROLE_CONSTRUCTION = ['construction_foreman', 'field_worker', 'project_engineer'];
-const ROLE_OBO = [...ROLE_INSPECTOR, ...ROLE_EXECUTIVE];
-
-const hasRole = (userRole, allowed) => {
-    if (!userRole) return false;
-    if (userRole === 'system_admin') return true;
-    return allowed.includes(userRole);
+const ROLE_LABELS = {
+    city_engineer: 'City Engineer',
+    asst_city_engineer: 'Assistant City Engineer',
+    admin_officer: 'Administrative Officer V',
+    admin_clerk: 'Administrative Clerk',
+    records_officer: 'Records Officer',
+    division_chief: 'Division Chief',
+    division_chief_arch: 'Architectural Division Chief',
+    division_chief_structural: 'Structural Division Chief',
+    division_chief_electrical: 'Electrical Division Chief',
+    design_engineer: 'Design Engineer',
+    estimator: 'Estimator / QS',
+    cad_operator: 'CAD Operator',
+    project_engineer: 'Project Engineer',
+    construction_foreman: 'Construction Foreman',
+    field_worker: 'Field Worker',
+    building_inspector: 'Building Inspector',
+    electrical_inspector: 'Electrical Inspector',
+    mechanical_inspector: 'Mechanical Inspector',
+    dispatcher: 'Dispatcher',
+    manager: 'Manager',
+    system_admin: 'System Administrator',
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Nav Item structure
-// ─────────────────────────────────────────────────────────────────────────────
-const NavItem = ({ icon: Icon, label, to, tab, activeTab, onTabChange, badge, indent = false, state = null }) => {
-    const location = useLocation();
-    const isActive = (tab && activeTab !== undefined)
-        ? activeTab === tab
-        : to ? (location.pathname === to || location.pathname.startsWith(to + '/')) : false;
+const hasRole = (user, roles) => Boolean(user?.role && roles.includes(user.role));
+const hasPermission = (user, module, action) => checkPermission(user, module, action);
 
-    const baseClass = `w-full flex items-center justify-between px-3 py-2 rounded-lg font-bold transition-all group text-sm ${indent ? 'pl-8' : ''}`;
-    const activeClass = 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400';
-    const inactiveClass = 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white';
-
-    const content = (
-        <>
-            <span className="flex items-center gap-3">
-                <Icon size={16} className="shrink-0" />
-                <span className="truncate">{label}</span>
-            </span>
-            {badge !== undefined && badge !== null && (
-                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 min-w-[18px] text-center">{badge}</span>
-            )}
-        </>
-    );
-
-    const handleClick = (e) => {
-        if (to && tab && onTabChange && location.pathname === (to.split('?')[0])) {
-            e.preventDefault();
-            onTabChange(tab);
-        }
-    };
-
-    if (to) {
-        return (
-            <Link 
-                to={to} 
-                state={state || (tab ? { tab } : undefined)}
-                onClick={handleClick}
-                className={`${baseClass} ${isActive ? activeClass : inactiveClass}`}
-            >
-                {content}
-            </Link>
-        );
+function getStoredUser() {
+    try {
+        return JSON.parse(localStorage.getItem('pulso_user') || 'null');
+    } catch {
+        return null;
     }
+}
+
+function buildNavigation(user) {
+    const isGovernmentUser = hasRole(user, GOV_ROLES);
+    const canManageAdmin = hasRole(user, [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer']) || hasPermission(user, 'admin', 'manage');
+    const isSenior = hasRole(user, [...SENIOR_ROLES, 'city_engineer', 'asst_city_engineer']);
+
+    return [
+        {
+            label: 'My work',
+            items: [
+                { key: 'my-work', label: 'My work', to: '/gov/my-dashboard', icon: Home, show: isGovernmentUser },
+            ],
+        },
+        {
+            label: 'Operations & Map',
+            items: [
+                {
+                    key: 'dispatch-map',
+                    label: 'Command Center (Map)',
+                    to: '/gov/operations?view=dispatch',
+                    icon: Map,
+                    show: isGovernmentUser,
+                },
+                {
+                    key: 'reports-queue',
+                    label: 'Reports Queue',
+                    to: '/gov/operations?view=reports',
+                    icon: Inbox,
+                    show: isGovernmentUser,
+                },
+                {
+                    key: 'work-orders',
+                    label: 'Work Orders',
+                    to: '/gov/operations?view=work-orders',
+                    icon: Wrench,
+                    show: isGovernmentUser,
+                },
+                {
+                    key: 'closed-reports',
+                    label: 'Closed Reports',
+                    to: '/gov/operations?view=closed',
+                    icon: ClipboardCheck,
+                    show: isGovernmentUser,
+                },
+            ],
+        },
+        {
+            label: 'Planning and delivery',
+            items: [
+                {
+                    key: 'projects-delivery',
+                    label: 'Projects and delivery',
+                    to: '/gov/delivery',
+                    icon: FolderKanban,
+                    show: isGovernmentUser,
+                },
+                {
+                    key: 'inspections-permits',
+                    label: 'Inspections and permits',
+                    to: '/gov/obo',
+                    icon: ShieldCheck,
+                    show: isGovernmentUser,
+                },
+            ],
+        },
+        {
+            label: 'Records & Registry',
+            items: [
+                {
+                    key: 'records-registry',
+                    label: 'Records Registry',
+                    to: '/gov/records-workspace?view=registry',
+                    icon: FileArchive,
+                    show: isGovernmentUser,
+                },
+                {
+                    key: 'records-documents',
+                    label: 'Document Vault',
+                    to: '/gov/records-workspace?view=documents',
+                    icon: FileText,
+                    show: isGovernmentUser,
+                },
+                {
+                    key: 'records-timeline',
+                    label: 'Process Timeline',
+                    to: '/gov/records-workspace?view=timeline',
+                    icon: FileClock,
+                    show: isGovernmentUser,
+                },
+                {
+                    key: 'records-audit',
+                    label: 'Audit Trail',
+                    to: '/gov/records-workspace?view=audit',
+                    icon: History,
+                    show: isSenior || canManageAdmin,
+                },
+            ],
+        },
+        {
+            label: 'Insights & GIS',
+            items: [
+                {
+                    key: 'insights-heatmap',
+                    label: 'Analytics & GIS Heatmap',
+                    to: '/gov/insights?view=analytics',
+                    icon: Activity,
+                    show: isGovernmentUser,
+                },
+                {
+                    key: 'insights-predictive',
+                    label: 'Predictive Maintenance',
+                    to: '/gov/insights?view=predictive',
+                    icon: ShieldCheck,
+                    show: isGovernmentUser,
+                },
+            ],
+        },
+        {
+            label: 'Administration',
+            items: [
+                {
+                    key: 'admin-staff',
+                    label: 'Staff & Roles',
+                    to: '/gov/administration?view=staff',
+                    icon: UserCog,
+                    show: canManageAdmin,
+                },
+                {
+                    key: 'admin-residents',
+                    label: 'Resident Accounts',
+                    to: '/gov/administration?view=residents',
+                    icon: Users,
+                    show: canManageAdmin,
+                },
+                {
+                    key: 'admin-settings',
+                    label: 'System Settings',
+                    to: '/gov/administration?view=settings',
+                    icon: Settings,
+                    show: canManageAdmin,
+                },
+            ],
+        },
+    ]
+        .map((section) => ({
+            ...section,
+            items: section.items
+                .filter((item) => item.show)
+                .map((item) => ({
+                    ...item,
+                    children: item.children?.filter((child) => child.show) || [],
+                })),
+        }))
+        .filter((section) => section.items.length > 0);
+}
+
+function initialsFor(user) {
+    const value = user?.full_name || 'LGU Staff';
+    return value
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join('')
+        .toUpperCase();
+}
+
+const routeMatches = (location, target) => {
+    if (!target) return false;
+    const currentFull = `${location.pathname}${location.search}`;
+    if (target.includes('?')) {
+        return currentFull === target || currentFull.startsWith(`${target}&`);
+    }
+    if (location.pathname === target) {
+        return !location.search || location.pathname.startsWith(`${target}/`);
+    }
+    return location.pathname.startsWith(`${target}/`);
+};
+
+const GovNavItem = ({ item, expanded, onNavigate, onToggle }) => {
+    const location = useLocation();
+    const Icon = item.icon;
+    const isActive = routeMatches(location, item.to);
+    const activeChild = item.children?.some((child) => routeMatches(location.pathname, child.to));
+    const hasChildren = item.children?.length > 0;
+    const childRegionId = `gov-nav-children-${item.key}`;
 
     return (
-        <button
-            onClick={() => onTabChange?.(tab)}
-            className={`${baseClass} ${isActive ? activeClass : inactiveClass}`}
-        >
-            {content}
-        </button>
+        <div className={`gov-nav-workspace${activeChild ? ' has-active-child' : ''}`}>
+            <div className="gov-nav-item-row">
+                <Link
+                    to={item.to}
+                    onClick={onNavigate}
+                    className={`gov-nav-item${isActive ? ' is-active' : ''}${activeChild ? ' is-current-group' : ''}`}
+                    aria-current={isActive ? 'page' : undefined}
+                    title={item.label}
+                >
+                    <span className="gov-nav-item__marker" aria-hidden="true" />
+                    <Icon className="gov-nav-item__icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                    <span className="gov-nav-item__label">{item.label}</span>
+                    <span className="gov-nav-item__tooltip" role="tooltip">{item.label}</span>
+                </Link>
+                {hasChildren && (
+                    <button
+                        type="button"
+                        className="gov-nav-item__toggle"
+                        aria-label={`${expanded ? 'Hide' : 'Show'} ${item.label} sections`}
+                        aria-expanded={expanded}
+                        aria-controls={childRegionId}
+                        onClick={onToggle}
+                    >
+                        <ChevronDown size={15} aria-hidden="true" />
+                    </button>
+                )}
+            </div>
+            {hasChildren && (
+                <div id={childRegionId} className={`gov-nav-children${expanded ? ' is-open' : ''}`} hidden={!expanded}>
+                    {item.children.map((child) => {
+                        const childActive = routeMatches(location.pathname, child.to);
+                        return (
+                            <Link
+                                key={child.to}
+                                to={child.to}
+                                onClick={onNavigate}
+                                className={`gov-nav-child${childActive ? ' is-active' : ''}`}
+                                aria-current={childActive ? 'page' : undefined}
+                            >
+                                <span className="gov-nav-child__notch" aria-hidden="true" />
+                                <span>{child.label}</span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
     );
 };
 
-// Collapsible section
-const NavSection = ({ title, icon: Icon, children, defaultOpen = false, color = 'slate' }) => {
+const GovSidebar = ({ currentUser }) => {
+    const navigate = useNavigate();
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const sidebarRef = useRef(null);
+    const triggerRef = useRef(null);
+    const closeRef = useRef(null);
+    const storedUser = useMemo(() => getStoredUser(), []);
+    const user = currentUser || storedUser;
+    const navigation = useMemo(() => buildNavigation(user), [user]);
     const location = useLocation();
-
-    // Check if any child NavItem matches the current location
-    const hasActiveChild = React.Children.toArray(children).some(child => {
-        if (!React.isValidElement(child)) return false;
-        const to = child.props.to;
-        return to && (location.pathname === to || location.pathname.startsWith(to + '/'));
-    });
-
-    const storageKey = `pulso_sidebar_${title.replace(/\s+/g, '_')}`;
-    const [open, setOpen] = useState(() => {
-        if (hasActiveChild) return true;
-        const saved = localStorage.getItem(storageKey);
-        if (saved !== null) return saved === 'true';
-        return defaultOpen;
-    });
-
-    // Make sure it automatically opens if a child link becomes active
-    React.useEffect(() => {
-        if (hasActiveChild) {
-            setOpen(true);
-            localStorage.setItem(storageKey, 'true');
+    const [compactNavigation, setCompactNavigation] = useState(() => {
+        try {
+            return localStorage.getItem('pulso_gov_navigation_compact') === 'true';
+        } catch {
+            return false;
         }
-    }, [hasActiveChild, storageKey]);
+    });
+    const [expandedGroup, setExpandedGroup] = useState(null);
+    const [notificationsOpen, setNotificationsOpen] = useState(false);
 
-    const handleToggle = () => {
-        setOpen(o => {
-            const newState = !o;
-            localStorage.setItem(storageKey, String(newState));
-            return newState;
+    const toggleCompactNavigation = () => {
+        setCompactNavigation((current) => {
+            const next = !current;
+            try {
+                localStorage.setItem('pulso_gov_navigation_compact', String(next));
+            } catch {
+                // The navigation still works when preference storage is unavailable.
+            }
+            return next;
         });
     };
 
-    return (
-        <div className="mb-1">
-            <button
-                onClick={handleToggle}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all hover:bg-slate-50 dark:hover:bg-slate-800/50 group`}
-            >
-                <span className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest text-${color}-500`}>
-                    <Icon size={13} />
-                    {title}
-                </span>
-                {open
-                    ? <ChevronDown size={13} className="text-slate-400" />
-                    : <ChevronRight size={13} className="text-slate-400" />
-                }
-            </button>
-            {open && (
-                <div className="mt-0.5 space-y-0.5 pb-1 border-l-2 border-slate-100 dark:border-slate-800 ml-3 pl-1">
-                    {children}
-                </div>
-            )}
-        </div>
-    );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Sidebar Component
-// ─────────────────────────────────────────────────────────────────────────────
-const GovSidebar = ({ activeTab, onTabChange, currentUser }) => {
-    const navigate = useNavigate();
-    const role = currentUser?.role || 'dispatcher';
-
-    // Add scroll retention to automatically restore sidebar scroll position across page navigation
-    const sidebarRef = React.useRef(null);
-    React.useEffect(() => {
-        const scrollKey = 'pulso_sidebar_scroll_position';
-        const scrollPos = sessionStorage.getItem(scrollKey);
-        if (scrollPos && sidebarRef.current) {
-            sidebarRef.current.scrollTop = parseInt(scrollPos, 10);
-        }
-        
-        const handleScroll = (e) => {
-            sessionStorage.setItem(scrollKey, e.target.scrollTop);
-        };
-        
-        const el = sidebarRef.current;
-        if (el) {
-            el.addEventListener('scroll', handleScroll, { passive: true });
-            return () => el.removeEventListener('scroll', handleScroll);
-        }
+    useEffect(() => {
+        const closeOnHistoryNavigation = () => setDrawerOpen(false);
+        window.addEventListener('popstate', closeOnHistoryNavigation);
+        return () => window.removeEventListener('popstate', closeOnHistoryNavigation);
     }, []);
 
+    useEffect(() => {
+        const node = sidebarRef.current;
+        const storedPosition = sessionStorage.getItem('pulso_gov_navigation_scroll');
+        if (node && storedPosition) node.scrollTop = Number(storedPosition);
+
+        const retainScroll = () => {
+            if (node) sessionStorage.setItem('pulso_gov_navigation_scroll', String(node.scrollTop));
+        };
+
+        node?.addEventListener('scroll', retainScroll, { passive: true });
+        return () => node?.removeEventListener('scroll', retainScroll);
+    }, []);
+
+    useEffect(() => {
+        if (!drawerOpen) return undefined;
+
+        const priorOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        closeRef.current?.focus();
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setDrawerOpen(false);
+                triggerRef.current?.focus();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.body.style.overflow = priorOverflow;
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [drawerOpen]);
+
+    const closeDrawer = () => setDrawerOpen(false);
+
     const handleSignOut = () => {
-        const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
-        const wasGov = user?.role && user.role !== 'resident';
         localStorage.removeItem('pulso_token');
         localStorage.removeItem('pulso_user');
-        if (wasGov) {
-            navigate('/gov');
-        } else {
-            navigate('/login');
-        }
+        navigate('/gov');
     };
-
-    // Role display label mapping
-    const roleLabels = {
-        city_engineer: 'City Engineer / BO',
-        asst_city_engineer: 'Asst. City Engineer',
-        admin_officer: 'Administrative Officer V',
-        admin_clerk: 'Administrative Clerk',
-        records_officer: 'Records Officer',
-        division_chief: 'Division Chief',
-        division_chief_arch: 'Div Chief - Architectural',
-        division_chief_structural: 'Div Chief - Structural',
-        division_chief_electrical: 'Div Chief - Electrical',
-        design_engineer: 'Design Engineer',
-        estimator: 'Estimator / QS',
-        cad_operator: 'CAD Operator',
-        project_engineer: 'Project Engineer',
-        construction_foreman: 'Construction Foreman',
-        field_worker: 'Field Worker',
-        building_inspector: 'Building Inspector',
-        electrical_inspector: 'Electrical Inspector',
-        mechanical_inspector: 'Mechanical Inspector',
-        dispatcher: 'Dispatcher',
-        manager: 'Manager',
-        system_admin: 'System Administrator',
-    };
-
-    const avatarBg = {
-        city_engineer: 'from-blue-600 to-indigo-700',
-        asst_city_engineer: 'from-blue-500 to-indigo-600',
-        admin_officer: 'from-purple-500 to-purple-700',
-        system_admin: 'from-red-600 to-orange-600',
-        manager: 'from-indigo-500 to-blue-700',
-        dispatcher: 'from-orange-500 to-orange-700',
-        building_inspector: 'from-teal-500 to-cyan-700',
-        electrical_inspector: 'from-yellow-500 to-orange-500',
-        mechanical_inspector: 'from-green-500 to-emerald-700',
-        project_engineer: 'from-emerald-500 to-teal-600',
-        estimator: 'from-violet-500 to-purple-600',
-    };
-    const bg = avatarBg[role] || 'from-slate-500 to-slate-700';
 
     return (
-        <div className="w-64 bg-white dark:bg-slate-900 flex flex-col shrink-0 z-50 relative h-screen">
-            {/* Logo */}
-            <div className="h-20 flex items-center px-4 relative shrink-0 border-b border-slate-100 dark:border-slate-800">
-                <Link to="/" className="flex items-center">
-                    <Branding size="h-9" />
-                </Link>
-            </div>
+        <>
+            <button
+                ref={triggerRef}
+                type="button"
+                className="gov-mobile-nav-trigger"
+                aria-label="Open government navigation"
+                aria-expanded={drawerOpen}
+                aria-controls="government-navigation"
+                onClick={() => setDrawerOpen(true)}
+            >
+                <Menu size={20} aria-hidden="true" />
+            </button>
 
-            {/* Navigation */}
-            <div className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5 custom-scrollbar" ref={sidebarRef}>
+            <button
+                type="button"
+                className={`gov-sidebar-backdrop${drawerOpen ? ' is-open' : ''}`}
+                onClick={closeDrawer}
+                aria-label="Close government navigation"
+                tabIndex={drawerOpen ? 0 : -1}
+            />
 
-                {/* ── MAIN HUB ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-1">Main Hub</div>
-                <NavItem icon={Home} label="My Dashboard" to="/gov/my-dashboard" />
-                {checkPermission(currentUser, 'ops', 'manage') && (
-                    <NavItem icon={LayoutDashboard} label="Executive Performance" tab="overview" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
-                )}
-                {checkPermission(currentUser, 'ops', 'manage') && (
-                    <NavItem icon={AlertTriangle} label="Command Center" to="/dispatcher" />
-                )}
-                {checkPermission(currentUser, 'admin', 'audit') && (
-                    <NavItem icon={Brain} label="Analytics Command Center" to="/gov/analytics" />
-                )}
-                {checkPermission(currentUser, 'reports', 'view') && (
-                    <NavItem icon={TrendingUp} label="Predictive Maintenance" to="/gov/predictive" />
-                )}
+            <aside
+                id="government-navigation"
+                className={`gov-sidebar${drawerOpen ? ' is-open' : ''}${compactNavigation ? ' is-collapsed' : ''}`}
+                aria-label="Government workspace navigation"
+            >
+                <div className="gov-sidebar__brand-row">
+                    <Link to="/gov/my-dashboard" className="gov-sidebar__brand" onClick={closeDrawer} aria-label="PULSO government home">
+                        <span className="gov-sidebar__brand-word">PULSO</span>
+                        <span className="gov-sidebar__brand-context">Government</span>
+                    </Link>
+                    <button
+                        type="button"
+                        className="gov-sidebar__collapse"
+                        onClick={toggleCompactNavigation}
+                        aria-label={compactNavigation ? 'Expand government navigation' : 'Collapse government navigation'}
+                        aria-pressed={compactNavigation}
+                        title={compactNavigation ? 'Expand navigation' : 'Collapse navigation'}
+                    >
+                        {compactNavigation
+                            ? <PanelLeftOpen size={17} aria-hidden="true" />
+                            : <PanelLeftClose size={17} aria-hidden="true" />}
+                    </button>
+                    <button
+                        ref={closeRef}
+                        type="button"
+                        className="gov-sidebar__close"
+                        onClick={() => {
+                            closeDrawer();
+                            triggerRef.current?.focus();
+                        }}
+                        aria-label="Close government navigation"
+                    >
+                        <X size={20} aria-hidden="true" />
+                    </button>
+                </div>
 
-                {/* ── OPERATIONS & TRIAGE ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-4">Operations & Triage</div>
-                {checkPermission(currentUser, 'reports', 'view') && (
-                    <NavItem icon={Activity} label="Process Timeline" to="/gov/timeline" />
-                )}
-                {checkPermission(currentUser, 'ops', 'manage') && (
-                    <NavItem icon={Megaphone} label="Post Advisory" tab="advisories" activeTab={activeTab} onTabChange={onTabChange} to="/management" />
-                )}
+                <nav ref={sidebarRef} className="gov-sidebar__scroll" aria-label="Government modules">
+                    {navigation.map((section) => (
+                        <section className="gov-nav-section" key={section.label} aria-labelledby={`gov-nav-${section.label.replace(/\s+/g, '-').toLowerCase()}`}>
+                            <h2 id={`gov-nav-${section.label.replace(/\s+/g, '-').toLowerCase()}`} className="gov-nav-section__label">
+                                {section.label}
+                            </h2>
+                            <div className="gov-nav-section__items">
+                                {section.items.map((item) => {
+                                    const containsActiveRoute = item.children?.some((child) => routeMatches(location.pathname, child.to));
+                                    const itemExpanded = expandedGroup === item.key || (expandedGroup === null && containsActiveRoute);
 
-                {/* ── LGU DEPARTMENTS ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-4">LGU Departments</div>
+                                    return (
+                                        <GovNavItem
+                                            key={item.key}
+                                            item={item}
+                                            expanded={itemExpanded}
+                                            onToggle={() => setExpandedGroup(itemExpanded ? false : item.key)}
+                                            onNavigate={closeDrawer}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    ))}
+                </nav>
 
-                {/* Administrative Division */}
-                {checkPermission(currentUser, 'records', 'view') && (
-                    <NavSection title="Administrative" icon={Briefcase} defaultOpen={['admin_officer','admin_clerk','records_officer'].includes(role)}>
-                        <NavItem icon={BookOpen} label="Records & Registry" to="/gov/records" indent />
-                        <NavItem icon={FileText} label="Document Archive" to="/gov/document-registry" indent />
-                        <NavItem icon={FileBarChart2} label="Reports Archive" to="/gov/reports-archive" indent />
-                        <NavItem icon={FileCheck2} label="Audit Logs" to="/gov/audit-logs" indent />
-                    </NavSection>
-                )}
+                <div className="gov-sidebar__footer">
+                    <button
+                        type="button"
+                        className="gov-nav-item gov-nav-item--utility"
+                        onClick={() => setNotificationsOpen(true)}
+                        title="Notifications"
+                    >
+                        <Bell className="gov-nav-item__icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                        <span className="gov-nav-item__label">Notifications</span>
+                        <span className="gov-nav-item__tooltip" role="tooltip">Notifications</span>
+                    </button>
+                    <Link to="/gov/agent-app" className="gov-nav-item gov-nav-item--utility" onClick={closeDrawer} title="Field app and downloads">
+                        <Smartphone className="gov-nav-item__icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                        <span className="gov-nav-item__label">Field app and downloads</span>
+                        <span className="gov-nav-item__tooltip" role="tooltip">Field app and downloads</span>
+                    </Link>
+                    <button type="button" className="gov-nav-item gov-nav-item--utility" onClick={handleSignOut} title="Log out">
+                        <LogOut className="gov-nav-item__icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                        <span className="gov-nav-item__label">Log out</span>
+                        <span className="gov-nav-item__tooltip" role="tooltip">Log out</span>
+                    </button>
 
-                {/* Design Division */}
-                {hasRole(role, ROLE_DESIGN) && (
-                    <NavSection title="Design & Planning" icon={Ruler} defaultOpen={['design_engineer','cad_operator'].includes(role)}>
-                        <NavItem icon={Map} label="LGU Projects" to="/gov/projects" indent />
-                        <NavItem icon={Building2} label="Design Requests" to="/gov/design-requests" indent />
-                        <NavItem icon={FlaskConical} label="Structure Analysis" to="/gov/analysis" indent />
-                    </NavSection>
-                )}
-
-                {/* Survey Division */}
-                {hasRole(role, ROLE_SURVEY) && (
-                    <NavSection title="Survey & Estimation" icon={Eye} defaultOpen={role === 'estimator'}>
-                        <NavItem icon={Map} label="Field Surveys" to="/gov/surveys" indent />
-                        <NavItem icon={ClipboardList} label="Bill of Quantities" to="/gov/boq" indent />
-                        <NavItem icon={PackageCheck} label="Cost Estimation" to="/gov/estimation" indent />
-                    </NavSection>
-                )}
-
-                {/* OBO Division */}
-                {hasRole(role, ROLE_OBO) && (
-                    <NavSection title="Building Official (OBO)" icon={ShieldCheck} defaultOpen={['building_inspector','electrical_inspector','mechanical_inspector'].includes(role)} color="teal">
-                        <NavItem icon={Building2} label="OBO Inspections" to="/gov/obo" indent />
-                        <NavItem icon={Briefcase} label="Permit Tracking" tab="permits" activeTab={activeTab} onTabChange={onTabChange} to="/management" indent />
-                    </NavSection>
-                )}
-
-                {/* Procurement / BAC */}
-                {hasRole(role, ROLE_PROCUREMENT) && (
-                    <NavSection title="Procurement / BAC" icon={PackageCheck} defaultOpen={['estimator'].includes(role)} color="violet">
-                        <NavItem icon={Landmark} label="RA 9184 Bidding" tab="procurement" activeTab={activeTab} onTabChange={onTabChange} to="/management" indent />
-                        <NavItem icon={ClipboardList} label="Procurement Requests" to="/gov/procurement" indent />
-                    </NavSection>
-                )}
-
-                {/* ── PLATFORM SETTINGS ── */}
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-3 pt-4">Platform Settings</div>
-                {role === 'system_admin' && (
-                    <>
-                        <NavItem icon={UserCog} label="Gov Accounts" to="/gov/users" />
-                        <NavItem icon={Shield} label="Resident Accounts" to="/gov/residents" />
-                    </>
-                )}
-                <NavItem icon={Settings} label="Settings" to="/gov/settings" />
-                {role === 'system_admin' && (
-                    <NavItem icon={HardHat} label="Agent App Download" to="/gov/agent-app" />
-                )}
-                <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg font-bold text-sm transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 mt-2"
-                >
-                    <LogOut size={16} />
-                    Sign Out
-                </button>
-            </div>
-
-            {/* User Card */}
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${bg} flex items-center justify-center font-black text-white text-sm shadow shrink-0`}>
-                        {currentUser?.full_name?.charAt(0)?.toUpperCase() || 'G'}
-                    </div>
-                    <div className="min-w-0">
-                        <div className="font-black text-slate-900 dark:text-white text-sm leading-tight truncate">
-                            {currentUser?.full_name || 'LGU Staff'}
-                        </div>
-                        <div className="text-[10px] text-indigo-500 font-bold truncate">
-                            {roleLabels[role] || role}
-                        </div>
+                    <div className="gov-sidebar__identity" title={`${user?.full_name || 'LGU Staff'} — ${ROLE_LABELS[user?.role] || user?.role || 'Government staff'}`}>
+                        <span className="gov-sidebar__avatar" aria-hidden="true">{initialsFor(user)}</span>
+                        <span className="gov-sidebar__identity-copy">
+                            <strong>{user?.full_name || 'LGU Staff'}</strong>
+                            <span>{ROLE_LABELS[user?.role] || user?.role || 'Government staff'}</span>
+                        </span>
                     </div>
                 </div>
-            </div>
-        </div>
+            </aside>
+
+            <NotificationCenter
+                isOpen={notificationsOpen}
+                onClose={() => setNotificationsOpen(false)}
+            />
+        </>
     );
 };
 

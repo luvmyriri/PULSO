@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
     GitBranch, Map, Building2, ShieldCheck, PackageCheck,
     ClipboardList, Ruler, Eye, HardHat, Wrench, FileBarChart2,
@@ -17,10 +17,12 @@ import {
     Banknote, CalendarRange, Landmark, Coins
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import OrangeSelect from '../components/OrangeSelect';
 import ThemeToggle from '../components/ThemeToggle';
 import DocumentUploadModal from '../components/DocumentUploadModal';
 import ComplianceReminder from '../components/ComplianceReminder';
+import './planning-delivery-workspace.css';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -41,8 +43,8 @@ const PAGE_CONFIG = {
         statuses: ['pending','assigned','in_progress','completed','cancelled'],
     },
     '/gov/projects': {
-        title: 'LGU Infrastructure Projects',
-        subtitle: 'Monitor all 6-phase infrastructure projects from request to certified completion.',
+        title: 'Projects',
+        subtitle: 'Manage infrastructure projects from request through completion.',
         icon: Map,
         color: 'indigo',
         apiPath: '/api/gov/projects',
@@ -57,8 +59,8 @@ const PAGE_CONFIG = {
         statuses: ['application_received','inspection_scheduled','inspection_complete','permit_issued','failed_inspection'],
     },
     '/gov/procurement': {
-        title: 'Procurement Requests',
-        subtitle: 'RA 9184 compliant procurement workflow from draft to awarded bid.',
+        title: 'Procurement',
+        subtitle: 'Manage procurement requests from draft through endorsement.',
         icon: PackageCheck,
         color: 'violet',
         apiPath: '/api/gov/procurement',
@@ -90,40 +92,40 @@ const PAGE_CONFIG = {
     },
 
     '/gov/design-requests': {
-        title: 'Design Requests',
-        subtitle: 'Active design and planning requests across infrastructure project phases.',
+        title: 'Design work',
+        subtitle: 'Manage design requests, drawings, and review work for active projects.',
         icon: Ruler,
         color: 'indigo',
         apiPath: '/api/gov/design-requests',
         statuses: ['request_received','survey_in_progress','design_in_progress','approved_by_city_engineer'],
     },
     '/gov/analysis': {
-        title: 'Structure Analysis',
-        subtitle: 'Structural and civil engineering analysis queue from active project phases.',
+        title: 'Engineering analysis',
+        subtitle: 'Review structural and civil engineering analysis for active projects.',
         icon: FlaskConical,
         color: 'blue',
         apiPath: '/api/gov/analysis',
         statuses: ['survey_in_progress','design_in_progress','approved_by_city_engineer'],
     },
     '/gov/surveys': {
-        title: 'Field Surveys',
-        subtitle: 'Geodetic and civil engineering field survey assignments and results.',
+        title: 'Field surveys',
+        subtitle: 'Manage survey assignments, field observations, and submitted results.',
         icon: Eye,
         color: 'green',
         apiPath: '/api/gov/surveys',
         statuses: ['assigned','in_progress','survey_in_progress'],
     },
     '/gov/boq': {
-        title: 'Bill of Quantities',
-        subtitle: 'Material and labor cost estimates across all active procurement requests.',
+        title: 'Bill of quantities',
+        subtitle: 'Prepare material, labor, and equipment quantities for active projects.',
         icon: ClipboardList,
         color: 'amber',
         apiPath: '/api/gov/boq',
         statuses: [],
     },
     '/gov/estimation': {
-        title: 'Cost Estimation',
-        subtitle: 'Aggregated BoQ cost estimates per procurement request. RA 9184 compliant.',
+        title: 'Cost planning',
+        subtitle: 'Review project quantities and cost estimates before procurement.',
         icon: PackageCheck,
         color: 'violet',
         apiPath: '/api/gov/estimation',
@@ -187,17 +189,27 @@ const PAGE_CONFIG = {
     },
 };
 
+const DELIVERY_VIEWS = [
+    { key: 'projects', label: 'Projects', shortLabel: 'Projects', path: '/gov/projects', icon: Map },
+    { key: 'design', label: 'Design work', shortLabel: 'Design', path: '/gov/design-requests', icon: Ruler, roles: ['design_engineer', 'cad_operator', 'division_chief', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'analysis', label: 'Engineering analysis', shortLabel: 'Analysis', path: '/gov/analysis', icon: FlaskConical, roles: ['design_engineer', 'division_chief', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'surveys', label: 'Field surveys', shortLabel: 'Surveys', path: '/gov/surveys', icon: Eye, roles: ['project_engineer', 'estimator', 'division_chief', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'estimation', label: 'Cost planning', shortLabel: 'Costs', path: '/gov/estimation', icon: Coins, roles: ['estimator', 'project_engineer', 'division_chief', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'quantities', label: 'Bill of quantities', shortLabel: 'Quantities', path: '/gov/boq', icon: ClipboardList, roles: ['estimator', 'project_engineer', 'division_chief', 'admin_officer', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'procurement', label: 'Procurement', shortLabel: 'Procurement', path: '/gov/procurement', icon: PackageCheck, roles: ['estimator', 'project_engineer', 'division_chief', 'admin_officer', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Budget Pipeline Component (Digital Handshake Visualizer)
-const BudgetPipeline = ({ item }) => {
-    if (!item || !['/gov/procurement', '/gov/estimation'].includes(window.location.pathname)) return null;
+const BudgetPipeline = ({ item, path }) => {
+    if (!item || !['/gov/procurement', '/gov/estimation'].includes(path)) return null;
 
     const steps = [
         { id: 'validation', label: 'Validation', icon: CheckCircle2, completed: item.status === 'validated' || item.funding_certified || item.cash_released || item.bac_meeting_date },
-        { id: 'funding', label: 'ObR Posting', icon: Banknote, completed: item.funding_certified, sub: item.obr_number },
-        { id: 'cash', label: 'Cash Availability', icon: Coins, completed: item.cash_released },
-        { id: 'bac', label: 'BAC Scheduled', icon: CalendarRange, completed: !!item.bac_meeting_date, sub: item.bac_meeting_date ? new Date(item.bac_meeting_date).toLocaleDateString() : null },
-        { id: 'ntp', label: 'NTP Issued', icon: Shield, completed: item.ntp_issued }
+        { id: 'funding', label: 'Funding record', icon: Banknote, completed: item.funding_certified, sub: item.obr_number },
+        { id: 'cash', label: 'Cash confirmed', icon: Coins, completed: item.cash_released },
+        { id: 'bac', label: 'BAC meeting', icon: CalendarRange, completed: !!item.bac_meeting_date, sub: item.bac_meeting_date ? new Date(item.bac_meeting_date).toLocaleDateString() : null },
+        { id: 'ntp', label: 'Notice to proceed', icon: Shield, completed: item.ntp_issued }
     ];
 
     const currentStep = steps.findLastIndex(s => s.completed);
@@ -208,9 +220,9 @@ const BudgetPipeline = ({ item }) => {
                 <div>
                     <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
                         <Landmark className="text-indigo-500" size={20} />
-                        Budget Handshake Pipeline
+                        Funding and procurement progress
                     </h3>
-                    <p className="text-xs text-slate-500 font-medium">Real-time status of procurement funding and scheduling (RA 9184).</p>
+                    <p className="text-xs text-slate-500 font-medium">Current funding, cash, BAC schedule, and notice-to-proceed status.</p>
                 </div>
                 <div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-black uppercase tracking-wider">
                     {item.pr_number || 'TR-2026-X'}
@@ -223,7 +235,7 @@ const BudgetPipeline = ({ item }) => {
                 <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: currentStep >= 0 ? `${(currentStep / (steps.length - 1)) * 80 + 10}%` : '0%' }}
-                    className="absolute left-10 top-5 h-0.5 bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000"
+                    className="absolute left-10 top-5 h-0.5 bg-indigo-500 transition-all duration-500"
                 />
 
                 {steps.map((step, idx) => (
@@ -237,8 +249,8 @@ const BudgetPipeline = ({ item }) => {
                         }`}>
                             <step.icon size={18} />
                         </div>
-                        <div className="absolute top-12 whitespace-nowrap flex flex-col items-center">
-                            <span className={`text-[10px] font-black uppercase tracking-wider ${step.completed ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
+                        <div className="absolute top-12 w-24 flex flex-col items-center text-center">
+                            <span className={`text-[10px] leading-3 font-black uppercase tracking-wider ${step.completed ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
                                 {step.label}
                             </span>
                             {step.sub && (
@@ -349,7 +361,7 @@ const ItemRow = ({ item, path, onView }) => {
         const priorityClass = priorityColors[item.priority] || 'bg-slate-500 text-white';
 
         return (
-            <tr onClick={() => onView?.(item)} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer border-l-4 border-l-transparent hover:border-l-orange-500">
+            <tr onClick={() => onView?.(item)} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer border-b border-slate-100 dark:border-slate-800">
                 <td className="p-4 font-mono font-bold text-orange-600 dark:text-orange-400 text-xs">{item.advisory_id || `ADV-${item.id}`}</td>
                 <td className="p-4">
                     <div className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-xs">{item.title}</div>
@@ -570,13 +582,18 @@ const AuditRow = ({ entry, index }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Page Component
 // ─────────────────────────────────────────────────────────────────────────────
-const GovDivisionPage = () => {
+const GovDivisionPage = ({ workspace, activePathOverride }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const [token] = useState(() => localStorage.getItem('pulso_token'));
     const [currentUser] = useState(() => {
         try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
     });
+    const isDeliveryWorkspace = location.pathname === '/gov/delivery';
+    const requestedDeliveryView = new URLSearchParams(location.search).get('view') || 'projects';
+    const availableDeliveryViews = DELIVERY_VIEWS.filter((view) => !view.roles || view.roles.includes(currentUser?.role));
+    const activeDeliveryView = availableDeliveryViews.find((view) => view.key === requestedDeliveryView) || availableDeliveryViews[0] || DELIVERY_VIEWS[0];
+    const activePath = activePathOverride || (isDeliveryWorkspace ? activeDeliveryView.path : location.pathname);
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
@@ -631,11 +648,11 @@ const GovDivisionPage = () => {
 
     // Fetch documents when a project is selected
     useEffect(() => {
-        if (selectedItem && location.pathname === '/gov/projects' && selectedItem.id) {
+        if (selectedItem && activePath === '/gov/projects' && selectedItem.id) {
             fetchProjectDocuments(selectedItem.id);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedItem, location.pathname]);
+    }, [selectedItem, activePath]);
     
     // Sync temporary states for procurement modal
     useEffect(() => {
@@ -905,7 +922,7 @@ const GovDivisionPage = () => {
     const ITEMS_PER_PAGE = 10;
 
 
-    const config = PAGE_CONFIG[location.pathname] || {
+    const config = PAGE_CONFIG[activePath] || {
         title: 'Division Page',
         subtitle: 'City Engineering Office module',
         icon: HardHat,
@@ -916,6 +933,7 @@ const GovDivisionPage = () => {
 
     const colors = colorMap[config.color] || colorMap.slate;
     const Icon = config.icon;
+    const HeaderIcon = isDeliveryWorkspace ? Map : Icon;
 
     useEffect(() => {
         if (!token || !currentUser) { navigate('/gov'); return; }
@@ -950,7 +968,7 @@ const GovDivisionPage = () => {
         }, search ? 400 : 0);
 
         return () => clearTimeout(handler);
-    }, [location.pathname, statusFilter, search, token, config.apiPath]);
+    }, [activePath, statusFilter, search, token, config.apiPath]);
 
     const filtered = items.filter(item => {
         const s = search.toLowerCase();
@@ -998,14 +1016,14 @@ const GovDivisionPage = () => {
     });
 
 
-    const isAuditLog = location.pathname === '/gov/audit-logs';
-    const isTimeline = location.pathname === '/gov/timeline';
-    const isRecords = location.pathname === '/gov/records';
+    const isAuditLog = activePath === '/gov/audit-logs';
+    const isTimeline = activePath === '/gov/timeline';
+    const isRecords = activePath === '/gov/records';
     const isStatic = !config.apiPath;
-    const isSettings = location.pathname === '/gov/settings';
-    const isAgentApp = location.pathname === '/gov/agent-app';
-    const isUsers = location.pathname === '/gov/users';
-    const isAdvisory = location.pathname === '/gov/advisories';
+    const isSettings = activePath === '/gov/settings';
+    const isAgentApp = activePath === '/gov/agent-app';
+    const isUsers = activePath === '/gov/users';
+    const isAdvisory = activePath === '/gov/advisories';
 
     // Pagination — computed after route flags are known
     const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
@@ -1024,7 +1042,7 @@ const GovDivisionPage = () => {
     useEffect(() => { 
         setPage(1); 
         setItems([]);
-    }, [location.pathname, statusFilter, search, token, config.apiPath]);
+    }, [activePath, statusFilter, search, token, config.apiPath]);
 
     const activeFilterCount = [roleFilter, trustFilter].filter(Boolean).length;
 
@@ -1058,11 +1076,15 @@ const GovDivisionPage = () => {
                 <header className="h-16 bg-white dark:bg-slate-900 flex items-center justify-between px-8 shrink-0 border-b border-slate-200 dark:border-slate-800 z-40 shadow-sm">
                     <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${colors.icon}`}>
-                            <Icon size={18} />
+                            <HeaderIcon size={18} />
                         </div>
                         <div>
-                            <h1 className="text-base font-black text-slate-900 dark:text-white leading-tight">{config.title}</h1>
-                            <p className="text-[11px] text-slate-500 hidden sm:block">{config.subtitle}</p>
+                            <h1 className="text-base font-black text-slate-900 dark:text-white leading-tight">
+                                {isDeliveryWorkspace ? 'Projects and delivery' : config.title}
+                            </h1>
+                            <p className="text-[11px] text-slate-500 hidden sm:block">
+                                {isDeliveryWorkspace ? 'Plan, survey, design, cost, and procure in one workspace.' : config.subtitle}
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1085,9 +1107,59 @@ const GovDivisionPage = () => {
                     </div>
                 </header>
 
+                {isDeliveryWorkspace && (
+                    <nav className="delivery-workspace-tabs" aria-label="Projects and delivery functions">
+                        {availableDeliveryViews.map((view) => {
+                            const ViewIcon = view.icon;
+                            const isActive = view.key === activeDeliveryView.key;
+                            return (
+                                <Link
+                                    key={view.key}
+                                    to={`/gov/delivery?view=${view.key}`}
+                                    className={`delivery-workspace-tab${isActive ? ' is-active' : ''}`}
+                                    aria-current={isActive ? 'page' : undefined}
+                                    onClick={() => {
+                                        setSearch('');
+                                        setStatusFilter('');
+                                        setSelectedItem(null);
+                                        setPage(1);
+                                    }}
+                                >
+                                    <ViewIcon size={15} strokeWidth={1.8} aria-hidden="true" />
+                                    <span className="delivery-workspace-tab__long">{view.label}</span>
+                                    <span className="delivery-workspace-tab__short">{view.shortLabel}</span>
+                                </Link>
+                            );
+                        })}
+                    </nav>
+                )}
+
+                {workspace && !isDeliveryWorkspace && (
+                    <GovernmentWorkspaceTabs
+                        workspace={workspace}
+                        currentUser={currentUser}
+                        onViewChange={() => {
+                            setSearch('');
+                            setStatusFilter('');
+                            setSelectedItem(null);
+                            setPage(1);
+                        }}
+                    />
+                )}
+
                 {/* Main Content */}
                 <main className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full mx-auto space-y-4">
+
+                        {isDeliveryWorkspace && (
+                            <section className="delivery-workspace-context" aria-labelledby="delivery-view-heading">
+                                <div>
+                                    <h2 id="delivery-view-heading">{config.title}</h2>
+                                    <p>{config.subtitle}</p>
+                                </div>
+                                <span>{activeDeliveryView.label}</span>
+                            </section>
+                        )}
 
                         {/* Settings Page — Full UI */}
                         {isSettings && (
@@ -1257,8 +1329,8 @@ const GovDivisionPage = () => {
                                             </div>
                                         </div>
 
-                                        <div className="mt-8 p-4 bg-indigo-50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20">
-                                            <h3 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-2">
+                                        <div className="mt-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                            <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-2">
                                                 <ShieldCheck size={14} /> Installation Note
                                             </h3>
                                             <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -1481,7 +1553,7 @@ const GovDivisionPage = () => {
 
 
                                 {/* Budget Pipeline - Only for Procurement/Estimation */}
-                                <BudgetPipeline item={selectedItem || filtered[0]} />
+                                <BudgetPipeline item={selectedItem || filtered[0]} path={activePath} />
 
                                 {/* Table */}
                                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-md shadow-orange-100/60 dark:shadow-orange-900/10 overflow-hidden">
@@ -1654,7 +1726,7 @@ const GovDivisionPage = () => {
                                                                 </td>
                                                             </tr>
                                                         ) :
-                                                        <ItemRow key={item.id} item={item} path={location.pathname} onView={setSelectedItem} />
+                                                        <ItemRow key={item.id} item={item} path={activePath} onView={setSelectedItem} />
                                                     )}
                                                 </tbody>
                                             </table>
@@ -2087,7 +2159,7 @@ const GovDivisionPage = () => {
                             )}
 
                             {/* Document & Advance Panel for Projects */}
-                            {location.pathname === '/gov/projects' && (
+                            {activePath === '/gov/projects' && (
                                 <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Phase Completion Gate</div>
@@ -2243,7 +2315,7 @@ const GovDivisionPage = () => {
                                                 <button 
                                                     onClick={() => handleAdvancePhase(selectedItem.id)}
                                                     disabled={advancingPhase || hasMissingDocs}
-                                                    className={`w-full relative overflow-hidden group text-white py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 mt-2 ${hasMissingDocs ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 disabled:from-indigo-400 disabled:to-indigo-400'}`}
+                                                    className={`w-full relative overflow-hidden group text-white py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 mt-2 ${hasMissingDocs ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed' : 'bg-[#0b4f6c] hover:bg-[#083e55] disabled:bg-slate-400'}`}
                                                 >
                                                     {advancingPhase ? 'Executing Compliance Gates...' : hasMissingDocs ? 'Documents Required' : 'Advance to Next Phase'}
                                                     {advancingPhase ? (
@@ -2264,7 +2336,7 @@ const GovDivisionPage = () => {
                             <button onClick={() => setSelectedItem(null)} className="flex-1 py-2 rounded-xl font-bold text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                 Close
                             </button>
-                            {location.pathname === '/gov/work-orders' && selectedItem?.status === 'open' && (
+                            {activePath === '/gov/work-orders' && selectedItem?.status === 'open' && (
                                 <>
                                     <button onClick={() => { setApprovalAction('approve'); setShowApprovalModal(true); }} className="flex-1 py-2 rounded-xl font-bold text-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors">
                                         Approve
@@ -2274,9 +2346,9 @@ const GovDivisionPage = () => {
                                     </button>
                                 </>
                             )}
-                            {(location.pathname === '/gov/work-orders' || location.pathname === '/gov/projects') && (
-                                <button onClick={() => { setSelectedItem(null); navigate(location.pathname === '/gov/work-orders' ? '/dispatcher' : '/gov/projects'); }} className="flex-1 py-2 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
-                                    {location.pathname === '/gov/work-orders' ? 'Open in Command Center' : 'View Timeline'}
+                            {(activePath === '/gov/work-orders' || activePath === '/gov/projects') && (
+                                <button onClick={() => { setSelectedItem(null); navigate(activePath === '/gov/work-orders' ? '/dispatcher' : '/gov/delivery?view=projects'); }} className="flex-1 py-2 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+                                    {activePath === '/gov/work-orders' ? 'Open in reports and dispatch' : 'Return to projects'}
                                 </button>
                             )}
                         </div>
@@ -2315,14 +2387,14 @@ const GovDivisionPage = () => {
                             )}
 
                             <form id="new-record-form" onSubmit={handleCreateRecord} className="space-y-4 pt-1">
-                                {location.pathname === '/gov/work-orders' && (
+                                {activePath === '/gov/work-orders' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Title</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, title: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Description</label><textarea required onChange={e => setNewRecordForm({...newRecordForm, description: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" rows={3}></textarea></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Type</label><OrangeSelect value={newRecordForm.wo_type || 'standard'} onChange={v => setNewRecordForm({...newRecordForm, wo_type: v})} options={[{value:'standard',label:'Standard'},{value:'preemptive',label:'Preemptive'}]} className="w-full" /></div>
                                     </>
                                 )}
-                                {location.pathname === '/gov/projects' && (
+                                {activePath === '/gov/projects' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Project Title</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, title: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Description</label><textarea required onChange={e => setNewRecordForm({...newRecordForm, description: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" rows={3}></textarea></div>
@@ -2368,20 +2440,20 @@ const GovDivisionPage = () => {
                                         </div>
                                     </>
                                 )}
-                                {location.pathname === '/gov/obo' && (
+                                {activePath === '/gov/obo' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Applicant Name</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, applicant_name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Property Address</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, property_address: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Inspection Type</label><OrangeSelect value={newRecordForm.inspection_type || 'building'} onChange={v => setNewRecordForm({...newRecordForm, inspection_type: v})} options={[{value:'building',label:'Building'},{value:'electrical',label:'Electrical'},{value:'mechanical',label:'Mechanical'}]} className="w-full" /></div>
                                     </>
                                 )}
-                                {location.pathname === '/gov/procurement' && (
+                                {activePath === '/gov/procurement' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Request Title</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, title: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Purpose</label><textarea required onChange={e => setNewRecordForm({...newRecordForm, purpose: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" rows={3}></textarea></div>
                                     </>
                                 )}
-                                {location.pathname === '/gov/advisories' && (
+                                {activePath === '/gov/advisories' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Advisory Title</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, title: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" placeholder="e.g., Scheduled Power Interruption" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Description</label><textarea required onChange={e => setNewRecordForm({...newRecordForm, description: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" rows={3} placeholder="Provide details about the advisory..."></textarea></div>
@@ -2424,7 +2496,7 @@ const GovDivisionPage = () => {
                                         </div>
                                     </>
                                 )}
-                                {!['/gov/work-orders', '/gov/projects', '/gov/obo', '/gov/procurement', '/gov/advisories'].includes(location.pathname) && (
+                                {!['/gov/work-orders', '/gov/projects', '/gov/obo', '/gov/procurement', '/gov/advisories'].includes(activePath) && (
                                     <div className="text-sm text-slate-500 py-4 text-center">Form is not available for this module.</div>
                                 )}
                             </form>
@@ -2433,7 +2505,7 @@ const GovDivisionPage = () => {
                         
                         <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                             <button type="button" onClick={() => setShowNewModal(false)} className="flex-1 py-3 rounded-xl font-bold text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors">Cancel</button>
-                            <button type="submit" form="new-record-form" disabled={isSubmitting || !['/gov/work-orders', '/gov/projects', '/gov/obo', '/gov/procurement', '/gov/advisories'].includes(location.pathname)} className="flex-1 py-3 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50">
+                            <button type="submit" form="new-record-form" disabled={isSubmitting || !['/gov/work-orders', '/gov/projects', '/gov/obo', '/gov/procurement', '/gov/advisories'].includes(activePath)} className="flex-1 py-3 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50">
                                 {isSubmitting ? 'Saving...' : 'Create Record'}
                             </button>
                         </div>

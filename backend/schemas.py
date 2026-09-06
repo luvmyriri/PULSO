@@ -126,6 +126,10 @@ class UserUpdate(BaseModel):
     district_id: Optional[int] = None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Report Schemas (Dual Guest & Registered Support)
+# ─────────────────────────────────────────────────────────────────────────────
+
 class ReportBase(BaseModel):
     category: str
     description: str
@@ -139,6 +143,9 @@ class ReportBase(BaseModel):
     ai_metadata: Optional[Any] = None
     budget: Optional[float] = None
     deployment_date: Optional[datetime] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    submission_source: Optional[str] = "web"
 
     @field_validator('ai_metadata', mode='before')
     @classmethod
@@ -146,21 +153,25 @@ class ReportBase(BaseModel):
         if isinstance(v, str):
             try:
                 return json.loads(v)
-            except:
+            except Exception:
                 return v
         return v
 
+
 class ReportCreate(ReportBase):
-    pass
+    reporter_type: Optional[str] = "registered"
+
 
 class ReportResolutionConfirm(BaseModel):
     rating: int # 1-5
     note: Optional[str] = None
 
+
 class ReportResponse(ReportBase):
     id: int
     ticket_id: str
     resident_id: Optional[int] = None
+    reporter_type: str = "registered"
     status: str
     ai_category: Optional[str] = None
     ai_urgency: Optional[str] = None
@@ -169,11 +180,101 @@ class ReportResponse(ReportBase):
     severity_score: Optional[float] = 0.0
     cluster_id: Optional[int] = None
     reporter_name: Optional[str] = None  # Convenience field for dispatcher/management views
+    contact_verified: bool = False
+    claimed_at: Optional[datetime] = None
+    claimed_by_user_id: Optional[int] = None
+    is_claimed: Optional[bool] = False
+    
+    # Secure token fields (populated only upon initial guest creation response; None otherwise)
+    tracking_token: Optional[str] = None
+    tracking_url: Optional[str] = None
+
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public Tracking & Contextual Claim Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PublicTimelineItem(BaseModel):
+    stage: Optional[str] = None
+    status: str
+    label: Optional[str] = None
+    note: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ReportTrackRequest(BaseModel):
+    ticket_id: str
+    tracking_token: Optional[str] = None
+    tracking_code: Optional[str] = None
+
+    @field_validator('ticket_id')
+    @classmethod
+    def normalize_ticket_id(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError('Ticket ID is required.')
+        return v.strip().upper()
+
+    def get_token(self) -> str:
+        token = self.tracking_token or self.tracking_code
+        if not token or not token.strip():
+            raise ValueError('Tracking token or tracking code is required.')
+        return token.strip().upper()
+
+
+class ReportTrackResponse(BaseModel):
+    ticket_id: str
+    category: str
+    description: Optional[str] = None
+    status: str
+    public_status_label: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    location_barangay: Optional[str] = None
+    location_summary: Optional[str] = None
+    location_string: Optional[str] = None
+    image_url: Optional[str] = None
+    resolution_image_url: Optional[str] = None
+    is_claimed: bool = False
+    public_timeline: List[PublicTimelineItem] = []
+    timeline: Optional[List[PublicTimelineItem]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ReportClaimRequest(BaseModel):
+    tracking_token: Optional[str] = None
+    tracking_code: Optional[str] = None
+
+    def get_token(self) -> str:
+        token = self.tracking_token or self.tracking_code
+        if not token or not token.strip():
+            raise ValueError('Tracking token is required to claim a report.')
+        return token.strip().upper()
+
+
+class ReportClaimResponse(BaseModel):
+    message: str = "Report successfully linked to your account."
+    report: Optional[ReportResponse] = None
+    success: bool = True
+
+
+class UserReportsResponse(BaseModel):
+    total: int
+    filter: str = "all"
+    reports: List[ReportResponse] = []
+    skip: int = 0
+    limit: int = 50
 
 class AdvisoryBase(BaseModel):
     department: str

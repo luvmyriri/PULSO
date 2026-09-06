@@ -120,7 +120,8 @@ class Resident(Base):
     # Relationships
     barangay_ref = relationship("Barangay", foreign_keys=[barangay_id])
     district_ref = relationship("District", foreign_keys=[district_id])
-    reports = relationship("Report", back_populates="reporter")
+    reports = relationship("Report", foreign_keys="[Report.resident_id]", back_populates="reporter")
+    claimed_reports = relationship("Report", foreign_keys="[Report.claimed_by_user_id]", back_populates="claimed_by")
     notifications = relationship("Notification", back_populates="resident")
 
 
@@ -220,8 +221,18 @@ class Report(Base):
     id = Column(Integer, primary_key=True, index=True)
     ticket_id = Column(String, unique=True, index=True, default=generate_ticket_id)
     
-    # Points to Resident table
-    resident_id = Column(Integer, ForeignKey("residents.id"), nullable=True)
+    # Points to Resident table (Explicitly nullable for guest submissions)
+    resident_id = Column(Integer, ForeignKey("residents.id"), nullable=True, index=True)
+
+    # Guest Reporting & Contextual Authentication Extensions (Milestone 1)
+    reporter_type = Column(String(20), default="registered", nullable=False, index=True) # 'guest' | 'registered'
+    tracking_token_hash = Column(String(128), nullable=True, index=True)                 # HMAC-SHA256 hex digest
+    contact_email = Column(String(255), nullable=True, index=True)                       # Optional guest contact email
+    contact_phone = Column(String(50), nullable=True)                                    # Optional guest contact phone
+    contact_verified = Column(Boolean, default=False, nullable=False)                   # OTP verification status
+    claimed_at = Column(DateTime(timezone=True), nullable=True)                         # Timestamp when claimed by resident
+    claimed_by_user_id = Column(Integer, ForeignKey("residents.id"), nullable=True, index=True) # Resident who claimed ticket
+    submission_source = Column(String(30), default="web", nullable=False)               # 'web' | 'mobile' | 'assisted'
 
     category = Column(String, index=True)
     description = Column(String)
@@ -264,16 +275,25 @@ class Report(Base):
         """Social logic to fetch name for schema serialization."""
         if hasattr(self, "_reporter_name_override"):
             return self._reporter_name_override
-        return self.reporter.full_name if self.reporter else "Anonymous Resident"
+        if self.reporter:
+            return self.reporter.full_name
+        if self.reporter_type == "guest":
+            return "Guest Reporter"
+        return "Anonymous Resident"
 
     @reporter_name.setter
     def reporter_name(self, value):
         self._reporter_name_override = value
 
+    @property
+    def is_claimed(self) -> bool:
+        """Helper property indicating whether report is linked to an authenticated resident account."""
+        return self.claimed_by_user_id is not None or (self.reporter_type == "registered" and self.resident_id is not None)
+
     # Relationships
     barangay_ref = relationship("Barangay", foreign_keys=[barangay_id])
-    reporter = relationship("Resident", back_populates="reports")
-    barangay_ref = relationship("Barangay", foreign_keys=[barangay_id])
+    reporter = relationship("Resident", foreign_keys=[resident_id], back_populates="reports")
+    claimed_by = relationship("Resident", foreign_keys=[claimed_by_user_id], back_populates="claimed_reports")
 
 class Advisory(Base):
     __tablename__ = "advisories"

@@ -14,8 +14,96 @@
   --color-light-offset: #f8fafc;
   --color-light: #ffffff;
 
-  --font-sans: "Inter", sans-serif;
-  --font-display: "Oswald", sans-serif;
+  /* Civic Aperture Design Tokens */
+  --color-ink: #132238;
+  --color-canvas: #f7f8fa;
+  --color-canvas-dark: #071a2b;
+  --color-survey-blue: #075985;
+  --color-field-blue: #0b4f6c;
+  --color-field-blue-dark: #82c7d8;
+  --color-resident-action: #c2410c;
+  --color-resident-action-dark: #ff8a3d;
+  --color-pulse: #f97316;
+  --color-resolved: #0f766e;
+  --color-resolved-dark: #66d2c8;
+  --color-warning: #b45309;
+  --color-warning-dark: #fdb022;
+  --color-danger: #b42318;
+  --color-danger-dark: #fda29b;
+  --color-focus: #2563eb;
+  --color-focus-dark: #93c5fd;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Archivo", "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", "Cascadia Code", monospace;
+}
+
+:root {
+  /* Civic Aperture - Morning Field Sheet (Light) */
+  --gov-canvas: #f7f8fa;
+  --gov-surface: #ffffff;
+  --gov-surface-subtle: #f8faf9;
+  --gov-surface-elevated: #ffffff;
+  --gov-text: #132238;
+  --gov-text-secondary: #465d6c;
+  --gov-text-muted: #64748b;
+  --gov-rule: #c9d4d9;
+  --gov-rule-subtle: #e2e8f0;
+  --gov-action: #0b4f6c;
+  --gov-action-strong: #083e55;
+  --gov-action-soft: rgba(11, 79, 108, 0.08);
+  --gov-accent: #0b4f6c;
+  --gov-accent-soft: rgba(11, 79, 108, 0.1);
+  --gov-selection: #e7f3f7;
+  --gov-focus: #2563eb;
+  --gov-resident-action: #c2410c;
+  --gov-pulse: #f97316;
+  --gov-survey-blue: #075985;
+  --gov-resolved: #0f766e;
+  --gov-resolved-soft: rgba(15, 118, 110, 0.1);
+  --gov-warning: #b45309;
+  --gov-warning-soft: rgba(180, 83, 9, 0.1);
+  --gov-danger: #b42318;
+  --gov-danger-soft: rgba(180, 35, 24, 0.1);
+  --gov-critical: #b42318;
+  --gov-critical-soft: rgba(180, 35, 24, 0.1);
+  --gov-card-bg: #ffffff;
+  --gov-surface-hover: #f1f5f9;
+  --gov-sidebar-width: 256px;
+  --gov-sidebar-rail-width: 72px;
+}
+
+.dark {
+  /* Civic Aperture - Night Inspection (Dark) */
+  --gov-canvas: #071a2b;
+  --gov-surface: #0e283e;
+  --gov-surface-subtle: #15364d;
+  --gov-surface-elevated: #15364d;
+  --gov-text: #f4f7f2;
+  --gov-text-secondary: #b9c7cf;
+  --gov-text-muted: #8ea4b2;
+  --gov-rule: #335166;
+  --gov-rule-subtle: #223f54;
+  --gov-action: #82c7d8;
+  --gov-action-strong: #a5d9e5;
+  --gov-action-soft: rgba(130, 199, 216, 0.15);
+  --gov-accent: #82c7d8;
+  --gov-accent-soft: rgba(130, 199, 216, 0.15);
+  --gov-selection: #15364d;
+  --gov-focus: #93c5fd;
+  --gov-resident-action: #ff8a3d;
+  --gov-pulse: #f97316;
+  --gov-survey-blue: #38bdf8;
+  --gov-resolved: #66d2c8;
+  --gov-resolved-soft: rgba(102, 210, 200, 0.15);
+  --gov-warning: #fdb022;
+  --gov-warning-soft: rgba(253, 176, 34, 0.15);
+  --gov-danger: #fda29b;
+  --gov-danger-soft: rgba(253, 162, 155, 0.15);
+  --gov-critical: #fda29b;
+  --gov-critical-soft: rgba(253, 162, 155, 0.15);
+  --gov-card-bg: #0e283e;
+  --gov-surface-hover: #15364d;
 }
 
 @layer base {
@@ -43,6 +131,18 @@
   select,
   label {
     cursor: pointer;
+  }
+
+  /* Universal WCAG 2.2 AA visible focus double-ring pattern */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 3px solid #f97316 !important;
+    outline-offset: 2px !important;
   }
 
   ::selection {

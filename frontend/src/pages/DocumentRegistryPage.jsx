@@ -9,8 +9,9 @@ import {
 import { API_BASE_URL } from '../utils/apiBase';
 import { getToken } from '../utils/auth';
 import GovSidebar from '../components/GovSidebar';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 
-export default function DocumentRegistryPage() {
+export default function DocumentRegistryPage({ workspace }) {
     const location = useLocation();
     const token = getToken();
     const [currentUser] = useState(() => {
@@ -279,6 +280,8 @@ export default function DocumentRegistryPage() {
                     </div>
                 </div>
             </div>
+
+            {workspace && <GovernmentWorkspaceTabs workspace={workspace} currentUser={currentUser} />}
 
             {/* Stats Cards */}
             <div className="grid grid-cols-4 gap-4 p-4">
