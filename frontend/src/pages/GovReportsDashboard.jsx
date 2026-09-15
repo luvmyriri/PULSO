@@ -54,10 +54,8 @@ const INITIAL_REPORTS = [
             'https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=600&q=80'
         ],
         steps: [
-            { id: 'received', label: 'Received', time: '8:12 AM Today', icon: 'mail', completed: true },
-            { id: 'verified', label: 'Verified', time: '8:27 AM Today', icon: 'shield', completed: true, active: true },
-            { id: 'assigned', label: 'Assigned', time: '8:35 AM Today', icon: 'user', completed: true },
-            { id: 'in_progress', label: 'In progress', time: '—', icon: 'wrench', completed: false },
+            { id: 'reported', label: 'Reported', time: '8:12 AM Today', icon: 'mail', completed: true },
+            { id: 'in_progress', label: 'In Progress', time: '—', icon: 'wrench', completed: false, active: true },
             { id: 'resolved', label: 'Resolved', time: '—', icon: 'check', completed: false }
         ],
         activity: [
@@ -112,10 +110,8 @@ const INITIAL_REPORTS = [
             'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80'
         ],
         steps: [
-            { id: 'received', label: 'Received', time: '7:40 AM Today', icon: 'mail', completed: true },
-            { id: 'verified', label: 'Verified', time: '8:05 AM Today', icon: 'shield', completed: true },
-            { id: 'assigned', label: 'Assigned', time: '8:15 AM Today', icon: 'user', completed: true, active: true },
-            { id: 'in_progress', label: 'In progress', time: '—', icon: 'wrench', completed: false },
+            { id: 'reported', label: 'Reported', time: '7:40 AM Today', icon: 'mail', completed: true },
+            { id: 'in_progress', label: 'In Progress', time: '—', icon: 'wrench', completed: false, active: true },
             { id: 'resolved', label: 'Resolved', time: '—', icon: 'check', completed: false }
         ],
         activity: [
@@ -162,10 +158,8 @@ const INITIAL_REPORTS = [
             'https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=600&q=80'
         ],
         steps: [
-            { id: 'received', label: 'Received', time: '6:30 AM Today', icon: 'mail', completed: true },
-            { id: 'verified', label: 'Verified', time: '6:50 AM Today', icon: 'shield', completed: true },
-            { id: 'assigned', label: 'Assigned', time: '7:10 AM Today', icon: 'user', completed: true },
-            { id: 'in_progress', label: 'In progress', time: '7:30 AM Today', icon: 'wrench', completed: true, active: true },
+            { id: 'reported', label: 'Reported', time: '6:30 AM Today', icon: 'mail', completed: true },
+            { id: 'in_progress', label: 'In Progress', time: '7:30 AM Today', icon: 'wrench', completed: true, active: true },
             { id: 'resolved', label: 'Resolved', time: '—', icon: 'check', completed: false }
         ],
         activity: [
@@ -212,10 +206,8 @@ const INITIAL_REPORTS = [
             'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80'
         ],
         steps: [
-            { id: 'received', label: 'Received', time: '5:45 AM Today', icon: 'mail', completed: true, active: true },
-            { id: 'verified', label: 'Verified', time: '—', icon: 'shield', completed: false },
-            { id: 'assigned', label: 'Assigned', time: '—', icon: 'user', completed: false },
-            { id: 'in_progress', label: 'In progress', time: '—', icon: 'wrench', completed: false },
+            { id: 'reported', label: 'Reported', time: '5:45 AM Today', icon: 'mail', completed: true, active: true },
+            { id: 'in_progress', label: 'In Progress', time: '—', icon: 'wrench', completed: false },
             { id: 'resolved', label: 'Resolved', time: '—', icon: 'check', completed: false }
         ],
         activity: [
@@ -254,10 +246,8 @@ const INITIAL_REPORTS = [
             'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&w=600&q=80'
         ],
         steps: [
-            { id: 'received', label: 'Received', time: 'Yesterday 4:00 PM', icon: 'mail', completed: true },
-            { id: 'verified', label: 'Verified', time: 'Yesterday 4:20 PM', icon: 'shield', completed: true },
-            { id: 'assigned', label: 'Assigned', time: 'Yesterday 5:00 PM', icon: 'user', completed: true },
-            { id: 'in_progress', label: 'In progress', time: 'Yesterday 6:00 PM', icon: 'wrench', completed: true },
+            { id: 'reported', label: 'Reported', time: 'Yesterday 4:00 PM', icon: 'mail', completed: true },
+            { id: 'in_progress', label: 'In Progress', time: 'Yesterday 6:00 PM', icon: 'wrench', completed: true },
             { id: 'resolved', label: 'Resolved', time: 'Today 5:30 AM', icon: 'check', completed: true, active: true }
         ],
         activity: [
@@ -412,11 +402,9 @@ export default function GovReportsDashboard() {
                             r.image_url.startsWith('http') ? r.image_url : `${API_BASE_URL}${r.image_url}`
                         ] : INITIAL_REPORTS[0].evidence,
                         steps: [
-                            { id: 'received', label: 'Pending Review', time: 'Today', completed: true },
-                            { id: 'verified', label: 'Verified', time: r.status !== 'unverified' && r.status !== 'pending' ? 'Today' : '—', completed: r.status !== 'unverified' && r.status !== 'pending' },
-                            { id: 'assigned', label: 'Assigned', time: ['assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—', completed: ['assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) },
-                            { id: 'in_progress', label: 'In Progress', time: ['in_progress', 'dispatched', 'resolved'].includes(r.status) ? 'Today' : '—', completed: ['in_progress', 'dispatched', 'resolved'].includes(r.status) },
-                            { id: 'resolved', label: 'Resolved', time: r.status === 'resolved' ? 'Today' : '—', completed: r.status === 'resolved' }
+                            { id: 'reported', label: 'Reported', time: 'Today', completed: true },
+                            { id: 'in_progress', label: 'In Progress', time: ['in_progress', 'dispatched', 'resolved'].includes(r.status) ? 'Today' : '—', completed: ['in_progress', 'dispatched', 'resolved'].includes(r.status), active: ['in_progress', 'dispatched'].includes(r.status) },
+                            { id: 'resolved', label: 'Resolved', time: r.status === 'resolved' ? 'Today' : '—', completed: r.status === 'resolved', active: r.status === 'resolved' }
                         ],
                         activity: INITIAL_REPORTS[0].activity
                     }));
@@ -1306,42 +1294,46 @@ export default function GovReportsDashboard() {
                                         Pulseline status
                                     </div>
 
-                                    <div className="relative flex items-center justify-between w-full px-2 py-1">
-                                        {/* Connector Line Background */}
-                                        <div className="absolute top-4 left-4 right-4 h-[2px] bg-slate-200 dark:bg-slate-700 z-0" />
-
-                                        {/* Steps */}
+                                    <div className="flex items-start w-full px-2 py-1">
                                         {selectedReport.steps.map((step, idx) => (
-                                            <div key={step.id} className="relative z-10 flex flex-col items-center">
-                                                {/* Step Circle */}
-                                                <div
-                                                    className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all ${
-                                                        step.active
-                                                            ? 'bg-[#ff6b00] text-white border-[#ff6b00] ring-4 ring-orange-500/20'
-                                                            : step.completed
-                                                                ? 'bg-[#0a1324] dark:bg-slate-800 text-white border-[#0a1324] dark:border-slate-700'
-                                                                : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-400'
-                                                    }`}
-                                                >
-                                                    {step.completed ? (
-                                                        <Check size={13} strokeWidth={3} />
-                                                    ) : (
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                                                    )}
+                                            <React.Fragment key={step.id}>
+                                                {/* Step Node */}
+                                                <div className="flex flex-col items-center shrink-0">
+                                                    {/* Step Circle */}
+                                                    <div
+                                                        className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all ${
+                                                            step.active
+                                                                ? 'bg-[#ff6b00] text-white border-[#ff6b00] ring-4 ring-orange-500/20'
+                                                                : step.completed
+                                                                    ? 'bg-[#0a1324] dark:bg-slate-800 text-white border-[#0a1324] dark:border-slate-700'
+                                                                    : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-400'
+                                                        }`}
+                                                    >
+                                                        {step.completed ? (
+                                                            <Check size={13} strokeWidth={3} />
+                                                        ) : (
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                                                        )}
+                                                    </div>
+
+                                                    {/* Label */}
+                                                    <span className={`text-[10px] font-heading font-bold mt-1.5 ${
+                                                        step.active ? 'text-[#ff6b00]' : 'text-slate-700 dark:text-slate-300'
+                                                    }`}>
+                                                        {step.label}
+                                                    </span>
+
+                                                    {/* Timestamp */}
+                                                    <span className="text-[9px] font-mono-data text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                                                        {step.time}
+                                                    </span>
                                                 </div>
 
-                                                {/* Label */}
-                                                <span className={`text-[10px] font-heading font-bold mt-1.5 ${
-                                                    step.active ? 'text-[#ff6b00]' : 'text-slate-700 dark:text-slate-300'
-                                                }`}>
-                                                    {step.label}
-                                                </span>
-
-                                                {/* Timestamp */}
-                                                <span className="text-[9px] font-mono-data text-slate-400 dark:text-slate-500 whitespace-nowrap">
-                                                    {step.time}
-                                                </span>
-                                            </div>
+                                                {/* Connector Line between steps */}
+                                                {idx < selectedReport.steps.length - 1 && (
+                                                    <div className="flex-1 h-[2px] mt-[13px] bg-slate-200 dark:bg-slate-700 mx-1" />
+                                                )}
+                                            </React.Fragment>
                                         ))}
                                     </div>
                                 </div>

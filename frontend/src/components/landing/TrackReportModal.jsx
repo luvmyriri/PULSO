@@ -14,7 +14,7 @@ export default function TrackReportModal({ isOpen, onClose }) {
 
     setSearched(true);
     // Mock check for common input formats
-    if (ticketInput.toUpperCase().includes('REP') || ticketInput.length >= 3) {
+    if (ticketInput.toUpperCase().includes('PUL') || ticketInput.toUpperCase().includes('REP') || ticketInput.length >= 3) {
       setResult({
         id: ticketInput.toUpperCase(),
         title: 'Road Surface & Asphalt Restoration',
@@ -77,7 +77,7 @@ export default function TrackReportModal({ isOpen, onClose }) {
                 setTicketInput(e.target.value);
                 setSearched(false);
               }}
-              placeholder="e.g. REP-2026-0842"
+              placeholder="e.g. PUL-2026-0842"
               className="w-full pl-4 pr-10 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-mono-data uppercase text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#ff6b00]"
               autoFocus
             />

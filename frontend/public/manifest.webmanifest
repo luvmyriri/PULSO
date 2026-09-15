@@ -1,0 +1,40 @@
+{
+  "name": "PULSO - Caloocan City Citizen Portal",
+  "short_name": "PULSO",
+  "description": "Report utility hazards and road damage directly to Caloocan City Engineering.",
+  "start_url": "/?mode=standalone",
+  "scope": "/",
+  "id": "/?mode=standalone",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#ffffff",
+  "theme_color": "#ff6b00",
+  "orientation": "portrait-primary",
+  "categories": ["government", "utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

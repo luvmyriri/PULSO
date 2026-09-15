@@ -22,7 +22,7 @@ def seed_data():
             description='Please be advised that road milling and asphalt overlay operations will commence on Phase 1 Main Avenue starting tomorrow, 8:00 PM until 4:00 AM. Expect moderate to heavy traffic. Motorists are advised to take alternate routes.',
             priority='high',
             has_image=True,
-            image_url='https://images.unsplash.com/photo-1584488390885-c5112ea80ece?q=80&w=2070&auto=format&fit=crop',
+            image_url='https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=1200&q=80',
             stats_views=1205,
             stats_affected='2,500 residents'
         ),

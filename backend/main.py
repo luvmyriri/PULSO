@@ -231,6 +231,18 @@ async def root():
 async def health_check():
     return {"status": "healthy", "service": "PULSO Core Engine"}
 
+@app.get("/api/system/network-ip")
+async def get_network_ip():
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        ip = "192.168.0.110"
+    return {"ip": ip}
+
 class AIChatRequest(BaseModel):
     query: str
     context: Optional[str] = None
