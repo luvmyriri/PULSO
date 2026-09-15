@@ -155,7 +155,7 @@ const DISTRICT_OPTIONS = [
 
 const CALOOCAN_INCIDENTS = [
   {
-    id: 'REP-2026-0482',
+    id: 'PUL-2026-0482',
     category: 'water',
     title: 'Main Pipeline Pressure Leak',
     barangay: 'Brgy. 174, Camarin Road cor. Zabarte',
@@ -170,7 +170,7 @@ const CALOOCAN_INCIDENTS = [
     icon: Droplets,
   },
   {
-    id: 'REP-2026-0479',
+    id: 'PUL-2026-0479',
     category: 'power',
     title: '4 Streetlights Non-Operational',
     barangay: 'Brgy. 176, Bagong Silang (Phase 4)',
@@ -185,7 +185,7 @@ const CALOOCAN_INCIDENTS = [
     icon: Zap,
   },
   {
-    id: 'REP-2026-0465',
+    id: 'PUL-2026-0465',
     category: 'road',
     title: 'Asphalt Pavement Restoration Complete',
     barangay: 'Monumento Circle, South Caloocan',
@@ -200,7 +200,7 @@ const CALOOCAN_INCIDENTS = [
     icon: RoadIcon,
   },
   {
-    id: 'REP-2026-0458',
+    id: 'PUL-2026-0458',
     category: 'road',
     title: 'Storm Canal Declogging & Cover Repair',
     barangay: 'Brgy. 168, Deparo Road',
@@ -215,7 +215,7 @@ const CALOOCAN_INCIDENTS = [
     icon: RoadIcon,
   },
   {
-    id: 'REP-2026-0441',
+    id: 'PUL-2026-0441',
     category: 'power',
     title: 'Secondary Cable Insulator Replacement',
     barangay: 'Brgy. 182, Pangarap Village',
@@ -242,9 +242,13 @@ export default function MapPreviewSection() {
   const mapRef = useRef(null);
 
   const isDarkMode =
-    theme === 'dark' ||
-    (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) ||
-    (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+    theme === 'dark'
+      ? true
+      : theme === 'light'
+      ? false
+      : typeof document !== 'undefined'
+      ? document.documentElement.classList.contains('dark')
+      : false;
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -252,20 +256,37 @@ export default function MapPreviewSection() {
     libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
+  const activeStyles = useMemo(
+    () => (isDarkMode ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE),
+    [isDarkMode]
+  );
+
   const mapOptions = useMemo(
     () => ({
-      styles: isDarkMode ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE,
+      styles: activeStyles,
       disableDefaultUI: true,
       zoomControl: false,
       gestureHandling: 'greedy',
       minZoom: 10,
       maxZoom: 18,
     }),
-    [isDarkMode]
+    [activeStyles]
   );
+
+  // Dynamically update Google Map styles whenever theme changes
+  useEffect(() => {
+    if (mapRef.current && window.google && window.google.maps) {
+      mapRef.current.setOptions({
+        styles: activeStyles,
+      });
+    }
+  }, [activeStyles]);
 
   const onMapLoad = useCallback((mapInstance) => {
     mapRef.current = mapInstance;
+    mapInstance.setOptions({
+      styles: isDarkMode ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE,
+    });
     if (window.google && window.google.maps) {
       const bounds = new window.google.maps.LatLngBounds(
         new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
@@ -273,7 +294,7 @@ export default function MapPreviewSection() {
       );
       mapInstance.fitBounds(bounds, { top: 30, right: 30, bottom: 30, left: 30 });
     }
-  }, []);
+  }, [isDarkMode]);
 
   const onMapUnmount = useCallback(() => {
     mapRef.current = null;
@@ -608,34 +629,26 @@ export default function MapPreviewSection() {
               </div>
             )}
 
-            {/* Top Toolbar overlay on map */}
-            <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
-              <div className="pointer-events-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/95 dark:bg-slate-950/85 backdrop-blur-md text-slate-900 dark:text-white text-[10px] sm:text-[11px] font-mono-data border border-slate-200 dark:border-white/10 shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Caloocan GIS Live System</span>
-              </div>
-
-              {/* Map Zoom Controls */}
-              <div className="pointer-events-auto flex items-center gap-1 bg-white/95 dark:bg-slate-950/85 backdrop-blur-md rounded-lg p-1 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white shadow-xs">
-                <button
-                  type="button"
-                  onClick={handleZoomIn}
-                  className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded cursor-pointer transition-colors"
-                  title="Zoom In"
-                  aria-label="Zoom In"
-                >
-                  <ZoomIn size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleZoomOut}
-                  className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded cursor-pointer transition-colors"
-                  title="Zoom Out"
-                  aria-label="Zoom Out"
-                >
-                  <ZoomOut size={14} />
-                </button>
-              </div>
+            {/* Map Zoom Controls */}
+            <div className="absolute top-3 right-3 z-10 pointer-events-auto flex items-center gap-1 bg-white/95 dark:bg-slate-950/85 backdrop-blur-md rounded-lg p-1 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white shadow-xs">
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded cursor-pointer transition-colors"
+                title="Zoom In"
+                aria-label="Zoom In"
+              >
+                <ZoomIn size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded cursor-pointer transition-colors"
+                title="Zoom Out"
+                aria-label="Zoom Out"
+              >
+                <ZoomOut size={14} />
+              </button>
             </div>
 
             {/* Selected Pin Bottom Info Bar */}

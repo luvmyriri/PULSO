@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, PhoneCall, LogIn, UserPlus, LogOut, ArrowRight, User } from 'lucide-react';
+import { Menu, X, PhoneCall, LogIn, UserPlus, LogOut, ArrowRight, User, Smartphone } from 'lucide-react';
 import Branding from '../Branding';
 import ThemeToggle from '../ThemeToggle';
+import PwaModal from './PwaModal';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../../utils/authSession';
 
 /**
@@ -23,6 +24,7 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [pwaModalOpen, setPwaModalOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -118,7 +120,7 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
         aria-label="Official Citizen Navigation"
         className={`w-full transition-all duration-200 ${
           scrolled
-            ? 'bg-white/95 dark:bg-[#070a12]/95 backdrop-blur-md shadow-sm border-b border-slate-200 dark:border-slate-800 py-2 sm:py-2.5'
+            ? 'bg-white/95 dark:bg-[#070a12]/95 backdrop-blur-md shadow-md shadow-slate-900/5 dark:shadow-black/40 border-b border-slate-200/80 dark:border-slate-800 py-2 sm:py-2.5'
             : 'bg-white dark:bg-[#070a12] border-b border-slate-200/90 dark:border-slate-800 py-2.5 sm:py-3.5'
         }`}
       >
@@ -350,6 +352,20 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
                   {item.label}
                 </button>
               ))}
+
+              <button
+                type="button"
+                onClick={() => { setMobileMenuOpen(false); setPwaModalOpen(true); }}
+                className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl text-sm font-bold bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] border border-orange-200/80 dark:border-orange-800/60 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Smartphone size={16} className="text-[#ff6b00]" />
+                  <span>Install Mobile App (PWA)</span>
+                </div>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-[#ff6b00] text-white">
+                  QR Code
+                </span>
+              </button>
             </div>
 
             <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-2">
@@ -441,6 +457,9 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
           </div>
         )}
       </nav>
+
+      {/* Progressive Web App QR Code Modal */}
+      <PwaModal isOpen={pwaModalOpen} onClose={() => setPwaModalOpen(false)} />
     </header>
   );
 }

@@ -438,7 +438,7 @@ export default function Login() {
     return (
         <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden">
 
-            {/* ── Official Government Banner (GOVPH standard) ───────────── */}
+            {/* ── Official Header Ribbon (Without GOVPH) ───────────── */}
             <div className="relative z-30 w-full">
                 <OfficialBanner />
             </div>

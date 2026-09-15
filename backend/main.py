@@ -314,6 +314,22 @@ async def ai_rate_limit_status(
     """
     return gemini_service.get_rate_limit_stats()
 
+@app.get("/api/system/network-ip")
+async def get_network_ip(request: Request):
+    client_host = request.client.host if request.client else None
+    if client_host not in {"127.0.0.1", "::1"}:
+        raise HTTPException(status_code=404, detail="Local network discovery is unavailable.")
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.settimeout(1)
+            probe.connect(("8.8.8.8", 80))
+            ip = probe.getsockname()[0]
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail="Local network discovery is unavailable.") from exc
+
+    return {"ip": ip}
+
 class AIChatRequest(BaseModel):
     query: str
     context: Optional[str] = None

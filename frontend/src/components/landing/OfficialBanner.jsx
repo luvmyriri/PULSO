@@ -50,14 +50,6 @@ export default function OfficialBanner() {
         
         {/* Left: Official Government Affiliation */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* GOVPH Badge */}
-          <span className="inline-flex items-center gap-1 font-heading font-bold text-slate-800 dark:text-white text-[10px] sm:text-[11px] tracking-wider uppercase bg-slate-200/90 dark:bg-slate-800/80 px-1.5 sm:px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse" aria-hidden="true" />
-            GOVPH
-          </span>
-
-          <span className="text-slate-400 dark:text-slate-500" aria-hidden="true">|</span>
-
           <span className="font-semibold text-slate-800 dark:text-slate-200">
             Republic of the Philippines
           </span>

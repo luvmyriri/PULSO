@@ -23,6 +23,14 @@ export const CANONICAL_STATUS_LIST = [
     'Rejected'
 ];
 
+export const REPORT_WORKFLOW_STEPS = [
+    { id: 'received', label: 'Received' },
+    { id: 'verified', label: 'Verified' },
+    { id: 'assigned', label: 'Assigned' },
+    { id: 'in_progress', label: 'In Progress' },
+    { id: 'resolved', label: 'Resolved' }
+];
+
 /**
  * Returns a standardized status descriptor containing:
  * - canonical label
@@ -34,7 +42,7 @@ export const CANONICAL_STATUS_LIST = [
 export const getStatusDescriptor = (rawStatus) => {
     const raw = (rawStatus || '').toString().toLowerCase().trim();
     // Normalize punctuation like underscores, hyphens, periods to single spaces
-    const s = raw.replace(/[_\-\.]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const s = raw.replace(/[-_.]+/g, ' ').replace(/\s+/g, ' ').trim();
 
     // 1. Pending Review (Resident intake stage)
     if (['unverified', 'pending', 'received', 'pending review', 'intake', 'new'].includes(s) || s.startsWith('pend') || s.startsWith('unverif')) {
@@ -49,10 +57,10 @@ export const getStatusDescriptor = (rawStatus) => {
     }
 
     // 2. Verified (Triage & hazard validation stage)
-    if (['verified', 'pending approval', 'awaiting approval', 'validated'].includes(s) || s.includes('awaiting approval')) {
+    if (['verified', 'reviewed', 'under review', 'pending approval', 'awaiting approval', 'validated'].includes(s) || s.includes('awaiting approval')) {
         return {
             key: 'verified',
-            label: 'Verified',
+            label: s === 'reviewed' ? 'Reviewed' : s === 'under review' ? 'Under Review' : 'Verified',
             icon: ShieldCheck,
             badgeClass: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30',
             dotClass: 'bg-sky-500',
@@ -101,8 +109,19 @@ export const getStatusDescriptor = (rawStatus) => {
         };
     }
 
+    if (['cancelled', 'canceled'].includes(s) || s.includes('cancel')) {
+        return {
+            key: 'cancelled',
+            label: 'Cancelled',
+            icon: XCircle,
+            badgeClass: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/30',
+            dotClass: 'bg-slate-500',
+            description: 'Report withdrawn or cancelled; no active work should be implied.'
+        };
+    }
+
     // 6. Rejected (Spam / Invalid / Out of Jurisdiction)
-    if (['rejected', 'cancelled', 'canceled', 'spam', 'invalid', 'declined'].includes(s) || s.includes('reject') || s.includes('cancel')) {
+    if (['rejected', 'spam', 'invalid', 'declined'].includes(s) || s.includes('reject')) {
         return {
             key: 'rejected',
             label: 'Rejected',
@@ -122,6 +141,34 @@ export const getStatusDescriptor = (rawStatus) => {
         dotClass: 'bg-slate-400',
         description: 'Report status in process.'
     };
+};
+
+/**
+ * Returns the canonical workflow position without collapsing verified or
+ * assigned records into the in-progress field-work state.
+ */
+export const getReportWorkflowIndex = (rawStatus) => {
+    const key = getStatusDescriptor(rawStatus).key;
+    const indexByKey = {
+        pending_review: 0,
+        verified: 1,
+        assigned: 2,
+        in_progress: 3,
+        resolved: 4
+    };
+
+    return indexByKey[key] ?? -1;
+};
+
+export const buildReportWorkflowSteps = (rawStatus, timestamps = {}) => {
+    const currentIndex = getReportWorkflowIndex(rawStatus);
+
+    return REPORT_WORKFLOW_STEPS.map((step, index) => ({
+        ...step,
+        time: timestamps[step.id] || '—',
+        completed: index <= currentIndex,
+        active: index === currentIndex
+    }));
 };
 
 /**

@@ -40,7 +40,7 @@ export default function Landing() {
   const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-[#fffbf9] dark:bg-[#070a12] text-slate-900 dark:text-slate-100 font-sans selection:bg-[#ff6b00] selection:text-white transition-colors duration-200 overflow-x-hidden">
+    <div className="min-h-screen w-full flex flex-col bg-[#fffbf9] dark:bg-[#070a12] text-slate-900 dark:text-slate-100 font-sans selection:bg-[#ff6b00] selection:text-white transition-colors duration-200 overflow-x-clip">
       
       {/* Skip to Main Content Link for Keyboard / Screen Reader Accessibility */}
       <a
@@ -50,10 +50,10 @@ export default function Landing() {
         Skip to main content
       </a>
 
-      {/* 1. Official Republic of the Philippines / Caloocan City Header Ribbon */}
+      {/* Official Republic of the Philippines / Caloocan City Header Ribbon */}
       <OfficialBanner />
 
-      {/* 2. Semantic Navigation Header */}
+      {/* Semantic Navigation Header */}
       <CivicNavbar onOpenTrackModal={() => setIsTrackModalOpen(true)} />
 
       {/* 3. Main Landmark Content */}

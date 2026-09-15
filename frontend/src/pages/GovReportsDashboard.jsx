@@ -9,7 +9,7 @@ import {
     MessageSquare, Phone, Flag, Shield, Lock, FileText,
     Share2, Pin, PinOff, Eye, RefreshCw, Layers, ArrowUpRight,
     Bookmark, Map as MapIcon, CheckCircle2, Sparkles, Truck,
-    Briefcase, Navigation
+    Briefcase, Navigation, Menu
 } from 'lucide-react';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -22,7 +22,8 @@ import {
     getReportPlainTitle, 
     getUrgencyDescriptor, 
     CANONICAL_STATUS_LIST,
-    formatTicketId
+    formatTicketId,
+    buildReportWorkflowSteps
 } from '../utils/reportWorkflow';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,13 +54,10 @@ const INITIAL_REPORTS = [
         evidence: [
             'https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=600&q=80'
         ],
-        steps: [
-            { id: 'received', label: 'Received', time: '8:12 AM Today', icon: 'mail', completed: true },
-            { id: 'verified', label: 'Verified', time: '8:27 AM Today', icon: 'shield', completed: true, active: true },
-            { id: 'assigned', label: 'Assigned', time: '8:35 AM Today', icon: 'user', completed: true },
-            { id: 'in_progress', label: 'In progress', time: '—', icon: 'wrench', completed: false },
-            { id: 'resolved', label: 'Resolved', time: '—', icon: 'check', completed: false }
-        ],
+        steps: buildReportWorkflowSteps('Verified', {
+            received: '8:12 AM Today',
+            verified: '8:27 AM Today'
+        }),
         activity: [
             {
                 id: 1,
@@ -111,13 +109,11 @@ const INITIAL_REPORTS = [
         evidence: [
             'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80'
         ],
-        steps: [
-            { id: 'received', label: 'Received', time: '7:40 AM Today', icon: 'mail', completed: true },
-            { id: 'verified', label: 'Verified', time: '8:05 AM Today', icon: 'shield', completed: true },
-            { id: 'assigned', label: 'Assigned', time: '8:15 AM Today', icon: 'user', completed: true, active: true },
-            { id: 'in_progress', label: 'In progress', time: '—', icon: 'wrench', completed: false },
-            { id: 'resolved', label: 'Resolved', time: '—', icon: 'check', completed: false }
-        ],
+        steps: buildReportWorkflowSteps('Assigned', {
+            received: '7:40 AM Today',
+            verified: '8:05 AM Today',
+            assigned: '8:15 AM Today'
+        }),
         activity: [
             {
                 id: 1,
@@ -161,13 +157,12 @@ const INITIAL_REPORTS = [
         evidence: [
             'https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=600&q=80'
         ],
-        steps: [
-            { id: 'received', label: 'Received', time: '6:30 AM Today', icon: 'mail', completed: true },
-            { id: 'verified', label: 'Verified', time: '6:50 AM Today', icon: 'shield', completed: true },
-            { id: 'assigned', label: 'Assigned', time: '7:10 AM Today', icon: 'user', completed: true },
-            { id: 'in_progress', label: 'In progress', time: '7:30 AM Today', icon: 'wrench', completed: true, active: true },
-            { id: 'resolved', label: 'Resolved', time: '—', icon: 'check', completed: false }
-        ],
+        steps: buildReportWorkflowSteps('In progress', {
+            received: '6:30 AM Today',
+            verified: '6:50 AM Today',
+            assigned: '7:10 AM Today',
+            in_progress: '7:30 AM Today'
+        }),
         activity: [
             {
                 id: 1,
@@ -211,13 +206,9 @@ const INITIAL_REPORTS = [
         evidence: [
             'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80'
         ],
-        steps: [
-            { id: 'received', label: 'Received', time: '5:45 AM Today', icon: 'mail', completed: true, active: true },
-            { id: 'verified', label: 'Verified', time: '—', icon: 'shield', completed: false },
-            { id: 'assigned', label: 'Assigned', time: '—', icon: 'user', completed: false },
-            { id: 'in_progress', label: 'In progress', time: '—', icon: 'wrench', completed: false },
-            { id: 'resolved', label: 'Resolved', time: '—', icon: 'check', completed: false }
-        ],
+        steps: buildReportWorkflowSteps('Received', {
+            received: '5:45 AM Today'
+        }),
         activity: [
             {
                 id: 1,
@@ -253,13 +244,13 @@ const INITIAL_REPORTS = [
         evidence: [
             'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&w=600&q=80'
         ],
-        steps: [
-            { id: 'received', label: 'Received', time: 'Yesterday 4:00 PM', icon: 'mail', completed: true },
-            { id: 'verified', label: 'Verified', time: 'Yesterday 4:20 PM', icon: 'shield', completed: true },
-            { id: 'assigned', label: 'Assigned', time: 'Yesterday 5:00 PM', icon: 'user', completed: true },
-            { id: 'in_progress', label: 'In progress', time: 'Yesterday 6:00 PM', icon: 'wrench', completed: true },
-            { id: 'resolved', label: 'Resolved', time: 'Today 5:30 AM', icon: 'check', completed: true, active: true }
-        ],
+        steps: buildReportWorkflowSteps('Resolved', {
+            received: 'Yesterday 4:00 PM',
+            verified: 'Yesterday 4:20 PM',
+            assigned: 'Yesterday 5:00 PM',
+            in_progress: 'Yesterday 6:00 PM',
+            resolved: 'Today 5:30 AM'
+        }),
         activity: [
             {
                 id: 1,
@@ -281,8 +272,8 @@ export default function GovReportsDashboard() {
     const apiHost = window.location.hostname;
     const API_BASE_URL = `http://${apiHost}:33159`;
 
-    // ── Sidebar collapse state ──
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    // ── Narrow-layout navigation state ──
+    const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
     // ── Reports & Selection state ──
     const [reports, setReports] = useState(INITIAL_REPORTS);
@@ -325,6 +316,9 @@ export default function GovReportsDashboard() {
     const [isSubmittingWo, setIsSubmittingWo] = useState(false);
 
     const searchInputRef = useRef(null);
+    const mobileNavRef = useRef(null);
+    const mobileNavTriggerRef = useRef(null);
+    const mainContentRef = useRef(null);
 
     // ── Current User Profile ──
     const [currentUser, setCurrentUser] = useState({
@@ -371,6 +365,49 @@ export default function GovReportsDashboard() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    useEffect(() => {
+        if (!isMobileNavOpen) return undefined;
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        mainContentRef.current?.setAttribute('inert', '');
+        const focusTimer = window.setTimeout(() => {
+            mobileNavRef.current?.querySelector('a, button')?.focus();
+        }, 0);
+
+        const handleMobileNavKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                setIsMobileNavOpen(false);
+                return;
+            }
+
+            if (event.key !== 'Tab' || !mobileNavRef.current) return;
+            const focusable = [...mobileNavRef.current.querySelectorAll(
+                'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )];
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
+
+        window.addEventListener('keydown', handleMobileNavKeyDown);
+        return () => {
+            window.clearTimeout(focusTimer);
+            window.removeEventListener('keydown', handleMobileNavKeyDown);
+            document.body.style.overflow = previousOverflow;
+            mainContentRef.current?.removeAttribute('inert');
+            mobileNavTriggerRef.current?.focus();
+        };
+    }, [isMobileNavOpen]);
+
     // ── Live API Fetch & Real-time Database Synchronization ──
     const fetchLiveReports = async () => {
         const token = getAuthToken();
@@ -411,13 +448,13 @@ export default function GovReportsDashboard() {
                         evidence: r.image_url ? [
                             r.image_url.startsWith('http') ? r.image_url : `${API_BASE_URL}${r.image_url}`
                         ] : INITIAL_REPORTS[0].evidence,
-                        steps: [
-                            { id: 'received', label: 'Pending Review', time: 'Today', completed: true },
-                            { id: 'verified', label: 'Verified', time: r.status !== 'unverified' && r.status !== 'pending' ? 'Today' : '—', completed: r.status !== 'unverified' && r.status !== 'pending' },
-                            { id: 'assigned', label: 'Assigned', time: ['assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—', completed: ['assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) },
-                            { id: 'in_progress', label: 'In Progress', time: ['in_progress', 'dispatched', 'resolved'].includes(r.status) ? 'Today' : '—', completed: ['in_progress', 'dispatched', 'resolved'].includes(r.status) },
-                            { id: 'resolved', label: 'Resolved', time: r.status === 'resolved' ? 'Today' : '—', completed: r.status === 'resolved' }
-                        ],
+                        steps: buildReportWorkflowSteps(r.status, {
+                            received: 'Today',
+                            verified: ['verified', 'reviewed', 'under_review', 'assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—',
+                            assigned: ['assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—',
+                            in_progress: ['dispatched', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—',
+                            resolved: r.status === 'resolved' ? 'Today' : '—'
+                        }),
                         activity: INITIAL_REPORTS[0].activity
                     }));
                     setReports(mapped);
@@ -680,49 +717,94 @@ export default function GovReportsDashboard() {
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-[#f4f6fa] dark:bg-[#070a12] text-slate-900 dark:text-slate-100 font-sans antialiased select-none">
 
+            {isMobileNavOpen && (
+                <div
+                    className="fixed inset-0 z-50 lg:hidden"
+                    id="gov-mobile-navigation"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Government navigation"
+                >
+                    <div
+                        aria-hidden="true"
+                        className="absolute inset-0 bg-slate-950/55"
+                        onClick={() => setIsMobileNavOpen(false)}
+                    />
+                    <div ref={mobileNavRef} className="relative h-full w-60 max-w-[85vw] shadow-2xl">
+                        <button
+                            type="button"
+                            aria-label="Close government navigation"
+                            onClick={() => setIsMobileNavOpen(false)}
+                            className="absolute right-2 top-2 z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        >
+                            <X size={20} />
+                        </button>
+                        <div className="absolute bottom-20 left-3 z-50">
+                            <ThemeToggle size={16} />
+                        </div>
+                        <GovSidebar currentUser={currentUser} />
+                    </div>
+                </div>
+            )}
+
             {/* ═══════════════════════════════════════════════════════════════════
                 1. LEFT SIDEBAR (Dark Navy, Orange Active Accents, Collapsible)
             ══════════════════════════════════════════════════════════════════════ */}
             {/* ═══════════════════════════════════════════════════════════════════
                 1. LEFT SIDEBAR (Shared GovSidebar: 7 Primary Items, PULSO Theme)
             ══════════════════════════════════════════════════════════════════════ */}
-            <GovSidebar currentUser={currentUser} />
+            <div className="hidden lg:block shrink-0">
+                <GovSidebar currentUser={currentUser} />
+            </div>
 
             {/* ═══════════════════════════════════════════════════════════════════
                 MAIN VIEWPORT (Top Bar + Filter Bar + Table + Right Detail Panel)
             ══════════════════════════════════════════════════════════════════════ */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div ref={mainContentRef} className="flex-1 flex flex-col h-full overflow-hidden">
 
                 {/* ─────────────────────────────────────────────────────────────
                     2. TOP BAR & UNIFIED WORKFLOW CONTROLS
                 ────────────────────────────────────────────────────────────── */}
-                <header className="min-h-16 h-auto py-2.5 lg:py-0 lg:h-20 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800/80 px-4 lg:px-6 flex items-center justify-between z-20 gap-3 flex-wrap lg:flex-nowrap">
+                <header className="min-h-16 h-auto py-2.5 lg:py-0 lg:h-20 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800/80 px-3 sm:px-4 lg:px-6 flex items-center justify-between z-20 gap-3 flex-nowrap">
                     {/* Left: Breadcrumbs + Title + Persistent Role Subtitle */}
-                    <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <button
+                            ref={mobileNavTriggerRef}
+                            type="button"
+                            className="lg:hidden inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-xs hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            aria-label="Open government navigation"
+                            aria-expanded={isMobileNavOpen}
+                            aria-controls="gov-mobile-navigation"
+                            onClick={() => setIsMobileNavOpen(true)}
+                        >
+                            <Menu size={20} />
+                        </button>
+                        <div className="min-w-0">
                         <nav className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 font-medium">
-                            <Link to="/gov/my-dashboard" className="hover:text-slate-700 dark:hover:text-slate-300 transition-colors">Home</Link>
-                            <span>/</span>
-                            <span className="text-slate-500 dark:text-slate-400">Reports</span>
-                            <span>/</span>
+                            <Link to="/gov/my-dashboard" className="hidden sm:inline hover:text-slate-700 dark:hover:text-slate-300 transition-colors">Home</Link>
+                            <span className="hidden sm:inline">/</span>
+                            <span className="hidden sm:inline text-slate-500 dark:text-slate-400">Reports</span>
+                            <span className="hidden sm:inline">/</span>
                             <span className="text-slate-800 dark:text-slate-200 font-semibold">Citizen reports</span>
                         </nav>
                         <div className="flex items-center gap-2 mt-1">
                             <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-none">
                                 Citizen reports
                             </h1>
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
+                            <span className="hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
                                 Report Processing & Audit
                             </span>
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden xl:block mt-0.5 truncate max-w-lg">
                             Administrative Triage — Review citizen submissions, verify evidence, inspect audit trails, and manage compliance.
                         </p>
+                        </div>
                     </div>
 
                     {/* Right: Workflow View Switcher + Controls & User cluster */}
                     <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 ml-auto">
                         {/* Segmented View Switcher: Map View ↔ Table View */}
-                        <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                        <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -768,7 +850,7 @@ export default function GovReportsDashboard() {
                         </div>
 
                         {/* Search Input with '/' shortcut */}
-                        <div className="relative w-56 lg:w-64">
+                        <div className="relative hidden md:block w-56 lg:w-64">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                                 <Search size={14} />
                             </div>
@@ -800,7 +882,7 @@ export default function GovReportsDashboard() {
                         </button>
 
                         {/* Theme Toggle */}
-                        <ThemeToggle />
+                        <ThemeToggle className="hidden sm:flex" />
 
                         {/* User Avatar + Role Dropdown */}
                         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-slate-800">
@@ -823,8 +905,8 @@ export default function GovReportsDashboard() {
                 {/* ─────────────────────────────────────────────────────────────
                     3. FILTER BAR
                 ────────────────────────────────────────────────────────────── */}
-                <div className="h-14 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between text-xs font-medium relative z-40 overflow-visible">
-                    <div className="flex items-center gap-2.5 py-2 overflow-visible">
+                <div className="min-h-14 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800 px-3 sm:px-6 flex items-center text-xs font-medium relative z-40 overflow-x-auto overflow-y-visible custom-scrollbar">
+                    <div className="flex min-w-max items-center gap-2.5 py-2 overflow-visible">
                         {/* Saved View */}
                         <OrangeSelect
                             value={savedView}
@@ -936,10 +1018,37 @@ export default function GovReportsDashboard() {
                 {/* ─────────────────────────────────────────────────────────────
                     4. CONTENT WORKSPACE: REPORTS TABLE (LEFT) + DETAIL PANEL (RIGHT)
                 ────────────────────────────────────────────────────────────── */}
-                <div className="flex-1 flex overflow-hidden p-4 lg:p-6 gap-4 lg:gap-6">
+                <div className="flex-1 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden p-3 sm:p-4 lg:p-6 gap-3 sm:gap-4 lg:gap-6">
+
+                    <div
+                        className="xl:hidden flex shrink-0 gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#090e1a] custom-scrollbar"
+                        role="listbox"
+                        aria-label="Citizen reports"
+                    >
+                        {filteredReports.map((report) => {
+                            const isSelected = selectedReport?.id === report.id;
+                            return (
+                                <button
+                                    key={report.id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={isSelected}
+                                    onClick={() => setSelectedReportId(report.id)}
+                                    className={`min-h-14 min-w-44 rounded-lg border px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] ${
+                                        isSelected
+                                            ? 'border-[#0B4F6C] bg-[#0B4F6C]/10 text-[#0B4F6C] dark:border-[#82C7D8] dark:bg-[#82C7D8]/10 dark:text-[#82C7D8]'
+                                            : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200'
+                                    }`}
+                                >
+                                    <span className="block font-mono-data text-[11px] font-bold">{report.ticket_id}</span>
+                                    <span className="mt-0.5 block truncate text-xs font-semibold">{report.issue}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
 
                     {/* ── LEFT: REPORTS TABLE ────────────────────────────────── */}
-                    <div className="flex-1 flex flex-col bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden min-w-0">
+                    <div className="hidden xl:flex flex-1 flex-col bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden min-w-0">
 
                         {/* Table Header & Rows Container */}
                         <div className="flex-1 overflow-auto custom-scrollbar">
@@ -1139,7 +1248,7 @@ export default function GovReportsDashboard() {
 
                     {/* ── RIGHT: DETAIL PANEL (Persistent) ───────────────────── */}
                     {selectedReport && (
-                        <aside className="w-80 lg:w-96 xl:w-[420px] shrink-0 bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col overflow-hidden">
+                        <aside className="w-full xl:w-[420px] min-h-[620px] xl:min-h-0 shrink-0 bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col overflow-hidden">
 
                             {/* Detail Panel Header */}
                             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
@@ -1306,42 +1415,46 @@ export default function GovReportsDashboard() {
                                         Pulseline status
                                     </div>
 
-                                    <div className="relative flex items-center justify-between w-full px-2 py-1">
-                                        {/* Connector Line Background */}
-                                        <div className="absolute top-4 left-4 right-4 h-[2px] bg-slate-200 dark:bg-slate-700 z-0" />
-
-                                        {/* Steps */}
+                                    <div className="flex items-start w-full px-2 py-1">
                                         {selectedReport.steps.map((step, idx) => (
-                                            <div key={step.id} className="relative z-10 flex flex-col items-center">
-                                                {/* Step Circle */}
-                                                <div
-                                                    className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all ${
-                                                        step.active
-                                                            ? 'bg-[#ff6b00] text-white border-[#ff6b00] ring-4 ring-orange-500/20'
-                                                            : step.completed
-                                                                ? 'bg-[#0a1324] dark:bg-slate-800 text-white border-[#0a1324] dark:border-slate-700'
-                                                                : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-400'
-                                                    }`}
-                                                >
-                                                    {step.completed ? (
-                                                        <Check size={13} strokeWidth={3} />
-                                                    ) : (
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                                                    )}
+                                            <React.Fragment key={step.id}>
+                                                {/* Step Node */}
+                                                <div className="flex min-w-0 flex-col items-center">
+                                                    {/* Step Circle */}
+                                                    <div
+                                                        className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all ${
+                                                            step.active
+                                                                ? 'bg-[#ff6b00] text-white border-[#ff6b00] ring-4 ring-orange-500/20'
+                                                                : step.completed
+                                                                    ? 'bg-[#0a1324] dark:bg-slate-800 text-white border-[#0a1324] dark:border-slate-700'
+                                                                    : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-400'
+                                                        }`}
+                                                    >
+                                                        {step.completed ? (
+                                                            <Check size={13} strokeWidth={3} />
+                                                        ) : (
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                                                        )}
+                                                    </div>
+
+                                                    {/* Label */}
+                                                    <span className={`text-center text-[9px] sm:text-[10px] leading-tight font-heading font-bold mt-1.5 ${
+                                                        step.active ? 'text-[#ff6b00]' : 'text-slate-700 dark:text-slate-300'
+                                                    }`}>
+                                                        {step.label}
+                                                    </span>
+
+                                                    {/* Timestamp */}
+                                                    <span className="hidden sm:block text-[9px] font-mono-data text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                                                        {step.time}
+                                                    </span>
                                                 </div>
 
-                                                {/* Label */}
-                                                <span className={`text-[10px] font-heading font-bold mt-1.5 ${
-                                                    step.active ? 'text-[#ff6b00]' : 'text-slate-700 dark:text-slate-300'
-                                                }`}>
-                                                    {step.label}
-                                                </span>
-
-                                                {/* Timestamp */}
-                                                <span className="text-[9px] font-mono-data text-slate-400 dark:text-slate-500 whitespace-nowrap">
-                                                    {step.time}
-                                                </span>
-                                            </div>
+                                                {/* Connector Line between steps */}
+                                                {idx < selectedReport.steps.length - 1 && (
+                                                    <div className="flex-1 h-[2px] mt-[13px] bg-slate-200 dark:bg-slate-700 mx-1" />
+                                                )}
+                                            </React.Fragment>
                                         ))}
                                     </div>
                                 </div>
@@ -1399,7 +1512,7 @@ export default function GovReportsDashboard() {
                             </div>
 
                             {/* ── Detail Panel Action Bar (Bottom) ── */}
-                            <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 bg-slate-50/50 dark:bg-slate-900/50">
+                            <div className="grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50/50 p-3.5 sm:flex sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900/50">
                                 {/* 1. Request Changes (Outline) */}
                                 <button
                                     type="button"
@@ -1411,7 +1524,7 @@ export default function GovReportsDashboard() {
                                         confirmButtonText: 'Submit Request',
                                         confirmButtonColor: '#ff6b00'
                                     })}
-                                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-heading font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                    className="order-2 inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-heading text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] sm:order-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                                 >
                                     <MessageSquare size={14} />
                                     <span>Request changes</span>
@@ -1421,7 +1534,7 @@ export default function GovReportsDashboard() {
                                 <button
                                     type="button"
                                     onClick={handleOpenWorkOrderModal}
-                                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-xs shadow-md shadow-orange-500/20 transition-all cursor-pointer"
+                                    className="order-1 col-span-2 inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#0B4F6C] px-3 py-2.5 font-heading text-xs font-bold text-white shadow-md shadow-sky-900/15 transition-all hover:bg-[#083F57] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] active:scale-[0.98] sm:order-none dark:bg-[#82C7D8] dark:text-[#071A2B] dark:hover:bg-[#A6DBE7]"
                                 >
                                     <Wrench size={14} />
                                     <span>Assign work order</span>
@@ -1431,7 +1544,7 @@ export default function GovReportsDashboard() {
                                 <button
                                     type="button"
                                     onClick={handleEscalateReport}
-                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-red-300 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-heading font-bold text-xs hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors cursor-pointer"
+                                    className="order-3 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-300 bg-red-50/50 px-3 py-2.5 font-heading text-xs font-bold text-red-600 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] sm:order-none dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-900/40"
                                 >
                                     <Flag size={14} />
                                     <span>Escalate</span>
