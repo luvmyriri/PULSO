@@ -1,0 +1,212 @@
+[
+  {
+    "number": "1.1",
+    "id": "RES-US-002",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "1.2",
+    "id": "RES-US-003",
+    "criteria": 5,
+    "figures": 1
+  },
+  {
+    "number": "1.3",
+    "id": "RES-US-004",
+    "criteria": 5,
+    "figures": 1
+  },
+  {
+    "number": "1.4",
+    "id": "RES-US-005",
+    "criteria": 6,
+    "figures": 2
+  },
+  {
+    "number": "1.5",
+    "id": "RES-US-006",
+    "criteria": 5,
+    "figures": 1
+  },
+  {
+    "number": "1.6",
+    "id": "RES-US-007",
+    "criteria": 5,
+    "figures": 3
+  },
+  {
+    "number": "1.7",
+    "id": "RES-US-008",
+    "criteria": 5,
+    "figures": 1
+  },
+  {
+    "number": "1.8",
+    "id": "GOV-US-001",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "2.1",
+    "id": "RES-US-001",
+    "criteria": 4,
+    "figures": 2
+  },
+  {
+    "number": "2.2",
+    "id": "RES-US-009",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "2.3",
+    "id": "RES-US-010",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "2.4",
+    "id": "RES-US-011",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "2.5",
+    "id": "RES-US-012",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "2.6",
+    "id": "RES-US-017",
+    "criteria": 4,
+    "figures": 1
+  },
+  {
+    "number": "3.1",
+    "id": "RES-US-013",
+    "criteria": 5,
+    "figures": 4
+  },
+  {
+    "number": "3.2",
+    "id": "RES-US-014",
+    "criteria": 4,
+    "figures": 1
+  },
+  {
+    "number": "3.3",
+    "id": "RES-US-015",
+    "criteria": 5,
+    "figures": 1
+  },
+  {
+    "number": "3.4",
+    "id": "RES-US-016",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "3.5",
+    "id": "GOV-US-012",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "4.1",
+    "id": "GOV-US-002",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "4.2",
+    "id": "GOV-US-003",
+    "criteria": 5,
+    "figures": 3
+  },
+  {
+    "number": "4.3",
+    "id": "GOV-US-004",
+    "criteria": 5,
+    "figures": 3
+  },
+  {
+    "number": "4.4",
+    "id": "GOV-US-005",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "4.5",
+    "id": "GOV-US-006",
+    "criteria": 5,
+    "figures": 1
+  },
+  {
+    "number": "5.1",
+    "id": "GOV-US-007",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "5.2",
+    "id": "GOV-US-008",
+    "criteria": 5,
+    "figures": 3
+  },
+  {
+    "number": "5.3",
+    "id": "GOV-US-009",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "6.1",
+    "id": "GOV-US-010",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "6.2",
+    "id": "GOV-US-011",
+    "criteria": 5,
+    "figures": 3
+  },
+  {
+    "number": "6.3",
+    "id": "GOV-US-013",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "6.4",
+    "id": "GOV-US-014",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "6.5",
+    "id": "GOV-US-015",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "6.6",
+    "id": "GOV-US-016",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "7.1",
+    "id": "RES-US-018",
+    "criteria": 5,
+    "figures": 2
+  },
+  {
+    "number": "7.2",
+    "id": "GOV-US-017",
+    "criteria": 5,
+    "figures": 3
+  }
+]

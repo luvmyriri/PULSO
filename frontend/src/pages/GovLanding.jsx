@@ -17,6 +17,7 @@ import { API_BASE_URL } from '../utils/apiBase';
 import { useInteractionHarden } from '../hooks/useInteractionHarden';
 
 export default function GovLanding() {
+    const navigate = useNavigate();
     const captchaPaused = import.meta.env.DEV;
     const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
     const [email, setEmail] = useState('');
