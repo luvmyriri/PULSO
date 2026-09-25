@@ -34,7 +34,7 @@ def verify_ai_functionality():
         admin_token = resp2.json()["access_token"] if resp2.status_code == 200 else gov_token
         admin_headers = {"Authorization": f"Bearer {admin_token}"}
         print("✅ Admin Auth OK.")
-    except:
+    except Exception:
         admin_headers = gov_headers
 
     # ── 2. OMNI-ASSISTANT ───────────────────────────────────────────────

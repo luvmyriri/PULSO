@@ -1,0 +1,151 @@
+.delivery-workspace-tabs {
+    display: flex;
+    min-width: 0;
+    min-height: 50px;
+    flex: 0 0 50px;
+    align-items: stretch;
+    gap: 2px;
+    overflow-x: auto;
+    padding: 0 22px;
+    color: var(--gov-text-secondary, #465d6c);
+    background: var(--gov-surface, #fff);
+    border-bottom: 1px solid var(--gov-rule, #c9d4d9);
+    scrollbar-width: thin;
+    scrollbar-color: var(--gov-rule, #c9d4d9) transparent;
+}
+
+.delivery-workspace-tab {
+    position: relative;
+    display: inline-flex;
+    min-width: max-content;
+    min-height: 49px;
+    align-items: center;
+    gap: 7px;
+    padding: 0 12px;
+    color: inherit;
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 16px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.delivery-workspace-tab::after {
+    position: absolute;
+    right: 10px;
+    bottom: -1px;
+    left: 10px;
+    height: 2px;
+    background: transparent;
+    content: "";
+}
+
+.delivery-workspace-tab:hover {
+    color: var(--gov-text, #0c2436);
+    background: var(--gov-surface-subtle, #f8faf9);
+}
+
+.delivery-workspace-tab.is-active {
+    color: var(--gov-action-strong, #083e55);
+}
+
+.delivery-workspace-tab.is-active::after {
+    background: var(--gov-action, #0b4f6c);
+}
+
+.delivery-workspace-tab__short {
+    display: none;
+}
+
+.delivery-workspace-context {
+    display: flex;
+    min-height: 64px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 6px 2px 14px;
+    border-bottom: 1px solid var(--gov-rule, #c9d4d9);
+}
+
+.delivery-workspace-context h2 {
+    margin: 0;
+    color: var(--gov-text, #0c2436);
+    font-family: Archivo, Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 19px;
+    font-weight: 740;
+    letter-spacing: -0.02em;
+    line-height: 25px;
+}
+
+.delivery-workspace-context p {
+    max-width: 72ch;
+    margin: 3px 0 0;
+    color: var(--gov-text-secondary, #465d6c);
+    font-size: 11px;
+    line-height: 16px;
+}
+
+.delivery-workspace-context > span {
+    color: var(--gov-action-strong, #083e55);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.delivery-workspace-tab:focus-visible {
+    z-index: 1;
+    outline: 3px solid var(--gov-focus, #2563eb);
+    outline-offset: -3px;
+}
+
+@media (max-width: 1180px) {
+    .delivery-workspace-tabs {
+        padding-right: 10px;
+        padding-left: 10px;
+    }
+
+    .delivery-workspace-tab {
+        padding-right: 10px;
+        padding-left: 10px;
+    }
+
+    .delivery-workspace-tab__long {
+        display: none;
+    }
+
+    .delivery-workspace-tab__short {
+        display: inline;
+    }
+}
+
+@media (max-width: 767px) {
+    .delivery-workspace-tabs {
+        min-height: 48px;
+        flex-basis: 48px;
+        padding-left: 54px;
+        scroll-padding-left: 54px;
+    }
+
+    .delivery-workspace-tab {
+        min-height: 47px;
+        padding-right: 9px;
+        padding-left: 9px;
+    }
+
+    .delivery-workspace-context {
+        align-items: flex-start;
+        padding-top: 0;
+    }
+
+    .delivery-workspace-context > span {
+        display: none;
+    }
+}
+
+@media (forced-colors: active) {
+    .delivery-workspace-tab.is-active::after {
+        background: Highlight;
+    }
+}

@@ -54,6 +54,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import Swal from 'sweetalert2';
 import { CANONICAL_STATUS_LIST, getStatusDescriptor, formatTicketId } from '../utils/reportWorkflow';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
+import { API_BASE_URL } from '../utils/apiBase';
 
 import {
     NORTH_CALOOCAN_PATH,
@@ -311,10 +312,6 @@ const DispatcherDashboard = () => {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const queryReportId = searchParams.get('reportId');
-
-    // Standardized API Base URL for all backend interactions
-    const apiHost = window.location.hostname;
-    const API_BASE_URL = `http://${apiHost}:33159`;
 
     const [token, setToken] = useState(() => getAuthToken());
     const [currentUser, setCurrentUser] = useState(() => getAuthUser());
@@ -954,7 +951,7 @@ const DispatcherDashboard = () => {
             }
         } catch (error) {
             console.error("Critical Deletion Error:", error);
-            const msg = "Network error: The PULSO backend is unreachable. Please verify the server is running on port 33159.";
+            const msg = "Network error: The PULSO backend is unreachable. Please verify the server is running.";
             setDeleteError(msg);
             setNotification({ type: 'error', message: msg });
         } finally {
@@ -3146,13 +3143,13 @@ const DispatcherDashboard = () => {
                                                 <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 relative group">
                                                     {selectedReport.image_url ? (
                                                         <button 
-                                                            onClick={() => setZoomedImage(`http://localhost:33159${selectedReport.image_url}`)}
+                                                            onClick={() => setZoomedImage(`${API_BASE_URL}${selectedReport.image_url}`)}
                                                             className="w-full h-full cursor-zoom-in"
                                                             title="Click to Zoom Photo"
                                                             aria-label="Click to Zoom Photo"
                                                         >
                                                             <img 
-                                                                src={`http://localhost:33159${selectedReport.image_url}`} 
+                                                                src={`${API_BASE_URL}${selectedReport.image_url}`} 
                                                                 alt="Citizen report photographic evidence" 
                                                                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" 
                                                             />

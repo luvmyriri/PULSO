@@ -23,9 +23,10 @@ from typing import List, Tuple
 class PassportParser(BaseIDParser):
     ID_TYPE = 'passport'
 
-    # MRZ line patterns (relaxed for OCR noise)
-    _MRZ1 = re.compile(r'P<PHL([A-Z<]+?)<<([A-Z<]+)')
-    _MRZ2 = re.compile(r'([A-Z0-9<]{9})[0-9]PHL(\d{6})[0-9]([MF])(\d{6})')
+    # MRZ line patterns — tolerant of OCR noise where '<' is read as space, dash, or underscore
+    _FILL = r'[<\s\-_]'  # filler character variants OCR commonly produces
+    _MRZ1 = re.compile(r'P[<\s]PHL([A-Z<\s]+?)[<\s]{2}([A-Z<\s]+)', re.IGNORECASE)
+    _MRZ2 = re.compile(r'([A-Z0-9<\s\-]{9})[0-9]PHL(\d{6})[0-9]([MF<])(\d{6})', re.IGNORECASE)
 
     def extract(self, text: str, lines: List[str]) -> ParsedIDData:
         upper = text.upper()

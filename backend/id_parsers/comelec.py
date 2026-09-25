@@ -53,11 +53,8 @@ class COMLECParser(BaseIDParser):
         if precinct_match:
             result['precinct_no'] = precinct_match.group(1)
 
-        # 4. DOB: MM/DD/YYYY
-        dob_iso = self._extract_dob(upper)
-        if dob_iso:
-             y, m, d = dob_iso.split('-')
-             result['dob'] = f"{m}/{d}/{y}"
+        # 4. DOB: ISO YYYY-MM-DD
+        result['dob'] = self._extract_dob(upper)
 
         result['sex']      = self._extract_sex(upper)
         

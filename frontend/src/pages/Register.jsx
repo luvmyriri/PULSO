@@ -10,6 +10,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import IDCameraModal from '../components/IDCameraModal';
 import LegalModal from '../components/LegalModal';
 import { clearAuthSession } from '../utils/authSession';
+import { API_BASE_URL } from '../utils/apiBase';
 
 // ---------------------------------------------------------------------------
 // OCR Address Parser
@@ -719,7 +720,7 @@ export default function Register() {
             fd.append('idFront', formData.idFront);
             if (formData.idBack) fd.append('idBack', formData.idBack);
 
-            const res = await axios.post('http://localhost:33159/api/verify-residency', fd, {
+            const res = await axios.post(`${API_BASE_URL}/api/verify-residency`, fd, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
 
@@ -845,7 +846,7 @@ export default function Register() {
         setVerifying(true);
         setVerifyError('');
         try {
-            await axios.post('http://localhost:33159/api/auth/verify-registration', {
+            await axios.post(`${API_BASE_URL}/api/auth/verify-registration`, {
                 email: formData.email,
                 code: code
             });
@@ -863,7 +864,7 @@ export default function Register() {
         setVerifyError('');
         setVerifySuccess('');
         try {
-            await axios.post('http://localhost:33159/api/auth/resend-code', {
+            await axios.post(`${API_BASE_URL}/api/auth/resend-code`, {
                 email: formData.email,
                 code: '000000' // Placeholder for validation
             });
@@ -898,7 +899,7 @@ export default function Register() {
                 address: [...addressParts, formData.barangay, formData.municipality].filter(Boolean).join(', '),
                 barangay: formData.barangay,
             };
-            const res = await axios.post('http://localhost:33159/api/auth/register', payload);
+            const res = await axios.post(`${API_BASE_URL}/api/auth/register`, payload);
             if (res.status === 200 || res.status === 201) {
                 clearAuthSession();
                 setResendTimer(60);

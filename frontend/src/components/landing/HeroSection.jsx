@@ -70,8 +70,8 @@ export default function HeroSection({ onOpenTrackModal }) {
             <div className="w-full max-w-[395px]">
               <div className="flex flex-row flex-wrap items-center gap-2.5 mb-3.5">
                 <a
-                  href="/register"
-                  className="inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-xs sm:text-sm tracking-wide transition-all shadow-xs hover:shadow cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
+                  href="/report"
+                  className="inline-flex min-h-11 items-center justify-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-xs sm:text-sm tracking-wide transition-all shadow-xs hover:shadow cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
                 >
                   <span>Report an Issue Now</span>
                   <ArrowRight size={15} />
@@ -80,7 +80,7 @@ export default function HeroSection({ onOpenTrackModal }) {
                 <button
                   type="button"
                   onClick={onOpenTrackModal}
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-xs sm:text-sm border border-slate-300 dark:border-slate-700 transition-all shadow-2xs hover:border-[#ff6b00]/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                  className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-xs sm:text-sm border border-slate-300 dark:border-slate-700 transition-all shadow-2xs hover:border-[#ff6b00]/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                 >
                   <Search size={14} className="text-slate-500 dark:text-slate-400" />
                   <span>Track My Report</span>
@@ -106,10 +106,10 @@ export default function HeroSection({ onOpenTrackModal }) {
                 <button
                   type="button"
                   onClick={() => setPwaModalOpen(true)}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white font-bold text-xs shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
+                  className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white font-bold text-xs shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
                 >
                   <Smartphone size={13} />
-                  <span>Scan QR Code</span>
+                  <span>Install app</span>
                 </button>
               </div>
             </div>

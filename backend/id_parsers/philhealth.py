@@ -47,11 +47,8 @@ class PhilHealthParser(BaseIDParser):
                 result['member_type'] = ul.title()
                 break
 
-        # 4. DOB: MM/DD/YYYY
-        dob_iso = self._extract_dob(upper)
-        if dob_iso:
-             y, m, d = dob_iso.split('-')
-             result['dob'] = f"{m}/{d}/{y}"
+        # 4. DOB: ISO YYYY-MM-DD
+        result['dob'] = self._extract_dob(upper)
 
         result['sex']      = self._extract_sex(upper)
         result['address']  = self._extract_address(lines, upper)

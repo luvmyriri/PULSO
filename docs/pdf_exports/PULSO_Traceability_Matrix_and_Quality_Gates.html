@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audit & Implementation Traceability Matrix</title>
+    <style>
+        
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@page {
+    size: A4 portrait;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-center {
+        content: counter(page);
+    }
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.55;
+    color: #1e293b;
+    background-color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+/* Document Header & Cover */
+.doc-cover {
+    page-break-after: always;
+    padding: 40px 20px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 90vh;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 30px;
+}
+
+.pulse-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 2px solid #f97316;
+    border-radius: 10px;
+    color: #f97316;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-title {
+    font-size: 16pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #0f172a;
+    text-transform: uppercase;
+}
+
+.brand-sub {
+    font-size: 8.5pt;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.cover-main {
+    margin: 40px 0;
+}
+
+.cover-badge {
+    display: inline-block;
+    padding: 5px 14px;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.cover-title {
+    font-size: 26pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+}
+
+.cover-subtitle {
+    font-size: 12pt;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.6;
+    max-width: 650px;
+    margin-bottom: 30px;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 24px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.meta-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+}
+
+.meta-value {
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.cover-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8pt;
+    color: #64748b;
+}
+
+/* Headings */
+h1 {
+    font-size: 17pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-top: 28px;
+    margin-bottom: 14px;
+    letter-spacing: -0.3px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h2 {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    border-left: 3.5px solid #f97316;
+    padding-left: 10px;
+    letter-spacing: -0.2px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h4, h5, h6 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #475569;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+p {
+    margin: 0 0 10px 0;
+}
+
+/* Lists */
+ul, ol {
+    margin: 0 0 12px 0;
+    padding-left: 22px;
+}
+
+li {
+    margin-bottom: 4px;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 18px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+thead {
+    display: table-header-group;
+}
+
+tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid #1e293b;
+    letter-spacing: 0.2px;
+}
+
+td {
+    padding: 7px 10px;
+    border: 1px solid #e2e8f0;
+    vertical-align: top;
+    color: #334155;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+tbody tr:hover {
+    background-color: #f1f5f9;
+}
+
+/* Blockquotes / Callouts */
+blockquote {
+    margin: 14px 0;
+    padding: 10px 16px;
+    background-color: #f8fafc;
+    border-left: 4px solid #3b82f6;
+    border-radius: 0 6px 6px 0;
+    color: #334155;
+    font-size: 9pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* Code & Preformatted */
+code {
+    font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+    font-size: 8.2pt;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+pre {
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 8pt;
+    line-height: 1.45;
+    margin: 12px 0 16px 0;
+    border: 1px solid #334155;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+    border: none;
+    font-size: inherit;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.badge-implemented {
+    background-color: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.badge-proposed {
+    background-color: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
+.badge-broken {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.badge-risk {
+    background-color: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.badge-gap {
+    background-color: #faf5ff;
+    color: #6b21a8;
+    border: 1px solid #e9d5ff;
+}
+
+.badge-decision {
+    background-color: #fff1f2;
+    color: #9f1239;
+    border: 1px solid #fecdd3;
+}
+
+.badge-backend {
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+
+.badge-live {
+    background-color: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.badge-public {
+    background-color: #f0f9ff;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+}
+
+.badge-bearer {
+    background-color: #f5f3ff;
+    color: #5b21b6;
+    border: 1px solid #ddd6fe;
+}
+
+.badge-owner {
+    background-color: #fdf2f8;
+    color: #9d174d;
+    border: 1px solid #fbcfe8;
+}
+
+.badge-gov {
+    background-color: #f0fdfa;
+    color: #115e59;
+    border: 1px solid #99f6e4;
+}
+
+.badge-capability {
+    background-color: #fff7ed;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+}
+
+.badge-p0 {
+    background-color: #dc2626;
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.badge-p1 {
+    background-color: #ea580c;
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.badge-p2 {
+    background-color: #64748b;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* Print Utilities */
+.page-break {
+    page-break-before: always;
+}
+
+.no-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 20px 0;
+}
+
+/* User Story Cards */
+.story-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.story-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.story-id {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+    </style>
+</head>
+<body>
+    
+    <div class="doc-cover">
+        <div class="cover-brand">
+            <div class="pulse-logo">P</div>
+            <div class="brand-text">
+                <span class="brand-title">PULSO PLATFORM</span>
+                <span class="brand-sub">Civic Operations & Engineering</span>
+            </div>
+        </div>
+        <div class="cover-main">
+            <span class="cover-badge">TRACEABILITY & DEFECT REGISTER</span>
+            <h1 class="cover-title">Audit & Implementation Traceability Matrix</h1>
+            <div class="cover-subtitle">P0-P2 defect finding registry, architectural risk mappings, branch routing, and accountable QA gate owners.</div>
+            <div class="meta-grid">
+                
+        <div class="meta-item">
+            <span class="meta-label">Status</span>
+            <span class="meta-value">Working control document</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Version</span>
+            <span class="meta-value">0.2</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Last validated</span>
+            <span class="meta-value">23 August 2026</span>
+        </div>
+        
+            </div>
+        </div>
+        <div class="cover-footer">
+            <span>City Government of Caloocan &bull; Engineering & Resident Operations</span>
+            <span>CONFIDENTIAL &bull; STYLIZED QA SPECIFICATION</span>
+        </div>
+    </div>
+    
+    <div class="content-body">
+        <p>This matrix prevents the rework from becoming an untraceable visual exercise. Line references describe the audited baseline and will move as implementation begins. Future tickets should link a stable issue/ADR and update this document.</p>
+<h2 id="1-finding-to-delivery-traceability">1. Finding-to-delivery traceability</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Finding / evidence</th>
+<th style="text-align: right;">Priority</th>
+<th>Future outcome</th>
+<th>Branch</th>
+<th>Acceptance evidence</th>
+<th>Accountable owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-001</td>
+<td>Fixed 256 px government sidebar; <code>GovSidebar.jsx:233-244</code></td>
+<td style="text-align: right;">P0</td>
+<td>expanded/rail/drawer staff shell</td>
+<td>Government + Core</td>
+<td>390/768/1024/1280 screenshots; keyboard drawer test</td>
+<td>Gov FE lead</td>
+</tr>
+<tr>
+<td>F-002</td>
+<td>Resident top nav has two 200 px minimum regions; <code>ResidentDashboard.jsx:2352,2412</code>; 350 px feed at <code>:3783</code></td>
+<td style="text-align: right;">P0</td>
+<td>one nav model per breakpoint</td>
+<td>Resident + Core</td>
+<td>320/390 reflow and 200% zoom</td>
+<td>Resident FE lead</td>
+</tr>
+<tr>
+<td>F-003</td>
+<td>Jurisdiction check always true; <code>ResidentDashboard.jsx:2577-2581</code></td>
+<td style="text-align: right;">P0</td>
+<td>truthful location state machine + server confirmation</td>
+<td>Resident</td>
+<td>integration/E2E for inside/outside/denied/error/default pin</td>
+<td>Resident product + backend</td>
+</tr>
+<tr>
+<td>F-004</td>
+<td>Exact location description captured at <code>:1669-1677,2901</code> but absent from payload at <code>:3341-3346</code></td>
+<td style="text-align: right;">P0</td>
+<td>visible field → API → review → detail</td>
+<td>Resident</td>
+<td>contract test and persisted-report assertion</td>
+<td>Resident FE + backend</td>
+</tr>
+<tr>
+<td>F-005</td>
+<td><code>handleViewReport</code> defined at <code>:2813-2823</code> but not passed to <code>MyReports</code> at <code>:3817-3827</code></td>
+<td style="text-align: right;">P0</td>
+<td>URL-addressable report detail/timeline</td>
+<td>Resident</td>
+<td>card/notification/deep-link/reload/back E2E</td>
+<td>Resident FE lead</td>
+</tr>
+<tr>
+<td>F-006</td>
+<td>Notification delete uses undefined <code>token</code>; <code>ResidentDashboard.jsx:2476-2485</code></td>
+<td style="text-align: right;">P0</td>
+<td>shared session/API client and undo/error state</td>
+<td>Core + Resident</td>
+<td>component/integration test with expired session</td>
+<td>Core FE lead</td>
+</tr>
+<tr>
+<td>F-007</td>
+<td>Role definitions repeated across <code>ProtectedRoute</code>, <code>rbac_utils</code>, <code>GovSidebar</code>, <code>GovLanding</code>, user management</td>
+<td style="text-align: right;">P0</td>
+<td>canonical backend-owned capability registry</td>
+<td>Core + Government</td>
+<td>executable role/route/action/data matrix</td>
+<td>Security/backend owner</td>
+</tr>
+<tr>
+<td>F-008</td>
+<td>Settings nav visible broadly but route admin-guarded; <code>GovSidebar.jsx:325</code>, <code>App.jsx:184-187</code></td>
+<td style="text-align: right;">P0</td>
+<td>nav, route, page and action agreement</td>
+<td>Government</td>
+<td>per-role sidebar + deep-link E2E</td>
+<td>Gov FE + security</td>
+</tr>
+<tr>
+<td>F-009</td>
+<td>Hard-coded assignment IDs; <code>DispatcherDashboard.jsx:748-753,3102-3107,3195-3206</code></td>
+<td style="text-align: right;">P0</td>
+<td>eligible assignee service/pattern</td>
+<td>Government</td>
+<td>no-team/eligible/unavailable/confirm E2E</td>
+<td>Operations + backend</td>
+</tr>
+<tr>
+<td>F-010</td>
+<td>Permanent delete bypass pattern; <code>DispatcherDashboard.jsx:918-969,2011-2017</code></td>
+<td style="text-align: right;">P0</td>
+<td>archive/void/legal-hold workflow</td>
+<td>Government</td>
+<td>permission/reason/audit/recovery policy test</td>
+<td>Records + security</td>
+</tr>
+<tr>
+<td>F-011</td>
+<td>Nested interactions in report card; <code>DispatcherDashboard.jsx:1885-2020</code></td>
+<td style="text-align: right;">P0</td>
+<td>semantic row/card with separate controls</td>
+<td>Government + Core</td>
+<td>keyboard/screen-reader interaction test</td>
+<td>Gov FE + a11y</td>
+</tr>
+<tr>
+<td>F-012</td>
+<td>No shared focus-visible/dialog contract; many <code>outline-none</code> uses</td>
+<td style="text-align: right;">P0</td>
+<td>primitives with visible focus and overlay behavior</td>
+<td>Core</td>
+<td>axe + keyboard + NVDA/VoiceOver manual pass</td>
+<td>A11y/QA lead</td>
+</tr>
+<tr>
+<td>F-013</td>
+<td>Custom <code>OrangeSelect</code> lacks full combobox/listbox behavior; <code>OrangeSelect.jsx:45-133</code></td>
+<td style="text-align: right;">P0</td>
+<td>native select or proven accessible combobox</td>
+<td>Core</td>
+<td>APG keyboard/semantics test</td>
+<td>Core FE + a11y</td>
+</tr>
+<tr>
+<td>F-014</td>
+<td>Global scrollbars hidden; <code>index.css:53-58</code></td>
+<td style="text-align: right;">P1</td>
+<td>visible narrow scrollbars and overflow cues</td>
+<td>Core</td>
+<td>desktop/high-contrast/nested-scroll check</td>
+<td>Design-system owner</td>
+</tr>
+<tr>
+<td>F-015</td>
+<td>Primary <code>#F97316</code> used for small text/white controls</td>
+<td style="text-align: right;">P1</td>
+<td><code>#C2410C</code> resident action; pulse kept decorative</td>
+<td>Core</td>
+<td>automated + manual contrast matrix</td>
+<td>Design + a11y</td>
+</tr>
+<tr>
+<td>F-016</td>
+<td>Declared Inter/Oswald not loaded; <code>index.css:17-18</code>, <code>index.html</code></td>
+<td style="text-align: right;">P1</td>
+<td>approved font roles, files/fallbacks, glyph tests</td>
+<td>Core</td>
+<td>render/EN-FIL/Windows/mobile snapshots</td>
+<td>Design-system owner</td>
+</tr>
+<tr>
+<td>F-017</td>
+<td>Hidden light/dark Spline scenes and looping motion</td>
+<td style="text-align: right;">P1</td>
+<td>lightweight auth visual; route/media lazy loading; reduced motion</td>
+<td>Core + portals</td>
+<td>bundle/CWV/reduced-motion tests</td>
+<td>Performance owner</td>
+</tr>
+<tr>
+<td>F-018</td>
+<td>Fetch errors become empty arrays/No records; <code>GovDivisionPage.jsx:920,1070,1493</code></td>
+<td style="text-align: right;">P1</td>
+<td>distinct empty/filtered/denied/stale/error states</td>
+<td>Core + Government</td>
+<td>state-fixture component/integration tests</td>
+<td>Gov FE lead</td>
+</tr>
+<tr>
+<td>F-019</td>
+<td>Dead/prototype actions on landing/search/settings</td>
+<td style="text-align: right;">P1</td>
+<td>functional / disabled with reason / removed register</td>
+<td>Portal owners</td>
+<td>signed control register + E2E for retained controls</td>
+<td>Product owners</td>
+</tr>
+<tr>
+<td>F-020</td>
+<td>Dark map can lose jurisdiction treatment; <code>ResidentDashboard.jsx:2583-2598</code></td>
+<td style="text-align: right;">P1</td>
+<td>information-equivalent map themes</td>
+<td>Resident + Core</td>
+<td>visual/data parity in both themes</td>
+<td>Maps owner</td>
+</tr>
+<tr>
+<td>F-021</td>
+<td>Partial i18n and fixed <code>lang="en"</code>; language switcher hidden on gov routes</td>
+<td style="text-align: right;">P1</td>
+<td>resident EN/FIL parity and dynamic document language</td>
+<td>Core + Resident</td>
+<td>locale completeness, pseudolocalization, AT language test</td>
+<td>Content/localization</td>
+</tr>
+<tr>
+<td>F-022</td>
+<td>Militarized/technical copy across government and auth screens</td>
+<td style="text-align: right;">P1</td>
+<td>calm action/outcome vocabulary</td>
+<td>Both portals</td>
+<td>content review + comprehension test</td>
+<td>Content design</td>
+</tr>
+<tr>
+<td>F-023</td>
+<td>Resident Trust Score lacks transparent policy/appeal</td>
+<td style="text-align: right;">P1</td>
+<td>remove pending policy or fully explain/govern</td>
+<td>Resident</td>
+<td>signed policy, user comprehension, harm review</td>
+<td>Product/privacy</td>
+</tr>
+<tr>
+<td>F-024</td>
+<td>Conflicting five/six/thirteen-phase project models</td>
+<td style="text-align: right;">P0</td>
+<td>one canonical lifecycle and mapping</td>
+<td>Core + Government</td>
+<td>signed state model + transition contract tests</td>
+<td>Operations/product</td>
+</tr>
+<tr>
+<td>F-025</td>
+<td><code>ManagementDashboard</code> passes incorrect sidebar prop; <code>ManagementDashboard.jsx:262</code></td>
+<td style="text-align: right;">P0</td>
+<td>shared routed shell and typed/verified contract</td>
+<td>Government</td>
+<td>interaction test for sidebar tab action</td>
+<td>Gov FE lead</td>
+</tr>
+<tr>
+<td>F-026</td>
+<td>Position quick-action tab context is dropped; <code>PositionDashboard.jsx:723-733</code></td>
+<td style="text-align: right;">P1</td>
+<td>scoped URLs/saved view context</td>
+<td>Government</td>
+<td>direct-link and back-context E2E</td>
+<td>Gov FE lead</td>
+</tr>
+<tr>
+<td>F-027</td>
+<td>Eager route imports; <code>App.jsx:5-18</code></td>
+<td style="text-align: right;">P1</td>
+<td>route/domain lazy loading</td>
+<td>Core</td>
+<td>production bundle and route-load budget</td>
+<td>Performance owner</td>
+</tr>
+<tr>
+<td>F-028</td>
+<td>No frontend test script/Storybook/axe/visual regression; <code>package.json:6-46</code></td>
+<td style="text-align: right;">P0</td>
+<td>quality harness and component catalog</td>
+<td>Core</td>
+<td>CI runs all gates</td>
+<td>QA + Core FE</td>
+</tr>
+<tr>
+<td>F-029</td>
+<td>Lint baseline 170 problems</td>
+<td style="text-align: right;">P1</td>
+<td>changed-file zero-new + ratcheted legacy cleanup</td>
+<td>All</td>
+<td>CI report trending to zero</td>
+<td>Frontend lead</td>
+</tr>
+<tr>
+<td>F-030</td>
+<td>Dependency install reports 12 vulnerabilities</td>
+<td style="text-align: right;">P1</td>
+<td>reviewed dependency remediation workstream</td>
+<td>Core/security</td>
+<td>approved audit/remediation report; regression tests</td>
+<td>Security/FE lead</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-current-to-target-component-mapping">2. Current-to-target component mapping</h2>
+<p>This is a planning map, not permission to refactor before Phase 0.</p>
+<table>
+<thead>
+<tr>
+<th>Current area</th>
+<th>Target design-system/feature destination</th>
+<th>First characterization required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>components/Branding.jsx</code> and duplicate lockups</td>
+<td><code>Brand/Lockup</code></td>
+<td>size, seal use, dark/light, clear space, no animation</td>
+</tr>
+<tr>
+<td><code>components/ThemeToggle.jsx</code> and duplicates</td>
+<td><code>Action/SegmentedControl</code> + theme preference</td>
+<td>selected state, system behavior, persistence, accessible name</td>
+</tr>
+<tr>
+<td><code>components/OrangeSelect.jsx</code></td>
+<td>native select or <code>Field/Combobox</code></td>
+<td>keyboard, filtering, Escape, focus restore, errors</td>
+</tr>
+<tr>
+<td>date-picker implementations</td>
+<td><code>Field/Date</code></td>
+<td>typed entry, locale, min/max, calendar keyboard behavior</td>
+</tr>
+<tr>
+<td><code>TermsModal</code>, upload/camera overlays, page modals</td>
+<td><code>Overlay/Dialog</code> / <code>Drawer</code></td>
+<td>focus, Escape, outside interaction, return focus, async close</td>
+</tr>
+<tr>
+<td>local status maps in resident/gov pages</td>
+<td>canonical lifecycle + <code>Data/StatusBadge</code> + <code>SignalCut</code></td>
+<td>mapping of every backend state and exceptional branch</td>
+</tr>
+<tr>
+<td><code>GovSidebar.jsx</code></td>
+<td><code>GovernmentShell</code> + <code>Gov/Nav*</code></td>
+<td>route/capability/scroll persistence and responsive behavior</td>
+</tr>
+<tr>
+<td>resident TopNavigation + bottom nav</td>
+<td><code>ResidentShell</code></td>
+<td>breakpoint visibility, route mapping, account/language/alerts</td>
+</tr>
+<tr>
+<td>report cards/list/table variants</td>
+<td><code>Data/RecordCard</code>, <code>RecordTable</code>, portal composites</td>
+<td>row actions, selection, keyboard, responsive alternative</td>
+</tr>
+<tr>
+<td>bespoke alerts/toasts/<code>alert()</code></td>
+<td>shared feedback hierarchy</td>
+<td>severity, timeout, announcement, persistence, undo</td>
+</tr>
+<tr>
+<td>chart/map panels</td>
+<td><code>Chart/Frame</code>, <code>Map/*</code></td>
+<td>definitions, freshness, summary/table/list equivalent</td>
+</tr>
+<tr>
+<td><code>ProtectedRoute</code> + <code>rbac_utils</code> + page role lists</td>
+<td>session/capability policy module</td>
+<td>authoritative backend response and full role/action matrix</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-document-coverage">3. Document coverage</h2>
+<table>
+<thead>
+<tr>
+<th>Decision/workstream</th>
+<th>Governing document</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Current findings and priority</td>
+<td><a href="./01-current-state-assessment.md">01-current-state-assessment.md</a></td>
+</tr>
+<tr>
+<td>Product principles, IA, canonical statuses</td>
+<td><a href="./02-experience-framework.md">02-experience-framework.md</a></td>
+</tr>
+<tr>
+<td>Tokens, components, Figma, handoff</td>
+<td><a href="./03-figma-design-system-spec.md">03-figma-design-system-spec.md</a></td>
+</tr>
+<tr>
+<td>Resident routes/flows/states/copy</td>
+<td><a href="./04-resident-experience-spec.md">04-resident-experience-spec.md</a></td>
+</tr>
+<tr>
+<td>Government roles/queues/decisions/modules</td>
+<td><a href="./05-government-experience-spec.md">05-government-experience-spec.md</a></td>
+</tr>
+<tr>
+<td>Phases, branches, tests, performance, rollout</td>
+<td><a href="./06-implementation-plan.md">06-implementation-plan.md</a></td>
+</tr>
+<tr>
+<td>Research, tasks, measures, analytics/privacy</td>
+<td><a href="./07-research-and-validation-plan.md">07-research-and-validation-plan.md</a></td>
+</tr>
+<tr>
+<td>Resident user stories, endpoint acceptance, QA, and SDLC</td>
+<td><a href="./12-resident-user-stories-and-sdlc.md">12-resident-user-stories-and-sdlc.md</a></td>
+</tr>
+<tr>
+<td>Government user stories, operational acceptance, QA, and SDLC</td>
+<td><a href="./13-government-user-stories-and-sdlc.md">13-government-user-stories-and-sdlc.md</a></td>
+</tr>
+<tr>
+<td>Integrated service cycle, complete route inventory, state and API contracts</td>
+<td><a href="./14-end-to-end-system-lifecycle-and-api-contract.md">14-end-to-end-system-lifecycle-and-api-contract.md</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-ticket-traceability-template">4. Ticket traceability template</h2>
+<p>Use this block in future implementation tickets:</p>
+<pre><code class="language-text">Finding / opportunity ID:
+User job:
+Outcome metric:
+Route(s):
+Role/capability/data scope:
+Canonical status/action:
+Figma file + node + component version:
+API contract/fixture:
+Responsive behavior:
+State matrix:
+Accessibility contract:
+English/Filipino content:
+Analytics events and privacy classification:
+Automated/manual acceptance tests:
+Feature flag/cohort:
+Rollback:
+Owner / reviewers:
+</code></pre>
+<h2 id="5-change-control-rule">5. Change-control rule</h2>
+<p>When a source path, role, lifecycle, API field, or Figma component changes:</p>
+<ol>
+<li>update the linked issue/ADR;</li>
+<li>update the affected row here;</li>
+<li>record the design/component version;</li>
+<li>identify resident, government, mobile, backend, analytics, and documentation impacts;</li>
+<li>update tests and rollout notes;</li>
+<li>set <code>Last validated</code> to the actual validation date—not the edit date when validation did not occur.</li>
+</ol>
+    </div>
+</body>
+</html>

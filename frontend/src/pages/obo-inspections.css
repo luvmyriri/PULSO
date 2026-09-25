@@ -1,0 +1,344 @@
+/* OBO Inspections & Permits Page Styles (Civic Aperture) */
+
+.obo-page {
+    display: flex;
+    min-height: 100dvh;
+    color: var(--gov-text, #0f172a);
+    background: var(--gov-canvas, #f8fafc);
+    font-family: "Source Sans 3", Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.obo-shell {
+    display: flex;
+    min-width: 0;
+    height: 100dvh;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.obo-topbar {
+    display: flex;
+    min-height: 64px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 10px 24px;
+    background: var(--gov-surface, #ffffff);
+    border-bottom: 1px solid var(--gov-rule, #e2e8f0);
+}
+
+.obo-topbar h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: Archivo, Inter, sans-serif;
+    color: var(--gov-text, #0f172a);
+    letter-spacing: -0.02em;
+}
+
+.obo-topbar p {
+    margin: 1px 0 0;
+    color: var(--gov-text-secondary, #64748b);
+    font-size: 12px;
+}
+
+.obo-tabs-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: var(--gov-surface, #ffffff);
+    border-bottom: 1px solid var(--gov-rule, #e2e8f0);
+    overflow-x: auto;
+}
+
+.obo-tabs-list {
+    display: flex;
+    gap: 18px;
+    min-width: max-content;
+}
+
+.obo-tab {
+    padding: 12px 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gov-text-secondary, #64748b);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.obo-tab:hover {
+    color: var(--gov-text, #0f172a);
+}
+
+.obo-tab.is-active {
+    color: var(--gov-accent, #0284c7);
+    border-bottom-color: var(--gov-accent, #0284c7);
+}
+
+.obo-tab-count {
+    background: var(--gov-surface-hover, #f1f5f9);
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+}
+
+.obo-main {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 20px 24px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.obo-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.obo-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.obo-layout-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 20px;
+    align-items: start;
+}
+
+.obo-table-wrapper {
+    background: var(--gov-surface, #ffffff);
+    border: 1px solid var(--gov-rule, #e2e8f0);
+    border-radius: 8px;
+    overflow-x: auto;
+}
+
+.obo-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 12px;
+}
+
+.obo-table th {
+    padding: 10px 12px;
+    font-weight: 700;
+    color: var(--gov-text-secondary, #64748b);
+    border-bottom: 1px solid var(--gov-rule, #e2e8f0);
+    background: color-mix(in srgb, var(--gov-surface) 98%, transparent);
+    white-space: nowrap;
+}
+
+.obo-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--gov-rule, #e2e8f0);
+    color: var(--gov-text, #0f172a);
+    vertical-align: middle;
+}
+
+.obo-table tr:hover td {
+    background: var(--gov-surface-hover, #f8fafc);
+}
+
+.obo-table tr.is-selected td {
+    background: color-mix(in srgb, var(--gov-accent, #0284c7) 6%, var(--gov-surface, #ffffff));
+}
+
+.obo-id-btn {
+    background: transparent;
+    border: none;
+    font-weight: 700;
+    color: var(--gov-accent, #0284c7);
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 0;
+}
+
+.obo-id-btn:hover {
+    text-decoration: underline;
+}
+
+/* Discipline Matrix Chips */
+.obo-discipline-chips {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.obo-chip {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.obo-chip.is-approved {
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+}
+
+.obo-chip.is-pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+}
+
+.obo-chip.is-rejected {
+    background: rgba(220, 38, 38, 0.15);
+    color: #dc2626;
+}
+
+/* Right Rail Summary */
+.obo-rail-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.obo-summary-card {
+    background: var(--gov-surface, #ffffff);
+    border: 1px solid var(--gov-rule, #e2e8f0);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.obo-summary-card h4 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gov-text-secondary, #64748b);
+}
+
+.obo-summary-card strong {
+    font-size: 13px;
+    color: var(--gov-text, #0f172a);
+}
+
+.obo-summary-card p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--gov-text-secondary, #64748b);
+    line-height: 1.4;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   OBO Detail Docket View
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.obo-docket-container {
+    background: var(--gov-surface, #ffffff);
+    border: 1px solid var(--gov-rule, #e2e8f0);
+    border-radius: 8px;
+    padding: 20px 24px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.obo-docket-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 24px;
+}
+
+.obo-docket-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.obo-card {
+    background: var(--gov-canvas, #f8fafc);
+    border: 1px solid var(--gov-rule, #e2e8f0);
+    border-radius: 6px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.obo-card h4 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gov-text-secondary, #64748b);
+}
+
+/* Technical Discipline Matrix Grid */
+.obo-discipline-grid {
+    display: grid;
+    gap: 6px;
+}
+
+.obo-discipline-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: var(--gov-surface, #ffffff);
+    border: 1px solid var(--gov-rule, #e2e8f0);
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.obo-discipline-name {
+    font-weight: 600;
+    color: var(--gov-text, #0f172a);
+}
+
+/* Payment Assessment Box */
+.obo-payment-box {
+    background: color-mix(in srgb, var(--gov-accent, #0284c7) 5%, var(--gov-surface, #ffffff));
+    border: 1px solid color-mix(in srgb, var(--gov-accent, #0284c7) 20%, transparent);
+    border-radius: 6px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.obo-payment-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+}
+
+.obo-payment-total {
+    font-size: 16px;
+    font-weight: 800;
+    font-family: Archivo, monospace;
+    color: var(--gov-text, #0f172a);
+}
+
+@media (max-width: 1024px) {
+    .obo-layout-split,
+    .obo-docket-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,66 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { 
-  X, 
-  Smartphone, 
-  Share2, 
-  PlusSquare, 
-  Download, 
-  Copy, 
-  Check, 
-  Apple, 
-  Wifi, 
-  Globe, 
-  Edit3, 
-  RotateCw 
+import {
+  X,
+  Smartphone,
+  Share2,
+  PlusSquare,
+  Download,
+  Copy,
+  Check,
+  Apple,
+  Wifi,
+  Globe,
+  Edit3,
+  RotateCw
 } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiBase';
+
+const getInitialPort = () => {
+  if (typeof window === 'undefined') return '5173';
+  return window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+};
+
+const getInitialOrigin = () => (
+  typeof window === 'undefined' ? '' : window.location.origin
+);
+
+const getInitialUrlMode = () => {
+  return 'origin';
+};
 
 export default function PwaModal({ isOpen, onClose }) {
   const [activePlatform, setActivePlatform] = useState('android'); // 'ios' | 'android'
   const [copied, setCopied] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstallable, setIsInstallable] = useState(false);
-  
-  // Wi-Fi vs Localhost mode
-  const [urlMode, setUrlMode] = useState('wifi'); // 'wifi' | 'origin'
-  const [wifiIp, setWifiIp] = useState('192.168.0.110');
-  const [isEditingIp, setIsEditingIp] = useState(false);
-  const [customIp, setCustomIp] = useState('192.168.0.110');
-  const [port, setPort] = useState('5173');
-  const [originUrl, setOriginUrl] = useState('');
+  const [networkStatus, setNetworkStatus] = useState('idle');
 
-  // Fetch local Wi-Fi IP from backend API
-  const fetchNetworkIp = async () => {
-    try {
-      const res = await fetch('http://localhost:33159/api/system/network-ip');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ip) {
-          setWifiIp(data.ip);
-          setCustomIp(data.ip);
-        }
-      }
-    } catch {
-      // Keep detected or fallback IP
-    }
-  };
+  // Wi-Fi vs Localhost mode
+  const [urlMode, setUrlMode] = useState(getInitialUrlMode); // 'wifi' | 'origin'
+  const [wifiIp, setWifiIp] = useState('');
+  const [isEditingIp, setIsEditingIp] = useState(false);
+  const [customIp, setCustomIp] = useState('');
+  const [port] = useState(getInitialPort);
+  const [originUrl] = useState(getInitialOrigin);
+  const dialogRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const isLocalDevelopment = import.meta.env.DEV
+    && typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const currentPort = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
-      setPort(currentPort);
-      setOriginUrl(window.location.origin);
-
-      const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (isLocalHost) {
-        setUrlMode('wifi');
-      } else {
-        setUrlMode('origin');
-      }
-    }
-
-    fetchNetworkIp();
-
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -74,9 +63,75 @@ export default function PwaModal({ isOpen, onClose }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isOpen || !isLocalDevelopment) return undefined;
+
+    const controller = new AbortController();
+    fetch(`${API_BASE_URL}/api/system/network-ip`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error('Network discovery unavailable');
+        return res.json();
+      })
+      .then((data) => {
+        if (!data?.ip) throw new Error('Network discovery unavailable');
+        setWifiIp(data.ip);
+        setCustomIp(data.ip);
+        setUrlMode('wifi');
+        setNetworkStatus('ready');
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          setUrlMode('origin');
+          setNetworkStatus('unavailable');
+        }
+      });
+
+    return () => controller.abort();
+  }, [isOpen, isLocalDevelopment]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const previouslyFocused = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
+
+    const handleDialogKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = [...dialogRef.current.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      )];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleDialogKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener('keydown', handleDialogKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, [isOpen, onClose]);
+
   // Compute final URL for QR Code
   const activeUrl = urlMode === 'wifi'
-    ? `http://${customIp || wifiIp}${port ? `:${port}` : ''}`
+    ? (customIp || wifiIp ? `http://${customIp || wifiIp}${port ? `:${port}` : ''}` : originUrl)
     : (originUrl || 'https://pulso.caloocan.gov.ph');
 
   const handleInstallClick = async () => {
@@ -89,24 +144,29 @@ export default function PwaModal({ isOpen, onClose }) {
     }
   };
 
-  const handleCopyLink = () => {
-    if (!activeUrl) return;
-    navigator.clipboard?.writeText(activeUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+  const handleCopyLink = async () => {
+    if (!activeUrl || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(activeUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      setCopied(false);
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-fadeIn"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="pwa-modal-title"
     >
-      <div 
+      <div
+        ref={dialogRef}
         className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[88vh] my-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -118,9 +178,9 @@ export default function PwaModal({ isOpen, onClose }) {
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <Wifi size={13} className="text-emerald-500 animate-pulse" />
-                  Same Wi-Fi Ready
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                  {networkStatus === 'ready' ? <Wifi size={13} className="text-emerald-500" /> : <Globe size={13} />}
+                  {networkStatus === 'ready' ? 'Same Wi-Fi preview available' : 'Install from a supported browser'}
                 </span>
               </div>
               <h3 id="pwa-modal-title" className="font-heading font-black text-lg sm:text-xl text-slate-900 dark:text-white leading-tight mt-0.5">
@@ -130,8 +190,10 @@ export default function PwaModal({ isOpen, onClose }) {
           </div>
 
           <button
+            ref={closeButtonRef}
+            type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
             aria-label="Close modal"
           >
             <X size={18} />
@@ -140,41 +202,46 @@ export default function PwaModal({ isOpen, onClose }) {
 
         {/* Modal Scrollable Body */}
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-5">
-          
+
           {/* Wi-Fi vs Localhost Network Selector */}
+          {isLocalDevelopment && (
           <div className="p-3 rounded-2xl bg-orange-50/70 dark:bg-orange-950/30 border border-orange-200/80 dark:border-orange-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
             <div className="flex items-center gap-2 text-xs text-slate-800 dark:text-slate-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-ping" />
-              <span className="font-bold">Access from Same Wi-Fi Network:</span>
+              <span className={`w-2 h-2 rounded-full shrink-0 ${networkStatus === 'ready' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              <span className="font-bold">Development preview address:</span>
             </div>
 
             <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-orange-200 dark:border-slate-700 text-xs shadow-2xs w-full sm:w-auto justify-center">
               <button
                 type="button"
                 onClick={() => setUrlMode('wifi')}
-                className={`px-3 py-1 rounded-lg font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                disabled={networkStatus !== 'ready' && !customIp}
+                aria-pressed={urlMode === 'wifi'}
+                className={`min-h-11 px-3 py-1 rounded-lg font-extrabold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-50 ${
                   urlMode === 'wifi'
                     ? 'bg-[#ff6b00] text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 <Wifi size={13} />
-                <span>Wi-Fi IP ({customIp})</span>
+                <span>{networkStatus === 'ready' ? `Wi-Fi preview (${customIp})` : 'Wi-Fi preview unavailable'}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setUrlMode('origin')}
-                className={`px-3 py-1 rounded-lg font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                aria-pressed={urlMode === 'origin'}
+                className={`min-h-11 px-3 py-1 rounded-lg font-extrabold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 ${
                   urlMode === 'origin'
                     ? 'bg-[#ff6b00] text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 <Globe size={13} />
-                <span>Localhost / Domain</span>
+                <span>Current site</span>
               </button>
             </div>
           </div>
+          )}
 
           {/* QR Code & Scan Prompt Card */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-orange-50/40 dark:from-slate-800/60 dark:to-orange-950/20 border border-slate-200/80 dark:border-slate-700/80">
@@ -196,7 +263,7 @@ export default function PwaModal({ isOpen, onClose }) {
               />
               <span className="text-[10px] font-mono font-bold text-slate-500 mt-1.5 uppercase tracking-wider flex items-center gap-1">
                 <Wifi size={10} className="text-[#ff6b00]" />
-                Scan via Phone
+                  {urlMode === 'wifi' ? 'Open mobile preview' : 'Scan via phone'}
               </span>
             </div>
 
@@ -204,11 +271,13 @@ export default function PwaModal({ isOpen, onClose }) {
             <div className="flex-1 text-center sm:text-left w-full min-w-0">
               <div className="flex items-center gap-2 justify-center sm:justify-start flex-wrap">
                 <h4 className="font-heading font-extrabold text-base text-slate-900 dark:text-white leading-snug">
-                  Scan to open on your phone
+                  {urlMode === 'wifi' ? 'Open the development preview' : 'Scan to open on your phone'}
                 </h4>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
-                Connect your phone to the <strong>same Wi-Fi network</strong> and scan the code. No App Store or Play Store download needed!
+                {urlMode === 'wifi'
+                  ? <>This HTTP address opens a same-network preview. Browser installation is unavailable until PULSO is served over HTTPS.</>
+                  : <>Open this secure site on your phone, then use your browser&apos;s install or Add to Home Screen action when available.</>}
               </p>
 
               {/* Direct App URL pill + Copy */}
@@ -219,7 +288,8 @@ export default function PwaModal({ isOpen, onClose }) {
                     value={customIp}
                     onChange={(e) => setCustomIp(e.target.value)}
                     placeholder="Enter Wi-Fi IPv4 (e.g. 192.168.0.110)"
-                    className="font-mono text-xs text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded outline-none border border-orange-400 flex-1"
+                    aria-label="Development Wi-Fi address"
+                    className="min-h-11 font-mono text-xs text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-orange-400 flex-1 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
                   />
                 ) : (
                   <span className="font-mono text-xs text-slate-700 dark:text-slate-300 truncate flex-1 text-left font-bold select-all">
@@ -231,7 +301,8 @@ export default function PwaModal({ isOpen, onClose }) {
                   <button
                     type="button"
                     onClick={() => setIsEditingIp(!isEditingIp)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    aria-label={isEditingIp ? 'Save development address' : 'Change development address'}
+                    className="min-h-11 min-w-11 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
                     title={isEditingIp ? 'Save IP' : 'Change Wi-Fi IP'}
                   >
                     <Edit3 size={13} />
@@ -241,10 +312,10 @@ export default function PwaModal({ isOpen, onClose }) {
                 <button
                   type="button"
                   onClick={handleCopyLink}
-                  className="px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/70 dark:hover:bg-orange-900/80 text-[#ff6b00] dark:text-orange-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                  className="min-h-11 px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/70 dark:hover:bg-orange-900/80 text-[#ff6b00] dark:text-orange-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
                 >
                   {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                  <span>{copied ? 'Copied!' : 'Copy'}</span>
+                  <span aria-live="polite">{copied ? 'Copied!' : 'Copy'}</span>
                 </button>
               </div>
 
@@ -253,7 +324,7 @@ export default function PwaModal({ isOpen, onClose }) {
                 <button
                   type="button"
                   onClick={handleInstallClick}
-                  className="mt-2.5 w-full inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-bold text-xs shadow-xs hover:shadow transition-all cursor-pointer"
+                  className="mt-2.5 min-h-11 w-full inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-bold text-xs shadow-xs hover:shadow transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
                 >
                   <Download size={14} />
                   <span>Install App on this Device</span>
@@ -264,27 +335,36 @@ export default function PwaModal({ isOpen, onClose }) {
 
           {/* Platform Step-by-Step Tabs */}
           <div>
-            <div className="flex items-center justify-between mb-3">
+            {urlMode === 'wifi' ? (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                <p className="font-bold">Preview only</p>
+                <p className="mt-1 text-xs leading-relaxed">The same-Wi-Fi HTTP address can preview the mobile layout, but browsers require HTTPS to install PULSO. Use the current secure site for installation.</p>
+              </div>
+            ) : (
+            <>
+            <div className="flex flex-col items-start justify-between gap-2 mb-3 sm:flex-row sm:items-center">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Installation Instructions:
               </span>
-              <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200/80 dark:border-slate-700">
+              <div className="grid w-full grid-cols-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200/80 dark:border-slate-700 sm:inline-flex sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setActivePlatform('android')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  aria-pressed={activePlatform === 'android'}
+                  className={`min-h-11 min-w-0 justify-center px-2 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 ${
                     activePlatform === 'android'
                       ? 'bg-white dark:bg-slate-700 text-[#ff6b00] shadow-xs font-black'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <Smartphone size={13} />
-                  <span>Android (Chrome)</span>
+                  <span>Android</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActivePlatform('ios')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  aria-pressed={activePlatform === 'ios'}
+                  className={`min-h-11 min-w-0 justify-center px-2 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 ${
                     activePlatform === 'ios'
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-black'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -304,8 +384,8 @@ export default function PwaModal({ isOpen, onClose }) {
                     1
                   </div>
                   <div>
-                    <p className="font-bold text-slate-900 dark:text-white">Connect to Same Wi-Fi &amp; Open Site</p>
-                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">Connect your phone to the same Wi-Fi and open <strong className="font-mono text-[#ff6b00]">{activeUrl}</strong> in Google Chrome.</p>
+                    <p className="font-bold text-slate-900 dark:text-white">Open the secure PULSO site</p>
+                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">Open <strong className="font-mono text-[#ff6b00]">{activeUrl}</strong> in Google Chrome.</p>
                   </div>
                 </div>
 
@@ -329,8 +409,8 @@ export default function PwaModal({ isOpen, onClose }) {
                     1
                   </div>
                   <div>
-                    <p className="font-bold text-slate-900 dark:text-white">Connect to Same Wi-Fi &amp; Scan QR</p>
-                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">Ensure your iPhone is connected to the same Wi-Fi, open the Camera app, and tap the yellow link to open in Safari.</p>
+                    <p className="font-bold text-slate-900 dark:text-white">Scan the secure site QR code</p>
+                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">Open the Camera app and tap the detected link to open PULSO in Safari.</p>
                   </div>
                 </div>
 
@@ -361,6 +441,8 @@ export default function PwaModal({ isOpen, onClose }) {
                 </div>
               </div>
             )}
+            </>
+            )}
           </div>
         </div>
 
@@ -372,7 +454,7 @@ export default function PwaModal({ isOpen, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+            className="min-h-11 px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
           >
             Done
           </button>

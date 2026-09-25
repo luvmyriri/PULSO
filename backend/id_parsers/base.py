@@ -181,8 +181,11 @@ class BaseIDParser:
 
     def _extract_dob(self, upper: str) -> str:
         """Parse the first valid birth-date string."""
-        # Remove expiry / validity clues first
-        cleaned = re.sub(r'(VALID|EXPIR|ISSU)\w*[\s\S]{0,40}', '', upper)
+        # Remove expiry / validity / issuance clues first (widen window to 80 chars)
+        cleaned = re.sub(
+            r'(VALID(?:ITY)?\s*DATE|EXPIR\w*|ISSU(?:ANCE|ED)?\s*(?:DATE)?|DATE\s*OF\s*(?:ISSUE|ISSUANCE|EXPIR\w*))[\s\S]{0,80}',
+            '', upper
+        )
 
         patterns = [
             # YYYY-MM-DD or YYYY/MM/DD, allow . and spaces
@@ -198,7 +201,7 @@ class BaseIDParser:
                         y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
                     else:
                         mo, d, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
-                    if 1900 < y < 2015 and 1 <= mo <= 12 and 1 <= d <= 31:
+                    if 1900 < y <= 2026 and 1 <= mo <= 12 and 1 <= d <= 31:
                         return f"{y:04d}-{mo:02d}-{d:02d}"
                 except Exception:
                     continue
@@ -220,7 +223,7 @@ class BaseIDParser:
                     else:
                         mon_str, d, y = g[0], int(g[1]), int(g[2])
                     mo = MONTH_MAP.get(mon_str, 0)
-                    if 1900 < y < 2015 and mo and 1 <= d <= 31:
+                    if 1900 < y <= 2026 and mo and 1 <= d <= 31:
                         return f"{y:04d}-{mo:02d}-{d:02d}"
                 except Exception:
                     continue

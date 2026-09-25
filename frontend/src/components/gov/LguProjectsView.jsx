@@ -26,8 +26,9 @@ import Swal from 'sweetalert2';
 import OrangeSelect from '../OrangeSelect';
 import ThemeToggle from '../ThemeToggle';
 import GovSidebar from '../GovSidebar';
+import { API_BASE_URL } from '../../utils/apiBase';
 
-const API_BASE = 'http://localhost:33159';
+const API_BASE = API_BASE_URL;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The 6 Authoritative Macro-Phases of Caloocan LGU Infrastructure Projects

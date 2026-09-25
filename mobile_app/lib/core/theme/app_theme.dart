@@ -5,12 +5,30 @@ class AppTheme {
   static const Color primaryOrange = Color(0xFFFF6600);
   static const Color primaryLight = Color(0xFFFFA366);
   static const Color primaryDark = Color(0xFFCC5200);
-  
+  static const Color primaryOrangeLight = Color(0xFFFFAA80);
+
   static const Color darkSlate = Color(0xFF0F172A);
   static const Color darkSlateLight = Color(0xFF1E293B);
-  
+
   static const Color lightGray = Color(0xFFF8FAFC);
-  
+
+  static const Color errorRed = Color(0xFFEF4444);
+  static const Color successGreen = Color(0xFF22C55E);
+  static const Color warningYellow = Color(0xFFEAB308);
+  static const Color infoBlue = Color(0xFF3B82F6);
+
+  static BoxDecoration glassDecoration({
+    Color? color,
+    double borderRadius = 20,
+    double opacity = 0.05,
+  }) {
+    return BoxDecoration(
+      color: (color ?? Colors.white).withValues(alpha: opacity),
+      borderRadius: BorderRadius.circular(borderRadius),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+    );
+  }
+
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,

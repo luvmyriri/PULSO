@@ -84,7 +84,8 @@ import {
     Sparkles,
     RotateCcw,
     CameraOff,
-    Copy
+    Copy,
+    Link2
 } from 'lucide-react';
 
 import { useTheme } from '../contexts/ThemeContext';
@@ -92,7 +93,14 @@ import Swal from 'sweetalert2';
 import Branding from '../components/Branding';
 import { useTranslation } from 'react-i18next';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
-import { formatTicketId } from '../utils/reportWorkflow';
+import {
+    formatTicketId,
+    getStatusDescriptor,
+    getReportWorkflowIndex,
+    REPORT_WORKFLOW_STEPS
+} from '../utils/reportWorkflow';
+import { API_BASE_URL } from '../utils/apiBase';
+import ClaimReportModal from '../components/modals/ClaimReportModal';
 import IDCameraModal from '../components/IDCameraModal';
 
 import {
@@ -470,20 +478,9 @@ const ResidentHomeView = ({
         created_at: new Date(Date.now() - 3600000 * 4).toISOString()
     };
 
-    const trackerSteps = [
-        { id: 'reported', label: 'Reported' },
-        { id: 'in_progress', label: 'In Progress' },
-        { id: 'resolved', label: 'Resolved' }
-    ];
-
-    const getStepIndex = (status) => {
-        const s = (status || '').toLowerCase();
-        if (s === 'resolved') return 2;
-        if (s === 'in_progress' || s === 'dispatched' || s === 'assigned' || s === 'approved_internal' || s === 'reviewed') return 1;
-        return 0; // reported / received / pending
-    };
-
-    const currentStepIndex = getStepIndex(latestReport?.status || 'assigned');
+    const trackerSteps = REPORT_WORKFLOW_STEPS;
+    const latestStatus = getStatusDescriptor(latestReport?.status);
+    const currentStepIndex = getReportWorkflowIndex(latestReport?.status);
 
     // 3. Nearby Issues Data
     const nearbyList = [
@@ -553,12 +550,12 @@ const ResidentHomeView = ({
     return (
         <div className="w-full max-w-[1400px] mx-auto pb-36 sm:pb-40 lg:pb-12 pt-2 sm:pt-4 px-3.5 sm:px-4 lg:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
-                
+
                 {/* ── LEFT COLUMN (Primary, ~65-70% on desktop) ── */}
                 <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4 sm:gap-5 w-full">
-                    
+
                     {/* 1. Alert Banner (High-contrast WCAG AAA Compliant, Expandable Interaction Cue) */}
-                    <div 
+                    <div
                         onClick={() => {
                             if (topAlert.title.includes('JULY 23')) {
                                 setActiveModal('services');
@@ -616,10 +613,7 @@ const ResidentHomeView = ({
                                     <User size={13} className="shrink-0" />
                                     <span>{
                                         (() => {
-                                            const s = (latestReport.status || 'assigned').toLowerCase().replace(/[\s-]/g, '_');
-                                            if (['resolved', 'completed', 'fixed', 'closed'].some(k => s.includes(k))) return 'Resolved';
-                                            if (['in_progress', 'dispatched', 'assigned', 'approved_internal'].some(k => s.includes(k))) return 'In Progress';
-                                            return 'Reported';
+                                            return latestStatus.label;
                                         })()
                                     }</span>
                                 </div>
@@ -678,7 +672,7 @@ const ResidentHomeView = ({
                         </div>
 
                         {/* Location Footer Strip with Explicit Affordance */}
-                        <div 
+                        <div
                             onClick={() => setActiveModal('map')}
                             role="button"
                             tabIndex={0}
@@ -699,7 +693,7 @@ const ResidentHomeView = ({
                                     </span>
                                 </div>
                             </div>
-                            
+
                             <div className="inline-flex items-center self-start xs:self-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/80 text-[11px] font-bold text-slate-700 dark:text-slate-300 group-hover:text-[#ff6b00] group-hover:border-orange-300 dark:group-hover:border-orange-800/60 transition-all shrink-0 shadow-2xs min-h-[36px]">
                                 <MapIcon size={12} className="text-[#ff6b00]" />
                                 <span>View on Map</span>
@@ -720,7 +714,7 @@ const ResidentHomeView = ({
                                     {nearbyList.length} nearby
                                 </span>
                             </div>
-                            <button 
+                            <button
                                 type="button"
                                 onClick={() => setActiveModal('map')}
                                 className="text-xs font-bold text-[#ff6b00] hover:underline flex items-center gap-1 cursor-pointer min-h-[44px] px-2 py-1"
@@ -734,7 +728,7 @@ const ResidentHomeView = ({
                             {nearbyList.map(item => {
                                 const ItemIcon = item.icon;
                                 return (
-                                    <div 
+                                    <div
                                         key={item.id}
                                         onClick={() => setActiveModal('map')}
                                         className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer group min-h-[48px]"
@@ -766,7 +760,7 @@ const ResidentHomeView = ({
                         </div>
 
                         {/* Visible "View more" Interactive Footer */}
-                        <button 
+                        <button
                             type="button"
                             onClick={() => setActiveModal('map')}
                             className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/50 hover:bg-orange-50/70 dark:hover:bg-orange-950/30 border-t border-slate-100 dark:border-slate-800 text-center text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] cursor-pointer transition-colors flex items-center justify-center gap-1.5 min-h-[48px]"
@@ -780,7 +774,7 @@ const ResidentHomeView = ({
 
                 {/* ── RIGHT COLUMN (Secondary Sidebar Content, ~30-35% on desktop) ── */}
                 <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-4 sm:gap-5 w-full">
-                    
+
                     {/* 1. City Updates Card */}
                     <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
                         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -790,8 +784,8 @@ const ResidentHomeView = ({
                                     City updates
                                 </h3>
                             </div>
-                            <button 
-                                onClick={() => handleSetTab('overview')} 
+                            <button
+                                onClick={() => handleSetTab('overview')}
                                 className="text-xs font-bold text-[#ff6b00] hover:underline cursor-pointer"
                             >
                                 View all
@@ -800,7 +794,7 @@ const ResidentHomeView = ({
 
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                             {displayUpdates.map((update, uIdx) => (
-                                <div 
+                                <div
                                     key={update.id || uIdx}
                                     onClick={() => { setSelectedPost(update); setActiveModal('post-details'); }}
                                     className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-start justify-between gap-2 cursor-pointer group"
@@ -894,6 +888,8 @@ const formatRelativeTime = (dateStr) => {
 const LguFeed = ({
     lguUpdates = [],
     loadingAdvisories,
+    advisoriesError,
+    onRetryAdvisories,
     getIconForCategory,
     setSelectedPost,
     setActiveModal,
@@ -935,11 +931,11 @@ const LguFeed = ({
     const criticalCount = lguUpdates.filter(u => {
         const p = (u.priority || '').toLowerCase();
         return p === 'critical' || p === 'urgent';
-    }).length || 2;
-    const totalCount = lguUpdates.length || 12;
+    }).length;
+    const totalCount = lguUpdates.length;
     const lastUpdated = lguUpdates[0]?.created_at
         ? formatRelativeTime(lguUpdates[0].created_at)
-        : '1h ago';
+        : (loadingAdvisories ? 'Updating…' : advisoriesError ? 'Unavailable' : 'No data');
 
     // 3. Services & Emergency Contacts
     const emergencyHotlines = [
@@ -974,14 +970,14 @@ const LguFeed = ({
                         <Bell className="text-orange-500" size={24} /> City Updates &amp; Advisories
                     </h2>
                     <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Verified municipal advisories, public utility alerts, and engineering notices across Caloocan.
+                        Municipal advisories, public utility alerts, and engineering notices across Caloocan.
                     </p>
                 </div>
             </div>
 
             {/* ── 2-Column Responsive Layout: Content directly beside sidebar on left, support rail on right ── */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                
+
                 {/* ── PRIMARY COLUMN: City Updates Content (Directly beside the sidebar, lg:col-span-8 xl:col-span-8) ── */}
                 <div className="lg:col-span-8 xl:col-span-8 space-y-4">
                     {/* Interactive Category Filter Tabs Capsule */}
@@ -1037,6 +1033,19 @@ const LguFeed = ({
                             <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
                                 <Loader2 className="animate-spin text-orange-500" size={28} />
                                 <span className="text-xs font-medium">{t('Synchronizing Live Advisories...')}</span>
+                            </div>
+                        ) : advisoriesError ? (
+                            <div role="alert" className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl border border-rose-200 dark:border-rose-900/60 p-6">
+                                <AlertTriangle className="mx-auto mb-3 text-rose-600 dark:text-rose-400" size={36} />
+                                <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">Advisories could not be loaded</p>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">The feed is temporarily unavailable. No advisory totals are being shown.</p>
+                                <button
+                                    type="button"
+                                    onClick={onRetryAdvisories}
+                                    className="mt-4 min-h-11 rounded-xl bg-[#B9380B] px-4 py-2 text-xs font-bold text-white hover:bg-[#9F2F09] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
+                                >
+                                    Try again
+                                </button>
                             </div>
                         ) : filteredUpdates.length === 0 ? (
                             <div className="text-center text-slate-400 py-16 bg-white dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 p-6">
@@ -1104,7 +1113,11 @@ const LguFeed = ({
                                                 className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/70 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700/60"
                                                 title="Cite this reference code when contacting city dispatch or LGU hotlines"
                                             >
-                                                Bulletin Ref: <strong className="text-slate-700 dark:text-slate-200">{update.advisory_id || 'PUB-4029'}</strong>
+                                                {update.advisory_id || update.id ? (
+                                                    <>Bulletin Ref: <strong className="text-slate-700 dark:text-slate-200">{update.advisory_id || update.id}</strong></>
+                                                ) : (
+                                                    <strong className="text-slate-700 dark:text-slate-200">Reference unavailable</strong>
+                                                )}
                                             </span>
 
                                             <button
@@ -1125,7 +1138,7 @@ const LguFeed = ({
 
                 {/* ── RIGHT SUPPORT RAIL: Contextual Glanceable Cards (lg:col-span-4 xl:col-span-4) ── */}
                 <aside className="lg:col-span-4 xl:col-span-4 space-y-4 lg:sticky lg:top-20 self-start">
-                    
+
                     {/* 1. This Month At A Glance */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
                         <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-3 px-1">
@@ -1138,7 +1151,7 @@ const LguFeed = ({
                                     <span className="text-[10px] font-black uppercase tracking-wider text-red-700 dark:text-red-400">Critical</span>
                                 </div>
                                 <div className="text-xl font-bold font-display text-red-700 dark:text-red-300">
-                                    {criticalCount}
+                                    {loadingAdvisories || advisoriesError ? '—' : criticalCount}
                                 </div>
                                 <div className="text-[10.5px] text-red-600/80 dark:text-red-400/70 font-medium">
                                     Urgent alerts
@@ -1151,7 +1164,7 @@ const LguFeed = ({
                                     <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">Total</span>
                                 </div>
                                 <div className="text-xl font-bold font-display text-blue-700 dark:text-blue-300">
-                                    {totalCount}
+                                    {loadingAdvisories || advisoriesError ? '—' : totalCount}
                                 </div>
                                 <div className="text-[10.5px] text-blue-600/80 dark:text-blue-400/70 font-medium">
                                     Advisories logged
@@ -1225,32 +1238,13 @@ const LguFeed = ({
     );
 };
 
-// ── Status Badge Configurations (WCAG AA Compliant in Light & Dark) ───────────
-const STATUS_CONFIG = {
-    pending:           { label: 'Pending',      cls: 'bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',      dot: 'bg-amber-500'  },
-    unverified:        { label: 'Pending',      cls: 'bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',      dot: 'bg-amber-500'  },
-    in_progress:       { label: 'In Progress',  cls: 'bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-500/30',            dot: 'bg-blue-500'   },
-    approved_internal: { label: 'In Progress',  cls: 'bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-500/30',            dot: 'bg-blue-500'   },
-    assigned:          { label: 'In Progress',  cls: 'bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-500/30',            dot: 'bg-blue-500'   },
-    dispatched:        { label: 'In Progress',  cls: 'bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-500/30',            dot: 'bg-blue-500'   },
-    resolved:          { label: 'Resolved',     cls: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30', dot: 'bg-emerald-500' },
-    rejected:          { label: 'Rejected',     cls: 'bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-500/30',            dot: 'bg-rose-500'   },
-    cancelled:         { label: 'Cancelled',    cls: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 border-slate-200 dark:border-slate-700',            dot: 'bg-slate-500'  },
-    verified:          { label: 'Reported',     cls: 'bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',      dot: 'bg-amber-500'  },
-    received:          { label: 'Reported',     cls: 'bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',      dot: 'bg-amber-500'  },
-};
-
 const StatusBadge = ({ status }) => {
-    const key = (status || '').toLowerCase().replace(/[\s-]/g, '_');
-    const cfg = STATUS_CONFIG[key] || {
-        label: 'Reported',
-        cls: 'bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',
-        dot: 'bg-amber-500'
-    };
+    const descriptor = getStatusDescriptor(status);
+    const StatusIcon = descriptor.icon;
     return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${cfg.cls} shrink-0`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-            {cfg.label}
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${descriptor.badgeClass} shrink-0`}>
+            <StatusIcon size={12} aria-hidden="true" />
+            {descriptor.label}
         </span>
     );
 };
@@ -1263,7 +1257,7 @@ const sanitizeDescription = (text) => {
     if (!text || typeof text !== 'string') return null;
     const trimmed = text.trim();
     const lower = trimmed.toLowerCase();
-    
+
     // Ignore generic placeholders
     if (
         lower === 'citizen report from pulso app.' ||
@@ -1284,24 +1278,12 @@ const sanitizeDescription = (text) => {
 };
 
 // ── Mini Pulseline Progress Tracker ───────────────────────────────────────────
-const REPORT_TRACKER_STEPS = [
-    { id: 'reported', label: 'Reported' },
-    { id: 'in_progress', label: 'In Progress' },
-    { id: 'resolved', label: 'Resolved' }
-];
-
-const getReportTrackerIndex = (status) => {
-    const s = (status || '').toLowerCase();
-    if (s === 'resolved') return 2;
-    if (s === 'in_progress' || s === 'dispatched' || s === 'assigned' || s === 'approved_internal' || s === 'verified' || s === 'reviewed' || s === 'under_review') return 1;
-    return 0; // pending, unverified, reported/received
-};
-
 const MiniProgressTracker = ({ status, resolutionDays }) => {
     const isRejected = status === 'rejected';
     const isCancelled = status === 'cancelled';
     const isResolved = status === 'resolved';
-    const currentStepIndex = getReportTrackerIndex(status);
+    const currentStepIndex = getReportWorkflowIndex(status);
+    const statusDescriptor = getStatusDescriptor(status);
 
     if (isRejected) {
         return (
@@ -1321,6 +1303,15 @@ const MiniProgressTracker = ({ status, resolutionDays }) => {
         );
     }
 
+    if (currentStepIndex < 0) {
+        return (
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100/80 dark:bg-slate-900/60 px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <Info size={15} className="shrink-0 text-slate-500" />
+                <span>Status: {statusDescriptor.label}. Workflow position is awaiting reconciliation.</span>
+            </div>
+        );
+    }
+
     return (
         <div className="w-full bg-slate-50/80 dark:bg-slate-950/50 rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
             {/* Header Stage Notice */}
@@ -1329,20 +1320,19 @@ const MiniProgressTracker = ({ status, resolutionDays }) => {
                     <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse ring-2 ring-orange-500/20 shrink-0" />
                     <span className="uppercase tracking-wider text-[10px] text-slate-400 dark:text-slate-500 font-mono">Progress:</span>
                     <span className="text-orange-600 dark:text-orange-400 font-semibold text-xs sm:text-[13px]">
-                        {currentStepIndex === 0 && 'Report submitted — awaiting action'}
-                        {currentStepIndex === 1 && 'In progress — field crew dispatched'}
-                        {currentStepIndex === 2 && `Resolved${resolutionDays !== null ? ` in ${resolutionDays}d` : ''}`}
+                        {statusDescriptor.label}
+                        {statusDescriptor.key === 'resolved' && resolutionDays !== null ? ` — ${resolutionDays}d` : ''}
                     </span>
                 </div>
                 <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/80 font-bold hidden sm:inline-block">
-                    Step {currentStepIndex + 1} of 3
+                    Step {currentStepIndex + 1} of {REPORT_WORKFLOW_STEPS.length}
                 </span>
             </div>
 
-            {/* 3-Step Horizontal Pulse Track */}
+            {/* Canonical horizontal Pulseline tracker */}
             <div className="flex items-start w-full px-1 pt-1 pb-1">
-                {REPORT_TRACKER_STEPS.map((step, idx) => {
-                    const isCompleted = idx < currentStepIndex || (isResolved && idx <= 2);
+                {REPORT_WORKFLOW_STEPS.map((step, idx) => {
+                    const isCompleted = idx < currentStepIndex || (isResolved && idx <= REPORT_WORKFLOW_STEPS.length - 1);
                     const isCurrent = idx === currentStepIndex && !isResolved;
                     return (
                         <React.Fragment key={step.id}>
@@ -1378,7 +1368,7 @@ const MiniProgressTracker = ({ status, resolutionDays }) => {
                             </div>
 
                             {/* Connector line segment between steps */}
-                            {idx < REPORT_TRACKER_STEPS.length - 1 && (
+                            {idx < REPORT_WORKFLOW_STEPS.length - 1 && (
                                 <div className="flex-1 mt-[12px] sm:mt-[13px] mx-1 h-[3px] rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
                                     <div
                                         className="h-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-500 rounded-full transition-all duration-500"
@@ -1442,19 +1432,19 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                     {report.image_url ? (
                         <button
                             type="button"
-                            onClick={() => setZoomedImage(`http://localhost:33159${report.image_url}`)}
+                            onClick={() => setZoomedImage(`${API_BASE_URL}${report.image_url}`)}
                             className="w-full h-full block relative focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer"
                             aria-label={`View full-size photo for report ${report.ticket_id}`}
                         >
                             <img
-                                src={`http://localhost:33159${report.image_url}`}
+                                src={`${API_BASE_URL}${report.image_url}`}
                                 alt={`${report.category || 'Report'} photo`}
                                 loading="lazy"
                                 className="w-full h-full object-cover object-center transition-transform duration-500 ease-out group-hover/thumb:scale-105"
                             />
                             {/* Watermark masking gradient at bottom */}
                             <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 via-black/25 to-transparent pointer-events-none" />
-                            
+
                             {/* Quick Zoom Affordance */}
                             <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold flex items-center gap-1 opacity-90 group-hover/thumb:opacity-100 transition-opacity">
                                 <Maximize2 size={11} />
@@ -1490,6 +1480,12 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/70 dark:bg-white/10 backdrop-blur-md text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-white/15 shadow-xs">
                                     <Clock size={11} className="text-slate-600 dark:text-slate-300" />
                                     <span>Longest Waiting ({daysWaiting}d)</span>
+                                </span>
+                            )}
+                            {(report.is_claimed || report.claimed_by_user_id || report.claimed_at) && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800/60 shadow-xs">
+                                    <Link2 size={11} className="text-orange-500" />
+                                    <span>Claimed Ticket</span>
                                 </span>
                             )}
                         </div>
@@ -1593,7 +1589,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                             {isResolved && report.resolution_image_url && (
                                 <button
                                     type="button"
-                                    onClick={() => setZoomedImage(`http://localhost:33159${report.resolution_image_url}`)}
+                                    onClick={() => setZoomedImage(`${API_BASE_URL}${report.resolution_image_url}`)}
                                     aria-label={`View photo proof for report ${report.ticket_id}`}
                                     className="text-[12px] font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-white
                                                border border-emerald-300 dark:border-emerald-600/40
@@ -1725,7 +1721,7 @@ const ReportCardSkeleton = () => (
     </div>
 );
 
-const MyReports = ({ userReports = [], loadingReports, handleSetModal, containerVariants, setZoomedImage, reportStatusFilter, setReportStatusFilter, handleCancelReport, t }) => {
+const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenClaimModal, containerVariants, setZoomedImage, reportStatusFilter, setReportStatusFilter, handleCancelReport, t }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
     const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
@@ -2171,12 +2167,12 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
 
                 {/* ── Left Column: Identity & Civic Stats ──────────────── */}
                 <div className="flex flex-col items-center gap-6 shrink-0 w-full lg:w-72">
-                    
+
                     {/* Avatar with Camera Upload Overlay */}
                     <div className="relative group">
                         <div className="w-36 h-36 rounded-full bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 font-black flex items-center justify-center text-white text-5xl shadow-[0_20px_40px_rgba(249,115,22,0.25)] border-4 border-white/20 dark:border-slate-800 relative overflow-hidden transition-transform duration-200 group-hover:scale-[1.02]">
                             {user.avatar}
-                            
+
                             {/* Hover Upload Overlay */}
                             <button
                                 type="button"
@@ -2559,7 +2555,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
         setIsConfirmOpen(false);
         setChanging(true);
         try {
-            const res = await fetch('http://localhost:33159/api/auth/change-password', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2599,7 +2595,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
             setIs2FAModalOpen(true);
             setOtpInput('');
             try {
-                const res = await fetch('http://localhost:33159/api/auth/send-2fa-code', {
+                const res = await fetch(`${API_BASE_URL}/api/auth/send-2fa-code`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: residentEmail })
@@ -2624,7 +2620,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
         e.preventDefault();
         setIsVerifyingOtp(true);
         try {
-            const res = await fetch('http://localhost:33159/api/auth/verify-2fa-code', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/verify-2fa-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: residentEmail, code: otpInput.trim() })
@@ -2659,10 +2655,10 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
 
     return (
         <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full space-y-6">
-            
+
             {/* ── Main Password Security Portal Card ── */}
             <div className="w-full bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 sm:p-10 transition-colors">
-                
+
                 {/* Header with Title and Neutral Sign Out Button */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-8 border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3.5">
@@ -2691,7 +2687,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
 
                 {/* Password Update Form */}
                 <form onSubmit={handleUpdatePassword} className="space-y-8 pt-8 max-w-2xl">
-                    
+
                     {/* Section 1: Current Password */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
@@ -2738,7 +2734,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            
+
                             {/* New Password Input */}
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 ml-1">
@@ -2870,8 +2866,8 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                                         }`}
                                     >
                                         <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                                            req.met 
-                                                ? 'bg-emerald-500 text-white' 
+                                            req.met
+                                                ? 'bg-emerald-500 text-white'
                                                 : 'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'
                                         }`}>
                                             {req.met && <Check size={11} strokeWidth={3} />}
@@ -2930,7 +2926,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
 
             {/* ── Secondary Cards: Gmail 2FA & Active Sessions ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
+
                 {/* Two-Factor Authentication via Gmail Card */}
                 <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between gap-5">
                     <div className="space-y-3">
@@ -3002,14 +2998,14 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
             {/* ── Gmail 2FA Activation & OTP Verification Modal ── */}
             <AnimatePresence>
                 {is2FAModalOpen && (
-                    <motion.div 
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }} 
-                        exit={{ opacity: 0 }} 
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                         className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
                         onClick={() => setIs2FAModalOpen(false)}
                     >
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0.95, opacity: 0, y: 15 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.95, opacity: 0, y: 15 }}
@@ -3019,7 +3015,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                             <div className="w-16 h-16 rounded-2xl bg-orange-500/10 dark:bg-orange-500/20 text-orange-500 flex items-center justify-center mx-auto mb-4">
                                 <Mail size={30} />
                             </div>
-                            
+
                             <h3 className="text-xl font-extrabold mb-1.5 font-heading">
                                 Verify Your Gmail Account
                             </h3>
@@ -3060,14 +3056,14 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                                 </div>
 
                                 <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={() => setIs2FAModalOpen(false)}
                                         className="flex-1 py-3 px-4 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center"
                                     >
                                         Cancel
                                     </button>
-                                    <button 
+                                    <button
                                         type="submit"
                                         disabled={otpInput.length < 6 || isVerifyingOtp}
                                         className={`flex-1 py-3 px-4 min-h-[44px] rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 ${
@@ -3095,14 +3091,14 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
             {/* ── Theme-Aware Password Confirmation Modal ── */}
             <AnimatePresence>
                 {isConfirmOpen && (
-                    <motion.div 
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }} 
-                        exit={{ opacity: 0 }} 
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                         className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
                         onClick={() => setIsConfirmOpen(false)}
                     >
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0.95, opacity: 0, y: 15 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.95, opacity: 0, y: 15 }}
@@ -3119,14 +3115,14 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                                 {t('dashboard.settings.confirmText', { defaultValue: 'Your account credentials will be updated immediately. You will need to use your new password for all future sign-ins.' })}
                             </p>
                             <div className="flex flex-col sm:flex-row gap-2.5">
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => setIsConfirmOpen(false)}
                                     className="flex-1 py-3 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
                                 >
                                     Cancel
                                 </button>
-                                <button 
+                                <button
                                     type="button"
                                     onClick={actuallyUpdatePassword}
                                     className="flex-1 py-3 px-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-orange-500/20 cursor-pointer"
@@ -3275,16 +3271,16 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false }) => 
                             >
                                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                     <div className={`p-1.5 rounded-lg shrink-0 transition-colors ${
-                                        selected 
-                                            ? 'bg-orange-500 text-white shadow-xs' 
+                                        selected
+                                            ? 'bg-orange-500 text-white shadow-xs'
                                             : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 group-hover:text-orange-500'
                                     }`}>
                                         {meta.icon}
                                     </div>
 
                                     <span className={`text-[13px] font-bold whitespace-nowrap truncate ${
-                                        selected 
-                                            ? 'text-orange-950 dark:text-orange-100 font-extrabold' 
+                                        selected
+                                            ? 'text-orange-950 dark:text-orange-100 font-extrabold'
                                             : 'text-slate-900 dark:text-slate-100'
                                     }`}>
                                         {label}
@@ -3574,7 +3570,7 @@ const ResidentModals = ({
                                                     alt="Incident Preview"
                                                     className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
                                                 />
-                                                
+
                                                 {/* Bottom gradient mask */}
                                                 <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
 
@@ -4032,7 +4028,7 @@ const ResidentModals = ({
                                                             {selectedHazard.image ? (
                                                                 <div style={{ width: '56px', height: '56px', borderRadius: '14px', overflow: 'hidden', marginBottom: '10px', border: `2px solid ${catColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
                                                                     <img
-                                                                        src={selectedHazard.image.startsWith('http') ? selectedHazard.image : `http://localhost:33159${selectedHazard.image.startsWith('/') ? selectedHazard.image : `/${selectedHazard.image}`}`}
+                                                                        src={selectedHazard.image.startsWith('http') ? selectedHazard.image : `${API_BASE_URL}${selectedHazard.image.startsWith('/') ? selectedHazard.image : `/${selectedHazard.image}`}`}
                                                                         alt={selectedHazard.title}
                                                                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                                     />
@@ -4340,7 +4336,7 @@ const ResidentModals = ({
                                 </div>
                                 {selectedPost.has_image && selectedPost.image_url && (
                                     <div className="mt-4 sm:mt-6 rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
-                                        <img src={`http://localhost:33159${selectedPost.image_url}`} alt="Advisory Content" className="w-full object-cover" />
+                                        <img src={`${API_BASE_URL}${selectedPost.image_url}`} alt="Advisory Content" className="w-full object-cover" />
                                     </div>
                                 )}
                                 <div className="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -4595,7 +4591,7 @@ const TopNavigation = ({
     const matchedActions = q ? quickActions.filter(a => a.label.toLowerCase().includes(q)) : [];
 
     // 2. User's Reports
-    const matchedReports = q ? userReports.filter(r => 
+    const matchedReports = q ? userReports.filter(r =>
         (r.ticket_id && r.ticket_id.toLowerCase().includes(q)) ||
         (r.category && r.category.toLowerCase().includes(q)) ||
         (r.ai_category && r.ai_category.toLowerCase().includes(q)) ||
@@ -5012,7 +5008,7 @@ const TopNavigation = ({
                                         ) : (
                                             notifications.filter(n => !n.is_hidden).map(notification => (
                                                 <div key={notification.id} className="relative group block w-full">
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleNotificationClick(notification)}
                                                         className="w-full text-left p-2.5 sm:p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex gap-2.5 sm:gap-3 overflow-hidden pr-8"
                                                     >
@@ -5028,13 +5024,13 @@ const TopNavigation = ({
                                                             <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-3 right-3 group-hover:opacity-0 transition-opacity"></div>
                                                         )}
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         onClick={async (e) => {
                                                             e.preventDefault();
                                                             e.stopPropagation();
                                                             setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_hidden: true } : n));
                                                             try {
-                                                                await fetch(`http://localhost:33159/api/notifications/${notification.id}`, {
+                                                                await fetch(`${API_BASE_URL}/api/notifications/${notification.id}`, {
                                                                     method: 'DELETE',
                                                                     headers: { 'Authorization': `Bearer ${token}` }
                                                                 });
@@ -5105,8 +5101,8 @@ const TopNavigation = ({
                                             className="bg-transparent border-none outline-none text-sm w-full text-slate-900 dark:text-white placeholder-slate-400 font-medium"
                                         />
                                         {searchQuery && (
-                                            <button 
-                                                onClick={() => setSearchQuery('')} 
+                                            <button
+                                                onClick={() => setSearchQuery('')}
                                                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
                                                 title="Clear search query"
                                             >
@@ -5142,6 +5138,22 @@ export default function ResidentDashboard() {
     const { theme, changeTheme } = useTheme();
     const navigate = useNavigate();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
+    const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+    const [claimModalInitialTicket, setClaimModalInitialTicket] = useState('');
+    const [claimModalInitialToken, setClaimModalInitialToken] = useState('');
+
+    // Contextual Claim Modal States & URL Parameter Deep-linking
+    useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        const claimTicketParam = searchParams.get('claim_ticket') || searchParams.get('claim_id');
+        const claimTokenParam = searchParams.get('claim_token') || searchParams.get('token');
+        if (claimTicketParam || claimTokenParam) {
+            if (claimTicketParam) setClaimModalInitialTicket(claimTicketParam);
+            if (claimTokenParam) setClaimModalInitialToken(claimTokenParam);
+            setIsClaimModalOpen(true);
+            setActiveTab('reports');
+        }
+    }, []);
     const [activeModal, setActiveModal] = useState(null); // 'file-report', 'post-details'
     const [zoomedImage, setZoomedImage] = useState(null);
     const [reportToCancel, setReportToCancel] = useState(null);
@@ -5308,6 +5320,8 @@ export default function ResidentDashboard() {
 
     const [lguUpdates, setLguUpdates] = useState([]);
     const [loadingAdvisories, setLoadingAdvisories] = useState(true);
+    const [advisoriesError, setAdvisoriesError] = useState(null);
+    const [advisoriesReloadKey, setAdvisoriesReloadKey] = useState(0);
 
     // New State for User Reports
     const [userReports, setUserReports] = useState([]);
@@ -5336,7 +5350,7 @@ export default function ResidentDashboard() {
 
     const fetchUserReports = async (userId) => {
         try {
-            const response = await fetch(`http://localhost:33159/api/reports/user/${userId}`, {
+            const response = await fetch(`${API_BASE_URL}/api/reports/user/${userId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
@@ -5354,7 +5368,7 @@ export default function ResidentDashboard() {
 
     const fetchNotifications = async (userId) => {
         try {
-            const response = await fetch(`http://localhost:33159/api/notifications/user/${userId}`, {
+            const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
@@ -5369,7 +5383,7 @@ export default function ResidentDashboard() {
     const handleMarkAllRead = async () => {
         if (!currentUser) return;
         try {
-            const response = await fetch(`http://localhost:33159/api/notifications/user/${currentUser.id}/read`, {
+            const response = await fetch(`${API_BASE_URL}/api/notifications/user/${currentUser.id}/read`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -5386,7 +5400,7 @@ export default function ResidentDashboard() {
         // Mark as read if it's currently unread
         if (!notif.is_read) {
             try {
-                await fetch(`http://localhost:33159/api/notifications/${notif.id}/read`, {
+                await fetch(`${API_BASE_URL}/api/notifications/${notif.id}/read`, {
                     method: 'PATCH',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -5420,16 +5434,20 @@ export default function ResidentDashboard() {
     useEffect(() => {
         console.log("PULSO: ResidentDashboard useEffect triggered. currentUser:", currentUser?.id);
         const fetchAdvisories = async () => {
+            setLoadingAdvisories(true);
+            setAdvisoriesError(null);
             try {
-                const response = await fetch('http://localhost:33159/api/advisories', {
+                const response = await fetch(`${API_BASE_URL}/api/advisories`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (response.ok) {
-                    const data = await response.json();
-                    setLguUpdates(data);
-                }
+                if (!response.ok) throw new Error(`Advisory request failed (${response.status})`);
+                const data = await response.json();
+                if (!Array.isArray(data)) throw new Error('Advisory response was not a list');
+                setLguUpdates(data);
             } catch (error) {
                 console.error("PULSO: Error fetching advisories:", error);
+                setLguUpdates([]);
+                setAdvisoriesError('Advisories are temporarily unavailable.');
             } finally {
                 setLoadingAdvisories(false);
             }
@@ -5450,7 +5468,7 @@ export default function ResidentDashboard() {
         // Auto-refresh user data and reports every 30s to keep status badges sync'd
         const interval = setInterval(loadData, 30000);
         return () => clearInterval(interval);
-    }, [currentUser]);
+    }, [currentUser, advisoriesReloadKey]);
 
     const [reportNotes, setReportNotes] = useState('');
     const [reportCategory, setReportCategory] = useState([]);
@@ -5483,14 +5501,14 @@ export default function ResidentDashboard() {
         else if (status === 'pending' || status === 'unverified') color = '#ef4444';
         else if (status === 'rejected') color = '#64748b';
         else if (status === 'cancelled') color = '#0f172a';
-        
+
         // Overwrite color for Public Facilities
         if (isPublicFacility) {
             color = isSelected ? '#16a34a' : '#22c55e';
         }
-        
-        let svgIcon = ''; 
-        
+
+        let svgIcon = '';
+
         // Crisp, solid vector shapes corresponding to report classifications
         if (cat.includes('flood') || cat.includes('water') || cat.includes('drain')) {
             // Droplet
@@ -5612,7 +5630,7 @@ export default function ResidentDashboard() {
                 let thumbUrl = rawImg;
                 if (!rawImg.startsWith('http') && !rawImg.startsWith('data:')) {
                     const cleanPath = rawImg.startsWith('/') ? rawImg : `/${rawImg}`;
-                    thumbUrl = `http://localhost:33159/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
+                    thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
                 }
 
                 const img = new Image();
@@ -5716,7 +5734,7 @@ export default function ResidentDashboard() {
                     if (thumbUrl.includes('/api/thumbnails')) {
                         const fallbackImg = new Image();
                         fallbackImg.crossOrigin = 'anonymous';
-                        fallbackImg.src = `http://localhost:33159${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
+                        fallbackImg.src = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
                     }
                 };
                 img.src = thumbUrl;
@@ -5810,7 +5828,7 @@ export default function ResidentDashboard() {
                 formData.append('image', blob, 'analysis.jpg');
             }
 
-            const res = await fetch('http://localhost:33159/api/reports/analyze', {
+            const res = await fetch(`${API_BASE_URL}/api/reports/analyze`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
@@ -5871,11 +5889,11 @@ export default function ResidentDashboard() {
                 console.warn("Frontend Google geocoding failed...", err);
             }
         }
-        
+
         // 1.5 Fallback to Backend Google Maps API (often works when frontend keys hit CORS or referrer restrictions)
         if (!primaryAddress) {
             try {
-                const res = await fetch(`http://localhost:33159/api/geocode/reverse?lat=${lat}&lng=${lng}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const res = await fetch(`${API_BASE_URL}/api/geocode/reverse?lat=${lat}&lng=${lng}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (res.ok) {
                     const data = await res.json();
                     if (data.address && !data.address.startsWith("Lat:")) {
@@ -5886,7 +5904,7 @@ export default function ResidentDashboard() {
                 console.warn("Backend Google geocoding failed...", err);
             }
         }
-        
+
         // 2. Try Free OpenStreetMap (Nominatim) if Google Maps completely fails
         if (!primaryAddress) {
             try {
@@ -5912,7 +5930,7 @@ export default function ResidentDashboard() {
                     if (shortCode.length >= 10 && shortCode.includes('+')) {
                         shortCode = shortCode.substring(4);
                     }
-                    
+
                     const locality = data.locality || data.city || '';
                     const region = (data.principalSubdivision === "National Capital Region") ? "Metro Manila" : (data.principalSubdivision || '');
                     plusCodeStr = locality ? `${shortCode} ${locality}, ${region}`.replace(/,\s*$/, '') : shortCode;
@@ -5921,7 +5939,7 @@ export default function ResidentDashboard() {
         } catch (err) {
             console.warn("BigDataCloud Plus Code API failed...", err);
         }
-        
+
         // Final Formatting
         setLocationAddress(primaryAddress || `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`);
         setPlusCode(plusCodeStr);
@@ -5953,7 +5971,7 @@ export default function ResidentDashboard() {
                 formData.append('image', blob, `report-${Date.now()}.jpg`);
             }
 
-            const response = await fetch('http://localhost:33159/api/reports', {
+            const response = await fetch(`${API_BASE_URL}/api/reports`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
@@ -5985,7 +6003,7 @@ export default function ResidentDashboard() {
     const confirmCancelReport = async (reportId) => {
         setReportToCancel(null);
         try {
-            const res = await fetch(`http://localhost:33159/api/reports/${reportId}/cancel`, {
+            const res = await fetch(`${API_BASE_URL}/api/reports/${reportId}/cancel`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -6021,7 +6039,7 @@ export default function ResidentDashboard() {
 
     const fetchUser = async (userId) => {
         try {
-            const response = await fetch(`http://localhost:33159/api/users/${userId}`, {
+            const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
@@ -6050,7 +6068,7 @@ export default function ResidentDashboard() {
             if (field === 'email') payload.email = value;
             if (field === 'phone') payload.phone_number = value;
 
-            const response = await fetch(`http://localhost:33159/api/users/${currentUser.id}`, {
+            const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -6094,7 +6112,7 @@ export default function ResidentDashboard() {
         setIsAILoading(true);
 
         try {
-            const resp = await fetch('http://localhost:33159/api/ai/assistant', {
+            const resp = await fetch(`${API_BASE_URL}/api/ai/assistant`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
@@ -6272,7 +6290,7 @@ export default function ResidentDashboard() {
                                                 </div>
                                                 <div>
                                                     <h4 className={`font-bold text-[15px] ${notif.is_read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>
-                                                        {notif.title} 
+                                                        {notif.title}
                                                         {notif.is_hidden && <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-500 px-2.5 py-0.5 rounded-md ml-3 uppercase tracking-wider font-bold">Dismissed</span>}
                                                     </h4>
                                                     <p className={`text-[13px] mt-1 ${notif.is_read ? 'text-slate-500 dark:text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{notif.message}</p>
@@ -6281,7 +6299,7 @@ export default function ResidentDashboard() {
                                             </div>
                                             <div className="flex flex-col gap-2 items-end shrink-0">
                                                 {!notif.is_read && (
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleNotificationClick(notif)}
                                                         className="text-[11px] uppercase tracking-wider font-bold text-blue-500 hover:text-blue-600 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition focus:outline-none"
                                                     >
@@ -6289,13 +6307,13 @@ export default function ResidentDashboard() {
                                                     </button>
                                                 )}
                                                 {!notif.is_hidden && (
-                                                    <button 
+                                                    <button
                                                         onClick={async (e) => {
                                                             e.preventDefault();
                                                             e.stopPropagation();
                                                             setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_hidden: true } : n));
                                                             try {
-                                                                await fetch(`http://localhost:33159/api/notifications/${notif.id}`, {
+                                                                await fetch(`${API_BASE_URL}/api/notifications/${notif.id}`, {
                                                                     method: 'DELETE',
                                                                     headers: { 'Authorization': `Bearer ${token}` }
                                                                 });
@@ -6385,6 +6403,7 @@ export default function ResidentDashboard() {
                                     userReports={userReports}
                                     loadingReports={loadingReports}
                                     handleSetModal={handleSetModal}
+                                    onOpenClaimModal={() => setIsClaimModalOpen(true)}
                                     containerVariants={containerVariants}
                                     setZoomedImage={setZoomedImage}
                                     reportStatusFilter={reportStatusFilter}
@@ -6400,6 +6419,8 @@ export default function ResidentDashboard() {
                                 <LguFeed
                                     lguUpdates={lguUpdates}
                                     loadingAdvisories={loadingAdvisories}
+                                    advisoriesError={advisoriesError}
+                                    onRetryAdvisories={() => setAdvisoriesReloadKey(key => key + 1)}
                                     getIconForCategory={getIconForCategory}
                                     setSelectedPost={setSelectedPost}
                                     setActiveModal={setActiveModal}
@@ -6445,7 +6466,7 @@ export default function ResidentDashboard() {
             </main>
 
             {/* ── Mobile Bottom Navigation Bar (Ultra-responsive, glassmorphism, touch-optimized, persistent across all scroll states) ── */}
-            <nav 
+            <nav
                 className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4rem] h-[calc(4rem+env(safe-area-inset-bottom,0px))] px-2 flex items-center justify-around select-none w-full"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             >
@@ -6694,6 +6715,20 @@ export default function ResidentDashboard() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* ── Contextual Claim Guest Report Modal ── */}
+            <ClaimReportModal
+                isOpen={isClaimModalOpen}
+                onClose={() => setIsClaimModalOpen(false)}
+                onSuccess={() => {
+                    if (currentUser?.id) {
+                        fetchUserReports(currentUser.id);
+                    }
+                }}
+                initialTicketId={claimModalInitialTicket}
+                initialTrackingToken={claimModalInitialToken}
+                token={token}
+            />
         </div>
     );
 }

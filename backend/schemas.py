@@ -1,33 +1,134 @@
-from pydantic import BaseModel
-from typing import Optional, List
+import json
+from pydantic import BaseModel, field_validator
+from typing import Optional, List, Any, Dict
 from datetime import datetime
 
-class UserBase(BaseModel):
+# ─────────────────────────────────────────────────────────────────────────────
+# Citizen / Resident Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Citizen / Resident Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ResidentBase(BaseModel):
     full_name: str
     email: str
     phone_number: Optional[str] = None
-    role: Optional[str] = "resident"
     address: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
+
+class ResidentCreate(ResidentBase):
+    password: str
+
+class ResidentUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
+
+class ResidentResponse(ResidentBase):
+    id: int
+    trust_score: int
+    is_verified: bool
+    kyc_level: str
+    created_at: datetime
+    role: str = "resident"
+
+    class Config:
+        from_attributes = True
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Government Official Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class OfficialBase(BaseModel):
+    full_name: str
+    email: str
+    display_name: Optional[str] = None
+    role_id: Optional[int] = None
+    account_type: Optional[str] = "staff"
+    primary_jurisdiction: Optional[List[str]] = None
     barangay: Optional[str] = None
+    address: Optional[str] = None
+    phone_number: Optional[str] = None
+
+class OfficialCreate(OfficialBase):
+    password: str
+
+class OfficialUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    display_name: Optional[str] = None
+    role_id: Optional[int] = None
+    account_type: Optional[str] = None
+    primary_jurisdiction: Optional[List[str]] = None
+    barangay: Optional[str] = None
+    address: Optional[str] = None
+    phone_number: Optional[str] = None
+    is_suspended: Optional[bool] = None
+    suspension_reason: Optional[str] = None
+
+class OfficialResponse(OfficialBase):
+    id: int
+    is_active: bool
+    is_suspended: bool
+    created_at: datetime
+    role: str
+    capabilities: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared / Polymorphic Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class UserResponse(BaseModel):
+    """
+    Polymorphic response for /api/me and shared user lookup.
+    Exposes fields common to both tables.
+    """
+    id: int
+    full_name: str
+    email: str
+    role: str
+    phone_number: Optional[str] = None
+    is_active: bool = True
+    is_verified: bool = True # Officials are True by property
+    is_suspended: bool = False
+    trust_score: int = 100
+    created_at: datetime
+    display_name: Optional[str] = None # Mainly for officials
+    kyc_level: Optional[str] = None # Mainly for residents
+    capabilities: Optional[Dict[str, Any]] = None
+
+    # Location fields (Normalized vs Legacy)
+    barangay: Optional[str] = None
+    address: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
 
 class UserUpdate(BaseModel):
+    """Legacy/Shared update schema - redirects to ResidentUpdate or OfficialUpdate in CRUD."""
     full_name: Optional[str] = None
     email: Optional[str] = None
     phone_number: Optional[str] = None
     address: Optional[str] = None
     barangay: Optional[str] = None
+    barangay_id: Optional[int] = None
+    district_id: Optional[int] = None
 
-class UserCreate(UserBase):
-    password: str
 
-class UserResponse(UserBase):
-    id: int
-    trust_score: int
-    is_verified: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+# ─────────────────────────────────────────────────────────────────────────────
+# Report Schemas (Dual Guest & Registered Support)
+# ─────────────────────────────────────────────────────────────────────────────
 
 class ReportBase(BaseModel):
     category: str
@@ -35,31 +136,145 @@ class ReportBase(BaseModel):
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
     location_string: Optional[str] = None
+    location_barangay: Optional[str] = None
+    barangay_id: Optional[int] = None
     image_url: Optional[str] = None
     resolution_image_url: Optional[str] = None
-    ai_metadata: Optional[str] = None
+    ai_metadata: Optional[Any] = None
+    budget: Optional[float] = None
+    deployment_date: Optional[datetime] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    submission_source: Optional[str] = "web"
+
+    @field_validator('ai_metadata', mode='before')
+    @classmethod
+    def parse_ai_metadata(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except Exception:
+                return v
+        return v
+
 
 class ReportCreate(ReportBase):
-    pass
+    reporter_type: Optional[str] = "registered"
+
+
+class ReportResolutionConfirm(BaseModel):
+    rating: int # 1-5
+    note: Optional[str] = None
+
 
 class ReportResponse(ReportBase):
     id: int
     ticket_id: str
-    user_id: int
+    resident_id: Optional[int] = None
+    reporter_type: str = "registered"
     status: str
     ai_category: Optional[str] = None
     ai_urgency: Optional[str] = None
     ai_summary: Optional[str] = None
     ai_reasoning: Optional[str] = None
     severity_score: Optional[float] = 0.0
-    ai_metadata: Optional[str] = None
     cluster_id: Optional[int] = None
     reporter_name: Optional[str] = None  # Convenience field for dispatcher/management views
+    contact_verified: bool = False
+    claimed_at: Optional[datetime] = None
+    claimed_by_user_id: Optional[int] = None
+    is_claimed: Optional[bool] = False
+    
+    # Secure token fields (populated only upon initial guest creation response; None otherwise)
+    tracking_token: Optional[str] = None
+    tracking_url: Optional[str] = None
+
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public Tracking & Contextual Claim Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PublicTimelineItem(BaseModel):
+    stage: Optional[str] = None
+    status: str
+    label: Optional[str] = None
+    note: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ReportTrackRequest(BaseModel):
+    ticket_id: str
+    tracking_token: Optional[str] = None
+    tracking_code: Optional[str] = None
+
+    @field_validator('ticket_id')
+    @classmethod
+    def normalize_ticket_id(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError('Ticket ID is required.')
+        return v.strip().upper()
+
+    def get_token(self) -> str:
+        token = self.tracking_token or self.tracking_code
+        if not token or not token.strip():
+            raise ValueError('Tracking token or tracking code is required.')
+        return token.strip().upper()
+
+
+class ReportTrackResponse(BaseModel):
+    ticket_id: str
+    category: str
+    description: Optional[str] = None
+    status: str
+    public_status_label: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    location_barangay: Optional[str] = None
+    location_summary: Optional[str] = None
+    location_string: Optional[str] = None
+    image_url: Optional[str] = None
+    resolution_image_url: Optional[str] = None
+    is_claimed: bool = False
+    public_timeline: List[PublicTimelineItem] = []
+    timeline: Optional[List[PublicTimelineItem]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ReportClaimRequest(BaseModel):
+    tracking_token: Optional[str] = None
+    tracking_code: Optional[str] = None
+
+    def get_token(self) -> str:
+        token = self.tracking_token or self.tracking_code
+        if not token or not token.strip():
+            raise ValueError('Tracking token is required to claim a report.')
+        return token.strip().upper()
+
+
+class ReportClaimResponse(BaseModel):
+    message: str = "Report successfully linked to your account."
+    report: Optional[ReportResponse] = None
+    success: bool = True
+
+
+class UserReportsResponse(BaseModel):
+    total: int
+    filter: str = "all"
+    reports: List[ReportResponse] = []
+    skip: int = 0
+    limit: int = 50
 
 class AdvisoryBase(BaseModel):
     department: str
@@ -92,7 +307,9 @@ class NotificationCreate(NotificationBase):
 
 class NotificationResponse(NotificationBase):
     id: int
-    user_id: int
+    resident_id: Optional[int] = None
+    official_id: Optional[int] = None
+    user_id: Optional[int] = None
     is_read: bool
     is_hidden: bool = False
     created_at: datetime
@@ -166,6 +383,15 @@ class ProcessTimelineResponse(BaseModel):
 
     class Config:
         from_attributes = True
+class KYCStatusResponse(BaseModel):
+    is_verified: bool
+    kyc_level: str
+    trust_score: int
+    last_verification: Optional[datetime] = None
+    registration_date: datetime
+
+    class Config:
+        from_attributes = True
 
 # ---------------------------------------------------------------------------
 # News & City Announcements Schemas
@@ -208,4 +434,3 @@ class NewsListResponse(BaseModel):
     page: int
     limit: int
     total_pages: int
-

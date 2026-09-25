@@ -12,6 +12,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import LegalModal from '../components/LegalModal';
 import OfficialBanner from '../components/landing/OfficialBanner';
 import { setAuthSession } from '../utils/authSession';
+import { API_BASE_URL } from '../utils/apiBase';
 import '../index.css';
 
 export default function Login() {
@@ -88,7 +89,7 @@ export default function Login() {
             formData.append('password', password);
             formData.append('captcha_token', captchaValue);
 
-            const response = await fetch('http://localhost:33159/api/auth/login', {
+            const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData,
@@ -122,7 +123,7 @@ export default function Login() {
                 setCanResend(false);
 
                 try {
-                    const res2fa = await fetch('http://localhost:33159/api/auth/send-2fa-code', {
+                    const res2fa = await fetch(`${API_BASE_URL}/api/auth/send-2fa-code`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: userEmail })
@@ -163,7 +164,7 @@ export default function Login() {
         if (!canResend) return;
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:33159/api/auth/resend-code', {
+            const response = await fetch(`${API_BASE_URL}/api/auth/resend-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: verificationEmail }),
@@ -187,7 +188,7 @@ export default function Login() {
         const code = verificationOtp.join('');
 
         try {
-            const response = await fetch('http://localhost:33159/api/auth/verify-email', {
+            const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: verificationEmail, code }),
@@ -208,7 +209,7 @@ export default function Login() {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:33159/api/auth/forgot-password', {
+            const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: recoveryEmail }),
@@ -234,7 +235,7 @@ export default function Login() {
 
         try {
             const code = recoveryOtp.join('');
-            const response = await fetch('http://localhost:33159/api/auth/verify-reset-code', {
+            const response = await fetch(`${API_BASE_URL}/api/auth/verify-reset-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: recoveryEmail, code }),
@@ -264,7 +265,7 @@ export default function Login() {
 
         try {
             const code = recoveryOtp.join('');
-            const response = await fetch('http://localhost:33159/api/auth/reset-password', {
+            const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: recoveryEmail, code, new_password: newPassword }),
@@ -288,7 +289,7 @@ export default function Login() {
         const enteredCode = twoFactorOtp.join('');
 
         try {
-            const res = await fetch('http://localhost:33159/api/auth/verify-2fa-code', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/verify-2fa-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: twoFactorEmail, code: enteredCode })
@@ -336,7 +337,7 @@ export default function Login() {
         if (!canResend) return;
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:33159/api/auth/send-2fa-code', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/send-2fa-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: twoFactorEmail })

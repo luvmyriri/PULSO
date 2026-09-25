@@ -13,14 +13,18 @@ import LegalModal from '../components/LegalModal';
 import OfficialBanner from '../components/landing/OfficialBanner';
 import { setAuthSession, clearAuthSession } from '../utils/authSession';
 
+import { API_BASE_URL } from '../utils/apiBase';
+import { useInteractionHarden } from '../hooks/useInteractionHarden';
+
 export default function GovLanding() {
     const navigate = useNavigate();
+    const captchaPaused = import.meta.env.DEV;
     const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const { throttleAction, isProcessing: loading } = useInteractionHarden();
     const [view, setView] = useState('login'); // 'login' | 'forgot'
     const [recoverySent, setRecoverySent] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -30,82 +34,83 @@ export default function GovLanding() {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        if (!captchaToken) {
+        if (!captchaPaused && !captchaToken) {
             setError('Please complete the security puzzle to proceed.');
-            setLoading(false);
             return;
         }
-        try {
-            const formData = new URLSearchParams();
-            formData.append('username', email);
-            formData.append('password', password);
-            formData.append('captcha_token', captchaToken || '');
+        await throttleAction(async () => {
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', email);
+                formData.append('password', password);
+                if (!captchaPaused) formData.append('captcha_token', captchaToken || '');
 
-            const response = await fetch('http://localhost:33159/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData
-            });
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
 
-            if (response.ok) {
-                const data = await response.json();
-                setAuthSession(data.access_token, data.user);
-                const GOV_ROLES = [
-                    'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
-                    'records_officer','division_chief','design_engineer','estimator',
-                    'cad_operator','project_engineer','construction_foreman','field_worker',
-                    'building_inspector','electrical_inspector','mechanical_inspector',
-                    'dispatcher','manager','system_admin',
-                ];
-                if (GOV_ROLES.includes(data.user.role)) {
-                    navigate('/gov/my-dashboard');
+                if (response.ok) {
+                    const data = await response.json();
+                    setAuthSession(data.access_token, data.user);
+                    const GOV_ROLES = [
+                        'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
+                        'records_officer','division_chief','design_engineer','estimator',
+                        'cad_operator','project_engineer','construction_foreman','field_worker',
+                        'building_inspector','electrical_inspector','mechanical_inspector',
+                        'dispatcher','manager','system_admin',
+                    ];
+                    if (GOV_ROLES.includes(data.user.role)) {
+                        navigate('/gov/my-dashboard');
+                    } else {
+                        setError('Authorized Government Personnel Only. Citizens please use the Citizen Portal.');
+                        clearAuthSession();
+                        if (recaptchaRef.current) recaptchaRef.current.reset();
+                        setCaptchaToken(null);
+                    }
                 } else {
-                    setError('Authorized Government Personnel Only. Citizens please use the Citizen Portal.');
-                    clearAuthSession();
-                    setLoading(false);
+                    const errData = await response.json();
+                    const msg = typeof errData.detail === 'object'
+                        ? (Array.isArray(errData.detail) ? errData.detail[0].msg : JSON.stringify(errData.detail))
+                        : errData.detail;
+                    setError(msg || 'Authentication failed');
                     if (recaptchaRef.current) recaptchaRef.current.reset();
                     setCaptchaToken(null);
                 }
-            } else {
-                const errData = await response.json();
-                const msg = typeof errData.detail === 'object'
-                    ? (Array.isArray(errData.detail) ? errData.detail[0].msg : JSON.stringify(errData.detail))
-                    : errData.detail;
-                setError(msg || 'Authentication failed');
-                if (recaptchaRef.current) recaptchaRef.current.reset();
-                setCaptchaToken(null);
+            } catch (err) {
+                setError('System Connectivity Error');
+                throw err;
             }
-        } catch (err) {
-            setError('System Connectivity Error');
-        } finally {
-            setLoading(false);
-        }
+        }, 2000); // 2 second throttle between clicks
     };
 
     const handleRecovery = async (e) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
-        try {
-            const response = await fetch('http://localhost:33159/api/auth/forgot-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: recoveryEmail })
-            });
-            if (response.ok) {
-                setRecoverySent(true);
-            } else {
-                const data = await response.json();
-                const msg = typeof data.detail === 'object'
-                    ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
-                    : data.detail;
-                setError(msg || 'Recovery failed. Internal protocol error.');
+        
+        await throttleAction(async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: recoveryEmail })
+                });
+
+                if (response.ok) {
+                    setRecoverySent(true);
+                } else {
+                    const data = await response.json();
+                    const msg = typeof data.detail === 'object' 
+                        ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
+                        : data.detail;
+                    setError(msg || 'Recovery failed. Internal protocol error.');
+                }
+            } catch (err) {
+                setError('System Connectivity Error');
+                throw err;
             }
-        } catch (err) {
-            setError('System Connectivity Error');
-        } finally {
-            setLoading(false);
-        }
+        }, 3000); // 3 second throttle for recovery requests (DB protection)
     };
 
     const DIRECTIVES = [
@@ -347,7 +352,7 @@ export default function GovLanding() {
 
                                                 {/* ReCAPTCHA Checkbox */}
                                                 <AnimatePresence>
-                                                    {email && password && (
+                                                    {email && password && !captchaPaused && (
                                                         <motion.div 
                                                             initial={{ opacity: 0, height: 0 }}
                                                             animate={{ opacity: 1, height: 'auto' }}
@@ -365,6 +370,16 @@ export default function GovLanding() {
                                                         </motion.div>
                                                     )}
                                                 </AnimatePresence>
+
+                                                {captchaPaused && (
+                                                    <div
+                                                        role="status"
+                                                        className="mb-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+                                                    >
+                                                        <ShieldCheck size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+                                                        <span><strong>Security check paused.</strong> Local development only; account credentials are still required.</span>
+                                                    </div>
+                                                )}
 
                                                 {/* Submit CTA Button */}
                                                 <button

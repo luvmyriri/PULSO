@@ -21,7 +21,7 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-
+import re
 import models
 import gov_models
 
@@ -78,12 +78,107 @@ def _haversine_meters(lat1: float, lng1: float, lat2: float, lng2: float) -> flo
 
 
 def _match_cost_key(category: str) -> str:
-    """Map AI category strings to cost model keys."""
+    """Map normalized category strings to cost model keys."""
     cat = (category or "").lower()
     for key in COST_MODEL:
         if key in cat:
             return key
     return "default"
+
+
+def _resolve_barangay(report: models.Report) -> str:
+    """
+    Authoritative barangay resolution:
+    1. Prefer reporter's user profile (barangay).
+    2. Fall back to regex extraction from location string.
+    3. Final fallback to placeholder on report itself.
+    """
+    # 1. Authoritative: User Profile (barangay_id -> barangay lookup or address fallback)
+    try:
+        if hasattr(report, "reporter") and report.reporter is not None:
+            reporter = report.reporter
+            # Check for barangay relationship first
+            if hasattr(reporter, "barangay_ref") and reporter.barangay_ref is not None:
+                return str(reporter.barangay_ref.name)
+            # Check for barangay_id
+            if hasattr(reporter, "barangay_id") and reporter.barangay_id is not None:
+                if hasattr(reporter, "barangay_ref") and reporter.barangay_ref:
+                    return str(reporter.barangay_ref.name)
+                return f"Barangay ID {reporter.barangay_id}"
+            # Check for address which may contain barangay
+            if hasattr(reporter, "address") and reporter.address:
+                loc = str(reporter.address).lower()
+                NORTH_BRGYS = ["bagong silang", "camarin", "vicas", "bagumbong", "deparo", "llano", "calicanto", "caybiga", "barugo", "talipapa"]
+                for b in NORTH_BRGYS:
+                    if b in loc:
+                        return b.title()
+    except Exception:
+        pass  # Skip user profile if any error
+    
+    # 2. Location String Regex Fallback
+    loc = (report.location_string or "").lower()
+    # List of known North Caloocan barangays for quick matching
+    NORTH_BRGYS = [
+        "bagong silang", "camarin", "vicas", "bagumbong", "deparo", 
+        "llano", "calicanto", "caybiga", "barugo", "talipapa"
+    ]
+    for b in NORTH_BRGYS:
+        if b in loc:
+            return b.title()
+            
+    # Attempt to extract "Brgy. XXX" or "Barangay XXX"
+    import re
+    match = re.search(r"(?:brgy|barangay)\.?\s*([a-zA-Z0-9\s]+)", loc)
+    if match:
+        return match.group(1).strip().title()
+
+    # 3. Final Fallback: Report field or Placeholder
+    if report.location_barangay:
+        return str(report.location_barangay).strip().title()
+    
+    # If we have "Caloocan" in location string but no barangay, mark as Unspecified Caloocan
+    if "caloocan" in (report.location_string or "").lower():
+        return "Caloocan (Unspecified)"
+        
+    return "Unknown District"
+
+
+def _is_in_jurisdiction(barangay_name: Optional[str]) -> bool:
+    """
+    Enforces the Caloocan jurisdictional boundary.
+    Expanded to support full city coverage (Barangays 1–188) and unspecified city zones.
+    """
+    if not barangay_name:
+        return False
+    
+    name_str = str(barangay_name).lower()
+    
+    # Extract number using regex to handle "Barangay 171", "Brgy. 171", etc.
+    match = re.search(r'(\d+)', name_str)
+    if match:
+        num = int(match.group(1))
+        # Support full Caloocan city (1-188)
+        return 1 <= num <= 188
+    
+    # Specific named barangays or zones
+    KNOWN_NAMES = ["bagong silang", "camarin", "vicas", "bagumbong", "deparo", "llano", "calicanto", "caybiga", "barugo", "talipapa"]
+    if any(name in name_str for name in KNOWN_NAMES):
+        return True
+        
+    if "caloocan" in name_str: return True
+    if "unknown district" in name_str: return True # Don't hide local reports even if geocoding is fuzzy
+    
+    return False
+
+
+def _resolve_category(report: models.Report) -> str:
+    """
+    Normalized category resolution:
+    1. Prefer AI-normalized category.
+    2. Fall back to user-selected category.
+    """
+    normalized = report.ai_category or report.category or "infrastructure"
+    return normalized.lower()
 
 
 def _estimate_cost(category: str, radius_m: float, report_count: int) -> float:
@@ -147,18 +242,22 @@ def get_infrastructure_clusters(
       - centroid, radius, report_ids, threat_level, severity_score,
         recurrence_score, estimated_cost, dominant_category, ai_summary stub
     """
-    since = datetime.now(timezone.utc) - timedelta(days=days_back)
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_back)
 
     q = db.query(models.Report).options(joinedload(models.Report.reporter)).filter(
         models.Report.location_lat.isnot(None),
         models.Report.location_lng.isnot(None),
         models.Report.created_at >= since,
-        models.Report.status.notin_(["rejected", "spam", "cancelled"]),
+        models.Report.status.notin_(["rejected", "spam"]),
     )
     if category_filter:
         q = q.filter(models.Report.category.ilike(f"%{category_filter}%"))
 
     reports = q.all()
+    
+    # Apply strict jurisdictional filter (North Caloocan: 165-188)
+    reports = [r for r in reports if _is_in_jurisdiction(_resolve_barangay(r))]
+    
     if len(reports) < min_samples:
         return []
 
@@ -194,12 +293,12 @@ def get_infrastructure_clusters(
             urgency = getattr(r, "ai_urgency", "Medium") or "Medium"
             severity_score += URGENCY_WEIGHTS.get(urgency, 1)
             urgency_breakdown[urgency] += 1
-            categories.append(r.category or "infrastructure")
+            categories.append(_resolve_category(r))
 
         # Dominant category
         cat_counts = defaultdict(int)
         for c in categories:
-            cat_counts[c.lower()] += 1
+            cat_counts[c] += 1
         dominant_category = max(cat_counts, key=cat_counts.get)
 
         # Recurrence score — resolved reports of same category near the centroid
@@ -216,7 +315,7 @@ def get_infrastructure_clusters(
         recurrence_score = min(1.0, len(resolved_ids) / max(len(group), 1))
 
         # Weekly growth rate (compare last 2 weeks)
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
         two_weeks_ago = now_utc - timedelta(days=14)
         one_week_ago  = now_utc - timedelta(days=7)
         
@@ -225,8 +324,8 @@ def get_infrastructure_clusters(
             try:
                 # Ensure r.created_at is aware for comparison
                 rcat = r.created_at
-                if rcat and rcat.tzinfo is None:
-                    rcat = rcat.replace(tzinfo=timezone.utc)
+                if rcat and rcat.tzinfo is not None:
+                    rcat = rcat.replace(tzinfo=None)
                 
                 if rcat:
                     if rcat < one_week_ago and rcat >= two_weeks_ago:
@@ -242,25 +341,11 @@ def get_infrastructure_clusters(
         threat_level = _classify_threat(severity_score, recurrence_score, len(group), growth_rate)
         estimated_cost = _estimate_cost(dominant_category, cluster_radius, len(group))
 
-        # Barangay extraction (Prioritize official reporter barangay, fallback to regex)
-        barangays = []
-        for r in group:
-            b = getattr(r, "barangay", None)
-            if not b and r.reporter:
-                b = r.reporter.barangay
-            if not b:
-                b = _extract_barangay(r.location_string)
-            
-            # Clean up: ensure only the number remains
-            if b:
-                import re
-                nums = re.findall(r"\d+", str(b))
-                b = nums[0] if nums else str(b)
-            barangays.append(b)
+        # Barangay extraction
+        barangays = [_resolve_barangay(r) for r in group]
         barangay_counts = defaultdict(int)
         for b in barangays:
-            if b:
-                barangay_counts[b] += 1
+            barangay_counts[b] += 1
         dominant_barangay = max(barangay_counts, key=barangay_counts.get) if barangay_counts else "Unknown"
 
         # Sample report descriptions for AI prompt
@@ -284,13 +369,13 @@ def get_infrastructure_clusters(
             "recurrence_score": round(recurrence_score, 2),
             "growth_rate": round(growth_rate, 2),
             "estimated_cost": estimated_cost,
-            "estimated_cost_formatted": f"₱{estimated_cost/1_000_000_000:,.1f}B" if estimated_cost >= 1_000_000_000 else f"₱{estimated_cost/1_000_000:,.1f}M",
+            "estimated_cost_formatted": f"PHP{estimated_cost/1_000_000_000:,.1f}B" if estimated_cost >= 1_000_000_000 else f"PHP{estimated_cost/1_000_000:,.1f}M",
             "cost_unit": COST_MODEL.get(_match_cost_key(dominant_category), COST_MODEL["default"])["unit"],
             "barangay": dominant_barangay,
             "urgency_breakdown": dict(urgency_breakdown),
             "sample_descriptions": sample_descriptions,
             "days_window": days_back,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         })
 
     # Sort by threat priority
@@ -299,15 +384,7 @@ def get_infrastructure_clusters(
     return clusters
 
 
-def _extract_barangay(location_string: Optional[str]) -> Optional[str]:
-    """Extract barangay number from a location string like 'Brgy 176, Caloocan'."""
-    if not location_string:
-        return None
-    import re
-    # Match various formats: Brgy 176, Barangay 176, Bgy 176, or just 176 (if it looks like a Caloocan North brgy number)
-    # Using \b for word boundary instead of variable-width look-behind
-    m = re.search(r"(?:[Bb]r(?:gy?|arangay)\.?\s*|\b)((?:16[5-9]|17\d|18[0-8]))(?:\b|$)", location_string)
-    return m.group(1) if m else None
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -320,11 +397,14 @@ def get_forecast(db: Session, weeks_back: int = 12, weeks_forward: int = 4) -> L
     Fits a linear trend and projects the next N weeks.
     Returns sorted by projected urgency (highest first).
     """
-    since = datetime.now(timezone.utc) - timedelta(weeks=weeks_back)
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(weeks=weeks_back)
     reports = db.query(models.Report).options(joinedload(models.Report.reporter)).filter(
         models.Report.created_at >= since,
-        models.Report.status.notin_(["rejected", "spam", "cancelled"]),
+        models.Report.status.notin_(["rejected", "spam"]),
     ).all()
+    
+    # Apply strict jurisdictional filter (North Caloocan: 165-188)
+    reports = [r for r in reports if _is_in_jurisdiction(_resolve_barangay(r))]
 
     # Bucket into (barangay, category, week_number)
     buckets: Dict[tuple, Dict[int, int]] = defaultdict(lambda: defaultdict(int))
@@ -333,18 +413,8 @@ def get_forecast(db: Session, weeks_back: int = 12, weeks_forward: int = 4) -> L
     for r in reports:
         if not r.created_at:
             continue
-        barangay = getattr(r, "barangay", None)
-        if not barangay and r.reporter:
-            barangay = r.reporter.barangay
-        if not barangay:
-            barangay = _extract_barangay(r.location_string) or "Unknown"
-        
-        # Clean to just number
-        if barangay != "Unknown":
-            import re
-            nums = re.findall(r"\d+", str(barangay))
-            barangay = nums[0] if nums else str(barangay)
-        category = (r.category or "infrastructure").lower()
+        barangay = _resolve_barangay(r)
+        category = _resolve_category(r)
         week_num = (r.created_at.date() - week_zero).days // 7
         buckets[(barangay, category)][week_num] += 1
 
@@ -364,7 +434,7 @@ def get_forecast(db: Session, weeks_back: int = 12, weeks_forward: int = 4) -> L
             slope, intercept = 0, float(y.mean())
 
         # Current week index
-        current_week = (datetime.now(timezone.utc).date() - week_zero).days // 7
+        current_week = (datetime.now(timezone.utc).replace(tzinfo=None).date() - week_zero).days // 7
 
         # Historical series (fill missing weeks with 0)
         history = [{"week": int(w), "count": int(week_data.get(w, 0))}
@@ -377,7 +447,7 @@ def get_forecast(db: Session, weeks_back: int = 12, weeks_forward: int = 4) -> L
             forecast.append({
                 "week_offset": fw,
                 "projected_count": round(float(projected), 1),
-                "week_label": (datetime.now(timezone.utc) + timedelta(weeks=fw)).strftime("Week of %b %d"),
+                "week_label": (datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(weeks=fw)).strftime("Week of %b %d"),
             })
 
         # Growth classification
@@ -421,13 +491,16 @@ def get_heatmap_intelligence(db: Session, days_back: int = 90) -> Dict[str, Any]
       1. raw_points — all report coords with weight + threat metadata
       2. clusters   — cluster circle overlays with threat levels
     """
-    since = datetime.now(timezone.utc) - timedelta(days=days_back)
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_back)
     reports = db.query(models.Report).filter(
         models.Report.location_lat.isnot(None),
         models.Report.location_lng.isnot(None),
         models.Report.created_at >= since,
-        models.Report.status.notin_(["rejected", "spam", "cancelled"]),
+        models.Report.status.notin_(["rejected", "spam"]),
     ).all()
+    
+    # Apply strict jurisdictional filter (North Caloocan: 165-188)
+    reports = [r for r in reports if _is_in_jurisdiction(_resolve_barangay(r))]
 
     # Build cluster lookup
     clusters = get_infrastructure_clusters(db, days_back=days_back)
@@ -445,7 +518,11 @@ def get_heatmap_intelligence(db: Session, days_back: int = 90) -> Dict[str, Any]
     for r in reports:
         cluster = cluster_lookup.get(r.id)
         threat = cluster["threat_level"] if cluster else "MONITORING"
-        weight = URGENCY_WEIGHTS.get(getattr(r, "ai_urgency", "Medium") or "Medium", 1)
+        
+        # Robust case-insensitive lookup for AI urgency
+        urgency_raw = str(getattr(r, "ai_urgency", "Medium") or "Medium").title()
+        weight = URGENCY_WEIGHTS.get(urgency_raw, 1.0)
+        
         raw_points.append({
             "lat":       r.location_lat,
             "lng":       r.location_lng,
@@ -453,8 +530,8 @@ def get_heatmap_intelligence(db: Session, days_back: int = 90) -> Dict[str, Any]
             "threat":    threat,
             "cluster_id": cluster["cluster_id"] if cluster else None,
             "category":  r.category,
-            "urgency":   getattr(r, "ai_urgency", "Medium"),
-            "color":     urgency_color.get(getattr(r, "ai_urgency", "Medium"), "#94a3b8"),
+            "urgency":   urgency_raw,
+            "color":     urgency_color.get(urgency_raw, "#94a3b8"),
             "report_id": r.id,
             "status":    r.status,
         })
@@ -549,11 +626,11 @@ def generate_boq_from_cluster(cluster: Dict[str, Any]) -> Dict[str, Any]:
         "contingency_12pct": contingency,
         "engineering_8pct": engineering,
         "total_estimate": total,
-        "total_formatted": f"₱{total/1_000_000_000:,.1f}B" if total >= 1_000_000_000 else f"₱{total/1_000_000:,.1f}M",
+        "total_formatted": f"PHP{total/1_000_000_000:,.1f}B" if total >= 1_000_000_000 else f"PHP{total/1_000_000:,.1f}M",
         "dpwh_reference": "DPWH 2024 Unit Price Guide, Region 3 (NCR-Adjacent)",
         "threat_level": cluster["threat_level"],
         "report_count": cluster["report_count"],
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     }
 
 
@@ -575,7 +652,7 @@ def get_recurrence_events(db: Session, days_window: int = 90) -> List[Dict]:
     ).order_by(models.Report.updated_at.desc()).all()
 
     # Get new reports since window
-    new_reports = db.query(models.Report).options(joinedload(models.Report.reporter)).filter(
+    new_reports = db.query(models.Report).filter(
         models.Report.created_at >= since,
         models.Report.status.notin_(["resolved", "rejected"]),
         models.Report.location_lat.isnot(None),
@@ -604,18 +681,10 @@ def get_recurrence_events(db: Session, days_window: int = 90) -> List[Dict]:
                     "lng":                new_r.location_lng,
                     "distance_meters":    round(dist, 1),
                     "days_since_resolved": (datetime.now(timezone.utc) - res_r.updated_at).days if res_r.updated_at else None,
-                    "barangay":           None,  # placeholder
+                    "barangay":           _resolve_barangay(new_r),
                     "severity":           "HIGH" if dist < 30 else "MEDIUM",
                     "recommendation":     "Systemic infrastructure failure. Recommend full structural assessment and budget escalation.",
                 })
-                # Clean barangay number for recurrence event
-                b_raw = getattr(new_r, "barangay", None) or (new_r.reporter.barangay if new_r.reporter else None) or _extract_barangay(new_r.location_string)
-                if b_raw:
-                    import re
-                    nums = re.findall(r"\d+", str(b_raw))
-                    b_raw = nums[0] if nums else str(b_raw)
-                recurrence_events[-1]["barangay"] = b_raw
-
                 matched_resolved.add(res_r.id)
                 break
 
@@ -718,19 +787,30 @@ def get_analytics_summary(db: Session) -> Dict[str, Any]:
 
     # Category breakdown
     cat_totals: Dict[str, int] = defaultdict(int)
-    for r in db.query(models.Report).filter(
-        models.Report.created_at >= datetime.now(timezone.utc) - timedelta(days=90),
-        models.Report.status.notin_(["rejected", "spam", "cancelled"]),
-    ).all():
+    cat_query = db.query(models.Report).filter(
+        models.Report.created_at >= datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=90),
+        models.Report.status.notin_(["rejected", "spam"]),
+    ).all()
+    
+    # Apply strict jurisdictional filter (North Caloocan: 165-188)
+    cat_reports = [r for r in cat_query if _is_in_jurisdiction(_resolve_barangay(r))]
+
+    for r in cat_reports:
         cat_totals[(r.category or "other").lower()] += 1
 
-    # Resolution rate
-    total_all = db.query(models.Report).filter(models.Report.status != "cancelled").count()
-    total_resolved = db.query(models.Report).filter(models.Report.status == "resolved").count()
+    # Resolution rate (Excluding cancelled for denominator)
+    # Fetch all for jurisdictional filtering
+    all_reports = db.query(models.Report).filter(models.Report.status.notin_(["cancelled", "rejected", "spam"])).all()
+    filtered_all = [r for r in all_reports if _is_in_jurisdiction(_resolve_barangay(r))]
+    
+    total_all = len(filtered_all)
+    total_resolved = len([r for r in filtered_all if r.status == "resolved"])
+    
     resolution_rate = round((total_resolved / max(total_all, 1)) * 100, 1)
 
     recurrence_events = get_recurrence_events(db, days_window=90)
 
+    total_budget = summary.get('total_estimated_cost', 0)
     return {
         **summary,
         "resolution_rate_pct": resolution_rate,
@@ -739,5 +819,5 @@ def get_analytics_summary(db: Session) -> Dict[str, Any]:
         "top_stress_barangays": [{"barangay": b, "stress_score": round(s, 1)} for b, s in top_barangays],
         "category_breakdown": dict(sorted(cat_totals.items(), key=lambda x: -x[1])[:10]),
         "chronic_recurrence_events": len(recurrence_events),
-        "total_budget_exposure": f"₱{summary['total_estimated_cost']:,.2f}",
+        "total_budget_exposure": f"PHP{total_budget:,.2f}",
     }

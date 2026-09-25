@@ -1,0 +1,48 @@
+{
+  "title": "Choose the more cinematic PULSO landing composition",
+  "question": "This reroll keeps Civic Aperture but removes more interface chrome. Each direction spends its boldness on one civic instrument, extreme negative space, and a distinct transition into resident and government access.",
+  "options": [
+    {
+      "id": "city-aperture-zero",
+      "label": "City Aperture Zero",
+      "kicker": "THE ROLL",
+      "lineage": "cinematic title card, panoramic infrastructure aperture, and survey timecode",
+      "thesis": "One impossibly wide civic window makes the city the only spectacle; everything else is quiet, exact, and actionable.",
+      "palette": ["#071A2B", "#F4F7F2", "#FF8A3D", "#82C7D8", "#335166"],
+      "materials": ["deep survey-blue void", "true-color panoramic city strip", "two-pixel Signal Cut", "opaque action rail"],
+      "viewport": "Most of the viewport is deliberate dark negative space. A razor-wide city panorama crosses the lower third while the headline, two resident actions, and separate government gate align to the same measured horizon. The Signal Cut travels once through the panorama and settles at a verified state.",
+      "risk": "The extreme restraint requires exceptional typography, photography, and spacing; weak execution would feel empty rather than cinematic.",
+      "comp": ".impeccable/mocks/decision/city-aperture-zero.png"
+    },
+    {
+      "id": "vertical-city-section",
+      "label": "Vertical City Section",
+      "lineage": "architectural section drawing, infrastructure photography, and editorial film framing",
+      "thesis": "A single vertical cut through the city reveals place, report, and response as one continuous civic section.",
+      "palette": ["#F4F7F5", "#0C2436", "#B9380B", "#0B4F6C", "#C9D4D9"],
+      "materials": ["mineral field sheet", "tall true-color city section", "precise coordinate rail", "ember route notch"],
+      "viewport": "A tall city aperture cuts off-center through an otherwise quiet mineral sheet. The headline occupies one open field, resident tasks occupy the other, and the Signal Cut crosses the aperture like a surveyed infrastructure section rather than a decorative line.",
+      "risk": "The vertical aperture must adapt carefully on mobile so it remains a meaningful city section instead of becoming a generic photo panel.",
+      "comp": ".impeccable/mocks/decision/vertical-city-section.png"
+    },
+    {
+      "id": "signal-fold",
+      "label": "Signal Fold",
+      "lineage": "folded engineering docket, cinematic reveal, and accountable lifecycle route",
+      "thesis": "Two civic field sheets part just enough to reveal the city and the one route from issue to public update.",
+      "palette": ["#F4F7F5", "#071A2B", "#0C2436", "#FF8A3D", "#82C7D8"],
+      "materials": ["opaque light and dark field sheets", "narrow true-color city reveal", "crisp fold rule", "single Signal Cut"],
+      "viewport": "A light resident field and dark government field overlap as two precise planes, separated by a narrow cinematic city reveal. Report and Track live on the resident plane; Government portal stays on the cooler plane; one Signal Cut passes through the reveal and binds them without cloning their interfaces.",
+      "risk": "The fold must read as functional portal separation, not as a decorative diagonal or fashionable split-screen effect.",
+      "comp": ".impeccable/mocks/decision/signal-fold.png"
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  },
+  "steer": true
+}

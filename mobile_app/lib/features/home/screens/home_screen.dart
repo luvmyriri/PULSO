@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
@@ -20,10 +21,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Quick Links remain static UI components
   final List<Map<String, dynamic>> _quickLinks = [
-    {'title': 'Report\nIssue', 'icon': Icons.warning_amber_rounded, 'color': AppTheme.primaryOrange},
-    {'title': 'LGU\nProjects', 'icon': Icons.map_outlined, 'color': Colors.blueAccent},
-    {'title': 'OBO\nPermits', 'icon': Icons.foundation_rounded, 'color': Colors.tealAccent},
-    {'title': 'My\nBarangay', 'icon': Icons.location_city_rounded, 'color': Colors.indigoAccent},
+    {
+      'title': 'Report\nIssue',
+      'icon': Icons.warning_amber_rounded,
+      'color': AppTheme.primaryOrange,
+    },
+    {
+      'title': 'LGU\nProjects',
+      'icon': Icons.map_outlined,
+      'color': Colors.blueAccent,
+    },
+    {
+      'title': 'OBO\nPermits',
+      'icon': Icons.foundation_rounded,
+      'color': Colors.tealAccent,
+    },
+    {
+      'title': 'My\nBarangay',
+      'icon': Icons.location_city_rounded,
+      'color': Colors.indigoAccent,
+    },
   ];
 
   @override
@@ -33,17 +50,14 @@ class _HomeScreenState extends State<HomeScreen> {
     /// Pages indexed by bottom nav
     final List<Widget> pages = [
       _HomeFeed(provider: provider, quickLinks: _quickLinks),
-      const MapScreen(),   // Live Google Maps view
+      const MapScreen(), // Live Google Maps view
       _PlaceholderPage(icon: Icons.foundation_rounded, label: 'OBO Services'),
       _PlaceholderPage(icon: Icons.person_rounded, label: 'Profile'),
     ];
 
     return Scaffold(
       backgroundColor: AppTheme.primaryDark,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: pages),
 
       // Floating Action Button — only show on Home tab
       floatingActionButton: _currentIndex == 0
@@ -66,16 +80,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppTheme.primaryOrange,
                   child: InkWell(
                     onTap: () async {
-                      final File? imageFile = await Navigator.of(context).push<File>(
+                      final result = await Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const CameraScreen(side: 'incident_report'),
+                          builder: (_) =>
+                              const CameraScreen(side: 'incident_report'),
                         ),
                       );
 
-                      if (imageFile != null && mounted) {
+                      if (result != null &&
+                          result is Map &&
+                          result['file'] != null &&
+                          mounted) {
+                        final File imageFile = result['file'];
+                        final double? capturedLat = result['lat'];
+                        final double? capturedLng = result['lng'];
+                        final String? capturedAddress = result['address'];
                         // Show Quick Review / Submission Dialog
                         String selectedCategory = 'Road Issue';
-                        final TextEditingController notesController = TextEditingController();
+                        final TextEditingController notesController =
+                            TextEditingController();
+                        final TextEditingController locationDescController =
+                            TextEditingController();
 
                         showModalBottomSheet(
                           context: context,
@@ -86,35 +111,59 @@ class _HomeScreenState extends State<HomeScreen> {
                               height: MediaQuery.of(context).size.height * 0.75,
                               decoration: const BoxDecoration(
                                 color: AppTheme.primaryDark,
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(30),
+                                ),
                               ),
                               padding: const EdgeInsets.all(24),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       const Text(
                                         'New AI Report',
-                                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                       IconButton(
                                         onPressed: () => Navigator.pop(context),
-                                        icon: const Icon(Icons.close, color: Colors.white54),
+                                        icon: const Icon(
+                                          Icons.close,
+                                          color: Colors.white54,
+                                        ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 16),
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(16),
-                                    child: Image.file(imageFile, height: 180, width: double.infinity, fit: BoxShape.fill == 'fill' ? BoxFit.fill : BoxFit.cover),
+                                    child: Image.file(
+                                      imageFile,
+                                      height: 180,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                   const SizedBox(height: 20),
-                                  const Text('Category', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  const Text(
+                                    'Category',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.05),
                                       borderRadius: BorderRadius.circular(12),
@@ -125,14 +174,116 @@ class _HomeScreenState extends State<HomeScreen> {
                                       dropdownColor: AppTheme.primaryDark,
                                       isExpanded: true,
                                       underline: const SizedBox(),
-                                      items: ['Road Issue', 'Water / Drainage', 'Waste Management', 'Street Lighting', 'Public Safety']
-                                          .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(color: Colors.white))))
-                                          .toList(),
-                                      onChanged: (val) => setModalState(() => selectedCategory = val!),
+                                      items:
+                                          [
+                                                'Road Issue',
+                                                'Water / Drainage',
+                                                'Waste Management',
+                                                'Street Lighting',
+                                                'Public Safety',
+                                              ]
+                                              .map(
+                                                (c) => DropdownMenuItem(
+                                                  value: c,
+                                                  child: Text(
+                                                    c,
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                      onChanged: (val) => setModalState(
+                                        () => selectedCategory = val!,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 20),
-                                  const Text('Description', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  // Location Info Display
+                                  if (capturedLat != null &&
+                                      capturedLng != null) ...[
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.green.withOpacity(0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.location_on,
+                                            color: Colors.green,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'GPS: ${capturedLat!.toStringAsFixed(5)}, ${capturedLng!.toStringAsFixed(5)}',
+                                              style: const TextStyle(
+                                                color: Colors.green,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'Exact Location Description',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextField(
+                                      controller: locationDescController,
+                                      maxLines: 2,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText:
+                                            'e.g., "Near the yellow street sign at the corner of..."',
+                                        hintStyle: const TextStyle(
+                                          color: Colors.white24,
+                                        ),
+                                        filled: true,
+                                        fillColor: Colors.white.withOpacity(
+                                          0.05,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '⚠️ Please describe exactly where in the photo the issue is located.',
+                                      style: TextStyle(
+                                        color: Colors.orange.shade300,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
+                                  const Text(
+                                    'Description',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   TextField(
                                     controller: notesController,
@@ -140,10 +291,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                     style: const TextStyle(color: Colors.white),
                                     decoration: InputDecoration(
                                       hintText: 'Describe the hazard...',
-                                      hintStyle: const TextStyle(color: Colors.white24),
+                                      hintStyle: const TextStyle(
+                                        color: Colors.white24,
+                                      ),
                                       filled: true,
                                       fillColor: Colors.white.withOpacity(0.05),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
                                     ),
                                   ),
                                   const Spacer(),
@@ -152,32 +308,70 @@ class _HomeScreenState extends State<HomeScreen> {
                                     height: 55,
                                     child: ElevatedButton(
                                       onPressed: () async {
-                                        Navigator.pop(context); // Close bottom sheet
-                                        
+                                        Navigator.pop(context);
+
+                                        // Append location description to the report
+                                        String fullDescription =
+                                            notesController.text;
+                                        if (locationDescController
+                                            .text
+                                            .isNotEmpty) {
+                                          fullDescription +=
+                                              '\n\n📍 EXACT LOCATION: ${locationDescController.text}';
+                                        }
+                                        if (capturedLat != null &&
+                                            capturedLng != null) {
+                                          fullDescription +=
+                                              '\n(GPS: ${capturedLat!.toStringAsFixed(5)}, ${capturedLng!.toStringAsFixed(5)})';
+                                        }
+
                                         // Trigger submission via Provider
-                                        final result = await provider.submitReport(
-                                          category: selectedCategory,
-                                          description: notesController.text,
-                                          lat: 14.7566, // Placeholder: Use real GPS in production
-                                          lng: 121.0450,
-                                          image: imageFile,
-                                        );
+                                        final result = await provider
+                                            .submitReport(
+                                              category: selectedCategory,
+                                              description: fullDescription,
+                                              lat: capturedLat ?? 14.7566,
+                                              lng: capturedLng ?? 121.0450,
+                                              locationString: capturedAddress,
+                                              image: imageFile,
+                                            );
 
                                         if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             SnackBar(
-                                              content: Text(result['message'] ?? (result['success'] ? 'Report submitted successfully!' : 'Submission failed')),
-                                              backgroundColor: result['success'] ? Colors.green : Colors.redAccent,
-                                              behavior: SnackBarBehavior.floating,
+                                              content: Text(
+                                                result['message'] ??
+                                                    (result['success']
+                                                        ? 'Report submitted successfully!'
+                                                        : 'Submission failed'),
+                                              ),
+                                              backgroundColor: result['success']
+                                                  ? Colors.green
+                                                  : Colors.redAccent,
+                                              behavior:
+                                                  SnackBarBehavior.floating,
                                             ),
                                           );
                                         }
                                       },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.primaryOrange,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
                                       ),
-                                      child: const Text('Verify & Submit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                      child: const Text(
+                                        'Verify & Submit',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -190,7 +384,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.camera_alt_rounded, color: Colors.white, size: 22),
+                        Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                         SizedBox(width: 8),
                         Text(
                           'Post Report',
@@ -205,7 +403,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-            ).animate().slideY(begin: 1.5, curve: Curves.easeOutBack, duration: 800.ms)
+            ).animate().slideY(
+              begin: 1.5,
+              curve: Curves.easeOutBack,
+              duration: 800.ms,
+            )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
 
@@ -229,17 +431,33 @@ class _HomeScreenState extends State<HomeScreen> {
               unselectedFontSize: 11,
               items: const [
                 BottomNavigationBarItem(
-                    icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.home_rounded)),
-                    label: 'Home'),
+                  icon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.home_rounded),
+                  ),
+                  label: 'Home',
+                ),
                 BottomNavigationBarItem(
-                    icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.map_rounded)),
-                    label: 'Map'),
+                  icon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.map_rounded),
+                  ),
+                  label: 'Map',
+                ),
                 BottomNavigationBarItem(
-                    icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.shield_rounded)),
-                    label: 'OBO Services'),
+                  icon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.shield_rounded),
+                  ),
+                  label: 'OBO Services',
+                ),
                 BottomNavigationBarItem(
-                    icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.person_rounded)),
-                    label: 'Profile'),
+                  icon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.person_rounded),
+                  ),
+                  label: 'Profile',
+                ),
               ],
             ),
           ),
@@ -263,41 +481,47 @@ class _HomeFeed extends StatelessWidget {
       children: [
         // Background Blobs Top Right
         Positioned(
-          top: -200,
-          right: -150,
-          child: Container(
-            width: 500,
-            height: 500,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  AppTheme.primaryOrange.withOpacity(0.15),
-                  Colors.transparent,
-                ],
+              top: -200,
+              right: -150,
+              child: Container(
+                width: 500,
+                height: 500,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.primaryOrange.withOpacity(0.15),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ).animate().fadeIn(duration: 2.seconds).scale(begin: const Offset(0.8, 0.8)),
+            )
+            .animate()
+            .fadeIn(duration: 2.seconds)
+            .scale(begin: const Offset(0.8, 0.8)),
 
         // Background Blobs Bottom Left
         Positioned(
-          bottom: -200,
-          left: -150,
-          child: Container(
-            width: 450,
-            height: 450,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  Colors.blueAccent.withOpacity(0.12),
-                  Colors.transparent,
-                ],
+              bottom: -200,
+              left: -150,
+              child: Container(
+                width: 450,
+                height: 450,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.blueAccent.withOpacity(0.12),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ).animate().fadeIn(duration: 2.seconds, delay: 500.ms).scale(begin: const Offset(0.8, 0.8)),
+            )
+            .animate()
+            .fadeIn(duration: 2.seconds, delay: 500.ms)
+            .scale(begin: const Offset(0.8, 0.8)),
 
         SafeArea(
           bottom: false,
@@ -321,7 +545,9 @@ class _HomeFeed extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: quickLinks.map((link) => _buildQuickLink(link)).toList(),
+                      children: quickLinks
+                          .map((link) => _buildQuickLink(link))
+                          .toList(),
                     ),
                   ),
                 ),
@@ -330,13 +556,20 @@ class _HomeFeed extends StatelessWidget {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                    child: _buildSectionHeader('My Incident Reports', Icons.history_rounded, action: 'View All'),
+                    child: _buildSectionHeader(
+                      'My Incident Reports',
+                      Icons.history_rounded,
+                      action: 'View All',
+                    ),
                   ),
                 ),
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 6,
+                      ),
                       child: _ReportCard(report: provider.myReports[index]),
                     ),
                     childCount: provider.myReports.length,
@@ -356,7 +589,10 @@ class _HomeFeed extends StatelessWidget {
                           color: AppTheme.primaryDark.withOpacity(0.6),
                           padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
                           alignment: Alignment.bottomLeft,
-                          child: _buildSectionHeader('Official Board', Icons.public_rounded),
+                          child: _buildSectionHeader(
+                            'Official Board',
+                            Icons.public_rounded,
+                          ),
                         ),
                       ),
                     ),
@@ -365,8 +601,13 @@ class _HomeFeed extends StatelessWidget {
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      child: _AdvisoryPost(advisory: provider.advisories[index]),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 8,
+                      ),
+                      child: _AdvisoryPost(
+                        advisory: provider.advisories[index],
+                      ),
                     ),
                     childCount: provider.advisories.length,
                   ),
@@ -425,13 +666,21 @@ class _HomeFeed extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const Spacer(),
         if (action != null)
           Text(
             action,
-            style: const TextStyle(color: AppTheme.primaryOrange, fontSize: 12, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: AppTheme.primaryOrange,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
       ],
     );
@@ -458,7 +707,11 @@ class _PlaceholderPage extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               label,
-              style: const TextStyle(color: Colors.white38, fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -489,32 +742,48 @@ class _ColorsHeader extends StatelessWidget {
                 children: [
                   ShaderMask(
                     shaderCallback: (bounds) => const LinearGradient(
-                      colors: [AppTheme.primaryOrange, AppTheme.primaryOrangeLight],
+                      colors: [
+                        AppTheme.primaryOrange,
+                        AppTheme.primaryOrangeLight,
+                      ],
                     ).createShader(bounds),
                     child: Text(
                       'PULSO',
                       style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                            height: 1.0,
-                            fontSize: 28,
-                          ),
+                        height: 1.0,
+                        fontSize: 28,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.greenAccent.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.greenAccent.withOpacity(0.3)),
+                      border: Border.all(
+                        color: Colors.greenAccent.withOpacity(0.3),
+                      ),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.verified, color: Colors.greenAccent, size: 10),
+                        Icon(
+                          Icons.verified,
+                          color: Colors.greenAccent,
+                          size: 10,
+                        ),
                         SizedBox(width: 4),
                         Text(
                           'VERIFIED ID',
-                          style: TextStyle(color: Colors.greenAccent, fontSize: 8, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -524,7 +793,11 @@ class _ColorsHeader extends StatelessWidget {
               const SizedBox(height: 4),
               const Text(
                 'Welcome, Validated Resident',
-                style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -591,11 +864,18 @@ class _AdvisoryPost extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(advisory['dept'],
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
-                  Text(advisory['time'],
-                      style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                  Text(
+                    advisory['dept'],
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    advisory['time'],
+                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                  ),
                 ],
               ),
               const Spacer(),
@@ -603,20 +883,37 @@ class _AdvisoryPost extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Text(advisory['title'],
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+          Text(
+            advisory['title'],
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text(advisory['desc'],
-              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5)),
+          Text(
+            advisory['desc'],
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
           const SizedBox(height: 16),
           const Divider(color: Colors.white10, height: 1),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _FeedActionButton(icon: Icons.thumb_up_alt_outlined, label: 'Like'),
-              _FeedActionButton(icon: Icons.chat_bubble_outline_rounded, label: 'Comment'),
+              _FeedActionButton(
+                icon: Icons.thumb_up_alt_outlined,
+                label: 'Like',
+              ),
+              _FeedActionButton(
+                icon: Icons.chat_bubble_outline_rounded,
+                label: 'Comment',
+              ),
               _FeedActionButton(icon: Icons.share_rounded, label: 'Share'),
             ],
           ),
@@ -675,19 +972,35 @@ class _ReportCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(report['title'],
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+                Text(
+                  report['title'],
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: Colors.white,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(report['category'],
-                    style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                Text(
+                  report['category'],
+                  style: const TextStyle(color: Colors.white54, fontSize: 13),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.access_time_rounded, size: 12, color: Colors.white38),
+                    const Icon(
+                      Icons.access_time_rounded,
+                      size: 12,
+                      color: Colors.white38,
+                    ),
                     const SizedBox(width: 4),
-                    Text(report['date'],
-                        style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                    Text(
+                      report['date'],
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 11,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -709,9 +1022,10 @@ class _ReportCard extends StatelessWidget {
             child: Text(
               report['status'],
               style: TextStyle(
-                  color: isResolved ? Colors.greenAccent : AppTheme.primaryOrange,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold),
+                color: isResolved ? Colors.greenAccent : AppTheme.primaryOrange,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -738,7 +1052,11 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => maxHeight;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return SizedBox.expand(child: child);
   }
 

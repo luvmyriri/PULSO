@@ -1,0 +1,266 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1800" viewBox="0 0 1440 1800" fill="none">
+  <metadata id="impeccable-direction-contract"><![CDATA[
+THESIS: Field evidence becomes accountable public work; refuse generic card dashboards and ornamental cinematic effects.
+OWN-WORLD: Civic Aperture morning/night palette, open/ruled surfaces, one Field Aperture per viewport, Signal Cut, Archivo + Source Sans 3 + IBM Plex Mono.
+STORY: Residents see evidence, location, status, next event, and a thumb-visible report action; the shared library keeps both portals consistent.
+FIRST VIEWPORT: Resident evidence leads, then active record/location, authored lifecycle, report action, and five stable destinations. Foundations/library make light/dark parity and recovery explicit.
+FORM: Operate; user-pinned Civic Aperture v0.2; seed key not applicable because the user explicitly approved the generated direction.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+]]></metadata>
+  <title>PULSO Civic Aperture v0.2 — Foundations</title>
+  <desc>Editable foundations sheet for the PULSO Civic Aperture design system. It documents light and dark semantic colors, typography, scale, elevation, motion, Field Aperture, Signal Cut, contrast, and accessibility rules.</desc>
+  <!--
+    THESIS: A field observation becomes visible, accountable public work; this sheet refuses the generic SaaS token-card grid.
+    OWN-WORLD: Morning field sheet and survey-night surfaces, mineral neutrals, ember resident action, field-blue government action, true-color evidence, ruled records, and the two-pixel Signal Cut.
+    STORY: Designers move from semantic foundations to evidence framing and lifecycle accountability, then leave with explicit accessibility constraints.
+    FIRST VIEWPORT: A wide civic statement, a surveyed coordinate rail, and an aperture diagram establish the system before token detail.
+    FORM: Approved Civic Aperture v0.2 system board translated into an editable field-guide SVG.
+    FINISH: Every required foundation is visible, named, theme-paired, and ready for Figma import.
+  -->
+  <defs>
+    <style>
+      .display { font-family: "Archivo", "Arial Narrow", sans-serif; font-weight: 700; letter-spacing: -1.2px; }
+      .heading { font-family: "Archivo", "Arial Narrow", sans-serif; font-weight: 700; letter-spacing: -0.4px; }
+      .body { font-family: "Source Sans 3", "Segoe UI", sans-serif; font-weight: 400; }
+      .label { font-family: "Source Sans 3", "Segoe UI", sans-serif; font-weight: 700; letter-spacing: 0.5px; }
+      .mono { font-family: "IBM Plex Mono", Consolas, monospace; font-weight: 500; }
+      .ink { fill: #0C2436; }
+      .muted { fill: #465D6C; }
+      .night-ink { fill: #F4F7F2; }
+      .night-muted { fill: #B9C7CF; }
+      .rule { stroke: #C9D4D9; stroke-width: 1; }
+      .night-rule { stroke: #335166; stroke-width: 1; }
+      .icon { stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    </style>
+    <filter id="raised" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0C2436" flood-opacity="0.12"/>
+    </filter>
+    <filter id="overlay" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#071A2B" flood-opacity="0.22"/>
+    </filter>
+    <pattern id="survey-dots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#335166" opacity="0.45"/>
+    </pattern>
+  </defs>
+
+  <rect width="1440" height="1800" fill="#F4F7F5"/>
+
+  <g id="Header">
+    <rect x="0" y="0" width="1440" height="264" fill="#F4F7F5"/>
+    <rect x="1030" y="0" width="410" height="264" fill="#071A2B"/>
+    <path d="M32 224H972L990 218L1000 238L1010 210L1022 224H1408" stroke="#B9380B" stroke-width="2"/>
+    <circle cx="990" cy="224" r="5" fill="#F4F7F5" stroke="#B9380B" stroke-width="2"/>
+
+    <g id="PULSO-mark" transform="translate(32 30)">
+      <circle cx="34" cy="34" r="31" stroke="#0C2436" stroke-width="3"/>
+      <path d="M8 35H20L25 23L31 48L38 15L45 40L51 29H62" stroke="#B9380B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="34" cy="34" r="20" stroke="#0B4F6C" stroke-width="2" stroke-dasharray="7 5"/>
+    </g>
+    <text x="116" y="42" class="label" font-size="14" fill="#B9380B">PULSO CORE  /  CIVIC APERTURE  /  v0.2</text>
+    <text x="116" y="112" class="display ink" font-size="54">Field evidence becomes</text>
+    <text x="32" y="169" class="display ink" font-size="54">accountable public work.</text>
+    <text x="34" y="204" class="body muted" font-size="17">One civic record. Two purpose-built views. No decorative certainty.</text>
+
+    <g id="Aperture-principle" transform="translate(1080 36)" color="#F4F7F2">
+      <path d="M0 28V0H28M280 0H308V28M308 132V160H280M28 160H0V132" class="icon"/>
+      <circle cx="154" cy="80" r="5" fill="#FF8A3D"/>
+      <path d="M70 80H238M154 22V138" stroke="#335166" stroke-width="1"/>
+      <path d="M70 80H130L140 73L150 89L160 69L171 80H238" stroke="#FF8A3D" stroke-width="2"/>
+      <text x="0" y="190" class="mono night-muted" font-size="12">BRGY 176 / 14.720712, 120.985134</text>
+    </g>
+  </g>
+
+  <g id="Semantic-color" transform="translate(32 308)">
+    <text x="0" y="0" class="heading ink" font-size="30">Semantic color, paired by meaning</text>
+    <text x="0" y="30" class="body muted" font-size="15">Light is a morning field sheet. Dark is a night inspection—not an inversion.</text>
+    <line x1="0" y1="54" x2="1376" y2="54" class="rule"/>
+
+    <g id="Light-palette" transform="translate(0 86)">
+      <text x="0" y="0" class="label ink" font-size="14">LIGHT / MORNING FIELD SHEET</text>
+      <g id="Token-light-canvas" transform="translate(0 28)">
+        <rect width="78" height="54" rx="8" fill="#F4F7F5" stroke="#C9D4D9"/>
+        <text x="92" y="21" class="label ink" font-size="14">Canvas</text><text x="92" y="43" class="mono muted" font-size="12">#F4F7F5</text>
+      </g>
+      <g id="Token-light-surface" transform="translate(224 28)">
+        <rect width="78" height="54" rx="8" fill="#FFFFFF" stroke="#C9D4D9"/>
+        <text x="92" y="21" class="label ink" font-size="14">Surface</text><text x="92" y="43" class="mono muted" font-size="12">#FFFFFF</text>
+      </g>
+      <g id="Token-light-primary-text" transform="translate(448 28)">
+        <rect width="78" height="54" rx="8" fill="#0C2436"/>
+        <text x="92" y="21" class="label ink" font-size="14">Primary text</text><text x="92" y="43" class="mono muted" font-size="12">#0C2436</text>
+      </g>
+      <g id="Token-light-resident-action" transform="translate(0 112)">
+        <rect width="78" height="54" rx="8" fill="#B9380B"/>
+        <text x="92" y="21" class="label ink" font-size="14">Resident action</text><text x="92" y="43" class="mono muted" font-size="12">#B9380B</text>
+      </g>
+      <g id="Token-light-government-action" transform="translate(224 112)">
+        <rect width="78" height="54" rx="8" fill="#0B4F6C"/>
+        <text x="92" y="21" class="label ink" font-size="14">Government action</text><text x="92" y="43" class="mono muted" font-size="12">#0B4F6C</text>
+      </g>
+      <g id="Token-light-resolved" transform="translate(448 112)">
+        <rect width="78" height="54" rx="8" fill="#0B756B"/>
+        <text x="92" y="21" class="label ink" font-size="14">Resolved</text><text x="92" y="43" class="mono muted" font-size="12">#0B756B</text>
+      </g>
+      <g id="Token-light-warning" transform="translate(0 196)">
+        <rect width="78" height="54" rx="8" fill="#B45309"/>
+        <text x="92" y="21" class="label ink" font-size="14">Warning</text><text x="92" y="43" class="mono muted" font-size="12">#B45309</text>
+      </g>
+      <g id="Token-light-critical" transform="translate(224 196)">
+        <rect width="78" height="54" rx="8" fill="#B42318"/>
+        <text x="92" y="21" class="label ink" font-size="14">Critical</text><text x="92" y="43" class="mono muted" font-size="12">#B42318</text>
+      </g>
+      <g id="Token-light-focus-ring" transform="translate(448 196)">
+        <rect width="78" height="54" rx="8" fill="#2563EB"/>
+        <text x="92" y="21" class="label ink" font-size="14">Focus ring</text><text x="92" y="43" class="mono muted" font-size="12">#2563EB</text>
+      </g>
+    </g>
+
+    <g id="Dark-palette" transform="translate(704 86)">
+      <rect x="-16" y="-22" width="688" height="292" rx="12" fill="#071A2B"/>
+      <text x="0" y="0" class="label night-ink" font-size="14">DARK / NIGHT INSPECTION</text>
+      <g id="Token-dark-canvas" transform="translate(0 28)">
+        <rect width="78" height="54" rx="8" fill="#071A2B" stroke="#335166"/>
+        <text x="92" y="21" class="label night-ink" font-size="14">Canvas</text><text x="92" y="43" class="mono night-muted" font-size="12">#071A2B</text>
+      </g>
+      <g id="Token-dark-surface" transform="translate(224 28)">
+        <rect width="78" height="54" rx="8" fill="#0E283E" stroke="#335166"/>
+        <text x="92" y="21" class="label night-ink" font-size="14">Surface</text><text x="92" y="43" class="mono night-muted" font-size="12">#0E283E</text>
+      </g>
+      <g id="Token-dark-primary-text" transform="translate(448 28)">
+        <rect width="78" height="54" rx="8" fill="#F4F7F2"/>
+        <text x="92" y="21" class="label night-ink" font-size="14">Primary text</text><text x="92" y="43" class="mono night-muted" font-size="12">#F4F7F2</text>
+      </g>
+      <g id="Token-dark-resident-action" transform="translate(0 112)">
+        <rect width="78" height="54" rx="8" fill="#FF8A3D"/>
+        <text x="92" y="21" class="label night-ink" font-size="14">Resident action</text><text x="92" y="43" class="mono night-muted" font-size="12">#FF8A3D</text>
+      </g>
+      <g id="Token-dark-government-action" transform="translate(224 112)">
+        <rect width="78" height="54" rx="8" fill="#82C7D8"/>
+        <text x="92" y="21" class="label night-ink" font-size="14">Government action</text><text x="92" y="43" class="mono night-muted" font-size="12">#82C7D8</text>
+      </g>
+      <g id="Token-dark-resolved" transform="translate(448 112)">
+        <rect width="78" height="54" rx="8" fill="#66D2C8"/>
+        <text x="92" y="21" class="label night-ink" font-size="14">Resolved</text><text x="92" y="43" class="mono night-muted" font-size="12">#66D2C8</text>
+      </g>
+      <g id="Token-dark-warning" transform="translate(0 196)">
+        <rect width="78" height="54" rx="8" fill="#FBBF24"/>
+        <text x="92" y="21" class="label night-ink" font-size="14">Warning</text><text x="92" y="43" class="mono night-muted" font-size="12">#FBBF24</text>
+      </g>
+      <g id="Token-dark-critical" transform="translate(224 196)">
+        <rect width="78" height="54" rx="8" fill="#FDA29B"/>
+        <text x="92" y="21" class="label night-ink" font-size="14">Critical</text><text x="92" y="43" class="mono night-muted" font-size="12">#FDA29B</text>
+      </g>
+      <g id="Token-dark-focus-ring" transform="translate(448 196)">
+        <rect width="78" height="54" rx="8" fill="#93C5FD"/>
+        <text x="92" y="21" class="label night-ink" font-size="14">Focus ring</text><text x="92" y="43" class="mono night-muted" font-size="12">#93C5FD</text>
+      </g>
+    </g>
+  </g>
+
+  <g id="Typography" transform="translate(32 704)">
+    <text x="0" y="0" class="heading ink" font-size="30">Typography carries civic authority</text>
+    <text x="0" y="30" class="body muted" font-size="15">Condensed only where it strengthens a public statement; humane everywhere people read or act.</text>
+    <line x1="0" y1="54" x2="1376" y2="54" class="rule"/>
+
+    <g id="Type-display-and-heading" transform="translate(0 90)">
+      <text x="0" y="0" class="display ink" font-size="62">Evidence is the hero.</text>
+      <text x="2" y="34" class="mono muted" font-size="12">DISPLAY / ARCHIVO VARIABLE 700 / 52–64</text>
+      <text x="2" y="76" class="heading ink" font-size="30">Move every case forward.</text>
+      <text x="2" y="104" class="mono muted" font-size="12">HEADING / ARCHIVO VARIABLE 700 / 28–32</text>
+    </g>
+
+    <g id="Type-interface-and-record" transform="translate(704 90)">
+      <text x="0" y="0" class="label ink" font-size="16">Interface &amp; long-form / Source Sans 3</text>
+      <text x="0" y="34" class="body ink" font-size="18">Report what needs fixing. Track what the city does next.</text>
+      <text x="0" y="62" class="body muted" font-size="15">Labels stay plain, states stay explicit, and recovery is always named.</text>
+      <text x="0" y="112" class="label ink" font-size="16">Record data / IBM Plex Mono</text>
+      <text x="0" y="144" class="mono ink" font-size="15">PUL-2026-0822  /  BRGY 176  /  UPDATED 08:37</text>
+      <text x="0" y="172" class="mono muted" font-size="13">14.720712, 120.985134  /  SOURCE: FIELD REPORT</text>
+    </g>
+  </g>
+
+  <g id="Scale-and-motion" transform="translate(32 1010)">
+    <line x1="0" y1="0" x2="1376" y2="0" class="rule"/>
+    <g id="Scale-spacing" transform="translate(0 46)">
+      <text x="0" y="0" class="heading ink" font-size="24">Spacing rhythm</text>
+      <text x="0" y="26" class="body muted" font-size="14">4 / 8 / 12 / 16 / 24 / 32 / 48 / 64</text>
+      <g id="Scale-spacing-bars" transform="translate(0 56)" fill="#0B4F6C">
+        <rect x="0" y="0" width="4" height="18"/><rect x="28" y="0" width="8" height="18"/><rect x="60" y="0" width="12" height="18"/>
+        <rect x="96" y="0" width="16" height="18"/><rect x="136" y="0" width="24" height="18"/><rect x="184" y="0" width="32" height="18"/>
+        <rect x="240" y="0" width="48" height="18"/><rect x="312" y="0" width="64" height="18"/>
+      </g>
+    </g>
+    <g id="Scale-radius-and-elevation" transform="translate(448 46)">
+      <text x="0" y="0" class="heading ink" font-size="24">Radius &amp; elevation</text>
+      <g id="Scale-radius-samples" transform="translate(0 44)">
+        <rect x="0" y="0" width="82" height="66" fill="#FFFFFF" stroke="#C9D4D9"/>
+        <rect x="102" y="0" width="82" height="66" rx="8" fill="#FFFFFF" stroke="#C9D4D9"/>
+        <rect x="204" y="0" width="82" height="66" rx="16" fill="#FFFFFF" filter="url(#raised)"/>
+        <text x="0" y="88" class="mono muted" font-size="11">NONE</text><text x="102" y="88" class="mono muted" font-size="11">CONTROL / 8</text><text x="204" y="88" class="mono muted" font-size="11">OVERLAY / 16</text>
+      </g>
+    </g>
+    <g id="Scale-motion" transform="translate(864 46)">
+      <text x="0" y="0" class="heading ink" font-size="24">Motion has one job</text>
+      <text x="0" y="28" class="body muted" font-size="14">120 pressed · 180 replace · 220 overlay · 320–450 signal</text>
+      <path d="M0 77H88L98 70L108 86L119 63L132 77H478" stroke="#B9380B" stroke-width="2"/>
+      <circle cx="132" cy="77" r="7" fill="#F4F7F5" stroke="#B9380B" stroke-width="2"/>
+      <text x="0" y="112" class="body muted" font-size="13">Reduced: immediate change or short opacity fade. Never loop status.</text>
+    </g>
+  </g>
+
+  <g id="Signature-principles" transform="translate(32 1260)">
+    <rect x="0" y="0" width="840" height="312" rx="12" fill="#0E283E" filter="url(#overlay)"/>
+    <rect x="20" y="20" width="800" height="206" rx="8" fill="#071A2B"/>
+    <rect x="20" y="20" width="800" height="206" rx="8" fill="url(#survey-dots)" opacity="0.65"/>
+    <path d="M48 188C140 148 182 166 264 120C354 70 426 124 516 82C612 36 694 106 790 52" stroke="#335166" stroke-width="12" opacity="0.75"/>
+    <path d="M48 188C140 148 182 166 264 120C354 70 426 124 516 82C612 36 694 106 790 52" stroke="#82C7D8" stroke-width="2"/>
+    <path d="M46 62V38H70M770 38H794V62M794 184V208H770M70 208H46V184" stroke="#F4F7F2" stroke-width="3"/>
+    <circle cx="516" cy="82" r="10" fill="#071A2B" stroke="#FF8A3D" stroke-width="3"/>
+    <path d="M516 72V92M506 82H526" stroke="#FF8A3D" stroke-width="2"/>
+    <rect x="20" y="226" width="800" height="66" fill="#071A2B"/>
+    <text x="40" y="254" class="mono night-ink" font-size="14">PUL-2026-0822  /  FLOODED STREET</text>
+    <text x="40" y="278" class="mono night-muted" font-size="12">BRGY 167 · 10TH AVE  /  14.720712, 120.985134  /  UPDATED 08:37</text>
+    <text x="684" y="258" class="label" font-size="13" fill="#FF8A3D">IN PROGRESS</text>
+
+    <g id="Signature-usage-principles" transform="translate(900 8)">
+      <text x="0" y="0" class="heading ink" font-size="30">Field Aperture</text>
+      <text x="0" y="32" class="body muted" font-size="15">One evidence or map region anchors the task.</text>
+      <text x="0" y="62" class="body ink" font-size="15">• Four quiet corners frame the source.</text>
+      <text x="0" y="88" class="body ink" font-size="15">• Evidence stays true-color and unfiltered.</text>
+      <text x="0" y="114" class="body ink" font-size="15">• Metadata sits on an opaque rail.</text>
+      <text x="0" y="140" class="body ink" font-size="15">• Maps always have a list/address alternative.</text>
+      <text x="0" y="198" class="heading ink" font-size="30">Signal Cut</text>
+      <text x="0" y="230" class="body muted" font-size="15">A two-pixel route connects evidence to public record.</text>
+      <text x="0" y="260" class="body ink" font-size="15">Current state uses one notch, icon, label, and time.</text>
+      <text x="0" y="286" class="body ink" font-size="15">No straight-dot stepper. No color-only meaning.</text>
+    </g>
+  </g>
+
+  <g id="Accessibility" transform="translate(32 1586)">
+    <line x1="0" y1="0" x2="1376" y2="0" class="rule"/>
+    <text x="0" y="44" class="heading ink" font-size="28">Theme parity is a release gate</text>
+    <text x="0" y="75" class="body muted" font-size="15">Same content, boundaries, hierarchy, target sizes, statuses, and recovery in both modes.</text>
+
+    <g id="Contrast-examples" transform="translate(0 106)">
+      <rect x="0" y="0" width="196" height="58" rx="8" fill="#B9380B"/>
+      <text x="20" y="25" class="label" font-size="14" fill="#FFFFFF">Resident action</text><text x="20" y="45" class="mono" font-size="11" fill="#FFFFFF">5.78:1 / PASS AA</text>
+      <rect x="216" y="0" width="196" height="58" rx="8" fill="#0B4F6C"/>
+      <text x="236" y="25" class="label" font-size="14" fill="#FFFFFF">Government action</text><text x="236" y="45" class="mono" font-size="11" fill="#FFFFFF">8.94:1 / PASS AA</text>
+      <rect x="432" y="0" width="196" height="58" rx="8" fill="#071A2B"/>
+      <text x="452" y="25" class="label" font-size="14" fill="#F4F7F2">Primary text</text><text x="452" y="45" class="mono" font-size="11" fill="#B9C7CF">16.31:1 / PASS AA</text>
+    </g>
+
+    <g id="WCAG-theme-parity-notes" transform="translate(704 103)">
+      <circle cx="18" cy="18" r="16" fill="#F4F7F5" stroke="#2563EB" stroke-width="3"/>
+      <path d="M11 18L16 23L26 12" stroke="#0C2436" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="52" y="15" class="label ink" font-size="14">WCAG 2.2 AA / both themes</text>
+      <text x="52" y="39" class="body muted" font-size="13">3 px focus · controls ≥3:1 · 44 px public targets · 320 px reflow</text>
+      <text x="52" y="65" class="body muted" font-size="13">200% zoom · keyboard · forced colors · reduced motion · English/Filipino expansion</text>
+    </g>
+  </g>
+
+  <g id="Footer" transform="translate(32 1782)">
+    <text x="0" y="0" class="mono muted" font-size="11">PULSO CORE / CIVIC APERTURE / FOUNDATIONS / EDITABLE SVG / 1440 × 1800</text>
+    <text x="1376" y="0" class="mono muted" font-size="11" text-anchor="end">EVIDENCE → LOCATION → STATUS → ACTION → RECORD</text>
+  </g>
+</svg>

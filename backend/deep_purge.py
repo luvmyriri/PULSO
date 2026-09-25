@@ -1,7 +1,7 @@
 
 from sqlalchemy import text, inspect
 from database import engine, SessionLocal
-from models import User
+from models import Official
 
 def deep_purge_legacy_data():
     db = SessionLocal()
@@ -16,14 +16,14 @@ def deep_purge_legacy_data():
                 print(f"Dropping obsolete table: {table}")
                 try:
                     db.execute(text(f'DROP TABLE "{table}" CASCADE'))
-                except:
+                except Exception:
                     print(f"Failed to drop {table}, moving on.")
             else:
                 print(f"Table {table} already absent/dropped.")
 
         # 2. Identify Abolished Users
         abolished_roles = ['engineer', 'field_agent']
-        legacy_users = db.query(User).filter(User.role.in_(abolished_roles)).all()
+        legacy_users = db.query(Official).filter(Official.role.in_(abolished_roles)).all()
         legacy_ids = [u.id for u in legacy_users]
         
         if legacy_ids:
@@ -54,7 +54,7 @@ def deep_purge_legacy_data():
                             print(f"Skipped {table}.{col}: {e}")
                             
             # 3. Final Deletion
-            deleted_count = db.query(User).filter(User.id.in_(legacy_ids)).delete(synchronize_session=False)
+            deleted_count = db.query(Official).filter(Official.id.in_(legacy_ids)).delete(synchronize_session=False)
             print(f"Successfully deleted {deleted_count} legacy users.")
         else:
             print("No legacy users found.")

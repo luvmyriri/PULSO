@@ -2,22 +2,27 @@
 gemini_service.py — PULSO AI Intelligence Layer
 Caloocan City Engineering Office — PULSO System
 
-SDK:   google-genai (new official SDK, replaces deprecated google.generativeai)
-Key:   Google AI Studio API Key — project: pulso-backend-system
-Model: gemini-2.0-flash (latest stable, available on this project)
+SDK:   google-genai (Vertex AI mode via service account)
+Auth:  Service Account — vertex-express@pulso-backend-system
+Model: gemini-2.5-flash (Vertex AI — region-independent)
 """
 
 import os
 import json
 import base64
+import time
+import hashlib
+import threading
+from collections import OrderedDict
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
 
 load_dotenv()
 
-GEMINI_API_KEY     = os.getenv("GOOGLE_GEMINI_API_KEY")
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google-credentials.json")
-GEMINI_MODEL       = "gemini-2.5-flash"   # Latest stable 2026 High-Speed Flash model
+GCP_PROJECT        = "pulso-backend-system"
+GCP_LOCATION       = "us-central1"          # Vertex AI serving region
+GEMINI_MODEL       = "gemini-2.5-flash"     # Latest stable 2026 High-Speed Flash model
 
 # ── SDK Init ──────────────────────────────────────────────────────────────────
 
@@ -26,29 +31,220 @@ _SDK_READY = False
 
 def _init():
     global _client, _SDK_READY
-    if not GEMINI_API_KEY:
-        print("[AI] ❌ GOOGLE_GEMINI_API_KEY not set — AI features disabled.")
+    # Set credentials path for ADC (Application Default Credentials)
+    creds_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), GOOGLE_CREDENTIALS)
+    if os.path.exists(creds_path):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
+    elif os.path.exists(GOOGLE_CREDENTIALS):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_CREDENTIALS
+    else:
+        print(f"[AI] [FAILED] Service account credentials not found at '{GOOGLE_CREDENTIALS}' — AI features disabled.")
         return
     try:
         from google import genai
-        _client = genai.Client(api_key=GEMINI_API_KEY)
+        _client = genai.Client(
+            vertexai=True,
+            project=GCP_PROJECT,
+            location=GCP_LOCATION,
+        )
         _SDK_READY = True
-        sa_ok = os.path.exists(GOOGLE_CREDENTIALS)
-        print(f"[AI] ✅ google-genai SDK ready  |  Model: {GEMINI_MODEL}")
-        print(f"[AI]    Project     : pulso-backend-system")
-        print(f"[AI]    Service Acct: vertex-express@pulso-backend-system {'✅' if sa_ok else '⚠️ creds not found'}")
+        print(f"[AI] [SUCCESS] Vertex AI SDK ready  |  Model: {GEMINI_MODEL}")
+        print(f"[AI]    Project  : {GCP_PROJECT}")
+        print(f"[AI]    Location : {GCP_LOCATION}")
+        print(f"[AI]    Auth     : Service Account (vertex-express@{GCP_PROJECT}) [OK]")
     except Exception as e:
-        print(f"[AI] ❌ SDK init failed: {e}")
+        print(f"[AI] [ERROR] Vertex AI SDK init failed: {e}")
 
 _init()
 
 
+# ── Rate Limiting & Cost Protection ───────────────────────────────────────────
+# Student project budget protection — hard caps to prevent bill blowup
+
+# Configurable limits (adjust as needed)
+DAILY_API_CAP       = int(os.getenv("AI_DAILY_CAP", "200"))     # Max Gemini calls per day (200 = ~100 ID scans)
+PER_USER_RPM        = int(os.getenv("AI_PER_USER_RPM", "10"))    # Max calls per user per minute
+CACHE_MAX_SIZE      = int(os.getenv("AI_CACHE_SIZE", "100"))     # Max cached responses
+CACHE_TTL_SECONDS   = int(os.getenv("AI_CACHE_TTL", "300"))      # Cache TTL (5 min default)
+AI_DISABLED         = os.getenv("AI_DISABLED", "false").lower() == "true"
+
+# Paths for persistence
+USAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".ai_usage.json")
+
+class _RateLimiter:
+    """In-memory rate limiter with daily cap, per-user throttle, and response cache."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        # Daily counter (load from file if exists)
+        self._daily_count = 0
+        self._daily_reset_date = time.strftime("%Y-%m-%d")
+        self._load_usage()
+        
+        # Per-user sliding window: { user_id: [timestamp, ...] }
+        self._user_windows: Dict[str, list] = {}
+        # Burst window: { user_id: [timestamp, ...] } (3 requests / 10s)
+        self._user_bursts: Dict[str, list] = {}
+        
+        # Response cache: OrderedDict for LRU eviction
+        self._cache: OrderedDict = OrderedDict()
+        # Stats
+        self._total_cached_hits = 0
+        self._total_blocked = 0
+
+    def _load_usage(self):
+        """Restore daily usage from local file."""
+        if os.path.exists(USAGE_FILE):
+            try:
+                with open(USAGE_FILE, "r") as f:
+                    data = json.load(f)
+                    if data.get("date") == self._daily_reset_date:
+                        self._daily_count = data.get("count", 0)
+                        print(f"[AI RATE] [RESTORE] Loaded usage: {self._daily_count} calls today.")
+                    else:
+                        print(f"[AI RATE] [INFO] Skipping stale usage file from {data.get('date')}")
+            except Exception as e:
+                print(f"[AI RATE] [ERROR] Failed to load usage file: {e}")
+
+    def _persist_usage(self):
+        """Save current daily usage to file."""
+        try:
+            with open(USAGE_FILE, "w") as f:
+                json.dump({"date": self._daily_reset_date, "count": self._daily_count}, f)
+        except Exception as e:
+            print(f"[AI RATE] [ERROR] Failed to save usage: {e}")
+
+    def _reset_daily_if_needed(self):
+        today = time.strftime("%Y-%m-%d")
+        if today != self._daily_reset_date:
+            print(f"[AI RATE] [RESET] Daily counter reset. Yesterday: {self._daily_count} calls.")
+            self._daily_count = 0
+            self._daily_reset_date = today
+            self._persist_usage()
+
+    def check_and_consume(self, user_id: str = "anonymous") -> tuple:
+        """
+        Check if a request is allowed.
+        Returns (allowed: bool, reason: str)
+        """
+        if AI_DISABLED:
+             return False, "AI features are currently disabled by the administrator."
+
+        with self._lock:
+            self._reset_daily_if_needed()
+
+            # 1. Daily hard cap
+            if self._daily_count >= DAILY_API_CAP:
+                self._total_blocked += 1
+                print(f"[AI RATE] [BLOCKED] DAILY CAP REACHED ({DAILY_API_CAP}). Call blocked for {user_id}.")
+                return False, f"AI daily limit reached ({DAILY_API_CAP}/day). Resets at midnight."
+
+            # 2. Burst Protection (Max 3 per 10s)
+            now = time.time()
+            burst_window = self._user_bursts.setdefault(user_id, [])
+            burst_window[:] = [t for t in burst_window if now - t < 10]
+            if len(burst_window) >= 3:
+                self._total_blocked += 1
+                return False, "Request sent too quickly. Please wait a few seconds."
+
+            # 3. Per-user rate limit (sliding window - 1 min)
+            window = self._user_windows.setdefault(user_id, [])
+            # Purge entries older than 60 seconds
+            window[:] = [t for t in window if now - t < 60]
+            if len(window) >= PER_USER_RPM:
+                self._total_blocked += 1
+                print(f"[AI RATE] [WARNING] User {user_id} exceeded {PER_USER_RPM} calls/min. Throttled.")
+                return False, f"Too many requests. ({PER_USER_RPM}/min limit)."
+
+            # 4. Allowed — consume
+            burst_window.append(now)
+            window.append(now)
+            self._daily_count += 1
+            self._persist_usage()
+            
+            remaining = DAILY_API_CAP - self._daily_count
+
+            # Print status every 10 calls or when below 20%
+            if self._daily_count % 10 == 0 or remaining < DAILY_API_CAP * 0.2:
+                pct = (self._daily_count / max(DAILY_API_CAP, 1)) * 100
+                print(f"[AI RATE] [STATS] {self._daily_count}/{DAILY_API_CAP} daily calls used ({pct:.0f}%) | Cache hits: {self._total_cached_hits} | Blocked: {self._total_blocked}")
+
+            return True, ""
+
+    def get_cached(self, cache_key: str) -> Optional[str]:
+        """Check if a response is cached and still valid."""
+        with self._lock:
+            if cache_key in self._cache:
+                value, timestamp = self._cache[cache_key]
+                if time.time() - timestamp < CACHE_TTL_SECONDS:
+                    self._total_cached_hits += 1
+                    self._cache.move_to_end(cache_key)  # LRU
+                    return value
+                else:
+                    del self._cache[cache_key]  # Expired
+        return None
+
+    def set_cached(self, cache_key: str, value: str):
+        """Store a response in cache."""
+        with self._lock:
+            self._cache[cache_key] = (value, time.time())
+            # Evict oldest if over size
+            while len(self._cache) > CACHE_MAX_SIZE:
+                self._cache.popitem(last=False)
+
+    def get_stats(self) -> Dict:
+        """Return current rate limiter stats."""
+        with self._lock:
+            self._reset_daily_if_needed()
+            return {
+                "daily_used": self._daily_count,
+                "daily_cap": DAILY_API_CAP,
+                "daily_remaining": DAILY_API_CAP - self._daily_count,
+                "daily_pct": round((self._daily_count / max(DAILY_API_CAP, 1)) * 100, 1),
+                "cache_size": len(self._cache),
+                "cache_hits": self._total_cached_hits,
+                "total_blocked": self._total_blocked,
+                "per_user_rpm": PER_USER_RPM,
+                "ai_disabled": AI_DISABLED
+            }
+
+
+_rate_limiter = _RateLimiter()
+
+def _make_cache_key(prompt: str, image_data: Optional[bytes] = None, image_data2: Optional[bytes] = None) -> str:
+    """Generate a cache key from the prompt and optional image hash."""
+    h = hashlib.md5(prompt.encode("utf-8", errors="ignore"))
+    if image_data:
+        h.update(hashlib.md5(image_data[:8192]).digest())  # Hash first 8KB of image for speed
+    if image_data2:
+        h.update(hashlib.md5(image_data2[:8192]).digest())
+    return h.hexdigest()
+
+def get_rate_limit_stats() -> Dict:
+    """Public accessor for rate limit dashboard."""
+    return _rate_limiter.get_stats()
+
+print(f"[AI RATE] [INFO] Rate limiter active: {DAILY_API_CAP}/day, {PER_USER_RPM}/user/min, cache={CACHE_MAX_SIZE}, kill_switch={'ON' if AI_DISABLED else 'OFF'}")
+
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
-def _generate(prompt: str, json_mode: bool = True) -> Optional[str]:
-    """Call Gemini with a text-only prompt."""
+def _generate(prompt: str, json_mode: bool = True, user_id: str = "system") -> Optional[str]:
+    """Call Gemini with a text-only prompt (rate-limited + cached)."""
     if not _SDK_READY or _client is None:
         return None
+
+    # Check cache first (text-only calls are very cacheable)
+    cache_key = _make_cache_key(prompt)
+    cached = _rate_limiter.get_cached(cache_key)
+    if cached:
+        return cached
+
+    # Rate limit check
+    allowed, reason = _rate_limiter.check_and_consume(user_id)
+    if not allowed:
+        print(f"[AI] Rate limited: {reason}")
+        return None
+
     try:
         from google.genai import types
         cfg = types.GenerateContentConfig(
@@ -60,16 +256,33 @@ def _generate(prompt: str, json_mode: bool = True) -> Optional[str]:
             contents=prompt,
             config=cfg,
         )
-        return resp.text.strip()
+        result = resp.text.strip()
+        # Cache successful responses
+        if result and json_mode:
+            _rate_limiter.set_cached(cache_key, result)
+        return result
     except Exception as e:
         print(f"[AI] generate error: {e}")
         return None
 
 
-def _generate_multimodal(prompt: str, image_bytes: bytes, mime: str = "image/jpeg") -> Optional[str]:
-    """Call Gemini with a text + image prompt (Vision)."""
+def _generate_multimodal(prompt: str, image_bytes: bytes, mime: str = "image/jpeg", user_id: str = "system") -> Optional[str]:
+    """Call Gemini with a text + image prompt (Vision) — rate-limited + cached."""
     if not _SDK_READY or _client is None:
         return None
+
+    # Check cache (image hash included)
+    cache_key = _make_cache_key(prompt, image_bytes)
+    cached = _rate_limiter.get_cached(cache_key)
+    if cached:
+        return cached
+
+    # Rate limit check
+    allowed, reason = _rate_limiter.check_and_consume(user_id)
+    if not allowed:
+        print(f"[AI] Rate limited (multimodal): {reason}")
+        return None
+
     try:
         from google.genai import types
         img_part = types.Part.from_bytes(data=image_bytes, mime_type=mime)
@@ -82,16 +295,33 @@ def _generate_multimodal(prompt: str, image_bytes: bytes, mime: str = "image/jpe
             contents=[prompt, img_part],
             config=cfg,
         )
-        return resp.text.strip()
+        result = resp.text.strip()
+        # Cache successful multimodal responses
+        if result:
+            _rate_limiter.set_cached(cache_key, result)
+        return result
     except Exception as e:
         print(f"[AI] multimodal error: {e}")
         return None
 
 
-def _generate_multimodal_dual(prompt: str, img1: bytes, img2: bytes, mime: str = "image/jpeg") -> Optional[str]:
-    """Call Gemini with a text + two ID images for visual cross-referencing."""
+def _generate_multimodal_dual(prompt: str, img1: bytes, img2: bytes, mime: str = "image/jpeg", user_id: str = "system") -> Optional[str]:
+    """Call Gemini with a text + two ID images for visual cross-referencing (rate-limited + cached)."""
     if not _SDK_READY or _client is None:
         return None
+
+    # Check cache
+    cache_key = _make_cache_key(prompt, img1, img2)
+    cached = _rate_limiter.get_cached(cache_key)
+    if cached:
+        return cached
+
+    # Rate limit check (dual images are expensive)
+    allowed, reason = _rate_limiter.check_and_consume(user_id)
+    if not allowed:
+        print(f"[AI] Rate limited (dual-modal): {reason}")
+        return None
+
     try:
         from google.genai import types
         part1 = types.Part.from_bytes(data=img1, mime_type=mime)
@@ -105,7 +335,11 @@ def _generate_multimodal_dual(prompt: str, img1: bytes, img2: bytes, mime: str =
             contents=[prompt, "FRONT ID IMAGE:", part1, "BACK ID IMAGE:", part2],
             config=cfg,
         )
-        return resp.text.strip()
+        result = resp.text.strip()
+        # Cache successful responses
+        if result:
+            _rate_limiter.set_cached(cache_key, result)
+        return result
     except Exception as e:
         print(f"[AI] multimodal-dual error: {e}")
         return None
@@ -139,7 +373,8 @@ def analyze_report(description: str, image_data: Optional[bytes] = None) -> Dict
     Performs multi-modal Vision analysis when an image is attached.
 
     Returns: category, urgency, severity_score, smart_summary,
-             reasoning, image_analysis, is_inappropriate, rejection_reason
+             reasoning, image_analysis, is_inappropriate, rejection_reason,
+             auto_description
     """
     prompt = f"""You are the "Vision Eye" triage agent for PULSO, the infrastructure management system of the Caloocan City Engineering Office, Metro Manila.
 
@@ -156,6 +391,7 @@ Return ONLY a valid JSON object with EXACTLY these keys (no extra text before or
   "smart_summary": "One-sentence technical summary for a dispatcher",
   "reasoning": "Brief justification for the severity score and category choice based on Scope of Service",
   "image_analysis": "Detailed description of detected hazards, infrastructure types, and technical markers seen in the image",
+  "auto_description": "A 1-3 sentence technical description of what is visible in the image, suitable as a citizen report body (e.g. 'Severe pothole approximately 1 meter wide on Main Avenue near Deparo. Road surface has deteriorated significantly, exposing the aggregate base.')",
   "is_inappropriate": false,
   "rejection_reason": ""
 }}
@@ -168,13 +404,12 @@ Intelligence Rules (STRICT SCOPE OF SERVICE):
    - Street Lighting: Burned-out streetlight bulbs, city-owned electrical wiring/lamp posts.
    - Public Safety & Regulatory: Structural safety (post-earthquake), building permit compliance, debris/fallen tree clearing, fire/electrical compliance for NEW constructions.
    - Public Facilities: Public schools, health centers, City Hall, basketball courts, plazas, covered courts, parks.
-   - Waste Management: General trash/garbage blockages not related to drainage.
 
 2. SCANNING GUIDELINES: 
    - Examine images CAREFULLY for infrastructure markers (city-owned vs private utility).
    - Look for specific technical details: pavement cracks, clogged drainage grates, burnt out LED modules, or structural fractures in public school walls.
 
-3. ZERO-GUESS POLICY: If the issue is NOT within the Engineering Office scope (e.g., private indoor plumbing, Maynilad water leaks, Meralco power line issues without post damage) or is ambiguous, you MUST set "category": "Undetermined" or "Waste Management".
+3. ZERO-GUESS POLICY: If the issue is NOT within the Engineering Office scope (e.g., private indoor plumbing, Maynilad water leaks, Meralco power line issues without post damage) or is ambiguous, you MUST set "category": "Undetermined".
 
 4. Urgency options: Low | Medium | High | Critical
 
@@ -183,6 +418,20 @@ Severity Guidelines:
 - Missing manhole covers / deep potholes on main roads / major flooding → High, score 7–8
 - Minor potholes / uncollected garbage / flickering streetlights → Low–Medium, score 2–5
 - Spam, joke, hate speech, or offensive content → is_inappropriate: true
+
+5. CRITICAL IMAGE CONTENT MODERATION — MANDATORY:
+   If an image is attached, you MUST perform content screening BEFORE any infrastructure analysis:
+   a) FACE / SELFIE DETECTION: If the image is primarily a selfie, portrait, or close-up of a human face (not an incidental bystander in the background of an infrastructure photo), this is NOT a valid infrastructure report. Set:
+      - "is_inappropriate": true
+      - "rejection_reason": "Image rejected: This appears to be a selfie or portrait photo, not an infrastructure issue. Please submit a photo showing the actual infrastructure problem (pothole, broken pipe, damaged road, etc.)."
+      - "category": "Inappropriate Content"
+   b) NON-INFRASTRUCTURE CONTENT: If the image shows food, animals, random objects, memes, screenshots, social media posts, or any content clearly unrelated to city infrastructure, set:
+      - "is_inappropriate": true  
+      - "rejection_reason": "Image rejected: The uploaded photo does not show a valid infrastructure issue. Please take a photo of the actual hazard or damage."
+      - "category": "Inappropriate Content"
+   c) VALID INFRASTRUCTURE images should show roads, drainage, streetlights, buildings, public facilities, or visible physical damage/hazards.
+
+6. AUTO-DESCRIPTION: If the image shows a legitimate infrastructure issue, generate a professional 1-3 sentence description in "auto_description" that describes the visible problem as if a citizen is reporting it. This should be factual, specific, and include observable details (size of damage, type of infrastructure, visible severity). If the image is inappropriate or no image is provided, set "auto_description" to an empty string.
 """
     try:
         raw = (_generate_multimodal(prompt, image_data) if image_data
@@ -195,7 +444,14 @@ Severity Guidelines:
     return _local_safety_check(description)
 
 
-def extract_id_data(front_ocr: str, back_ocr: str = "", id_type: str = "unknown", front_image: Optional[bytes] = None, back_image: Optional[bytes] = None) -> Optional[Dict]:
+def extract_id_data(
+    front_ocr: str, 
+    back_ocr: str = "", 
+    id_type: str = "unknown", 
+    front_image: Optional[bytes] = None, 
+    back_image: Optional[bytes] = None,
+    heuristic_context: str = ""
+) -> Optional[Dict]:
     """
     AI Multi-Side ID Parser & Visual Auditor — Structures OCR and performs 
     Multimodal Vision analysis to ensure front and back portraits match.
@@ -204,11 +460,12 @@ def extract_id_data(front_ocr: str, back_ocr: str = "", id_type: str = "unknown"
         return None
 
     ocr_context = f"FRONT SIDE OCR:\n{front_ocr}\n\nBACK SIDE OCR:\n{back_ocr}" if back_ocr else f"FRONT SIDE ONLY:\n{front_ocr}"
-
     prompt = f"""You are an elite ID Verification agent for the Caloocan City Engineering Office.
 You are performing a MULTIMODAL AUDIT of a Philippine ID (type: {id_type}).
 
 {ocr_context}
+
+{"ADVISORY: System suspects a potential data/surface inconsistency.\n" + heuristic_context if heuristic_context else ""}
 
 {"Two images (FRONT and BACK) are attached for Visual Verification." if back_image else "One image (FRONT) is attached."}
 
@@ -239,61 +496,36 @@ Extract into a JSON object with these exact fields:
   "is_back_correct": true
 }}
 
-Intelligence Rules (ZERO TOLERANCE FOR ERROR):
+Intelligence Rules (STRICT ZERO TOLERANCE FOR ERROR):
 1. VISUAL OCR OVERRIDE:
-   If the provided "FRONT SIDE OCR" or "BACK SIDE OCR" text is messy, incomplete, or contains obvious spelling errors (e.g., "B4gumBong" instead of "Bagumbong"), you MUST ignore the OCR text and perform a fresh, high-precision visual scan of the raw pixels in the images.
+   If the provided "FRONT SIDE OCR" or "BACK SIDE OCR" text is messy, incomplete, or contains obvious spelling errors (e.g., "B4gumBong" instead of "Bagumbong"), you MUST ignore the OCR text and perform a fresh, high-precision visual scan of the images.
 
-2. DATA CONSISTENCY:
-   - Full Name: Combine First, Middle, and Last names into a consistent identity.
-   - Birthdate: Must be in YYYY-MM-DD. If formatted as "01-JAN-1990", convert to "1990-01-01".
-   - Sex: "Male" or "Female" only.
-   - "postal_code": 4-digit code.
+2. Side & ID Type Verification (AUTHENTICITY AUDIT):
+   - You MUST identify the side (Front or Back) of EACH image.
+   - If BOTH the FRONT and BACK images provided appear to be the same side (e.g., front of card sent twice), you MUST set "is_document_mismatch": true and "mismatch_reason": "SCAN ERROR: You have scanned the same side of the ID twice. Please scan the Front side and then the Back side separately."
+   - Identify the exact ID type for EACH side (e.g., "UMID", "PhilID", "LTO").
+   - ADVISORIAL SCRUTINY: If a system advisory was provided above (e.g., regarding a PhilHealth vs PhilID mismatch), you MUST perform a deep visual inspection of the card templates to confirm or professionally debunk the mismatch. Do not lazily categorize them as the same type if they differ in layout, logo, or color scheme.
+   - If the ID type on the Front doesn't match the ID type on the Back (e.g. Front is UMID but Back is PhilID), set "is_document_mismatch": true and "mismatch_reason": "DOCUMENT MISMATCH: The front and back images belong to different types of government IDs."
 
-3. Side Identification:
-   - Identify the exact type: "UMID", "PHILID" (National ID/Philsys), "LTO" (Driver's License), "POSTAL", "COMELEC", "UMID", "GSIS", "PRC", or "PASSPORT".
-   - FRONT side has the primary portrait Photo, Full Name, and personal details.
-   - BACK side has QR code, magnetic stripe, barcode, or secondary metadata.
-   - PHILID Back: Has Kasarian/Sex, Uri ng Dugo, Kalagayang Sibil, Lugar ng Kapanganakan labels and a QR code. DO NOT classify this as COMELEC.
-   - If the "FRONT SIDE" image looks like a back side, set "is_front_correct": false.
+3. VISUAL FACE MATCH — CRITICAL BIOMETRIC AUDIT:
+   - Perform a detailed person-identity comparison between the main portrait on the Front and any secondary photo/watermark/ghost image on the Back.
+   - If the faces belong to DIFFERENT individuals, set "is_visual_face_match": false, "is_document_mismatch": true, "mismatch_reason": "IDENTITY MISMATCH: The portrait photo on the front does not match the individual detected on the back image."
+   - Check for signs of "Digital Re-photography": If you detect moiré patterns or signs that the user is scanning a photo of a phone screen or a computer monitor, flag it as a mismatch.
 
-4. VISUAL FACE MATCH — CRITICAL HIGH-SECURITY BIOMETRIC AUDIT:
-   This is the most important step. You must perform a detailed person-identity comparison.
+4. DATA CONSISTENCY & MERGING:
+   - Extract the full name and DOB from BOTH images if they appear on both.
+   - If the Name or Birthdate on the Back (often in QR codes or text) contradicts the Front, set "is_document_mismatch": true.
+   - Birthdate: Must be YYYY-MM-DD.
+   - Fix OCR Noise: Be aggressive about correcting (0 vs O, 1 vs I).
 
-   STEP A — Face Detection:
-   - On the FRONT image: Locate the main ID portrait photo (usually top-left or top-center).
-   - On the BACK image: Look for any secondary photo, ghost image, watermark photo, or tinted/transparent face overlay (common on new Philippine National IDs, LTO licenses, and UMID cards).
+5. PHILIPPINE ADDRESS INTELLIGENCE:
+   - house_no: Numeric only.
+   - subdivision: Include PH, PKG, and NV identifiers (e.g. "PH8A PKG14").
+   - barangay: Exact number for Caloocan (e.g. "171") or name for others (e.g. "Bagumbong"). Priority: numeric.
 
-   STEP B — Biometric Comparison (if BOTH sides have a face):
-   Carefully compare the following facial features between the two photos:
-   - Facial geometry: Overall face shape (oval, round, square, heart-shaped).
-   - Eye characteristics: Eye spacing, eye shape, distance between eyes and eyebrows.
-   - Nose shape: Nose bridge width and tip shape.
-   - Jawline and cheekbones: Jaw angle and cheekbone prominence.
-   - Skin tone and complexion.
-   - Gender presentation: Male vs. Female appearance.
-   - Approximate age range: Do both photos appear to be the same approximate age?
+6. RESPONSE FORMAT:
+   - If "is_document_mismatch" is true, ensure "mismatch_reason" is descriptive and professional.
 
-   STEP C — Decision:
-   - If the biometric features are CONSISTENT (same person, accounting for photo angle, lighting, or monochrome/tinted rendering): Set "is_visual_face_match": true, "face_match_confidence": "high".
-   - If there are MINOR inconsistencies (same person but different angle): Set "is_visual_face_match": true, "face_match_confidence": "medium".
-   - If the faces CLEARLY belong to DIFFERENT individuals (different gender, different bone structure, significantly different age): Set "is_visual_face_match": false, "is_document_mismatch": true, "face_match_confidence": "low", "mismatch_reason": "FACE MISMATCH: The portrait on the front ID does not match the person on the back. These appear to be two different individuals."
-   - If ONLY the front has a face and back has no face (older ID formats): Set "is_visual_face_match": true, "face_match_confidence": "na" (not applicable, cannot verify visually).
-
-5. PHILIPPINE ADDRESS INTELLIGENCE (DEEP DIVE):
-   - "house_no": Strictly numeric house, floor, or unit numbers (e.g. "123", "Unit 4B"). DO NOT put Phase (PH) or Package (PKG) numbers here.
-   - "block_lot": Identify BLK/LOT precisely (e.g., "B100 L11", "LOT 5 BLK 2").
-   - "subdivision": Include all named subdivisions, PH (Phase), PKG (Package), and NV (Northville) identifiers together here. 
-     *Example: "PH1 PKG2 Northville 1" or "Northville 15" or "PH8A PKG14".*
-   - "barangay": The specific Barangay. In Caloocan North, this is usually "Bagumbong", "Camarin", "Deparo", "Lumbac", etc. Ensure the Barangay name is accurately spelled.
-   - "postal_code": 4-digit code.
-
-6. Cross-Verification:
-   - Compare images vs OCR. If the visual ID says "JUAN" but OCR said "JOIN", the visual ID (Juan) is 100% correct.
-   - Set "is_document_mismatch": true if any critical field (Name, DOB, ID Type) differs drastically between eyes and OCR.
-   - Extract Jr., Sr., III, IV, etc. into the "suffix" field.
-   - Fix OCR Noise: Clean common errors (0 vs O, 1 vs I, 8 vs B). Be aggressive about fixing these based on context (e.g. 0 in a Name is probably O).
-   - Names: Title Case.
-   - INTELLIGENT DISPATCH: If the ID type is not one of the majors, use its visual and text clues to identify the most likely government issuer and return it in "front_id_type".
 """
     try:
         if front_image and back_image:
@@ -403,6 +635,28 @@ Provide a helpful, accurate, plain-text response:"""
     )}
 
 
+# ── Public Vision API Wrapper (used by philsys_service.py) ───────────────────
+
+async def analyze_image_with_prompt(image_bytes: bytes, prompt: str, user_id: str = "philsys") -> Dict:
+    """
+    Public async wrapper for Gemini Vision (multimodal) OCR.
+    Called by philsys_service.py for PhilID OCR extraction.
+    
+    Returns: { "text": "...", "success": bool }
+    """
+    # Detect mime type from file header
+    mime = "image/jpeg"
+    if image_bytes[:4] == b'\x89PNG':
+        mime = "image/png"
+    elif image_bytes[:4] == b'RIFF':
+        mime = "image/webp"
+
+    raw = _generate_multimodal(prompt, image_bytes, mime=mime, user_id=user_id)
+    if raw:
+        return {"text": raw, "success": True}
+    return {"text": "", "success": False}
+
+
 # ── Always-On Safety Fallback ─────────────────────────────────────────────────
 
 def _local_safety_check(description: str) -> Dict:
@@ -444,4 +698,68 @@ def _local_safety_check(description: str) -> Dict:
         "image_analysis": "No image provided",
         "is_inappropriate": False,
         "rejection_reason": ""
+    }
+
+def generate_maintenance_plan(asset_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    AI Engineering Planner — Generates a detailed maintenance strategy for an asset.
+    """
+    if not _SDK_READY:
+        return {
+            "plan": "AI maintenance planner is currently unavailable.",
+            "steps": [],
+            "estimated_cost": 0
+        }
+
+    prompt = f"""You are the Lead Maintenance Engineer for the Caloocan City Engineering Office.
+Generate a structured maintenance plan for the following infrastructure asset.
+
+Asset Information:
+- Name: {asset_data.get('asset_name')}
+- Category: {asset_data.get('category')}
+- Barangay: {asset_data.get('barangay')}
+- Health Score: {asset_data.get('health_score')} / 100
+- Material: {asset_data.get('material_type')}
+- Design Life: {asset_data.get('design_life')} years
+- Last Maintenance: {asset_data.get('last_maintenance_date', 'Unknown')}
+- Environmental Risks: {asset_data.get('environmental_risks', 'Standard')}
+
+Return ONLY a valid JSON object with these EXACT fields:
+{{
+  "priority": "CRITICAL | HIGH | MODERATE | LOW",
+  "maintenance_plan": "A concise executive summary of the recommended action.",
+  "steps": [
+    "Step 1: Description",
+    "Step 2: Description",
+    "Step 3: Description"
+  ],
+  "estimated_cost": 25000,
+  "estimated_duration_days": 5,
+  "required_personnel": ["Civil Engineer", "Maintenance Crew", "Inspector"],
+  "technical_justification": "Why this specific plan is recommended based on asset health and risk."
+}}
+
+Engineering Rules:
+1. Be technically specific (use engineering terms).
+2. Cost estimate should be in PHP (Philippine Pesos).
+3. If the asset health is < 40, prioritize replacement or major rehabilitation.
+4. If the asset category is 'Drainage' and 'Rainy Season' is mentioned, prioritize de-clogging and structural reinforcement.
+5. NO MARKDOWN. ONLY PLAIN TEXT STRINGS IN JSON.
+"""
+
+    try:
+        raw = _generate(prompt, json_mode=True)
+        if raw:
+            return json.loads(raw)
+    except Exception as e:
+        print(f"[AI] Maintenance plan generation error: {e}")
+
+    return {
+        "priority": "HIGH",
+        "maintenance_plan": f"Urgent preventive maintenance required for {asset_data.get('asset_name')}.",
+        "steps": ["Site inspection", "Surface cleanup", "Material patching"],
+        "estimated_cost": 45000,
+        "estimated_duration_days": 3,
+        "required_personnel": ["Field Inspector", "Maintenance Team"],
+        "technical_justification": "Fallback plan generated due to AI processing error."
     }

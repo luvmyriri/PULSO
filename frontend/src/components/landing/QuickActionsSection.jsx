@@ -60,7 +60,7 @@ export default function QuickActionsSection({ onOpenTrackModal }) {
           
           {/* Card 1: Report an Issue (Primary Action) */}
           <a
-            href="/register"
+            href="/report"
             className="group relative flex flex-col justify-between p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs hover:shadow-sm transition-all text-left min-h-[170px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
           >
             <div>
@@ -69,7 +69,7 @@ export default function QuickActionsSection({ onOpenTrackModal }) {
                   <AlertTriangle size={24} />
                 </div>
                 <span className="text-[10px] font-mono-data font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60">
-                  Takes 1 Min
+                  No Login Req.
                 </span>
               </div>
 

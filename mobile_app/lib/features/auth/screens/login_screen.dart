@@ -3,6 +3,8 @@ import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pulso_mobile/core/api/api_client.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
 import 'package:pulso_mobile/widgets/glass_card.dart';
 // import 'package:pulso_mobile/l10n/app_localizations.dart';
@@ -23,6 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _rememberMe = false;
   String _errorMessage = "";
 
   String _viewMode =
@@ -62,7 +65,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Color get brandOrange => AppTheme.primaryOrange;
 
   // Base URL for API - Pointing to the specified backend address
-  static const String baseUrl = "http://192.168.1.121:33159";
+  // Base URL for API - Using the centralized dynamic Client
+  String get dynamicBaseUrl => ApiClient.baseUrl;
 
   bool _initialized = false;
 
@@ -119,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final response = await http
           .post(
-            Uri.parse("$baseUrl/api/auth/forgot-password"),
+            Uri.parse("$dynamicBaseUrl/api/auth/forgot-password"),
             headers: {"Content-Type": "application/json"},
             body: json.encode({"email": _recoveryEmailController.text}),
           )
@@ -196,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final response = await http
           .post(
-            Uri.parse("$baseUrl/api/auth/verify-reset-code"),
+            Uri.parse("$dynamicBaseUrl/api/auth/verify-reset-code"),
             headers: {"Content-Type": "application/json"},
             body: json.encode({
               "email": _recoveryEmailController.text,
@@ -234,7 +238,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final response = await http
           .post(
-            Uri.parse("$baseUrl/api/auth/resend-code"),
+            Uri.parse("$dynamicBaseUrl/api/auth/resend-code"),
             headers: {"Content-Type": "application/json"},
             body: json.encode({"email": _registrationEmailController.text}),
           )
@@ -299,7 +303,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse("$baseUrl/api/auth/verify-registration"),
+        Uri.parse("$dynamicBaseUrl/api/auth/verify-registration"),
         headers: {"Content-Type": "application/json"},
         body: json.encode({
           "email": _registrationEmailController.text,
@@ -356,7 +360,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final response = await http
           .post(
-            Uri.parse("$baseUrl/api/auth/reset-password"),
+            Uri.parse("$dynamicBaseUrl/api/auth/reset-password"),
 
             headers: {"Content-Type": "application/json"},
             body: json.encode({
@@ -388,7 +392,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleLogin({String? captchaToken}) async {
+  Future<void> _handleLogin() async {
     setState(() {
       _isLoading = true;
       _errorMessage = "";
@@ -400,13 +404,9 @@ class _LoginScreenState extends State<LoginScreen> {
         "password": _passwordController.text,
       };
 
-      if (captchaToken != null) {
-        body["captcha_token"] = captchaToken;
-      }
-
       final response = await http
           .post(
-            Uri.parse("$baseUrl/api/auth/login"),
+            Uri.parse("$dynamicBaseUrl/api/auth/login"),
             headers: {"Content-Type": "application/x-www-form-urlencoded"},
             body: body,
           )
@@ -415,27 +415,35 @@ class _LoginScreenState extends State<LoginScreen> {
       final data = json.decode(response.body);
 
       if (response.statusCode == 200) {
-        if (data['require_captcha'] == true) {
-          // Show ReCAPTCHA Dialog
-          if (!mounted) return;
-          final token = await showDialog<String>(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => const CaptchaDialog(),
-          );
-
-          if (token != null) {
-            _handleLogin(captchaToken: token); // Re-try with token
-          } else {
-            setState(() => _isLoading = false);
-          }
-          return;
+        if (data['access_token'] != null) {
+          await ApiClient.saveToken(data['access_token']);
+          
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('remember_me', _rememberMe);
         }
-
+        
+        if (!mounted) return;
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text("Login Successful!")));
-        // Navigate to dashboard...
+        
+        // Dynamic redirection based on user role
+        final userData = data['user'] ?? {};
+        final String role = userData['role'] ?? 'citizen';
+        
+        final List<String> agentRoles = [
+          'field_worker', 
+          'construction_foreman', 
+          'project_engineer',
+          'dispatcher',
+          'manager'
+        ];
+
+        if (agentRoles.contains(role)) {
+          Navigator.pushReplacementNamed(context, '/agent');
+        } else {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
       } else {
         final errMsg = data['detail']?.toString() ?? "Authentication failed";
         setState(() {
@@ -447,13 +455,13 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = "Connection error. Is the backend running?";
       });
     } finally {
-      if (captchaToken != null || _errorMessage.isNotEmpty) {
-        setState(() => _isLoading = false);
-      }
+      if (!mounted) return;
+      setState(() => _isLoading = false);
     }
   }
 
@@ -638,7 +646,35 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: Checkbox(
+                    value: _rememberMe,
+                    onChanged: (val) {
+                      setState(() {
+                        _rememberMe = val ?? false;
+                      });
+                    },
+                    activeColor: brandOrange,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "Remember me",
+                  style: TextStyle(
+                    color: onSurface.withOpacity(0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
 
             SizedBox(
               width: double.infinity,
@@ -697,27 +733,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
 
-        const SizedBox(height: 32),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              "Don't have an account? ",
-              style: TextStyle(color: onSurface.withOpacity(0.5), fontSize: 13),
-            ),
-            GestureDetector(
-              onTap: () => Navigator.pushReplacementNamed(context, '/register'),
-              child: Text(
-                "Sign Up",
-                style: TextStyle(
-                  color: brandOrange,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ],
-        ),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -1699,88 +1715,14 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header Branding
+                  const SizedBox(height: 40),
+                  // Header Branding (Centered for App)
                   FadeInDown(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: const PulsoBranding(
-                              scale: 0.55,
-                              subtitle: 'RESIDENT PORTAL',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Navigation & Theme
-                        Flexible(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              // Theme Toggle
-                              Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: onSurface.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  children: [
-                                    _buildThemeButton(
-                                      context,
-                                      ThemeMode.light,
-                                      Icons.wb_sunny_outlined,
-                                      onSurface,
-                                    ),
-                                    _buildThemeButton(
-                                      context,
-                                      ThemeMode.system,
-                                      Icons.settings_brightness_outlined,
-                                      onSurface,
-                                    ),
-                                    _buildThemeButton(
-                                      context,
-                                      ThemeMode.dark,
-                                      Icons.nightlight_outlined,
-                                      onSurface,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Home Navigation
-                              GestureDetector(
-                                onTap: () => Navigator.pushNamedAndRemoveUntil(
-                                  context,
-                                  '/',
-                                  (route) => false,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.home_outlined,
-                                      color: brandOrange,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      "Home",
-                                      style: TextStyle(
-                                        color: brandOrange,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    child: const Center(
+                      child: PulsoBranding(
+                        scale: 0.8,
+                        subtitle: 'AGENT COMMAND',
+                      ),
                     ),
                   ),
 
@@ -1871,7 +1813,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Opacity(
                       opacity: 0.3,
                       child: Text(
-                        "NOTICE: RESIDENTS ONLY • CITY OF CALOOCAN",
+                        "NOTICE: AUTHORIZED PERSONNEL ONLY • CITY OF CALOOCAN",
                         style: TextStyle(
                           color: onSurface,
                           fontSize: 9,
@@ -1951,7 +1893,7 @@ class _CaptchaDialogState extends State<CaptchaDialog> {
           Navigator.pop(context, message.message);
         },
       )
-      ..loadHtmlString(_getHtml());
+      ..loadHtmlString(_getHtml(), baseUrl: "http://localhost/");
   }
 
   String _getHtml() {

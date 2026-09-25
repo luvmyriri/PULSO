@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Resident Portal & Mobile App: User Stories Specification</title>
+    <style>
+        
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@page {
+    size: A4 portrait;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-center {
+        content: counter(page);
+    }
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.6;
+    color: #1e293b;
+    background-color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+/* Document Header & Cover */
+.doc-cover {
+    page-break-after: always;
+    padding: 30px 10px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 88vh;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.pulse-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 2px solid #f97316;
+    border-radius: 10px;
+    color: #f97316;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-title {
+    font-size: 15pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #0f172a;
+    text-transform: uppercase;
+}
+
+.brand-sub {
+    font-size: 8pt;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.cover-main {
+    margin: 30px 0;
+}
+
+.cover-badge {
+    display: inline-block;
+    padding: 5px 14px;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
+    border-radius: 20px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.cover-title {
+    font-size: 24pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+}
+
+.cover-subtitle {
+    font-size: 11.5pt;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.6;
+    max-width: 650px;
+    margin-bottom: 24px;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.meta-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+}
+
+.meta-value {
+    font-size: 9pt;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.cover-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8pt;
+    color: #64748b;
+}
+
+/* Headings */
+h1 {
+    font-size: 16pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-top: 28px;
+    margin-bottom: 12px;
+    letter-spacing: -0.3px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h2 {
+    font-size: 12.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    border-left: 3.5px solid #f97316;
+    padding-left: 10px;
+    letter-spacing: -0.2px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h4 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+p {
+    margin: 0 0 10px 0;
+}
+
+/* Lists */
+ul, ol {
+    margin: 0 0 12px 0;
+    padding-left: 22px;
+}
+
+li {
+    margin-bottom: 4px;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 18px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+thead {
+    display: table-header-group;
+}
+
+tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid #1e293b;
+    letter-spacing: 0.2px;
+}
+
+td {
+    padding: 7px 10px;
+    border: 1px solid #e2e8f0;
+    vertical-align: top;
+    color: #334155;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+/* Blockquotes / Callouts */
+blockquote {
+    margin: 14px 0;
+    padding: 10px 16px;
+    background-color: #f8fafc;
+    border-left: 4px solid #f97316;
+    border-radius: 0 6px 6px 0;
+    color: #334155;
+    font-size: 9pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* Code & Preformatted */
+code {
+    font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+    font-size: 8.2pt;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+pre {
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 8pt;
+    line-height: 1.45;
+    margin: 12px 0 16px 0;
+    border: 1px solid #334155;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+    border: none;
+    font-size: inherit;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 20px 0;
+}
+
+/* Scenario Highlighting */
+strong {
+    color: #0f172a;
+}
+
+    </style>
+</head>
+<body>
+    
+    <div class="doc-cover">
+        <div class="cover-brand">
+            <div class="pulse-logo">P</div>
+            <div class="brand-text">
+                <span class="brand-title">PULSO PLATFORM</span>
+                <span class="brand-sub">Civic Operations & Engineering</span>
+            </div>
+        </div>
+        <div class="cover-main">
+            <span class="cover-badge">RESIDENT USER STORIES SPECIFICATION</span>
+            <h1 class="cover-title">Resident Portal & Mobile App: User Stories Specification</h1>
+            <div class="cover-subtitle">Exhaustive citizen user stories, PhilSys verification flows, multimodal reporting mechanics, real-time lifecycle tracking, and bilingual acceptance criteria.</div>
+            <div class="meta-grid">
+                
+        <div class="meta-item">
+            <span class="meta-label">Document Title</span>
+            <span class="meta-value">Resident Experience User Stories Specification</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">System</span>
+            <span class="meta-value">PULSO Civic Engagement & Infrastructure Intelligence Platform</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Target Audience</span>
+            <span class="meta-value">Product Managers, UI/UX Designers, Frontend & Mobile Engineers</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Version</span>
+            <span class="meta-value">1.0 (Focused Specification)</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Authority</span>
+            <span class="meta-value">Caloocan City Civic Operations & Resident Experience Group</span>
+        </div>
+        
+            </div>
+        </div>
+        <div class="cover-footer">
+            <span>City Government of Caloocan &bull; Engineering & Resident Operations</span>
+            <span>OFFICIAL PRODUCT & ENGINEERING SPECIFICATION</span>
+        </div>
+    </div>
+    
+    <div class="content-body">
+        <hr />
+<h2 id="1-executive-summary-persona-ecosystem">1. Executive Summary &amp; Persona Ecosystem</h2>
+<p>The PULSO Resident Portal and Mobile Application empower citizens of Caloocan City to act as active civic contributors. The platform bridges the communication gap between communities and the Local Government Unit (LGU) through intuitive incident reporting, automated AI-assisted triage, transparent lifecycle tracking, and localized public advisories.</p>
+<h3 id="resident-personas">Resident Personas</h3>
+<ul>
+<li><strong>Persona A: Maria Santos (The Daily Commuter)</strong><ul>
+<li><em>Profile:</em> 28 years old, commutes daily along Quirino Highway and Camarin Road.</li>
+<li><em>Goals:</em> Quickly report hazardous road conditions (potholes, open manholes) on mobile in under 60 seconds with exact GPS tags.</li>
+<li><em>Key Frustrations:</em> Filing complaints into black holes without confirmation or resolution timelines.</li>
+</ul>
+</li>
+<li><strong>Persona B: Mang Danilo Reyes (Community Leader / Barangay Tanod)</strong><ul>
+<li><em>Profile:</em> 54 years old, active community officer in Barangay 178, North Caloocan.</li>
+<li><em>Goals:</em> Submit consolidated reports for streetlights, clogged drainage, and fallen branches; track ongoing LGU infrastructure works in his barangay.</li>
+<li><em>Key Frustrations:</em> Language barriers with technical jargon, multiple duplicate complaints causing administrative delays.</li>
+</ul>
+</li>
+<li><strong>Persona C: Aling Elena Cruz (Tech-Cautious Resident)</strong><ul>
+<li><em>Profile:</em> 62 years old, prefers Filipino language interface, uses entry-level Android smartphone.</li>
+<li><em>Goals:</em> Verify her residency securely using her PhilSys National ID and receive SMS/push alerts when local water or electrical repairs are scheduled.</li>
+<li><em>Key Frustrations:</em> Complex multi-step forms, tiny typography, confusing verification procedures.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2 id="2-epic-1-onboarding-identity-resident-verification">2. Epic 1: Onboarding, Identity &amp; Resident Verification</h2>
+<h3 id="us-res-01-philsys-national-id-government-id-parsing">US-RES-01: PhilSys National ID &amp; Government ID Parsing</h3>
+<ul>
+<li><strong>As a</strong> prospective resident of Caloocan City,</li>
+<li><strong>I want to</strong> scan or upload my government-issued identification (e.g., PhilSys National ID, Driver's License, Voter's ID) during registration,</li>
+<li><strong>So that</strong> my identity and residency are automatically verified without requiring manual in-person verification at City Hall.</li>
+</ul>
+<h4 id="acceptance-criteria">Acceptance Criteria</h4>
+<ol>
+<li>The resident can capture an ID image using their mobile camera or upload an existing image file (JPEG, PNG, WebP up to 10MB).</li>
+<li>The system executes OCR parsing to extract: Full Name, Date of Birth, Address, and ID Serial Number.</li>
+<li>The extracted details pre-populate the registration form with clear visual indicators allowing the user to review and correct any OCR discrepancies.</li>
+<li>If the ID scan fails or is blurry, the user receives actionable guidance (e.g., "Ensure good lighting and all 4 corners of the ID are visible") and can retry or request assisted manual verification.</li>
+<li>All uploaded ID images are encrypted at rest using AES-256 and never made accessible via public URLs.</li>
+</ol>
+<h4 id="scenario-successful-philsys-id-scan">Scenario: Successful PhilSys ID Scan</h4>
+<ul>
+<li><strong>Given</strong> a resident is on the registration screen,</li>
+<li><strong>When</strong> they snap a clear photo of their PhilSys ID card,</li>
+<li><strong>Then</strong> the OCR engine parses their name and Caloocan address within 3 seconds and fills in the corresponding fields for final review.</li>
+</ul>
+<hr />
+<h3 id="us-res-02-secure-otp-account-activation">US-RES-02: Secure OTP Account Activation</h3>
+<ul>
+<li><strong>As a</strong> newly registered resident,</li>
+<li><strong>I want to</strong> receive a one-time verification code via email and SMS,</li>
+<li><strong>So that</strong> I can authenticate my account and prevent unauthorized profile creation under my identity.</li>
+</ul>
+<h4 id="acceptance-criteria_1">Acceptance Criteria</h4>
+<ol>
+<li>Upon submitting the registration form, a 6-digit numeric OTP is immediately dispatched to the user's verified contact method.</li>
+<li>The OTP input interface features auto-advance formatting, paste support, and a visible 60-second expiration countdown.</li>
+<li>A "Resend Code" affordance becomes active only after the 60-second timer elapses to prevent rate-limit abuse.</li>
+<li>Three consecutive incorrect OTP entries temporarily lock the submission for 5 minutes with clear instructional copy.</li>
+<li>Successful verification immediately logs the user into their active session and presents an onboarding welcome tour.</li>
+</ol>
+<hr />
+<h2 id="3-epic-2-multimodal-civic-incident-reporting">3. Epic 2: Multimodal Civic Incident Reporting</h2>
+<h3 id="us-res-03-quick-capture-incident-submission">US-RES-03: Quick-Capture Incident Submission</h3>
+<ul>
+<li><strong>As a</strong> resident who discovers a public infrastructure defect,</li>
+<li><strong>I want to</strong> submit a report containing photos, automatic GPS location, and a concise description,</li>
+<li><strong>So that</strong> the City Engineering Office can immediately identify, locate, and assess the problem.</li>
+</ul>
+<h4 id="acceptance-criteria_2">Acceptance Criteria</h4>
+<ol>
+<li>The reporting flow requires only three primary steps: Capture/Attach Evidence -&gt; Confirm Geolocation -&gt; Describe Issue.</li>
+<li>The user can attach up to 4 high-resolution photos or a short 10-second video of the hazard.</li>
+<li>The application automatically queries the device GPS to pin the exact latitude and longitude with an accuracy radius indicator.</li>
+<li>The user can adjust the map pin manually if reporting from a nearby safe location or safe distance.</li>
+<li>An optional voice note or speech-to-text input is available for users who prefer speaking over typing.</li>
+<li>The submit button displays an explicit upload progress indicator and disables duplicate taps.</li>
+</ol>
+<h4 id="scenario-reporting-a-fallen-electrical-cable">Scenario: Reporting a Fallen Electrical Cable</h4>
+<ul>
+<li><strong>Given</strong> a commuter spots a dangling power line,</li>
+<li><strong>When</strong> they open PULSO, snap a photo, and tap "Submit Urgent Concern",</li>
+<li><strong>Then</strong> the system captures the GPS coordinates, classifies the issue under Emergency/Electrical, and provides an instant tracking ticket ID within 3 seconds.</li>
+</ul>
+<hr />
+<h3 id="us-res-04-ai-assisted-triage-category-suggestion">US-RES-04: AI-Assisted Triage &amp; Category Suggestion</h3>
+<ul>
+<li><strong>As a</strong> resident submitting a report,</li>
+<li><strong>I want the</strong> system's AI engine to analyze my photo and suggest the category and urgency level,</li>
+<li><strong>So that</strong> I don't have to navigate complex bureaucratic department lists.</li>
+</ul>
+<h4 id="acceptance-criteria_3">Acceptance Criteria</h4>
+<ol>
+<li>When a photo is uploaded, Gemini 2.5 Vision analyzes the image to suggest: Utility Type (Road, Drainage, Electrical, Water, Waste), Incident Summary, and Severity Level.</li>
+<li>The suggested category is presented as an editable chip; the user can accept the AI suggestion with one tap or choose a different category from a curated dropdown.</li>
+<li>If the AI detects an emergency (e.g., open fire, active transformer explosion), a prominent warning banner provides the direct Caloocan Emergency Hotline button (911 / LGU Command).</li>
+</ol>
+<hr />
+<h3 id="us-res-05-real-time-duplicate-report-awareness">US-RES-05: Real-Time Duplicate Report Awareness</h3>
+<ul>
+<li><strong>As a</strong> resident reporting an issue,</li>
+<li><strong>I want to</strong> see if neighbors have already reported the same incident nearby,</li>
+<li><strong>So that</strong> I can upvote/subscribe to the existing ticket instead of creating duplicate administrative noise.</li>
+</ul>
+<h4 id="acceptance-criteria_4">Acceptance Criteria</h4>
+<ol>
+<li>When a location and category are selected, the system checks for existing active reports within a 50-meter radius using geospatial clustering.</li>
+<li>If matching tickets are found, a card appears: <em>"3 neighbors reported a similar issue near this location. Would you like to subscribe to updates?"</em></li>
+<li>Tapping "Me Too / Subscribe" adds the resident's account to the notification broadcast list for that ticket cluster without creating a redundant database record.</li>
+<li>If the resident's issue is distinct, they can tap <em>"This is a different problem"</em> to proceed with their original submission.</li>
+</ol>
+<hr />
+<h2 id="4-epic-3-real-time-lifecycle-tracking-notifications">4. Epic 3: Real-Time Lifecycle Tracking &amp; Notifications</h2>
+<h3 id="us-res-06-interactive-ticket-process-timeline">US-RES-06: Interactive Ticket Process Timeline</h3>
+<ul>
+<li><strong>As a</strong> resident who submitted a report,</li>
+<li><strong>I want to</strong> view an end-to-end visual timeline of my ticket's lifecycle,</li>
+<li><strong>So that</strong> I know exactly which department is handling my concern and what actions have been taken.</li>
+</ul>
+<h4 id="acceptance-criteria_5">Acceptance Criteria</h4>
+<ol>
+<li>The Ticket Detail screen displays a chronological process stepper with clear status states:<br />
+   *   <code>Submitted</code> -&gt; <code>AI Verified</code> -&gt; <code>Assigned to Division</code> -&gt; <code>Crew Dispatched</code> -&gt; <code>In Progress</code> -&gt; <code>Resolved</code> -&gt; <code>Closed</code>.</li>
+<li>Each step shows the timestamp, assigned department (e.g., City Engineering - Maintenance Division), and public-safe field notes.</li>
+<li>The interface displays estimated completion windows based on historical resolution times for that category and severity.</li>
+<li>The timeline updates in real time without requiring manual pull-to-refresh when a push event is broadcast.</li>
+</ol>
+<hr />
+<h3 id="us-res-07-push-notifications-sms-status-alerts">US-RES-07: Push Notifications &amp; SMS Status Alerts</h3>
+<ul>
+<li><strong>As a</strong> resident on the go,</li>
+<li><strong>I want to</strong> receive immediate push notifications and SMS updates when my report's status changes,</li>
+<li><strong>So that</strong> I stay informed without having to constantly check the app.</li>
+</ul>
+<h4 id="acceptance-criteria_6">Acceptance Criteria</h4>
+<ol>
+<li>Notifications are triggered on key milestones: (a) Report Verified by Dispatcher, (b) Crew Dispatched to Site, (c) Work Completed / Proof Attached, (d) Scheduled LGU Maintenance Advisories.</li>
+<li>Tapping a push notification deep-links directly to the relevant ticket detail view.</li>
+<li>Users can configure notification channels in their profile (Push Only, SMS Only, or Both).</li>
+</ol>
+<hr />
+<h2 id="5-epic-4-resolution-review-proof-of-work-feedback">5. Epic 4: Resolution Review, Proof of Work &amp; Feedback</h2>
+<h3 id="us-res-08-proof-of-resolution-review-resident-sign-off">US-RES-08: Proof of Resolution Review &amp; Resident Sign-off</h3>
+<ul>
+<li><strong>As a</strong> reporting citizen,</li>
+<li><strong>I want to</strong> inspect "Before and After" photos uploaded by the field crew when a job is marked resolved,</li>
+<li><strong>So that</strong> I can verify that the repair was completed satisfactorily.</li>
+</ul>
+<h4 id="acceptance-criteria_7">Acceptance Criteria</h4>
+<ol>
+<li>When a ticket enters <code>Resolved</code> status, the resident receives a notification: <em>"Your concern has been resolved. Please review the completed work."</em></li>
+<li>The ticket screen displays a side-by-side comparison of the initial complaint photo vs. the field crew's completion photo.</li>
+<li>The resident can tap <strong>"Confirm Resolution"</strong> or <strong>"Issue Not Resolved"</strong>.</li>
+<li>Selecting "Confirm Resolution" transitions the ticket to <code>Closed</code> and prompts for a 1-5 star service rating and optional feedback.</li>
+<li>Selecting "Issue Not Resolved" opens a re-opening modal where the user must upload a new photo showing the persisting problem, reopening the ticket for supervisory review.</li>
+</ol>
+<hr />
+<h2 id="6-epic-5-community-advisories-language-accessibility">6. Epic 5: Community Advisories, Language &amp; Accessibility</h2>
+<h3 id="us-res-09-localized-infrastructure-advisories">US-RES-09: Localized Infrastructure Advisories</h3>
+<ul>
+<li><strong>As a</strong> resident of Caloocan,</li>
+<li><strong>I want to</strong> view an interactive map and feed of active public works, road repairs, and scheduled utility interruptions,</li>
+<li><strong>So that</strong> I can plan my travel routes and daily activities accordingly.</li>
+</ul>
+<h4 id="acceptance-criteria_8">Acceptance Criteria</h4>
+<ol>
+<li>The Home screen features a dedicated "Active Advisories" carousel showing official announcements from the City Engineer and Mayor's Office.</li>
+<li>Advisories are geotagged and rendered on the map with distinct icons (e.g., Road Closure, Water Interruption, Power Maintenance).</li>
+<li>Users can filter advisories by their specific Barangay (e.g., Barangay 171 to Barangay 188 in District 3).</li>
+</ol>
+<hr />
+<h3 id="us-res-10-full-bilingual-support-filipino-english">US-RES-10: Full Bilingual Support (Filipino &amp; English)</h3>
+<ul>
+<li><strong>As a</strong> resident who is more comfortable in Tagalog/Filipino,</li>
+<li><strong>I want to</strong> toggle the entire application language with one tap,</li>
+<li><strong>So that</strong> all instructions, form labels, AI summaries, and notifications are easily understood.</li>
+</ul>
+<h4 id="acceptance-criteria_9">Acceptance Criteria</h4>
+<ol>
+<li>A persistent language selector (EN / FIL) is accessible from the top navigation and profile settings.</li>
+<li>Toggling the language instantaneously translates 100% of static UI labels, error messages, and system notifications without page reload.</li>
+<li>AI-generated category descriptions and status updates are provided in the user's selected language.</li>
+<li>Screen readers (TalkBack on Android, VoiceOver on iOS) respect the selected language locale.</li>
+</ol>
+    </div>
+</body>
+</html>
