@@ -61,6 +61,7 @@ import Swal from 'sweetalert2';
 import { CANONICAL_STATUS_LIST, getStatusDescriptor, formatTicketId } from '../utils/reportWorkflow';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
+import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
 import {
     CALOOCAN_NORTH_BARANGAYS_DETAILED,
     CALOOCAN_SOUTH_BARANGAYS_DETAILED,
@@ -83,7 +84,6 @@ const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7505408, lng: 121.0540317 }; // Z
 const CALOOCAN_CITY_HALL_SOUTH_LOC = { lat: 14.6469, lng: 120.9844 }; // 8th Ave South City Hall
 const MONUMENTO_CIRCLE_LOC = { lat: 14.6574, lng: 120.9840 }; // Bonifacio Monument Circle
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
-const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry'];
 
 
 const INFRASTRUCTURE_CATEGORIES = [

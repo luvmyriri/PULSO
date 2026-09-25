@@ -78,6 +78,10 @@ class Resident(Base):
     verification_code = Column(String, nullable=True)
     is_verified = Column(Boolean, default=False)
     kyc_level = Column(String, default="Bronze (Self-Signed)")  # Bronze, Silver, Gold
+    id_tier = Column(String, nullable=True)  # "primary" or "secondary"
+    id_type = Column(String, nullable=True)  # e.g. "philsys", "lto", "passport"
+    secondary_id_type = Column(String, nullable=True)
+    verification_mode = Column(String, nullable=True)  # "automated", "second_id", "manual_review"
     last_kyc_verification = Column(DateTime(timezone=True), nullable=True)
     
     is_active = Column(Boolean, default=True)

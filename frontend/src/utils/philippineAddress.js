@@ -180,8 +180,8 @@ export function encodeOpenLocationCode(lat, lng, shortLocal = true) {
  */
 export function extractCleanPlusCode(str, lat = null, lng = null) {
     if (str && typeof str === 'string') {
-        // Look for 4 characters + '+' + 2 to 4 characters (e.g. Q22G+QGP)
-        const match = str.match(/\b([23456789CFGHJMPQRVWX]{4}\+[23456789CFGHJMPQRVWX]{2,4})\b/i);
+        // Look for 4 to 8 characters + '+' + 2 to 4 characters (e.g. P2X6+65, Q22G+QGP)
+        const match = str.match(/\b([23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,4})\b/i);
         if (match) {
             return match[1].toUpperCase();
         }
@@ -585,4 +585,99 @@ export function formatNearbyAddress(addressOrStructured) {
 export function isMinimumViableAddress(structured) {
     if (!structured) return false;
     return Boolean(structured.barangay && (structured.plusCode || structured.city));
+}
+/**
+ * Formats full address for Evidence Photo Watermark.
+ * Output: [Subdivision/Village], [Street / Block-Lot], [Plus Code], [Barangay], [City], [ZIP] [Region]
+ * Example:
+ *   B6-L14, P2X6+65, Barangay 171, Caloocan, 1421 Metro Manila
+ *   Celina Homes 3, Blk 4 Lot 16 Silver, Q22G+QGP, Barangay 171, Caloocan, 1421 Metro Manila
+ * Gracefully degrades with zero empty comma gaps.
+ */
+export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates = null) {
+    if (!addressOrStructured) {
+        if (fallbackCoordinates && fallbackCoordinates.lat && fallbackCoordinates.lng) {
+            const pc = extractCleanPlusCode('', fallbackCoordinates.lat, fallbackCoordinates.lng);
+            const brgy = findBarangayByCoordinates(fallbackCoordinates.lat, fallbackCoordinates.lng);
+            const postal = brgy ? getPostalCodeForBarangay(brgy.name) : '1421';
+            const parts = [
+                pc,
+                brgy ? brgy.name : 'Barangay 171',
+                'Caloocan',
+                `${postal} Metro Manila`
+            ].filter(Boolean);
+            return parts.join(', ');
+        }
+        return 'Caloocan City';
+    }
+
+    let s = typeof addressOrStructured === 'string'
+        ? parseAddressString(addressOrStructured, fallbackCoordinates?.lat, fallbackCoordinates?.lng)
+        : addressOrStructured;
+
+    if (!s) {
+        return typeof addressOrStructured === 'string' ? addressOrStructured : 'Caloocan City';
+    }
+
+    // Resolve Plus Code
+    let pc = s.plusCode;
+    if (!pc && fallbackCoordinates?.lat && fallbackCoordinates?.lng) {
+        pc = extractCleanPlusCode('', fallbackCoordinates.lat, fallbackCoordinates.lng);
+    }
+
+    // Resolve Barangay
+    let brgy = s.barangay;
+    if (!brgy && fallbackCoordinates?.lat && fallbackCoordinates?.lng) {
+        const detected = findBarangayByCoordinates(fallbackCoordinates.lat, fallbackCoordinates.lng);
+        if (detected) brgy = detected.name;
+    }
+
+    // Resolve Postal Code & Region
+    let postal = s.postalCode;
+    if (!postal && brgy) {
+        postal = getPostalCodeForBarangay(brgy);
+    }
+    if (!postal) postal = '1421';
+    const region = s.region || 'Metro Manila';
+    const postalAdmin = [postal, region].filter(Boolean).join(' ');
+
+    const city = s.city ? s.city.replace(/\s*City$/i, '') : 'Caloocan';
+
+    // Assemble components in standard order:
+    // [Subdivision], [Street / Block-Lot], [Plus Code], [Barangay], [City], [ZIP Region]
+    const parts = [];
+
+    if (s.subdivision) {
+        parts.push(s.subdivision);
+    }
+
+    if (s.streetAddress && (!s.subdivision || !s.streetAddress.includes(s.subdivision))) {
+        parts.push(s.streetAddress);
+    }
+
+    if (pc) {
+        parts.push(pc);
+    }
+
+    if (brgy) {
+        parts.push(brgy);
+    }
+
+    if (city) {
+        parts.push(city);
+    }
+
+    if (postalAdmin) {
+        parts.push(postalAdmin);
+    }
+
+    if (parts.length > 0) {
+        return parts.join(', ');
+    }
+
+    if (fallbackCoordinates && fallbackCoordinates.lat && fallbackCoordinates.lng) {
+        return `Coordinates: ${Number(fallbackCoordinates.lat).toFixed(4)}, ${Number(fallbackCoordinates.lng).toFixed(4)}`;
+    }
+
+    return 'Caloocan City';
 }

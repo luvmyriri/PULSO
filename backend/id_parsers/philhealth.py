@@ -53,6 +53,7 @@ class PhilHealthParser(BaseIDParser):
         result['sex']      = self._extract_sex(upper)
         result['address']  = self._extract_address(lines, upper)
         result['barangay'] = self._extract_barangay(upper)
+        result['id_number'] = result['pin']
         return result
 
     def _extract_philhealth_names(self, lines: List[str], upper: str) -> Tuple[str, str, str]:

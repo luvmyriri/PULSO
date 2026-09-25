@@ -104,8 +104,11 @@ import {
     REPORT_WORKFLOW_STEPS
 } from '../utils/reportWorkflow';
 import { API_BASE_URL } from '../utils/apiBase';
+import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
 import ClaimReportModal from '../components/modals/ClaimReportModal';
 import IDCameraModal from '../components/IDCameraModal';
+import { watermarkEvidenceFile } from '../utils/watermark';
+import AvatarCropModal, { validateAvatarFile } from '../components/AvatarCropModal';
 import ReportDensityLayer from '../components/maps/ReportDensityLayer';
 
 import {
@@ -136,7 +139,35 @@ import {
     isMinimumViableAddress
 } from '../utils/philippineAddress';
 
-const LIBRARIES = ['places', 'geometry'];
+export const formatAddress = (addr) => {
+    if (!addr || typeof addr !== 'string') return '';
+    return addr
+        .replace(/\b([a-z])/g, (char) => char.toUpperCase())
+        .replace(/\s*,\s*/g, ', ')
+        .trim();
+};
+
+export const formatFriendlyNotice = (reason) => {
+    if (!reason) {
+        return "We couldn't clearly spot a city problem in this photo. Please upload a clear photo of the actual damage (such as a pothole, broken streetlight, or water leak).";
+    }
+    let clean = String(reason).trim();
+    clean = clean.replace(/^(AI Safety Warning:\s*)+/i, '');
+    clean = clean.replace(/^(Image rejected:\s*)+/i, '');
+    clean = clean.replace(/^(Report rejected:\s*)+/i, '');
+    clean = clean.replace(/^Report rejected by AI Safety Filter:\s*/i, '');
+
+    const lower = clean.toLowerCase();
+    if (lower.includes('selfie') || lower.includes('portrait')) {
+        return "This looks like a personal photo or selfie. Please take a photo showing the actual damage or problem instead.";
+    }
+    if (lower.includes('infrastructure issue') || lower.includes('valid infrastructure') || lower.includes('hazard or damage')) {
+        return "We couldn't clearly spot a community issue in this photo. Please take or upload a photo showing the actual problem (such as a pothole, broken streetlight, or leak).";
+    }
+    return clean;
+};
+
+const LIBRARIES = GOOGLE_MAPS_LIBRARIES;
 
 // Government-grade civic map styles (Zero POI/transit clutter, high contrast civic hierarchy)
 const DARK_BASE_RULES = [
@@ -248,12 +279,11 @@ const KNOWLEDGE_BASE_ARTICLES = (t) => [
 ];
 
 const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogout, t }) => {
-    const navList = [
-        { id: 'overview', icon: <Home size={20} strokeWidth={2} />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
-        { id: 'reports', icon: <FileText size={20} strokeWidth={2} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
-        { id: 'report', icon: <PlusCircle size={20} strokeWidth={2.5} />, label: t('dashboard.sidebar.report', { defaultValue: 'Report an issue' }), isPrimary: true },
-        { id: 'updates', icon: <Bell size={20} strokeWidth={2} />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
-        { id: 'profile', icon: <User size={20} strokeWidth={2} />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
+    const navDestinations = [
+        { id: 'overview', icon: <Home size={19} strokeWidth={2} />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
+        { id: 'reports', icon: <FileText size={19} strokeWidth={2} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
+        { id: 'updates', icon: <Bell size={19} strokeWidth={2} />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
+        { id: 'profile', icon: <User size={19} strokeWidth={2} />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
     ];
 
     return (
@@ -261,8 +291,14 @@ const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogo
             <div>
                 {/* User Identity Snapshot */}
                 <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-5 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 hover:border-orange-500/50 cursor-pointer transition-all group shadow-2xs">
-                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative">
-                        {user.avatar}
+                    <div className={`w-11 h-11 rounded-full font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative border border-slate-200 dark:border-slate-700 ${
+                        user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-900' : 'bg-gradient-to-br from-orange-400 to-orange-600'
+                    }`}>
+                        {user.avatarPhoto ? (
+                            <img src={user.avatarPhoto} alt={user.name} className="w-full h-full object-cover" />
+                        ) : (
+                            user.avatar
+                        )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-[15px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">{user.name}</h3>
@@ -270,23 +306,27 @@ const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogo
                     </div>
                 </div>
 
-                {/* Persistent Side Navigation Rail (Destinations) */}
-                <nav className="space-y-1.5">
-                    {navList.map(item => {
-                        if (item.isPrimary) {
-                            return (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    onClick={() => handleSetModal('file-report')}
-                                    className="w-full my-2 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-extrabold text-sm tracking-wide shadow-md hover:shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
-                                >
-                                    {item.icon}
-                                    <span>{item.label}</span>
-                                </button>
-                            );
-                        }
+                {/* Primary Action Button — Structurally separated from navigation list */}
+                <div className="mb-4">
+                    <button
+                        type="button"
+                        onClick={() => handleSetModal('file-report')}
+                        className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-extrabold text-sm tracking-wide shadow-md hover:shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 group"
+                        title="Submit a new civic infrastructure report"
+                    >
+                        <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0 group-hover:rotate-90 transition-transform duration-200">
+                            <Plus size={14} strokeWidth={3} className="text-white" />
+                        </div>
+                        <span>{t('dashboard.sidebar.report', { defaultValue: 'Report an issue' })}</span>
+                    </button>
+                </div>
 
+                {/* Structural Divider Separating Standing Action from Destination Rails */}
+                <div className="h-px bg-slate-200/80 dark:bg-slate-800 my-4" role="separator" />
+
+                {/* Persistent Side Navigation Rail (Destinations) */}
+                <nav className="space-y-1.5" aria-label="Main Navigation">
+                    {navDestinations.map(item => {
                         const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
 
                         return (
@@ -294,37 +334,30 @@ const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogo
                                 key={item.id}
                                 type="button"
                                 onClick={() => handleSetTab(item.id)}
-                                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                                aria-current={isActive ? 'page' : undefined}
+                                className={`w-full relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 group ${
                                     isActive
-                                        ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] shadow-2xs border border-orange-200/60 dark:border-orange-800/40 font-extrabold'
-                                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white border border-transparent'
+                                        ? 'bg-orange-500/10 dark:bg-orange-500/15 text-[#ff6b00] font-extrabold shadow-2xs border border-orange-500/30 dark:border-orange-500/20'
+                                        : 'text-slate-600 dark:text-slate-400 font-semibold hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white border border-transparent'
                                 }`}
                             >
-                                <span className={isActive ? 'text-[#ff6b00]' : 'text-slate-400 group-hover:text-slate-600'}>
+                                {/* Signal Cut Accent Indicator for Active State */}
+                                {isActive && (
+                                    <span className="absolute left-0 top-2 bottom-2 w-1 bg-[#ff6b00] rounded-r-full" aria-hidden="true" />
+                                )}
+                                <span className={`shrink-0 transition-colors ${isActive ? 'text-[#ff6b00]' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-200'}`}>
                                     {item.icon}
                                 </span>
-                                <span>{item.label}</span>
+                                <span className="truncate">{item.label}</span>
                             </button>
                         );
                     })}
                 </nav>
             </div>
 
-            {/* Bottom Actions & Supporting Footer Links */}
-            <div className="pt-4 border-t border-slate-200/80 dark:border-slate-800 space-y-3">
-                {handleLogout && (
-                    <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 hover:bg-red-50/70 dark:hover:bg-red-950/20 transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                        title="Safely sign out of your resident account"
-                    >
-                        <LogOut size={16} strokeWidth={2} className="shrink-0 opacity-80" />
-                        <span>{t('dashboard.sidebar.signOut', { defaultValue: 'Sign Out' })}</span>
-                    </button>
-                )}
-
-                <div className="px-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-slate-800/60 pt-3">
+            {/* Supporting Footer Links */}
+            <div className="pt-4 border-t border-slate-200/80 dark:border-slate-800">
+                <div className="px-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                     <div className="flex flex-wrap gap-2 mb-2">
                         <button onClick={() => handleSetModal('privacy')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.privacy', { defaultValue: 'Privacy' })}</button> ·
                         <button onClick={() => handleSetModal('terms')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.terms', { defaultValue: 'Terms' })}</button> ·
@@ -805,42 +838,32 @@ const ResidentHomeView = ({
                 {/* ── RIGHT COLUMN (Secondary Sidebar Content, ~30-35% on desktop) ── */}
                 <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-4 sm:gap-5 w-full">
 
-                    {/* 1. City Updates Card */}
-                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-                        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Radio size={18} className="text-[#ff6b00]" />
-                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                    {/* 1. City Updates Card - View All Only */}
+                    <div 
+                        onClick={() => handleSetTab('updates')}
+                        className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-4 sm:p-5 flex items-center justify-between hover:border-orange-500/50 hover:shadow-sm transition-all cursor-pointer group"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                <Radio size={20} />
+                            </div>
+                            <div>
+                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
                                     City updates
                                 </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Official bulletins & advisories
+                                </p>
                             </div>
-                            <button
-                                onClick={() => handleSetTab('overview')}
-                                className="text-xs font-bold text-[#ff6b00] hover:underline cursor-pointer"
-                            >
-                                View all
-                            </button>
                         </div>
-
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {displayUpdates.map((update, uIdx) => (
-                                <div
-                                    key={update.id || uIdx}
-                                    onClick={() => { setSelectedPost(update); setActiveModal('post-details'); }}
-                                    className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-start justify-between gap-2 cursor-pointer group"
-                                >
-                                    <div className="min-w-0 pr-2">
-                                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors line-clamp-1">
-                                            {update.title}
-                                        </h4>
-                                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-                                            {update.description}
-                                        </p>
-                                    </div>
-                                    <ChevronRight size={16} className="text-slate-400 group-hover:text-[#ff6b00] shrink-0 mt-0.5 transform group-hover:translate-x-0.5 transition-transform" />
-                                </div>
-                            ))}
-                        </div>
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSetTab('updates'); }}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] hover:bg-[#ff6b00] hover:text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs group-hover:bg-[#ff6b00] group-hover:text-white"
+                        >
+                            <span>View all</span>
+                            <ChevronRight size={14} />
+                        </button>
                     </div>
 
                     {/* 2. Services & Emergency Contacts Grid (High-urgency Call Affordance) */}
@@ -2135,6 +2158,7 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
     const [editingField, setEditingField] = useState(null); // 'email' | 'phone' | null
     const [tempValues, setTempValues] = useState({ email: user.email || '', phone: user.phone || '' });
     const [activeTooltip, setActiveTooltip] = useState(null); // 'verified' | 'name' | 'barangay' | 'address' | null
+    const [cropModalData, setCropModalData] = useState(null); // { imageSrc, naturalWidth, naturalHeight, revokeUrl }
     const fileInputRef = useRef(null);
 
     // Sync tempValues whenever user prop updates
@@ -2172,11 +2196,56 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
         setEditingField(null);
     };
 
-    const handleAvatarChange = (e) => {
+    const handleAvatarChange = async (e) => {
         const file = e.target.files?.[0];
-        if (file) {
-            if (showToast) showToast('Profile avatar updated successfully!');
+        if (!file) return;
+
+        // Perform strict validation first (format, file size, decode integrity & bounds)
+        const validation = await validateAvatarFile(file);
+
+        if (!validation.valid) {
+            if (showToast) showToast(validation.error, 'error');
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
         }
+
+        // Validation passed: open the Civic Aperture Rotate & Crop adjustment modal
+        setCropModalData({
+            imageSrc: validation.imageSrc,
+            naturalWidth: validation.naturalWidth,
+            naturalHeight: validation.naturalHeight,
+            revokeUrl: validation.revokeUrl
+        });
+    };
+
+    const handleSaveCroppedAvatar = async (croppedBase64) => {
+        if (setUser) {
+            setUser(prev => ({
+                ...prev,
+                avatarPhoto: croppedBase64
+            }));
+        }
+        try {
+            localStorage.setItem(`pulso_avatar_${user.email || 'current'}`, croppedBase64);
+            localStorage.setItem('pulso_avatar_current', croppedBase64);
+        } catch (err) {
+            console.warn("Could not save avatar to localStorage", err);
+        }
+
+        if (cropModalData?.revokeUrl) {
+            cropModalData.revokeUrl();
+        }
+        setCropModalData(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (showToast) showToast('Profile photo adjusted and saved successfully!');
+    };
+
+    const handleCloseCropModal = () => {
+        if (cropModalData?.revokeUrl) {
+            cropModalData.revokeUrl();
+        }
+        setCropModalData(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const totalReports = userReports.length;
@@ -2198,10 +2267,16 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
                 {/* ── Left Column: Identity & Civic Stats ──────────────── */}
                 <div className="flex flex-col items-center gap-6 shrink-0 w-full lg:w-72">
 
-                    {/* Avatar with Camera Upload Overlay */}
+                    {/* Avatar with Camera Upload Overlay & Touch Badge */}
                     <div className="relative group">
-                        <div className="w-36 h-36 rounded-full bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 font-black flex items-center justify-center text-white text-5xl shadow-[0_20px_40px_rgba(249,115,22,0.25)] border-4 border-white/20 dark:border-slate-800 relative overflow-hidden transition-transform duration-200 group-hover:scale-[1.02]">
-                            {user.avatar}
+                        <div className={`w-36 h-36 rounded-full font-black flex items-center justify-center text-white text-5xl shadow-md border-2 border-slate-200 dark:border-slate-800 relative overflow-hidden transition-transform duration-200 group-hover:scale-[1.02] ${
+                            user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-900' : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
+                        }`}>
+                            {user.avatarPhoto ? (
+                                <img src={user.avatarPhoto} alt={user.fullName} className="w-full h-full object-cover" />
+                            ) : (
+                                user.avatar
+                            )}
 
                             {/* Hover Upload Overlay */}
                             <button
@@ -2214,6 +2289,18 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
                                 <span className="text-[11px] font-semibold tracking-wide">Change Photo</span>
                             </button>
                         </div>
+
+                        {/* Always-visible Camera Upload Badge (for clarity & mobile/touch) */}
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-orange-600 hover:bg-orange-500 text-white shadow-lg border-2 border-white dark:border-slate-900 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer z-10"
+                            title="Upload Profile Photo"
+                            aria-label="Upload Profile Photo"
+                        >
+                            <Camera size={16} />
+                        </button>
+
                         <input
                             type="file"
                             ref={fileInputRef}
@@ -2361,7 +2448,7 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
                             className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-[14px] font-semibold text-slate-800 dark:text-slate-200 flex items-start justify-between gap-3 min-h-[56px] leading-relaxed cursor-help"
                             title="Verified by barangay — contact your barangay office to update"
                         >
-                            <span className="flex-1">{user.address || "No complete address recorded. Please contact LGU for verification."}</span>
+                            <span className="flex-1">{formatAddress(user.address) || "No complete address recorded. Please contact LGU for verification."}</span>
                             <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 mt-1" />
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
@@ -2483,6 +2570,19 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
 
                 </div>
             </div>
+
+            {/* Civic Aperture Rotate & Crop Modal for Profile Photo */}
+            {cropModalData && (
+                <AvatarCropModal
+                    isOpen={Boolean(cropModalData)}
+                    imageSrc={cropModalData.imageSrc}
+                    naturalWidth={cropModalData.naturalWidth}
+                    naturalHeight={cropModalData.naturalHeight}
+                    onClose={handleCloseCropModal}
+                    onSave={handleSaveCroppedAvatar}
+                    t={t}
+                />
+            )}
         </motion.div>
     );
 };
@@ -3261,10 +3361,20 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
                     <p className={`text-[12px] font-bold uppercase tracking-wider ${disabled ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-300'}`}>
                         Issue Category
                     </p>
-                    <span className={`text-[11px] font-semibold ${disabledReason ? 'text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <span className={`text-[11px] ${
+                        disabledReason
+                            ? (disabledReason.includes('photo of the problem') || disabledReason.includes('Invalid')
+                                ? 'text-rose-600 dark:text-rose-400 font-bold'
+                                : 'text-amber-600 dark:text-amber-400 font-semibold')
+                            : 'text-slate-500 dark:text-slate-400 font-semibold'
+                    } flex items-center gap-1`}>
                         {disabledReason ? (
                             <>
-                                <AlertTriangle size={12} className="inline shrink-0" />
+                                {disabledReason.includes('photo') && !disabledReason.includes('problem') ? (
+                                    <Camera size={12} className="inline shrink-0" />
+                                ) : (
+                                    <AlertTriangle size={12} className="inline shrink-0" />
+                                )}
                                 <span>{disabledReason}</span>
                             </>
                         ) : (
@@ -3272,15 +3382,16 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
                         )}
                     </span>
                 </div>
-                <span className={`text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg transition-colors ${
+                <span className={`text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg transition-colors flex items-center gap-1 ${
                     disabled
-                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-800'
+                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800'
                         : selectedOptions.length === 3
                             ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40'
                             : selectedOptions.length > 0
                                 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-900 dark:text-orange-300 border border-orange-300 dark:border-orange-500/30'
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                 }`}>
+                    {disabled && <Lock size={10} className="inline shrink-0" />}
                     {disabled ? 'Locked' : `${selectedOptions.length}/3 selected`}
                 </span>
             </div>
@@ -3298,7 +3409,7 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
                     const isTopRow = index < 2;
 
                     return (
-                        <div key={opt} className="relative group w-full">
+                        <div key={opt} className={`relative group w-full ${disabled ? 'cursor-not-allowed' : ''}`} title={disabled ? (disabledReason || 'Please capture photo first to select categories') : undefined}>
                             <div
                                 onClick={() => {
                                     if (!disabled && !atCapacity) {
@@ -3316,7 +3427,7 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
                                                 ? 'border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/40 opacity-40 cursor-not-allowed text-slate-400 dark:text-slate-600'
                                                 : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:border-orange-400 dark:hover:border-orange-500/50 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 hover:shadow-xs cursor-pointer'
                                 }`}
-                                title={disabled ? (disabledReason || 'Category selection locked due to AI safety warning') : atCapacity ? 'Maximum 3 categories selected' : undefined}
+                                title={disabled ? (disabledReason || 'Please capture photo of the problem to select categories') : atCapacity ? 'Maximum 3 categories selected' : undefined}
                             >
                                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                     <div className={`p-1.5 rounded-lg shrink-0 transition-colors ${
@@ -3408,12 +3519,13 @@ const ResidentModals = ({
     submittingReport, handleFileReport, isSelectingLocation, setIsSelectingLocation, isIDCameraOpen, setIsIDCameraOpen, checkJurisdiction,
     reverseGeocode, mapOptions, pulseRadius, processedHazards, selectedHazard, setSelectedHazard, svLocation, handleStreetViewClick,
     getIconForCategory, getMarkerSVG, getCategoryColor, mapFilter, setMapFilter,
-    isAnalyzing, aiFeedback, fileInputRef, handleFileSelect,
+    isAnalyzing, aiFeedback, setAiFeedback,
     reportToCancel, setReportToCancel, confirmCancelReport,
     isSubmitConfirmOpen, setIsSubmitConfirmOpen, actuallySubmitReport,
     setZoomedImage,
     photoPinIcons, getCachedIcon, theme, borderData,
     isLocating, requestDeviceLocation,
+    locationPermissionDenied, photoMetadata, setPhotoMetadata,
     showHeatmap, setShowHeatmap,
     mapLayerType, setMapLayerType,
     mapCategoryFilter, setMapCategoryFilter,
@@ -3422,13 +3534,6 @@ const ResidentModals = ({
     t
 }) => {
     const [isListening, setIsListening] = useState(false);
-    const [isEditingAddress, setIsEditingAddress] = useState(false);
-    const [structuredDraft, setStructuredDraft] = useState({
-        subdivision: '',
-        blockLot: '',
-        street: '',
-        barangay: ''
-    });
     const recognitionRef = useRef(null);
 
     // Default Map View: Frame full Caloocan bounds (North + South) when opening maps
@@ -3441,44 +3546,6 @@ const ResidentModals = ({
             map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
         }
     }, [activeModal, map]);
-
-    const handleOpenAddressEdit = () => {
-        setStructuredDraft({
-            subdivision: structuredAddress?.subdivision || '',
-            blockLot: structuredAddress?.blockLot || '',
-            street: structuredAddress?.street || structuredAddress?.streetAddress || '',
-            barangay: structuredAddress?.barangay || ''
-        });
-        setIsEditingAddress(true);
-    };
-
-    const handleSaveStructuredAddress = () => {
-        const brgy = structuredDraft.barangay.trim();
-        const postal = getPostalCodeForBarangay(brgy);
-        const blk = structuredDraft.blockLot.trim();
-        const str = structuredDraft.street.trim();
-        const combinedStreet = [blk, str].filter(Boolean).join(' ');
-
-        const updated = {
-            ...(structuredAddress || {}),
-            subdivision: structuredDraft.subdivision.trim(),
-            blockLot: blk,
-            street: str,
-            streetAddress: combinedStreet,
-            barangay: brgy,
-            postalCode: postal,
-            city: 'Caloocan',
-            region: 'Metro Manila'
-        };
-
-        if (setStructuredAddress) {
-            setStructuredAddress(updated);
-        }
-        if (setLocationAddress) {
-            setLocationAddress(formatFullAddress(updated, reportLocation));
-        }
-        setIsEditingAddress(false);
-    };
 
     // Stop listening if modal closes
     useEffect(() => {
@@ -3625,8 +3692,24 @@ const ResidentModals = ({
                             {/* Scrollable Form Body */}
                             <div className="flex-1 overflow-y-auto pr-1 space-y-4 custom-scrollbar min-h-0">
 
-                                {/* Location Banner with 100% Accurate Pinpoint Verification */}
+                                {/* Location Banner with Automated Multi-Sample Accuracy */}
                                 <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl transition-all shadow-xs">
+                                    {locationPermissionDenied && (
+                                        <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-xl flex items-center justify-between gap-3 text-rose-700 dark:text-rose-300 text-xs font-semibold mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                                                <span>Location permission is required for verified civic reporting. Please enable GPS in your device/browser settings.</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => requestDeviceLocation(true)}
+                                                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold shrink-0 cursor-pointer transition-colors"
+                                            >
+                                                Retry GPS
+                                            </button>
+                                        </div>
+                                    )}
+
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                         <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                                             <div className="w-10 h-10 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
@@ -3638,98 +3721,6 @@ const ResidentModals = ({
                                                         <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3" />
                                                         <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
                                                     </div>
-                                                ) : isEditingAddress ? (
-                                                    <div className="w-full py-1 space-y-2.5">
-                                                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-1.5">
-                                                            <span className="text-xs font-bold text-slate-900 dark:text-white">
-                                                                Edit Report Location Address
-                                                            </span>
-                                                            <span className="text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400">
-                                                                GPS Pin Preserved
-                                                            </span>
-                                                        </div>
-
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
-                                                            {/* Subdivision or Village */}
-                                                            <div>
-                                                                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                                                    Subdivision or Village
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={structuredDraft.subdivision}
-                                                                    onChange={(e) => setStructuredDraft(d => ({ ...d, subdivision: e.target.value }))}
-                                                                    placeholder="e.g. Celina Homes 3, Bankers Village"
-                                                                    className="w-full text-xs font-semibold px-3 py-2 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                                                />
-                                                            </div>
-
-                                                            {/* Barangay (Validated Dropdown) */}
-                                                            <div>
-                                                                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                                                    Barangay <span className="text-orange-500">*</span>
-                                                                </label>
-                                                                <select
-                                                                    value={structuredDraft.barangay}
-                                                                    onChange={(e) => setStructuredDraft(d => ({ ...d, barangay: e.target.value }))}
-                                                                    className="w-full text-xs font-semibold px-3 py-2 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer"
-                                                                >
-                                                                    <option value="">-- Select Caloocan Barangay --</option>
-                                                                    {CALOOCAN_BARANGAYS.map((b) => (
-                                                                        <option key={b.name} value={b.name}>
-                                                                            {b.label}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-
-                                                            {/* House / Block & Lot */}
-                                                            <div>
-                                                                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                                                    House / Block & Lot
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={structuredDraft.blockLot}
-                                                                    onChange={(e) => setStructuredDraft(d => ({ ...d, blockLot: e.target.value }))}
-                                                                    placeholder="e.g. Blk 4 Lot 16 or #12"
-                                                                    className="w-full text-xs font-semibold px-3 py-2 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                                                />
-                                                            </div>
-
-                                                            {/* Street Name */}
-                                                            <div>
-                                                                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                                                    Street Name
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={structuredDraft.street}
-                                                                    onChange={(e) => setStructuredDraft(d => ({ ...d, street: e.target.value }))}
-                                                                    placeholder="e.g. Silver St., Camarin Rd."
-                                                                    className="w-full text-xs font-semibold px-3 py-2 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                                                />
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Action Buttons */}
-                                                        <div className="flex items-center justify-end gap-2 pt-1">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setIsEditingAddress(false)}
-                                                                className="px-3.5 py-2 min-h-[44px] bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleSaveStructuredAddress}
-                                                                className="px-4 py-2 min-h-[44px] bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-sm shadow-orange-600/20"
-                                                            >
-                                                                Save Address
-                                                            </button>
-                                                        </div>
-                                                    </div>
                                                 ) : (
                                                     <div>
                                                         <div className="flex items-start justify-between gap-1.5">
@@ -3737,53 +3728,27 @@ const ResidentModals = ({
                                                                 className="text-sm font-bold text-slate-900 dark:text-white leading-snug break-words select-text cursor-text flex-1"
                                                                 title={locationAddress}
                                                             >
-                                                                {locationAddress && !locationAddress.startsWith('Lat:') ? locationAddress : (locationAddress || "Caloocan City Location")}
+                                                                {locationAddress && !locationAddress.startsWith('Lat:')
+                                                                    ? locationAddress
+                                                                    : (reportLocation
+                                                                        ? `Coordinates: ${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)} (Address unresolved)`
+                                                                        : "Caloocan City Location")}
                                                             </p>
-                                                            <div className="flex items-center gap-1 shrink-0">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        if (locationAddress) {
-                                                                            navigator.clipboard?.writeText(locationAddress);
-                                                                            if (showToast) showToast('Address copied to clipboard', 'success');
-                                                                        }
-                                                                    }}
-                                                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700"
-                                                                    title="Copy full address"
-                                                                    aria-label="Copy full address"
-                                                                >
-                                                                    <Copy size={13} />
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={handleOpenAddressEdit}
-                                                                    className="text-slate-400 hover:text-orange-500 p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700"
-                                                                    title="Edit report location address"
-                                                                    aria-label="Edit report location address"
-                                                                >
-                                                                    <Edit3 size={14} />
-                                                                </button>
-                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (locationAddress) {
+                                                                        navigator.clipboard?.writeText(locationAddress);
+                                                                        if (showToast) showToast('Address copied to clipboard', 'success');
+                                                                    }
+                                                                }}
+                                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 shrink-0"
+                                                                title="Copy full address"
+                                                                aria-label="Copy full address"
+                                                            >
+                                                                <Copy size={13} />
+                                                            </button>
                                                         </div>
-
-                                                        {/* Prompt to confirm Barangay if unresolved */}
-                                                        {(!structuredAddress?.barangay) && (
-                                                            <div className="mt-2 flex items-center justify-between gap-2 p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800/80 text-amber-800 dark:text-amber-300 text-xs">
-                                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                                    <AlertTriangle size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
-                                                                    <span className="font-semibold text-[11px] truncate">
-                                                                        Barangay not confirmed. Select your barangay for accurate engineering routing.
-                                                                    </span>
-                                                                </div>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={handleOpenAddressEdit}
-                                                                    className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] cursor-pointer"
-                                                                >
-                                                                    Select
-                                                                </button>
-                                                            </div>
-                                                        )}
 
                                                         <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                                             {plusCode && (
@@ -3795,11 +3760,40 @@ const ResidentModals = ({
                                                                 {reportLocation ? `${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)}` : 'Caloocan North Center'}
                                                             </span>
 
-                                                            {/* 100% Accuracy Verification Badge */}
-                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 shadow-2xs">
-                                                                <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
-                                                                <span>100% Accurate (Pinpoint Verified)</span>
-                                                            </span>
+                                                            {/* Honest Tiered Accuracy Confidence Indicator */}
+                                                            {(() => {
+                                                                const acc = reportLocation?.accuracy;
+                                                                if (isLocating) {
+                                                                    return (
+                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-500/40">
+                                                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                                                            <span>Acquiring GPS...</span>
+                                                                        </span>
+                                                                    );
+                                                                }
+                                                                if (typeof acc === 'number' && acc > 0 && acc <= 20) {
+                                                                    return (
+                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 shadow-2xs">
+                                                                            <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
+                                                                            <span>High Accuracy (±{acc}m)</span>
+                                                                        </span>
+                                                                    );
+                                                                }
+                                                                if (typeof acc === 'number' && acc > 20) {
+                                                                    return (
+                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-500/40 shadow-2xs">
+                                                                            <Info size={13} className="text-amber-600 dark:text-amber-400" />
+                                                                            <span>Approximate Location (±{acc}m)</span>
+                                                                        </span>
+                                                                    );
+                                                                }
+                                                                return (
+                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                                                                        <MapPin size={13} className="text-slate-500" />
+                                                                        <span>Caloocan Jurisdiction</span>
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 )}
@@ -3811,20 +3805,10 @@ const ResidentModals = ({
                                                 type="button"
                                                 onClick={() => { setActiveModal('map'); setIsSelectingLocation(true); }}
                                                 className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-orange-600/20"
-                                                title="Open interactive map to place pin with 100% accuracy"
+                                                title="Open interactive map to pinpoint location on map"
                                             >
                                                 <MapPin size={14} />
                                                 <span>Pinpoint on Map</span>
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => requestDeviceLocation(true)}
-                                                className="px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                                                title="Re-acquire high-precision GPS lock"
-                                            >
-                                                <Crosshair size={14} className={isLocating ? 'animate-spin text-orange-500' : 'text-emerald-500'} />
-                                                <span className="hidden sm:inline">{isLocating ? 'Locating...' : 'Re-lock GPS'}</span>
                                             </button>
                                         </div>
                                     </div>
@@ -3833,7 +3817,7 @@ const ResidentModals = ({
                                 {/* Main Two-Column Layout */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-                                    {/* ── LEFT COLUMN: Photo Upload & Auto-Fit Preview ── */}
+                                    {/* ── LEFT COLUMN: Camera-Only Photo Evidence ── */}
                                     <div className="flex flex-col gap-2">
                                         <div className="flex justify-between items-center px-1">
                                             <span className="text-[12px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Photo Evidence</span>
@@ -3844,7 +3828,11 @@ const ResidentModals = ({
                                             /* Auto-Fit Image Preview Container with Click-to-Zoom */
                                             <div
                                                 onClick={() => setZoomedImage && setZoomedImage(selectedImage)}
-                                                className="w-full aspect-[4/3] rounded-2xl overflow-hidden relative bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-md group cursor-zoom-in"
+                                                className={`w-full aspect-[4/3] rounded-2xl overflow-hidden relative bg-slate-950 shadow-md group cursor-zoom-in ${
+                                                    aiFeedback?.is_inappropriate 
+                                                        ? 'border-2 border-rose-500 ring-4 ring-rose-500/20' 
+                                                        : 'border border-slate-200 dark:border-slate-800'
+                                                }`}
                                                 title="Click to zoom picture"
                                             >
                                                 <img
@@ -3852,6 +3840,36 @@ const ResidentModals = ({
                                                     alt="Incident Preview"
                                                     className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
                                                 />
+
+                                                {/* Invalid Photo Non-Infrastructure Warning Banner */}
+                                                {aiFeedback?.is_inappropriate && (
+                                                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center z-20">
+                                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-white/20 via-rose-500/20 to-white/5 backdrop-blur-xl border border-white/30 border-t-white/60 flex items-center justify-center text-rose-300 mb-2 shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),0_12px_24px_rgba(244,63,94,0.3)] animate-bounce">
+                                                            <AlertTriangle size={24} className="drop-shadow-[0_2px_6px_rgba(244,63,94,0.5)]" />
+                                                        </div>
+                                                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-gradient-to-b from-white/25 via-rose-500/20 to-white/5 backdrop-blur-xl border border-white/35 border-t-white/70 border-b-white/15 text-white font-black text-[10px] uppercase tracking-wider mb-2 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7),0_6px_20px_rgba(244,63,94,0.35)] drop-shadow-sm select-none">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e] animate-pulse shrink-0" />
+                                                            <span>Invalid Photo • Not Infrastructure</span>
+                                                        </span>
+                                                        <h4 className="text-sm font-bold text-white mb-1.5 drop-shadow-xs">
+                                                            Cannot Proceed With This Photo
+                                                        </h4>
+                                                        <p className="text-[11px] text-rose-100/95 leading-relaxed max-w-xs mb-3.5 p-3 rounded-2xl bg-gradient-to-b from-white/10 via-rose-950/20 to-white/[0.03] backdrop-blur-xl border border-white/20 border-t-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_12px_32px_rgba(0,0,0,0.5)]">
+                                                            {formatFriendlyNotice(aiFeedback.rejection_reason)}
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setIsIDCameraOpen(true);
+                                                            }}
+                                                            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs shadow-md shadow-orange-500/25 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                                                        >
+                                                            <Camera size={14} />
+                                                            <span>Take Valid Photo</span>
+                                                        </button>
+                                                    </div>
+                                                )}
 
                                                 {/* Bottom gradient mask */}
                                                 <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
@@ -3868,27 +3886,27 @@ const ResidentModals = ({
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setSelectedImage(null);
+                                                        setReportCategory([]);
+                                                        if (setPhotoMetadata) setPhotoMetadata(null);
                                                         setAiFeedback(null);
                                                     }}
                                                     className="absolute top-3 right-3 p-2 rounded-full bg-slate-950/75 hover:bg-rose-600 text-white backdrop-blur-xs shadow-md transition-all cursor-pointer z-10"
-                                                    title="Remove image"
+                                                    title="Remove evidence photo"
+                                                    aria-label="Remove evidence photo"
                                                 >
                                                     <X size={16} strokeWidth={2.5} />
                                                 </button>
 
-                                                {/* Bottom Action Affordances */}
+                                                {/* Bottom Metadata & Retake Bar */}
                                                 <div className="absolute bottom-3 inset-x-3 flex items-center justify-between gap-2 z-10">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            fileInputRef.current?.click();
-                                                        }}
-                                                        className="px-3.5 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 text-white text-xs font-bold backdrop-blur-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20"
-                                                    >
-                                                        <Upload size={14} />
-                                                        <span>Change Photo</span>
-                                                    </button>
+                                                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 text-white text-xs font-semibold backdrop-blur-xs border border-white/10 shadow-xs">
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                                        <span>
+                                                            {photoMetadata?.capturedAt
+                                                                ? `Live Photo • ${new Date(photoMetadata.capturedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                                                : 'Live Camera Evidence'}
+                                                        </span>
+                                                    </div>
 
                                                     <button
                                                         type="button"
@@ -3896,10 +3914,11 @@ const ResidentModals = ({
                                                             e.stopPropagation();
                                                             setIsIDCameraOpen(true);
                                                         }}
-                                                        className="px-3.5 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 text-white text-xs font-bold backdrop-blur-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20"
+                                                        className="px-3.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 text-white text-xs font-bold backdrop-blur-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20 shadow-xs"
+                                                        title="Retake photo using device camera"
                                                     >
                                                         <Camera size={14} />
-                                                        <span>Retake</span>
+                                                        <span>Retake Photo</span>
                                                     </button>
                                                 </div>
 
@@ -3912,57 +3931,80 @@ const ResidentModals = ({
                                                 )}
                                             </div>
                                         ) : (
-                                            /* Empty Upload Dropzone */
+                                            /* Empty State: Camera-Only Primary Action */
                                             <div
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="w-full aspect-[4/3] rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 flex flex-col items-center justify-center p-5 text-center hover:border-orange-500 dark:hover:border-orange-500 hover:bg-orange-50/30 dark:hover:bg-slate-800 transition-all cursor-pointer group"
+                                                onClick={() => setIsIDCameraOpen(true)}
+                                                className="w-full aspect-[4/3] rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 flex flex-col items-center justify-center p-6 text-center hover:border-orange-500 dark:hover:border-orange-500 hover:bg-orange-50/20 dark:hover:bg-slate-800/60 transition-all cursor-pointer group"
                                             >
-                                                <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 group-hover:text-orange-500 group-hover:scale-105 shadow-xs transition-all mb-2.5">
-                                                    <Camera size={26} />
+                                                <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 group-hover:text-orange-500 group-hover:scale-105 shadow-xs transition-all mb-3">
+                                                    <Camera size={28} />
                                                 </div>
-                                                <p className="text-sm font-extrabold text-slate-900 dark:text-white mb-0.5">
-                                                    Take photo or upload evidence
+                                                <p className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white mb-1">
+                                                    Capture Photo Evidence
                                                 </p>
-                                                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-3.5">
-                                                    Auto-fits portrait or landscape photos
+                                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
+                                                    Device camera required for authentic, timestamp-verified field condition
                                                 </p>
 
-                                                <div className="flex gap-2.5" onClick={e => e.stopPropagation()}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setIsIDCameraOpen(true)}
-                                                        className="px-3.5 py-2 min-h-[44px] bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs flex items-center gap-1.5 cursor-pointer"
-                                                    >
-                                                        <Camera size={14} />
-                                                        <span>Open Camera</span>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => fileInputRef.current?.click()}
-                                                        className="px-3.5 py-2 min-h-[44px] bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs flex items-center gap-1.5 cursor-pointer"
-                                                    >
-                                                        <Upload size={14} />
-                                                        <span>Browse File</span>
-                                                    </button>
-                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setIsIDCameraOpen(true);
+                                                    }}
+                                                    className="w-full max-w-[240px] py-3 px-4 min-h-[48px] bg-orange-600 hover:bg-orange-700 active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-orange-600/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
+                                                >
+                                                    <Camera size={16} strokeWidth={2.5} />
+                                                    <span>Open Camera</span>
+                                                </button>
                                             </div>
                                         )}
-
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={handleFileSelect}
-                                        />
 
                                         <IDCameraModal
                                             isOpen={isIDCameraOpen}
                                             onClose={() => setIsIDCameraOpen(false)}
-                                            onCapture={file => setSelectedImage(URL.createObjectURL(file))}
-                                            title="Infrastructure Issue Photo"
+                                            onCapture={(file, aiData) => {
+                                                setSelectedImage(URL.createObjectURL(file));
+                                                if (setPhotoMetadata) {
+                                                    setPhotoMetadata({
+                                                        capturedAt: new Date().toISOString(),
+                                                        lat: reportLocation?.lat,
+                                                        lng: reportLocation?.lng,
+                                                        accuracy: reportLocation?.accuracy
+                                                    });
+                                                }
+                                                if (aiData) {
+                                                    setAiFeedback(aiData);
+                                                    if (aiData.auto_description && !reportNotes) {
+                                                        setReportNotes(aiData.auto_description);
+                                                    }
+                                                    const aiCat = (aiData.category || '').toLowerCase();
+                                                    let mapped = [];
+                                                    if (aiCat.includes('light') || aiCat.includes('electric') || aiCat.includes('power') || aiCat.includes('lamp') || aiCat.includes('street')) {
+                                                        mapped.push('Power & Street Lighting');
+                                                    } else if (aiCat.includes('road') || aiCat.includes('bridge') || aiCat.includes('pothole') || aiCat.includes('asphalt') || aiCat.includes('pavement')) {
+                                                        mapped.push('Roads & Drainage');
+                                                    } else if (aiCat.includes('water') || aiCat.includes('drain') || aiCat.includes('flood') || aiCat.includes('canal') || aiCat.includes('sewer') || aiCat.includes('pipe') || aiCat.includes('manhole')) {
+                                                        mapped.push('Water Supply Network');
+                                                    } else if (aiCat.includes('safety') || aiCat.includes('regulat') || aiCat.includes('hazard') || aiCat.includes('fire') || aiCat.includes('building') || aiCat.includes('debris') || aiCat.includes('tree')) {
+                                                        mapped.push('Public Safety & Regulatory');
+                                                    } else if (aiCat.includes('facilit') || aiCat.includes('park') || aiCat.includes('hall') || aiCat.includes('court') || aiCat.includes('school') || aiCat.includes('gym')) {
+                                                        mapped.push('Public Facilities');
+                                                    }
+                                                    if (mapped.length > 0) {
+                                                        setReportCategory(mapped);
+                                                    }
+                                                }
+                                            }}
+                                            title="Capture Evidence Photo"
                                             side="ISSUE"
-                                            guideText="Center the infrastructure issue in the frame"
+                                            guideText="Center the infrastructure hazard in frame"
+                                            metadata={{
+                                                location: reportLocation,
+                                                structuredAddress: structuredAddress,
+                                                locationAddress: locationAddress,
+                                                timestamp: new Date()
+                                            }}
                                         />
 
                                         {/* ── Submission Guidelines & Evidence Tips (Informational) ── */}
@@ -4000,13 +4042,15 @@ const ResidentModals = ({
                                             value={reportCategory}
                                             onChange={setReportCategory}
                                             options={REPORT_CATEGORIES(t)}
-                                            disabled={isAnalyzing || Boolean(aiFeedback?.is_inappropriate)}
+                                            disabled={!selectedImage || isAnalyzing || Boolean(aiFeedback?.is_inappropriate)}
                                             disabledReason={
-                                                isAnalyzing
-                                                    ? '(Scanning photo...)'
-                                                    : aiFeedback?.is_inappropriate
-                                                        ? '(Locked: Resolve AI Warning)'
-                                                        : ''
+                                                !selectedImage
+                                                    ? '(Capture photo first)'
+                                                    : isAnalyzing
+                                                        ? '(Scanning photo...)'
+                                                        : aiFeedback?.is_inappropriate
+                                                            ? '(Please capture a photo of the problem)'
+                                                            : ''
                                             }
                                         />
 
@@ -4016,8 +4060,8 @@ const ResidentModals = ({
                                                     <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-200 flex items-start gap-2 mb-1.5">
                                                         <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
                                                         <div>
-                                                            <span className="font-bold">AI Safety Warning: </span>
-                                                            <span>{aiFeedback.rejection_reason || 'Photo does not appear to show a valid infrastructure issue.'}</span>
+                                                            <span className="font-bold">Please check your photo: </span>
+                                                            <span>{formatFriendlyNotice(aiFeedback.rejection_reason)}</span>
                                                         </div>
                                                     </div>
                                                 )}
@@ -4107,7 +4151,7 @@ const ResidentModals = ({
                                     {aiFeedback?.is_inappropriate ? (
                                         <span className="text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1.5">
                                             <AlertTriangle size={14} className="shrink-0 text-rose-500" />
-                                            <span>Photo rejected: Retake or upload an infrastructure damage photo</span>
+                                            <span>Please take or upload a photo showing the actual problem</span>
                                         </span>
                                     ) : !isCategorySelected ? (
                                         <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5">
@@ -4140,7 +4184,7 @@ const ResidentModals = ({
                                     <button
                                         type="button"
                                         onClick={handleFileReport}
-                                        disabled={submittingReport || !isCategorySelected || Boolean(aiFeedback?.is_inappropriate)}
+                                        disabled={submittingReport || !isCategorySelected || Boolean(aiFeedback?.is_inappropriate) || !selectedImage}
                                         className="w-full sm:w-auto px-6 py-2.5 min-h-[44px] rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer"
                                     >
                                         {submittingReport ? (
@@ -4148,6 +4192,10 @@ const ResidentModals = ({
                                                 <Loader2 size={15} className="animate-spin" />
                                                 <span>Submitting...</span>
                                             </>
+                                        ) : aiFeedback?.is_inappropriate ? (
+                                            <span>Invalid Photo • Retake to Continue</span>
+                                        ) : !selectedImage ? (
+                                            <span>Capture Photo to Continue</span>
                                         ) : (
                                             <span>Submit Report</span>
                                         )}
@@ -5144,7 +5192,8 @@ const TopNavigation = ({
     processedHazards = [],
     setSelectedPost,
     setSelectedHazard,
-    setReportStatusFilter
+    setReportStatusFilter,
+    token
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -5159,6 +5208,9 @@ const TopNavigation = ({
     });
 
     const searchRef = useRef(null);
+    const [showUserMenu, setShowUserMenu] = useState(false);
+    const userMenuTimeoutRef = useRef(null);
+    const userMenuRef = useRef(null);
 
     const saveRecentSearch = (query) => {
         if (!query || !query.trim()) return;
@@ -5185,15 +5237,29 @@ const TopNavigation = ({
         try { localStorage.removeItem('pulso_recent_searches'); } catch (e) { /* ignore */ }
     };
 
-    // Click outside to close search
+    // Click outside to close search and user menu
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (searchRef.current && !searchRef.current.contains(e.target)) {
                 setIsSearchOpen(false);
             }
+            if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+                setShowUserMenu(false);
+            }
+        };
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setIsSearchOpen(false);
+                setShowUserMenu(false);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
+            if (userMenuTimeoutRef.current) clearTimeout(userMenuTimeoutRef.current);
+        };
     }, []);
 
     // Filter items based on query
@@ -5652,9 +5718,10 @@ const TopNavigation = ({
                                                             e.stopPropagation();
                                                             setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_hidden: true } : n));
                                                             try {
+                                                                const authToken = token || getAuthToken();
                                                                 await fetch(`${API_BASE_URL}/api/notifications/${notification.id}`, {
                                                                     method: 'DELETE',
-                                                                    headers: { 'Authorization': `Bearer ${token}` }
+                                                                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
                                                                 });
                                                             } catch (err) {
                                                                 console.error("Delete error:", err);
@@ -5675,18 +5742,91 @@ const TopNavigation = ({
                         </AnimatePresence>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="hidden sm:flex w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 items-center justify-center bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full transition-colors focus:outline-none shrink-0 cursor-pointer active:scale-95"
-                        title="Sign Out"
-                        aria-label="Sign Out"
+                    {/* User Profile Avatar with Hover & Click Sign Out Dropdown */}
+                    <div
+                        ref={userMenuRef}
+                        className="relative shrink-0"
+                        onMouseEnter={() => {
+                            if (userMenuTimeoutRef.current) clearTimeout(userMenuTimeoutRef.current);
+                            setShowUserMenu(true);
+                        }}
+                        onMouseLeave={() => {
+                            userMenuTimeoutRef.current = setTimeout(() => setShowUserMenu(false), 220);
+                        }}
                     >
-                        <LogOut size={13} className="sm:w-4 sm:h-4" />
-                    </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowUserMenu(prev => !prev)}
+                            className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold text-[11px] sm:text-sm flex items-center justify-center text-white shadow-xs shrink-0 hover:opacity-95 hover:ring-2 hover:ring-orange-500/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer overflow-hidden"
+                            aria-label="User menu"
+                            aria-expanded={showUserMenu}
+                        >
+                            {user.avatarPhoto ? (
+                                <img src={user.avatarPhoto} alt={user.name} className="w-full h-full object-cover rounded-full" />
+                            ) : (
+                                user.avatar
+                            )}
+                        </button>
 
-                    <button onClick={() => handleSetTab('profile')} className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold text-[11px] sm:text-sm flex items-center justify-center text-white shadow-xs shrink-0 hover:opacity-90 transition-opacity focus:outline-none cursor-pointer" aria-label="Profile">
-                        {user.avatar}
-                    </button>
+                        <AnimatePresence>
+                            {showUserMenu && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="absolute top-11 sm:top-12 right-0 w-60 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/90 dark:border-slate-800 p-2 z-50 text-slate-900 dark:text-white ring-1 ring-black/5"
+                                >
+                                    {/* User Identity Snapshot */}
+                                    <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 mb-1 border border-slate-100 dark:border-slate-800/80">
+                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold text-xs flex items-center justify-center text-white shrink-0 shadow-xs overflow-hidden">
+                                            {user.avatarPhoto ? (
+                                                <img src={user.avatarPhoto} alt={user.name} className="w-full h-full object-cover rounded-full" />
+                                            ) : (
+                                                user.avatar
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user.name}</p>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.barangay || 'Resident'}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="space-y-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowUserMenu(false);
+                                                handleSetTab('profile');
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors text-left cursor-pointer"
+                                        >
+                                            <User size={15} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                            <span>{t('dashboard.sidebar.account', { defaultValue: 'My Account' })}</span>
+                                        </button>
+
+                                        <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+
+                                        {handleLogout && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowUserMenu(false);
+                                                    handleLogout();
+                                                }}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left cursor-pointer group"
+                                                title="Sign Out"
+                                            >
+                                                <LogOut size={15} className="text-red-500 dark:text-red-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                                                <span>{t('dashboard.sidebar.signOut', { defaultValue: 'Sign Out' })}</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 </div>
             </div>
 
@@ -5810,11 +5950,13 @@ export default function ResidentDashboard() {
         return 'overview';
     });
 
-    const { isLoaded, loadError } = useJsApiLoader({
+    const loaderOptions = React.useMemo(() => ({
         id: 'google-map-script',
         googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-        libraries: LIBRARIES,
-    });
+        libraries: GOOGLE_MAPS_LIBRARIES,
+    }), []);
+
+    const { isLoaded, loadError } = useJsApiLoader(loaderOptions);
 
     const [pulseRadius, setPulseRadius] = useState(0);
 
@@ -6123,9 +6265,11 @@ export default function ResidentDashboard() {
         confirmed: true,
         source: 'pinpoint',
         isExact: true,
-        accuracy: 0
-    }); // Default: Celina Homes 3, Barangay 171, Caloocan (100% Accurate Pinpoint)
+        accuracy: 12
+    }); // Default: Celina Homes 3, Barangay 171, Caloocan
     const [isLocating, setIsLocating] = useState(false);
+    const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
+    const [photoMetadata, setPhotoMetadata] = useState(null);
     const [showHeatmap, setShowHeatmap] = useState(true);
     const [mapLayerType, setMapLayerType] = useState('roadmap'); // 'roadmap' | 'hybrid'
     const [mapCategoryFilter, setMapCategoryFilter] = useState('all');
@@ -6454,37 +6598,39 @@ export default function ResidentDashboard() {
             return;
         }
         setIsLocating(true);
+        setLocationPermissionDenied(false);
 
         let bestAcc = Infinity;
         let bestCoords = null;
+        let watchId = null;
+        let settledTimer = null;
 
         const finalize = (coords) => {
             const finalCoords = coords || bestCoords;
             if (finalCoords) {
                 let finalLat = finalCoords.latitude;
                 let finalLng = finalCoords.longitude;
-                // If device coordinates are within Celina Homes 3 / Brgy 171 neighborhood (coarse laptop Wi-Fi ~150m)
-                // calibrate to exact residential pinpoint
+                const actualAccuracy = Math.round(finalCoords.accuracy || bestAcc || 25);
+
+                // Calibrate Wi-Fi drift to Celina Homes 3, Brgy 171 if within vicinity
                 if (finalLat >= 14.7505 && finalLat <= 14.7535 && finalLng >= 121.0250 && finalLng <= 121.0275) {
                     finalLat = 14.751952;
                     finalLng = 121.026277;
                 }
+
                 const loc = {
                     lat: finalLat,
                     lng: finalLng,
-                    accuracy: 0,
+                    accuracy: actualAccuracy,
                     confirmed: true,
-                    source: 'pinpoint',
-                    isExact: true
+                    source: 'device-gps',
+                    timestamp: Date.now()
                 };
                 setReportLocation(loc);
                 reverseGeocode(loc.lat, loc.lng);
             }
             setIsLocating(false);
         };
-
-        let watchId = null;
-        let settledTimer = null;
 
         const stopWatching = () => {
             if (watchId !== null) {
@@ -6497,10 +6643,11 @@ export default function ResidentDashboard() {
             }
         };
 
+        // Multi-sample window: sample over 4 seconds, choose reading with lowest accuracy radius
         settledTimer = setTimeout(() => {
             stopWatching();
             finalize();
-        }, 4500); // 4.5s satellite lock settling window
+        }, 4000);
 
         try {
             watchId = navigator.geolocation.watchPosition(
@@ -6510,22 +6657,32 @@ export default function ResidentDashboard() {
                         bestAcc = acc;
                         bestCoords = pos.coords;
                     }
-                    // Lock instantly if satellite lock achieves high accuracy (<= 20m)
-                    if (acc <= 20) {
+                    // Finalize immediately if GPS fix achieves exceptional accuracy (<= 8m)
+                    if (acc <= 8) {
                         stopWatching();
                         finalize(pos.coords);
                     }
                 },
                 err => {
                     console.warn("High-accuracy watch fallback:", err);
+                    if (err.code === 1) { // PERMISSION_DENIED
+                        stopWatching();
+                        setIsLocating(false);
+                        setLocationPermissionDenied(true);
+                        return;
+                    }
                     stopWatching();
                     navigator.geolocation.getCurrentPosition(
                         pos => finalize(pos.coords),
                         fallbackErr => {
                             console.warn("Geolocation fallback failed:", fallbackErr);
                             setIsLocating(false);
-                            if (force) showToast('Could not retrieve live GPS. Defaulted to Celina Homes 3, Caloocan.', 'info');
-                            if (!locationAddress) reverseGeocode(14.751952, 121.026277);
+                            if (fallbackErr.code === 1) {
+                                setLocationPermissionDenied(true);
+                            } else {
+                                if (force) showToast('Could not retrieve live GPS. Defaulted to Caloocan North.', 'info');
+                                if (!locationAddress) reverseGeocode(14.751952, 121.026277);
+                            }
                         },
                         { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
                     );
@@ -6542,6 +6699,13 @@ export default function ResidentDashboard() {
     useEffect(() => {
         requestDeviceLocation(false);
     }, []);
+
+    // Automatically sample fresh high-accuracy location whenever Quick Report modal is opened
+    useEffect(() => {
+        if (activeModal === 'file-report') {
+            requestDeviceLocation(false);
+        }
+    }, [activeModal]);
 
     // ── AI Triage Logic ───────────────────────────────────────────────────────
 
@@ -6575,8 +6739,19 @@ export default function ResidentDashboard() {
                 return;
             }
 
-            // 3. Set clean image directly without watermark
-            setSelectedImage(URL.createObjectURL(file));
+            // 3. Burn standardized PULSO Evidence Photo Watermark onto uploaded photo
+            try {
+                const watermarkedFile = await watermarkEvidenceFile(file, {
+                    location: reportLocation,
+                    structuredAddress: structuredAddress,
+                    locationAddress: locationAddress,
+                    timestamp: new Date()
+                });
+                setSelectedImage(URL.createObjectURL(watermarkedFile));
+            } catch (err) {
+                console.error("Watermark processing error:", err);
+                setSelectedImage(URL.createObjectURL(file));
+            }
             setAiFeedback(null);
         }
     };
@@ -6618,7 +6793,7 @@ export default function ResidentDashboard() {
                 setAiFeedback(data);
 
                 if (data.is_inappropriate) {
-                    showToast(data.rejection_reason || 'Image rejected by AI: not a valid infrastructure issue photo.', 'error');
+                    showToast(formatFriendlyNotice(data.rejection_reason), 'error');
                     setReportCategory([]);
                 } else {
                     if (data.auto_description && !reportNotes) {
@@ -6822,8 +6997,12 @@ export default function ResidentDashboard() {
             showToast('Please select at least one issue category.', 'error');
             return;
         }
+        if (!selectedImage) {
+            showToast('Please capture photo evidence of the infrastructure issue before submitting.', 'error');
+            return;
+        }
         if (aiFeedback?.is_inappropriate) {
-            showToast(aiFeedback.rejection_reason || 'Cannot submit: Photo evidence was rejected by AI Safety Filter. Please upload a valid infrastructure photo.', 'error');
+            showToast(formatFriendlyNotice(aiFeedback.rejection_reason) || 'Please upload a photo of the problem to submit your report.', 'error');
             return;
         }
         setIsSubmitConfirmOpen(true);
@@ -6853,6 +7032,9 @@ export default function ResidentDashboard() {
                 const response = await fetch(selectedImage);
                 const blob = await response.blob();
                 formData.append('image', blob, `report-${Date.now()}.jpg`);
+                if (photoMetadata?.capturedAt) {
+                    formData.append('photo_captured_at', photoMetadata.capturedAt);
+                }
             }
 
             const response = await fetch(`${API_BASE_URL}/api/reports`, {
@@ -6867,6 +7049,7 @@ export default function ResidentDashboard() {
                 setActiveTab('reports');
                 setReportNotes('');
                 setSelectedImage(null);
+                setPhotoMetadata(null);
                 fetchUserReports(currentUser.id);
             } else {
                 const errorData = await response.json();
@@ -6887,9 +7070,17 @@ export default function ResidentDashboard() {
     const confirmCancelReport = async (reportId) => {
         setReportToCancel(null);
         try {
+            const authToken = token || getAuthToken();
+            if (!authToken) {
+                showToast("You must be logged in to retract a report.", 'error');
+                return;
+            }
             const res = await fetch(`${API_BASE_URL}/api/reports/${reportId}/cancel`, {
                 method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (res.ok) {
@@ -6898,26 +7089,30 @@ export default function ResidentDashboard() {
                     fetchUserReports(currentUser.id);
                 }
             } else {
-                const err = await res.json();
+                const err = await res.json().catch(() => ({}));
                 showToast(err.detail || "Failed to cancel report", 'error');
             }
         } catch (error) {
             console.error("Error cancelling report:", error);
-            showToast("An error occurred while cancelling the report", 'error');
+            showToast("Network error: Could not reach the server to cancel the report. Please try again.", 'error');
         }
     };
 
 
     // Real User Data State
-    const [user, setUser] = useState({
-        name: 'Resident',
-        fullName: 'Loading...',
-        barangay: 'Loading...',
-        email: '',
-        phone: '',
-        memberSince: 'Loading...',
-        trustScore: 100,
-        avatar: 'R'
+    const [user, setUser] = useState(() => {
+        const savedAvatar = typeof localStorage !== 'undefined' ? (localStorage.getItem('pulso_avatar_current') || null) : null;
+        return {
+            name: 'Resident',
+            fullName: 'Loading...',
+            barangay: 'Loading...',
+            email: '',
+            phone: '',
+            memberSince: 'Loading...',
+            trustScore: 100,
+            avatar: 'R',
+            avatarPhoto: savedAvatar
+        };
     });
     const [updatingProfile, setUpdatingProfile] = useState(false);
 
@@ -6928,16 +7123,20 @@ export default function ResidentDashboard() {
             });
             if (response.ok) {
                 const data = await response.json();
+                const savedAvatar = (typeof localStorage !== 'undefined')
+                    ? (localStorage.getItem(`pulso_avatar_${data.email || 'current'}`) || localStorage.getItem('pulso_avatar_current') || null)
+                    : null;
                 setUser({
                     name: data.full_name ? data.full_name.split(' ')[0] : 'Resident',
                     fullName: data.full_name || '',
-                    address: data.address || '',
+                    address: formatAddress(data.address || ''),
                     barangay: data.barangay || '',
                     email: data.email || '',
                     phone: data.phone_number || '', // Mapped to phone_number
                     memberSince: new Date(data.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
                     trustScore: data.trust_score || 100,
-                    avatar: data.full_name ? data.full_name.charAt(0).toUpperCase() : 'R'
+                    avatar: data.full_name ? data.full_name.charAt(0).toUpperCase() : 'R',
+                    avatarPhoto: savedAvatar
                 });
             }
         } catch (error) {
@@ -7126,8 +7325,10 @@ export default function ResidentDashboard() {
                 setMapFilter={setMapFilter}
                 isAnalyzing={isAnalyzing}
                 aiFeedback={aiFeedback}
-                fileInputRef={fileInputRef}
-                handleFileSelect={handleFileSelect}
+                setAiFeedback={setAiFeedback}
+                locationPermissionDenied={locationPermissionDenied}
+                photoMetadata={photoMetadata}
+                setPhotoMetadata={setPhotoMetadata}
                 reportToCancel={reportToCancel}
                 setReportToCancel={setReportToCancel}
                 confirmCancelReport={confirmCancelReport}
@@ -7213,9 +7414,10 @@ export default function ResidentDashboard() {
                                                             e.stopPropagation();
                                                             setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_hidden: true } : n));
                                                             try {
+                                                                const authToken = token || getAuthToken();
                                                                 await fetch(`${API_BASE_URL}/api/notifications/${notif.id}`, {
                                                                     method: 'DELETE',
-                                                                    headers: { 'Authorization': `Bearer ${token}` }
+                                                                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
                                                                 });
                                                             } catch (err) {
                                                                 console.error("Delete error:", err);
@@ -7261,6 +7463,7 @@ export default function ResidentDashboard() {
                 setSelectedPost={setSelectedPost}
                 setSelectedHazard={setSelectedHazard}
                 setReportStatusFilter={setReportStatusFilter}
+                token={token}
             />
 
             {/* Main Layout Grid (Responsive 2-Column Content + Sticky Side Nav) */}

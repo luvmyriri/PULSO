@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, FileText, X, Check, Lock, Scale } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-export default function LegalModal({ isOpen, onClose, initialTab = 'privacy' }) {
+export default function LegalModal({ isOpen, onClose, initialTab = 'privacy', onAccept }) {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState(initialTab);
 
@@ -197,7 +197,10 @@ export default function LegalModal({ isOpen, onClose, initialTab = 'privacy' }) 
                             LGU Caloocan City • PULSO Legal Terms
                         </div>
                         <button
-                            onClick={onClose}
+                            onClick={() => {
+                                if (onAccept) onAccept();
+                                onClose();
+                            }}
                             className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-[#ff6b00] to-[#ff8533] hover:from-[#e65c00] hover:to-[#ff6b00] text-white font-bold text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-[#ff6b00]/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                         >
                             <Check size={16} /> I Understand &amp; Accept

@@ -406,6 +406,7 @@ Return ONLY a valid JSON object with EXACTLY these keys (no extra text before or
   "reasoning": "Brief justification for the severity score and category choice based on Scope of Service",
   "image_analysis": "Detailed description of detected hazards, infrastructure types, and technical markers seen in the image",
   "auto_description": "A 1-3 sentence technical description of what is visible in the image, suitable as a citizen report body (e.g. 'Severe pothole approximately 1 meter wide on Main Avenue near Deparo. Road surface has deteriorated significantly, exposing the aggregate base.')",
+  "is_infrastructure": true,
   "is_inappropriate": false,
   "rejection_reason": ""
 }}
@@ -423,7 +424,7 @@ Intelligence Rules (STRICT SCOPE OF SERVICE):
    - Examine images CAREFULLY for infrastructure markers (city-owned vs private utility).
    - Look for specific technical details: pavement cracks, clogged drainage grates, burnt out LED modules, or structural fractures in public school walls.
 
-3. ZERO-GUESS POLICY: If the issue is NOT within the Engineering Office scope (e.g., private indoor plumbing, Maynilad water leaks, Meralco power line issues without post damage) or is ambiguous, you MUST set "category": "Undetermined".
+3. ZERO-GUESS POLICY: If the issue is NOT within the Engineering Office scope (e.g., private indoor plumbing, Maynilad water leaks, Meralco power line issues without post damage) or is ambiguous, you MUST set "category": "Undetermined" and "is_infrastructure": false, "is_inappropriate": true.
 
 4. Urgency options: Low | Medium | High | Critical
 
@@ -431,19 +432,23 @@ Severity Guidelines:
 - Downed electrical wires / structural collapse / active fire → Critical, score 9–10
 - Missing manhole covers / deep potholes on main roads / major flooding → High, score 7–8
 - Minor potholes / uncollected garbage / flickering streetlights → Low–Medium, score 2–5
-- Spam, joke, hate speech, or offensive content → is_inappropriate: true
+- Spam, joke, hate speech, or offensive content → is_inappropriate: true, is_infrastructure: false
 
 5. CRITICAL IMAGE CONTENT MODERATION — MANDATORY:
    If an image is attached, you MUST perform content screening BEFORE any infrastructure analysis:
-   a) FACE / SELFIE DETECTION: If the image is primarily a selfie, portrait, or close-up of a human face (not an incidental bystander in the background of an infrastructure photo), this is NOT a valid infrastructure report. Set:
+   a) FACE / SELFIE DETECTION: If the image is primarily a selfie, portrait, person, or close-up of a human face (not an incidental bystander in the background of an infrastructure photo), this is NOT a valid infrastructure report. Set:
+      - "is_infrastructure": false
       - "is_inappropriate": true
-      - "rejection_reason": "Image rejected: This appears to be a selfie or portrait photo, not an infrastructure issue. Please submit a photo showing the actual infrastructure problem (pothole, broken pipe, damaged road, etc.)."
+      - "rejection_reason": "This looks like a personal photo or selfie. Please take a photo showing the actual road damage, street lighting, drainage, or city hazard instead."
       - "category": "Inappropriate Content"
-   b) NON-INFRASTRUCTURE CONTENT: If the image shows food, animals, random objects, memes, screenshots, social media posts, or any content clearly unrelated to city infrastructure, set:
+   b) NON-INFRASTRUCTURE CONTENT: If the image shows food, animals, random objects, memes, indoor rooms, screenshots, or any content clearly unrelated to city public works and infrastructure, set:
+      - "is_infrastructure": false
       - "is_inappropriate": true  
-      - "rejection_reason": "Image rejected: The uploaded photo does not show a valid infrastructure issue. Please take a photo of the actual hazard or damage."
+      - "rejection_reason": "We couldn't clearly see a city infrastructure issue in this photo. Please take a photo showing the actual problem (such as a pothole, broken streetlight, or drainage hazard)."
       - "category": "Inappropriate Content"
-   c) VALID INFRASTRUCTURE images should show roads, drainage, streetlights, buildings, public facilities, or visible physical damage/hazards.
+   c) VALID INFRASTRUCTURE images:
+      - "is_infrastructure": true
+      - "is_inappropriate": false
 
 6. AUTO-DESCRIPTION: If the image shows a legitimate infrastructure issue, generate a professional 1-3 sentence description in "auto_description" that describes the visible problem as if a citizen is reporting it. This should be factual, specific, and include observable details (size of damage, type of infrastructure, visible severity). If the image is inappropriate or no image is provided, set "auto_description" to an empty string.
 """
@@ -451,7 +456,21 @@ Severity Guidelines:
         raw = (_generate_multimodal(prompt, image_data) if image_data
                else _generate(prompt, json_mode=True))
         if raw:
-            return json.loads(raw)
+            parsed = json.loads(raw)
+            # Enforce strict infrastructure validity
+            is_infra = parsed.get("is_infrastructure", True)
+            is_inapp = parsed.get("is_inappropriate", False)
+            cat = str(parsed.get("category", "")).lower()
+
+            if is_inapp or not is_infra or "inappropriate" in cat or cat == "undetermined":
+                parsed["is_inappropriate"] = True
+                parsed["is_infrastructure"] = False
+                if not parsed.get("rejection_reason"):
+                    parsed["rejection_reason"] = "We couldn't clearly see a city infrastructure issue in this photo. Please take a photo showing the actual problem."
+            else:
+                parsed["is_inappropriate"] = False
+                parsed["is_infrastructure"] = True
+            return parsed
     except Exception as e:
         print(f"[AI] analyze_report parse error: {e}")
 
@@ -464,27 +483,33 @@ def extract_id_data(
     id_type: str = "unknown", 
     front_image: Optional[bytes] = None, 
     back_image: Optional[bytes] = None,
-    heuristic_context: str = ""
+    heuristic_context: str = "",
+    expected_id_type: Optional[str] = None
 ) -> Optional[Dict]:
     """
     AI Multi-Side ID Parser & Visual Auditor — Structures OCR and performs 
-    Multimodal Vision analysis to ensure front and back portraits match.
+    Multimodal Vision analysis to ensure front and back portraits match and
+    extracts fields according to known Philippine ID templates.
     """
     if not _SDK_READY:
         return None
 
+    target_type = expected_id_type or id_type or "unknown"
     ocr_context = f"FRONT SIDE OCR:\n{front_ocr}\n\nBACK SIDE OCR:\n{back_ocr}" if back_ocr else f"FRONT SIDE ONLY:\n{front_ocr}"
+    advisory_context = f"ADVISORY: System suspects a potential data/surface inconsistency.\n{heuristic_context}\n" if heuristic_context else ""
+    image_context = "Two images (FRONT and BACK) are attached for Visual Verification." if back_image else "One image (FRONT) is attached."
+
     prompt = f"""You are an elite ID Verification agent for the Caloocan City Engineering Office.
-You are performing a MULTIMODAL AUDIT of a Philippine ID (type: {id_type}).
+You are performing a TEMPLATE-AWARE MULTIMODAL AUDIT of a Philippine ID (Declared Type: {target_type}).
 
 {ocr_context}
 
-{"ADVISORY: System suspects a potential data/surface inconsistency.\n" + heuristic_context if heuristic_context else ""}
-
-{"Two images (FRONT and BACK) are attached for Visual Verification." if back_image else "One image (FRONT) is attached."}
+{advisory_context}
+{image_context}
 
 Extract into a JSON object with these exact fields:
 {{
+  "id_number": "",
   "first_name": "",
   "last_name": "",
   "middle_name": "",
@@ -507,38 +532,74 @@ Extract into a JSON object with these exact fields:
   "front_id_type": "unknown",
   "back_id_type": "unknown",
   "is_front_correct": true,
-  "is_back_correct": true
+  "is_back_correct": true,
+  "field_confidences": {{
+    "id_number": "high",
+    "first_name": "high",
+    "last_name": "high",
+    "dob": "high",
+    "address": "high"
+  }}
 }}
 
 Intelligence Rules (STRICT ZERO TOLERANCE FOR ERROR):
-1. VISUAL OCR OVERRIDE:
-   If the provided "FRONT SIDE OCR" or "BACK SIDE OCR" text is messy, incomplete, or contains obvious spelling errors (e.g., "B4gumBong" instead of "Bagumbong"), you MUST ignore the OCR text and perform a fresh, high-precision visual scan of the images.
+1. TEMPLATE-BASED ID NUMBER EXTRACTION:
+   - "id_number" is the MOST CRITICAL FIELD. Extract the primary identification number for this card:
+     * PhilSys National ID: 16 digits (PCN), format XXXX-XXXX-XXXX-XXXX or 16 continuous digits.
+     * Driver's License (LTO): License number at top right, format [A-Z]XX-XX-XXXXXX.
+     * UMID: 12-digit Common Reference Number (CRN) at top right, format XXXX-XXXXXXX-X.
+     * Passport (DFA): Passport number at top right and on MRZ line, format [A-Z]XXXXXXX.
+     * PhilHealth: 12-digit PIN at top, format XX-XXXXXXXXX-X.
+     * Voter's ID / Cert: Voter ID / VIN (Voter Identification Number) or Precinct Number.
+     * SSS / GSIS: 10-digit SSS Number (XX-XXXXXXX-X) or GSIS BP Number.
+     * Postal ID: 16-character Postal Reference Number (PRN) or PH- number.
+     * Barangay ID: Control number or Certificate number.
+   - Populate "id_number" with the clean, formatted number without label prefixes.
 
-2. Side & ID Type Verification (AUTHENTICITY AUDIT):
-   - You MUST identify the side (Front or Back) of EACH image.
-   - If BOTH the FRONT and BACK images provided appear to be the same side (e.g., front of card sent twice), you MUST set "is_document_mismatch": true and "mismatch_reason": "SCAN ERROR: You have scanned the same side of the ID twice. Please scan the Front side and then the Back side separately."
-   - Identify the exact ID type for EACH side (e.g., "UMID", "PhilID", "LTO").
-   - ADVISORIAL SCRUTINY: If a system advisory was provided above (e.g., regarding a PhilHealth vs PhilID mismatch), you MUST perform a deep visual inspection of the card templates to confirm or professionally debunk the mismatch. Do not lazily categorize them as the same type if they differ in layout, logo, or color scheme.
-   - If the ID type on the Front doesn't match the ID type on the Back (e.g. Front is UMID but Back is PhilID), set "is_document_mismatch": true and "mismatch_reason": "DOCUMENT MISMATCH: The front and back images belong to different types of government IDs."
+2. PHILIPPINE NATIONAL ID (PhilSys) TWO-SIDED STRUCTURE — CRITICAL:
+   - The FRONT of PhilSys contains:
+     * PCN: 16-digit card number (e.g. 2197-1609-8154-0734)
+     * Full Name: Last Name (Apelyido), Given Names (Mga Pangalan), Middle Name (Gitnang Apelyido)
+     * Date of Birth (Petsa ng Kapanganakan)
+     * RESIDENCE ADDRESS (Tirahan): e.g. "PH8A PKG14 BLK15 LOT11, BARANGAY 176, CITY OF CALOOCAN, NCR, THIRD DISTRICT"
+     * Portrait Photo
+   - The BACK of PhilSys contains:
+     * Large QR Code
+     * Sex (Kasarian / Sex: MALE or FEMALE)
+     * Blood Type (Uri ng Dugo)
+     * Marital Status (Kalagayang Sibil)
+     * PLACE OF BIRTH (Lugar ng Kapanganakan): e.g. "CAMALIGAN, CAMARINES SUR" or any Philippine province/town.
+   - RESIDENCE ADDRESS vs PLACE OF BIRTH:
+     * "Lugar ng Kapanganakan" on the back is the PLACE OF BIRTH, NOT the residence address.
+     * The RESIDENCE ADDRESS is printed strictly on the FRONT ("Tirahan").
+     * NEVER compare the front Residence Address to the back Place of Birth! It is completely expected and normal for someone born in another province to now reside in Caloocan City. This is NEVER an address discrepancy or document mismatch.
+   - COMBINE BOTH SIDES:
+     * Extract Name, ID Number, DOB, and Address from the FRONT.
+     * Extract Sex (Kasarian) from the BACK.
 
-3. VISUAL FACE MATCH — CRITICAL BIOMETRIC AUDIT:
-   - Perform a detailed person-identity comparison between the main portrait on the Front and any secondary photo/watermark/ghost image on the Back.
-   - If the faces belong to DIFFERENT individuals, set "is_visual_face_match": false, "is_document_mismatch": true, "mismatch_reason": "IDENTITY MISMATCH: The portrait photo on the front does not match the individual detected on the back image."
-   - Check for signs of "Digital Re-photography": If you detect moiré patterns or signs that the user is scanning a photo of a phone screen or a computer monitor, flag it as a mismatch.
+3. VISUAL OCR OVERRIDE:
+   - The provided images are the ultimate source of truth. If raw OCR text has typos or misread characters, use your visual reading of the images. NEVER report a mismatch due to minor OCR character noise.
 
-4. DATA CONSISTENCY & MERGING:
-   - Extract the full name and DOB from BOTH images if they appear on both.
-   - If the Name or Birthdate on the Back (often in QR codes or text) contradicts the Front, set "is_document_mismatch": true.
+4. ID Type & Mismatch Check:
+   - Identify the exact ID type on Front and Back.
+   - If the resident declared "{target_type}" but the uploaded card is clearly a completely different government document (e.g. resident declared Driver's License but uploaded a Passport or PhilHealth), set "is_document_mismatch": true and "mismatch_reason": "You selected [declared type], but the uploaded card appears to be [actual card type]. Please choose the matching ID type or upload the correct card."
+   - If BOTH the FRONT and BACK images are the same side, set "is_document_mismatch": true and "mismatch_reason": "SCAN ERROR: You have scanned the same side of the ID twice. Please scan Front and Back separately."
+
+5. VISUAL FACE MATCH — BIOMETRIC AUDIT:
+   - Compare portrait on Front with secondary photo/ghost portrait on Back if present.
+   - If different people, set "is_visual_face_match": false, "is_document_mismatch": true, "mismatch_reason": "IDENTITY MISMATCH: The portrait photo on the front does not match the individual on the back."
+
+6. PHILIPPINE ADDRESS & NAME INTELLIGENCE:
+   - Names: Separate into first_name, middle_name, last_name, suffix.
    - Birthdate: Must be YYYY-MM-DD.
-   - Fix OCR Noise: Be aggressive about correcting (0 vs O, 1 vs I).
+   - house_no: House / Unit / Lot number.
+   - block_lot: Block and Lot if specified (e.g. "BLK 15 LOT 11").
+   - subdivision: Phase / Package / Subdivision name (e.g. "PH8A PKG14").
+   - barangay: Exact number for Caloocan (e.g. "176") or name. Priority: numeric string without "Barangay" prefix.
+   - Assign confidence ("high", "medium", "low") for key fields based on image legibility.
 
-5. PHILIPPINE ADDRESS INTELLIGENCE:
-   - house_no: Numeric only.
-   - subdivision: Include PH, PKG, and NV identifiers (e.g. "PH8A PKG14").
-   - barangay: Exact number for Caloocan (e.g. "171") or name for others (e.g. "Bagumbong"). Priority: numeric.
-
-6. RESPONSE FORMAT:
-   - If "is_document_mismatch" is true, ensure "mismatch_reason" is descriptive and professional.
+7. RESPONSE FORMAT:
+   - If "is_document_mismatch" is true, ensure "mismatch_reason" is descriptive and professional. Do NOT flag mismatch for normal multi-side ID card structures.
 
 """
     try:

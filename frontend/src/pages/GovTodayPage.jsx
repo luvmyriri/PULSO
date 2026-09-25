@@ -32,6 +32,7 @@ import GovBreadcrumb from '../components/GovBreadcrumb';
 import GovUserDropdown from '../components/GovUserDropdown';
 import { useTheme } from '../contexts/ThemeContext';
 import { API_BASE_URL } from '../utils/apiBase';
+import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import { formatTicketId } from '../utils/reportWorkflow';
 import {
@@ -44,7 +45,7 @@ import {
 } from '../data/caloocanBoundaries';
 import './citizen-reports.css';
 
-const LIBRARIES = ['places', 'geometry'];
+const LIBRARIES = GOOGLE_MAPS_LIBRARIES;
 
 const DARK_MAP_STYLE = [
     { featureType: 'poi', stylers: [{ visibility: 'off' }] },

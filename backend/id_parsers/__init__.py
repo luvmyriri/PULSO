@@ -17,10 +17,12 @@ from .postal import PostalIDParser
 from .comelec import COMLECParser
 from .passport import PassportParser
 from .gsis import GSISParser
+from .barangay import BarangayIDParser
 
 # Registry maps detected id_type keys → parser class
 PARSER_REGISTRY = {
     'philid':     PhilIDParser,
+    'philsys':    PhilIDParser,
     'umid':       UMIDParser,
     'lto':        LTOParser,
     'prc':        PRCParser,
@@ -30,6 +32,8 @@ PARSER_REGISTRY = {
     'comelec':    COMLECParser,
     'passport':   PassportParser,
     'gsis':       GSISParser,
+    'sss_gsis':   GSISParser,
+    'barangay':   BarangayIDParser,
 }
 
 

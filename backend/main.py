@@ -126,13 +126,37 @@ async def download_resident_app():
         media_type="application/vnd.android.package-archive"
     )
 
-# Configure CORS so the Vite frontend and Flutter mobile app can access the backend
+# Configure CORS so Vite frontend, mobile clients, and production domains can access the backend
+# Note: When allow_credentials=True, allow_origins MUST NOT be ["*"] according to the CORS standard.
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:33159",
+    "http://127.0.0.1:33159",
+]
+
+env_allowed = os.getenv("ALLOWED_ORIGINS")
+if env_allowed:
+    for origin in env_allowed.split(","):
+        cleaned = origin.strip()
+        if cleaned and cleaned not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(cleaned)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=86400,
 )
 
 @app.get("/api/system/ip")
@@ -369,16 +393,17 @@ async def ai_omni_assistant(
 @app.post("/api/verify-residency")
 async def verify_residency(
     idFront: UploadFile = File(...),
-    idBack: UploadFile = File(...)
+    idBack: UploadFile = File(...),
+    idType: Optional[str] = Form(None)
 ):
     """
-    Receives front and back ID images, performs OCR,
+    Receives front and back ID images and declared ID type, performs OCR,
     and verifies if the address is within North Caloocan (Brgy 165-188).
     """
     front_bytes = await idFront.read()
     back_bytes = await idBack.read() if idBack else None
     
-    result = await ocr_service.perform_ocr(front_bytes, back_bytes)
+    result = await ocr_service.perform_ocr(front_bytes, back_bytes, id_type=idType)
     
     # Return early if OCR failed entirely
     if not result.get("success"):
@@ -432,11 +457,29 @@ def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
     if brgy_str and str(brgy_str).isdigit() and not user_data.get("barangay_id"):
         user_data["barangay_id"] = int(brgy_str)
     
-    # Create user as unverified
+    # Determine initial KYC level based on ID tier and verification mode
+    id_tier = user_data.get("id_tier")
+    id_type = user_data.get("id_type")
+    ver_mode = user_data.get("verification_mode")
+    if id_tier == "primary":
+        if id_type == "philsys":
+            kyc_level = "Gold (PhilSys Verified)"
+        else:
+            kyc_level = "Silver (Primary ID Verified)"
+    elif id_tier == "secondary":
+        if ver_mode == "second_id":
+            kyc_level = "Silver (Dual Secondary Verified)"
+        else:
+            kyc_level = "Bronze (Pending Manual Review)"
+    else:
+        kyc_level = "Bronze (Self-Signed)"
+
+    # Create user as unverified (awaiting OTP verification)
     new_user = models.Resident(
         **{k: v for k, v in user_data.items() if k != "password"},
         password_hash=user_data["password"],
         verification_code=code,
+        kyc_level=kyc_level,
         is_verified=False
     )
     db.add(new_user)
@@ -1518,7 +1561,7 @@ async def create_new_report(
         reason = ai_analysis.get("rejection_reason", "Inappropriate content detected.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Report rejected by AI Safety Filter: {reason}"
+            detail=reason or "Please upload a clear photo showing the actual problem."
         )
 
     # 6. Auto-reverse-geocode address if missing

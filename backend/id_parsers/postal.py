@@ -31,10 +31,14 @@ class PostalIDParser(BaseIDParser):
         result['first_name'], result['last_name'], result['middle_name'] = \
             self._extract_postal_names(lines, upper)
             
-        # 2. Postal ID Number starting with 'PH-'
+        # 2. Postal ID Number starting with 'PH-' or PRN (16 alphanumeric)
         id_match = re.search(r'\b(PH-[A-Z0-9\-]+)\b', upper)
+        if not id_match:
+            id_match = re.search(r'\b(?:PRN\s*[:#-]?\s*)?([A-Z0-9]{12,16})\b', upper)
         if id_match:
-            result['postal_id_no'] = id_match.group(1)
+            val = id_match.group(1)
+            result['postal_id_no'] = val
+            result['id_number'] = val
 
         # 3. DOB: ISO YYYY-MM-DD
         result['dob'] = self._extract_dob(upper)

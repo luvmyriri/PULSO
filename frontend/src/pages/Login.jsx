@@ -1118,35 +1118,7 @@ export default function Login() {
                 </div>
             </main>
 
-            {/* ── Standard Civic Legal Footer Strip ───────────────────────── */}
-            <footer className="relative z-10 w-full bg-slate-100/80 dark:bg-[#060911] border-t border-slate-200/80 dark:border-slate-800/80 py-3.5 text-slate-500 dark:text-slate-400 text-[11px] transition-colors">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
-                    <span>
-                        &copy; {new Date().getFullYear()} City Government of Caloocan • City Engineering Department. All rights reserved.
-                    </span>
-                    <div className="flex items-center gap-4 font-semibold">
-                        <button 
-                            type="button" 
-                            onClick={() => setLegalModal({ isOpen: true, tab: 'privacy' })} 
-                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
-                        >
-                            Privacy Policy
-                        </button>
-                        <span>•</span>
-                        <button 
-                            type="button" 
-                            onClick={() => setLegalModal({ isOpen: true, tab: 'terms' })} 
-                            className="hover:text-[#ff6b00] transition-colors cursor-pointer"
-                        >
-                            Terms of Service
-                        </button>
-                        <span>•</span>
-                        <Link to="/" className="hover:text-[#ff6b00] transition-colors cursor-pointer">
-                            Portal Home
-                        </Link>
-                    </div>
-                </div>
-            </footer>
+
 
             <LegalModal
                 isOpen={legalModal.isOpen}

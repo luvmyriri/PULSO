@@ -30,8 +30,7 @@ import {
   COMBINED_CALOOCAN_BOUNDS,
 } from '../../data/caloocanBoundaries';
 import { useTheme } from '../../contexts/ThemeContext';
-
-const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry'];
+import { GOOGLE_MAPS_LIBRARIES } from '../../utils/mapsConfig';
 
 const CALOOCAN_CENTER = { lat: 14.7104, lng: 121.0298 };
 

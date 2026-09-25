@@ -16,8 +16,9 @@ import Step5ContactPreferences from '../components/report-wizard/Step5ContactPre
 import Step6ReviewConsent from '../components/report-wizard/Step6ReviewConsent';
 import DuplicateWarningModal from '../components/report-wizard/DuplicateWarningModal';
 
+import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
+
 const DRAFT_STORAGE_KEY = 'pulso_report_wizard_draft_v1';
-const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry'];
 
 export default function ReportWizardPage() {
   const { t } = useTranslation();
@@ -352,6 +353,7 @@ export default function ReportWizardPage() {
             <Step3EvidenceUpload 
               evidenceData={formData.evidence}
               category={formData.category}
+              locationData={formData.location}
               onEvidenceChange={(ev) => {
                 setFormData(p => {
                   const updated = { ...p, evidence: ev };

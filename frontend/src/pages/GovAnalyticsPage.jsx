@@ -23,8 +23,9 @@ import GovBreadcrumb from '../components/GovBreadcrumb';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 
 import { API_BASE_URL } from '../utils/apiBase';
+import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const LIBRARIES = ['places', 'geometry'];
+const LIBRARIES = GOOGLE_MAPS_LIBRARIES;
 
 const CATEGORY_LABELS = {
     'roads_bridges': 'Roads & Bridges',

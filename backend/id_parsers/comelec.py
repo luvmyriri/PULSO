@@ -79,6 +79,7 @@ class COMLECParser(BaseIDParser):
         if not result['barangay']:
              result['barangay'] = self._extract_barangay(upper)
 
+        result['id_number'] = result.get('vin') or result.get('precinct_no', '')
         return result
 
     def _extract_comelec_address(self, lines: List[str], upper: str) -> str:

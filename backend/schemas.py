@@ -18,6 +18,10 @@ class ResidentBase(BaseModel):
     address: Optional[str] = None
     barangay_id: Optional[int] = None
     district_id: Optional[int] = None
+    id_tier: Optional[str] = None
+    id_type: Optional[str] = None
+    secondary_id_type: Optional[str] = None
+    verification_mode: Optional[str] = None
 
 class ResidentCreate(ResidentBase):
     password: str
@@ -29,6 +33,10 @@ class ResidentUpdate(BaseModel):
     address: Optional[str] = None
     barangay_id: Optional[int] = None
     district_id: Optional[int] = None
+    id_tier: Optional[str] = None
+    id_type: Optional[str] = None
+    secondary_id_type: Optional[str] = None
+    verification_mode: Optional[str] = None
 
 class ResidentResponse(ResidentBase):
     id: int
@@ -74,11 +82,21 @@ class OfficialUpdate(BaseModel):
 
 class OfficialResponse(OfficialBase):
     id: int
-    is_active: bool
-    is_suspended: bool
+    is_active: bool = True
+    is_suspended: bool = False
     created_at: datetime
     role: str
     capabilities: Optional[Dict[str, Any]] = None
+
+    @field_validator('is_active', mode='before')
+    @classmethod
+    def set_is_active(cls, v):
+        return True if v is None else bool(v)
+
+    @field_validator('is_suspended', mode='before')
+    @classmethod
+    def set_is_suspended(cls, v):
+        return False if v is None else bool(v)
 
     class Config:
         from_attributes = True
@@ -105,6 +123,26 @@ class UserResponse(BaseModel):
     display_name: Optional[str] = None # Mainly for officials
     kyc_level: Optional[str] = None # Mainly for residents
     capabilities: Optional[Dict[str, Any]] = None
+
+    @field_validator('is_active', mode='before')
+    @classmethod
+    def set_is_active(cls, v):
+        return True if v is None else bool(v)
+
+    @field_validator('is_suspended', mode='before')
+    @classmethod
+    def set_is_suspended(cls, v):
+        return False if v is None else bool(v)
+
+    @field_validator('is_verified', mode='before')
+    @classmethod
+    def set_is_verified(cls, v):
+        return True if v is None else bool(v)
+
+    @field_validator('trust_score', mode='before')
+    @classmethod
+    def set_trust_score(cls, v):
+        return 100 if v is None else int(v)
 
     # Location fields (Normalized vs Legacy)
     barangay: Optional[str] = None

@@ -1,6 +1,9 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RefreshCw, AlertCircle, CameraOff } from 'lucide-react';
+import { X, RefreshCw, AlertCircle, CameraOff, Loader2, AlertTriangle } from 'lucide-react';
+import { burnEvidenceWatermark, formatWatermarkTimestamp } from '../utils/watermark';
+import { formatWatermarkAddress } from '../utils/philippineAddress';
+import { API_BASE_URL } from '../utils/apiBase';
 
 const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subtitle, metadata, guideText }) => {
     const videoRef = useRef(null);
@@ -10,6 +13,59 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
     const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
     const [facingMode, setFacingMode] = useState('environment');
     const [isLoading, setIsLoading] = useState(true);
+    const [liveTime, setLiveTime] = useState(() => new Date());
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [capturedPreviewUrl, setCapturedPreviewUrl] = useState(null);
+    const [validationError, setValidationError] = useState(null);
+
+    // Reset captured preview when modal opens or closes
+    useEffect(() => {
+        if (!isOpen) {
+            if (capturedPreviewUrl) {
+                URL.revokeObjectURL(capturedPreviewUrl);
+            }
+            setCapturedPreviewUrl(null);
+            setValidationError(null);
+            setIsVerifying(false);
+        }
+    }, [isOpen]);
+
+    const handleRetake = () => {
+        if (capturedPreviewUrl) {
+            URL.revokeObjectURL(capturedPreviewUrl);
+        }
+        setCapturedPreviewUrl(null);
+        setValidationError(null);
+        setIsVerifying(false);
+    };
+
+    // Live clock for real-time camera viewfinder watermark
+    useEffect(() => {
+        if (!isOpen || side !== 'ISSUE') return;
+        setLiveTime(new Date());
+        const interval = setInterval(() => {
+            setLiveTime(new Date());
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [isOpen, side]);
+
+    // Live Watermark Address & Coordinates for viewfinder
+    const addressSource = metadata?.structuredAddress || metadata?.locationAddress || metadata?.address;
+    const watermarkAddress = formatWatermarkAddress(
+        addressSource,
+        metadata?.location || metadata?.coordinates
+    );
+
+    let coordsText = '';
+    const loc = metadata?.location || metadata?.coordinates;
+    if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+        coordsText = `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`;
+        if (typeof loc.accuracy === 'number' && loc.accuracy > 0 && loc.accuracy < 100) {
+            coordsText += ` (±${Math.round(loc.accuracy)}m)`;
+        }
+    } else if (metadata?.lat && metadata?.lng) {
+        coordsText = `${Number(metadata.lat).toFixed(4)}, ${Number(metadata.lng).toFixed(4)}`;
+    }
 
     const stopStream = useCallback(() => {
         if (streamRef.current) {
@@ -106,9 +162,76 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
         
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        canvas.toBlob((blob) => {
-            if (blob) {
-                const file = new File([blob], `captured_evidence.jpg`, { type: 'image/jpeg' });
+        // Reset transform so watermark text is never mirrored
+        if (facingMode === 'user') {
+            context.setTransform(1, 0, 0, 1, 0, 0);
+        }
+
+        // Burn evidence watermark for issue reports
+        if (side === 'ISSUE') {
+            burnEvidenceWatermark(canvas, {
+                ...metadata,
+                timestamp: liveTime
+            });
+        }
+
+        canvas.toBlob(async (blob) => {
+            if (!blob) return;
+            const file = new File([blob], `captured_evidence.jpg`, { type: 'image/jpeg' });
+
+            // If not issue photo (e.g. ID card), proceed directly
+            if (side !== 'ISSUE') {
+                onCapture(file);
+                onClose();
+                return;
+            }
+
+            // For infrastructure issue evidence: Validate with AI before proceeding
+            const previewUrl = URL.createObjectURL(blob);
+            setCapturedPreviewUrl(previewUrl);
+            setIsVerifying(true);
+            setValidationError(null);
+
+            try {
+                const formData = new FormData();
+                formData.append('image', blob, 'captured_evidence.jpg');
+                if (metadata?.category) {
+                    formData.append('description', `Selected category: ${metadata.category}`);
+                }
+
+                const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+                const headers = {};
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const res = await fetch(`${API_BASE_URL}/api/reports/analyze`, {
+                    method: 'POST',
+                    headers,
+                    body: formData
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.is_inappropriate || data.is_infrastructure === false) {
+                        // REJECT! Block proceeding
+                        const reason = data.rejection_reason || "We couldn't clearly see a city infrastructure issue in this photo. Please point your camera at the actual road damage, broken streetlight, or drainage hazard.";
+                        setValidationError(reason);
+                        setIsVerifying(false);
+                        return;
+                    }
+
+                    // Valid infrastructure photo: proceed
+                    setIsVerifying(false);
+                    onCapture(file, data);
+                    onClose();
+                } else {
+                    // Fallback on server response error
+                    setIsVerifying(false);
+                    onCapture(file);
+                    onClose();
+                }
+            } catch (err) {
+                console.warn('AI infrastructure verification network error:', err);
+                setIsVerifying(false);
                 onCapture(file);
                 onClose();
             }
@@ -200,13 +323,21 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
                                 </div>
                             ) : (
                                 <>
-                                    <video
-                                        ref={videoRef}
-                                        autoPlay
-                                        playsInline
-                                        muted
-                                        className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
-                                    />
+                                    {capturedPreviewUrl ? (
+                                        <img
+                                            src={capturedPreviewUrl}
+                                            alt="Captured Evidence Preview"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <video
+                                            ref={videoRef}
+                                            autoPlay
+                                            playsInline
+                                            muted
+                                            className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+                                        />
+                                    )}
 
                                     {/* Camera UI Overlays */}
                                     <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-6">
@@ -214,14 +345,102 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
                                         <div />
 
                                         {/* Middle-Bottom Guide text (Floating Pill) */}
-                                        <div className="mb-32">
-                                            <span className="text-white text-[11px] sm:text-xs font-bold tracking-wide drop-shadow-lg bg-black/40 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
-                                                {guideText || "Center the issue in your view"}
-                                            </span>
-                                        </div>
+                                        {!capturedPreviewUrl && (
+                                            <div className={side === 'ISSUE' ? "mb-28 sm:mb-32" : "mb-16"}>
+                                                <span className="text-white text-[11px] sm:text-xs font-bold tracking-wide drop-shadow-lg bg-black/40 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
+                                                    {guideText || "Center the issue in your view"}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
 
+                                    {/* Live Evidence Watermark Overlay on Viewfinder */}
+                                    {side === 'ISSUE' && !capturedPreviewUrl && (
+                                        <div className="absolute inset-x-0 bottom-0 pointer-events-none z-20">
+                                            {/* Protective Scrim Gradient */}
+                                            <div className="bg-gradient-to-t from-[#05080f]/95 via-[#060a12]/85 to-transparent pt-8 pb-3 px-3 sm:px-5">
+                                                {/* Civic Signal Cut: Orange beacon bar */}
+                                                <div className="flex items-center gap-2 mb-1.5">
+                                                    <div className="w-12 sm:w-16 h-0.5 bg-orange-500 rounded-full shadow-[0_0_8px_#ff6b00]" />
+                                                    <div className="flex-1 h-px bg-white/20" />
+                                                </div>
 
+                                                {/* Line 1: PULSO · Caloocan City   Timestamp */}
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-xs sm:text-sm font-bold tracking-tight">
+                                                        <span className="text-[#ff7a1a]">PULSO</span>
+                                                        <span className="text-white"> · Caloocan City</span>
+                                                    </span>
+                                                    <span 
+                                                        style={{ color: '#ffffff' }}
+                                                        className="text-[10px] sm:text-xs font-semibold text-white font-mono tracking-tight drop-shadow-md"
+                                                    >
+                                                        {formatWatermarkTimestamp(liveTime)}
+                                                    </span>
+                                                </div>
+
+                                                {/* Line 2: Full Address with Plus Code */}
+                                                <div 
+                                                    style={{ color: '#ffffff' }}
+                                                    className="text-[11px] sm:text-xs text-white font-medium leading-snug mt-0.5 line-clamp-2 drop-shadow-md"
+                                                >
+                                                    {watermarkAddress}
+                                                </div>
+
+                                                {/* Line 3: Coordinates */}
+                                                {coordsText && (
+                                                    <div 
+                                                        style={{ color: 'rgba(255, 255, 255, 0.85)' }}
+                                                        className="text-[9px] sm:text-[10px] font-mono text-white/85 mt-0.5 drop-shadow-md"
+                                                    >
+                                                        {coordsText}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* AI Verifying Overlay */}
+                                    {isVerifying && (
+                                        <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center z-30">
+                                            <div className="w-14 h-14 rounded-2xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 mb-3 animate-pulse shadow-lg">
+                                                <Loader2 size={30} className="animate-spin text-orange-500" />
+                                            </div>
+                                            <h4 className="text-base sm:text-lg font-bold text-white mb-1.5">
+                                                Verifying Infrastructure Photo...
+                                            </h4>
+                                            <p className="text-xs text-slate-300 max-w-xs leading-relaxed">
+                                                PULSO AI is confirming that this photo shows an actual city hazard (road, lighting, drainage, or public safety issue).
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Invalid Photo: Non-Infrastructure Warning Modal Overlay */}
+                                    {validationError && (
+                                        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-30">
+                                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-b from-white/20 via-rose-500/20 to-white/5 backdrop-blur-xl border border-white/30 border-t-white/60 flex items-center justify-center text-rose-300 mb-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),0_12px_28px_rgba(244,63,94,0.3)] animate-bounce">
+                                                <AlertTriangle size={30} className="drop-shadow-[0_2px_8px_rgba(244,63,94,0.5)]" />
+                                            </div>
+                                            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-b from-white/25 via-rose-500/20 to-white/5 backdrop-blur-xl border border-white/35 border-t-white/70 border-b-white/15 text-white font-black text-[10px] sm:text-[11px] uppercase tracking-wider mb-2.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7),0_8px_24px_rgba(244,63,94,0.35)] drop-shadow-sm select-none">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e] animate-pulse shrink-0" />
+                                                <span>Invalid Photo • Not Infrastructure</span>
+                                            </span>
+                                            <h4 className="text-base sm:text-lg font-bold text-white mb-2 max-w-sm drop-shadow-sm">
+                                                Cannot Proceed With This Photo
+                                            </h4>
+                                            <p className="text-xs sm:text-[13px] text-rose-100/95 leading-relaxed max-w-sm mb-5 p-4 rounded-2xl bg-gradient-to-b from-white/10 via-rose-950/20 to-white/[0.03] backdrop-blur-xl border border-white/20 border-t-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_12px_40px_rgba(0,0,0,0.5)]">
+                                                {validationError}
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={handleRetake}
+                                                className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-lg shadow-orange-500/25 flex items-center gap-2 cursor-pointer active:scale-95"
+                                            >
+                                                <RefreshCw size={16} />
+                                                <span>Retake Photo</span>
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {isLoading && (
                                         <div className="absolute inset-0 
@@ -249,7 +468,7 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
 
                             {/* Switch Camera */}
                             <div className="w-10 sm:w-12">
-                                {hasMultipleCameras && !error && (
+                                {hasMultipleCameras && !error && !capturedPreviewUrl && (
                                     <button
                                         onClick={handleSwitchCamera}
                                         className="p-2 sm:p-3.5 rounded-full 
@@ -265,16 +484,17 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
                                 )}
                             </div>
 
-                            {/* Capture Button */}
+                            {/* Center Action: Shutter Capture Button */}
                             <button
                                 onClick={handleCapture}
-                                disabled={!streamRef.current || isLoading || !!error}
+                                disabled={!streamRef.current || isLoading || !!error || isVerifying || !!capturedPreviewUrl}
                                 className="w-14 h-14 sm:w-18 sm:h-18 rounded-full 
                                     bg-white dark:bg-slate-700
                                     flex items-center justify-center 
                                     border-[4px] sm:border-[6px] border-gray-300 dark:border-slate-600
                                     hover:scale-105 active:scale-95 transition-all shadow-2xl 
-                                    disabled:opacity-50 disabled:cursor-not-allowed group"
+                                    disabled:opacity-40 disabled:cursor-not-allowed group"
+                                title={capturedPreviewUrl ? 'Retake photo above to continue' : 'Capture photo'}
                             >
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-orange-500 group-hover:bg-orange-600 transition-colors" />
                             </button>
@@ -286,12 +506,12 @@ const IDCameraModal = ({ isOpen, onClose, onCapture, side = 'front', title, subt
                                     <CameraOff size={18} className="sm:hidden mb-0.5" />
                                     <CameraOff size={20} className="hidden sm:block mb-0.5" />
                                     {/* Live dot */}
-                                    {streamRef.current && !isLoading && (
+                                    {streamRef.current && !isLoading && !capturedPreviewUrl && (
                                         <span className="absolute -top-1 -right-1 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full animate-pulse" />
                                     )}
                                 </div>
                                 <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-tighter">
-                                    {streamRef.current && !isLoading ? 'Live' : 'Off'}
+                                    {streamRef.current && !isLoading && !capturedPreviewUrl ? 'Live' : 'Off'}
                                 </span>
                             </div>
                         </div>

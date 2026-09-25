@@ -597,8 +597,6 @@ async def verify_philid(
 # openverify QR Verification (bettergovph/openverify Integration)
 # ============================================================================
 
-import jwt
-
 PHILSYS_QR_VERIFY_URL = os.getenv("PHILSYS_QR_VERIFY_URL", "https://verify.philsys.gov.ph/api/verify")
 PHILSYS_EVERIFY_URL = os.getenv("PHILSYS_EVERIFY_URL", "https://verify.philsys.gov.ph/api/pub/qr/check")
 PHILSYS_QR_COOKIE = os.getenv("PHILSYS_QR_COOKIE", "")

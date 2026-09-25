@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { getStoredToken } from '../../utils/auth';
+import { watermarkEvidenceFile } from '../../utils/watermark';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
@@ -13,6 +14,7 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'
 export default function Step3EvidenceUpload({ 
   evidenceData, 
   category, 
+  locationData,
   onEvidenceChange, 
   onBack, 
   onContinue 
@@ -41,12 +43,25 @@ export default function Step3EvidenceUpload({
       return;
     }
 
+    // Burn standardized PULSO Evidence Photo Watermark
+    let fileToUse = file;
+    try {
+      fileToUse = await watermarkEvidenceFile(file, {
+        location: locationData,
+        structuredAddress: locationData,
+        locationAddress: locationData?.address,
+        timestamp: new Date()
+      });
+    } catch (err) {
+      console.error("Watermark processing error:", err);
+    }
+
     // Generate local preview URL
-    const previewUrl = URL.createObjectURL(file);
+    const previewUrl = URL.createObjectURL(fileToUse);
 
     // Initial state with scanning active
     onEvidenceChange({
-      file,
+      file: fileToUse,
       previewUrl,
       fileName: file.name,
       fileSize: file.size,
@@ -82,7 +97,7 @@ export default function Step3EvidenceUpload({
       if (res.ok) {
         const data = await res.json();
         if (data.is_inappropriate) {
-          const reason = data.rejection_reason || 'The uploaded photo does not show a valid infrastructure issue. Please take a photo of the actual hazard or damage.';
+          const reason = data.rejection_reason || "We couldn't clearly see a city issue in this photo. Please upload a clear photo showing the actual problem (such as a pothole, broken streetlight, or water leak).";
           setErrorMessage(reason);
           onEvidenceChange({
             file,
