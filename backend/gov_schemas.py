@@ -4,8 +4,8 @@ City Engineering Office, Caloocan City — PULSO System
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime
+from typing import Optional, List, Dict, Any
+from datetime import datetime, date
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -609,3 +609,369 @@ class AdvisoryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Physical Infrastructure Asset Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AssetBase(BaseModel):
+    asset_name: str
+    category: str  # Roads, Drainage, Bridges, Public Buildings, Facilities
+    gps_coordinates: Optional[Dict[str, Any]] = None
+    material_type: Optional[str] = None
+    date_completed: Optional[date] = None
+    design_life: int = 20
+    original_contractor: Optional[str] = None
+    barangay: Optional[str] = None
+    barangay_id: Optional[int] = None
+    condition_score: Optional[float] = 100.0
+    status: Optional[str] = "operational"
+
+
+class AssetCreate(AssetBase):
+    asset_id: Optional[str] = None
+
+
+class AssetUpdate(BaseModel):
+    asset_name: Optional[str] = None
+    category: Optional[str] = None
+    gps_coordinates: Optional[Dict[str, Any]] = None
+    material_type: Optional[str] = None
+    design_life: Optional[int] = None
+    original_contractor: Optional[str] = None
+    barangay_id: Optional[int] = None
+    barangay: Optional[str] = None
+    condition_score: Optional[float] = None
+    status: Optional[str] = None
+
+
+class AssetMaintenanceLogResponse(BaseModel):
+    log_id: str
+    asset_id: str
+    work_type: str
+    cost: Optional[float] = None
+    completion_date: date
+
+    class Config:
+        from_attributes = True
+
+
+class AssetResponse(AssetBase):
+    asset_id: str
+    barangay_name: Optional[str] = None
+    district_code: Optional[str] = None
+    condition_tier: str  # "good", "fair", "poor", "critical"
+    active_work_orders_count: int = 0
+    last_maintenance_date: Optional[date] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AssetDetailResponse(AssetResponse):
+    deterioration_velocity: float = 0.0
+    flood_risk_level: Optional[str] = "Low"
+    soil_subsidence: Optional[float] = 0.0
+    maintenance_history: List[AssetMaintenanceLogResponse] = []
+    active_work_orders: List[Dict[str, Any]] = []
+    linked_projects: List[Dict[str, Any]] = []
+
+
+class CategoryConditionBreakdown(BaseModel):
+    good: int = 0
+    fair: int = 0
+    poor: int = 0
+    critical: int = 0
+
+
+class CategoryStats(BaseModel):
+    category_name: str
+    total_count: int
+    avg_condition_score: float
+    condition_breakdown: CategoryConditionBreakdown
+    active_work_orders: int
+
+
+class AssetStatsResponse(BaseModel):
+    total_assets: int
+    overall_avg_condition: float
+    total_critical_assets: int
+    total_active_work_orders: int
+    categories: Dict[str, CategoryStats]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Work Order Blockers & Inspections Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class WorkOrderBlockRequest(BaseModel):
+    reason_code: str  # weather, utility, permit, materials, security, access, other
+    delay_days: float = Field(default=1.0, ge=0.1)
+    notes: Optional[str] = None
+
+
+class WorkOrderUnblockRequest(BaseModel):
+    resolution_notes: Optional[str] = None
+    next_status: Optional[str] = "in_progress"
+
+
+class WorkOrderBlockerResponse(BaseModel):
+    id: int
+    work_order_id: int
+    reason_code: str
+    delay_days: float
+    notes: Optional[str] = None
+    blocked_by_id: Optional[int] = None
+    blocked_by_name: Optional[str] = None
+    is_resolved: bool
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+    resolved_by_id: Optional[int] = None
+    resolved_by_name: Optional[str] = None
+    resolution_notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WorkOrderVerifyRequest(BaseModel):
+    inspection_date: Optional[datetime] = None
+    checklist_results: Optional[Dict[str, Any]] = None
+    passed: bool
+    notes: Optional[str] = None
+    evidence_photo_url: Optional[str] = None
+
+
+class WorkOrderInspectionResponse(BaseModel):
+    id: int
+    work_order_id: int
+    inspector_id: int
+    inspector_name: Optional[str] = None
+    inspection_date: datetime
+    checklist_results: Optional[Dict[str, Any]] = None
+    passed: bool
+    notes: Optional[str] = None
+    evidence_photo_url: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Citizen Report Request Information
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ReportRequestInfo(BaseModel):
+    reason: str = Field(..., description="Short classification: Unclear photo, Access permission, Landmark verification")
+    message: str = Field(..., description="Actionable explanation shown to citizen")
+
+
+class ReportRequestInfoResponse(BaseModel):
+    status: str
+    report_id: int
+    ticket_id: str
+    new_status: str
+    timeline_id: int
+    message: str
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Today Operations Hub
+# ─────────────────────────────────────────────────────────────────────────────
+
+class OperationsLeadershipMetrics(BaseModel):
+    unassigned_concerns: int
+    overdue_actions: int
+    awaiting_verification: int
+    open_high_priority: int
+    resolved_in_period: int
+
+
+class OperationsTriageItem(BaseModel):
+    id: int
+    entity_type: str  # "report" | "work_order"
+    ticket_id: str
+    title: str
+    category: str
+    priority: str
+    status: str
+    barangay: Optional[str] = None
+    time_in_state: str
+    action_url: str
+    recommended_action: str
+
+
+class SectorMetric(BaseModel):
+    open_tickets: int
+    critical_count: int
+    resolved_7d: int
+    active_work_orders: int
+
+
+class SectorSummary(BaseModel):
+    north_caloocan: SectorMetric
+    south_caloocan: SectorMetric
+
+
+class TeamCapacityItem(BaseModel):
+    team_id: str
+    team_name: str
+    category: str
+    active_orders: int
+    blocked_orders: int
+    personnel_count: int
+    capacity_pct: float
+
+
+class GovOperationsTodayResponse(BaseModel):
+    timestamp: datetime
+    metrics: OperationsLeadershipMetrics
+    needs_attention: List[OperationsTriageItem]
+    sector_summary: SectorSummary
+    team_capacity: List[TeamCapacityItem]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Governed Announcements & Public Notices
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AnnouncementBase(BaseModel):
+    title_en: str = Field(..., min_length=3, max_length=255, description="English announcement headline")
+    title_fil: Optional[str] = Field(None, max_length=255, description="Filipino headline translation")
+    content_en: str = Field(..., min_length=10, description="Full English announcement text")
+    content_fil: Optional[str] = Field(None, description="Full Filipino announcement text")
+    category: str = Field("general_notice", description="Category: planned_works, service_interruption, progress_update, work_completed, general_notice, advisory")
+    priority: str = Field("normal", description="Priority: normal, urgent, emergency")
+    target_audience: str = Field("public", description="Audience: public, district, barangay, staff")
+    target_districts: Optional[List[str]] = Field(default_factory=list, description="Target districts")
+    target_barangays: Optional[List[str]] = Field(default_factory=list, description="Target barangays")
+    district_id: Optional[int] = Field(None, description="District lookup ID")
+    barangay_id: Optional[int] = Field(None, description="Barangay lookup ID")
+    channels: List[str] = Field(default=["web"], description="Target channels: web, sms, email")
+    scheduled_at: Optional[datetime] = Field(None, description="Scheduled release timestamp")
+    expires_at: Optional[datetime] = Field(None, description="Expiration timestamp")
+    source_report_id: Optional[int] = Field(None, description="Originating citizen report ID")
+    source_work_order_id: Optional[int] = Field(None, description="Originating work order ID")
+    source_project_id: Optional[int] = Field(None, description="Originating project ID")
+    source_asset_id: Optional[str] = Field(None, description="Originating asset ID")
+    image_url: Optional[str] = Field(None, description="Cover visual URL")
+
+
+class AnnouncementCreate(AnnouncementBase):
+    pass
+
+
+class AnnouncementUpdate(BaseModel):
+    title_en: Optional[str] = Field(None, min_length=3, max_length=255)
+    title_fil: Optional[str] = Field(None, max_length=255)
+    content_en: Optional[str] = Field(None, min_length=10)
+    content_fil: Optional[str] = None
+    category: Optional[str] = None
+    priority: Optional[str] = None
+    target_audience: Optional[str] = None
+    target_districts: Optional[List[str]] = None
+    target_barangays: Optional[List[str]] = None
+    district_id: Optional[int] = None
+    barangay_id: Optional[int] = None
+    channels: Optional[List[str]] = None
+    scheduled_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    source_report_id: Optional[int] = None
+    source_work_order_id: Optional[int] = None
+    source_project_id: Optional[int] = None
+    source_asset_id: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+class AnnouncementStatusUpdate(BaseModel):
+    status: str = Field(..., description="Target status: draft, in_review, approved, scheduled, published, expired, withdrawn")
+    scheduled_at: Optional[datetime] = Field(None, description="Mandatory when status transitions to 'scheduled'")
+    withdrawal_reason: Optional[str] = Field(None, description="Mandatory when status transitions to 'withdrawn'")
+    notes: Optional[str] = Field(None, description="Optional transition notes")
+
+
+class AnnouncementCorrectionCreate(BaseModel):
+    correction_summary: str = Field(..., min_length=5, description="Publicly visible summary of correction")
+    reason: str = Field(..., min_length=5, description="Operational reason")
+    updated_title_en: Optional[str] = None
+    updated_title_fil: Optional[str] = None
+    updated_content_en: Optional[str] = None
+    updated_content_fil: Optional[str] = None
+
+
+class AnnouncementCorrectionResponse(BaseModel):
+    id: int
+    announcement_id: int
+    editor_id: int
+    editor_name: Optional[str] = None
+    correction_summary: str
+    reason: str
+    previous_content: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AnnouncementDeliveryResponse(BaseModel):
+    id: int
+    announcement_id: int
+    channel: str
+    status: str
+    recipient_count: int
+    delivered_count: int
+    failed_count: int
+    error_message: Optional[str] = None
+    last_attempted_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AnnouncementResponse(AnnouncementBase):
+    id: int
+    announcement_id: str
+    status: str
+    author_id: int
+    author_name: Optional[str] = None
+    reviewer_id: Optional[int] = None
+    reviewer_name: Optional[str] = None
+    approved_by_id: Optional[int] = None
+    approved_by_name: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
+    withdrawal_reason: Optional[str] = None
+    withdrawn_at: Optional[datetime] = None
+    withdrawn_by_id: Optional[int] = None
+    withdrawn_by_name: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    has_corrections: bool = False
+    corrections_count: int = 0
+    corrections: List[AnnouncementCorrectionResponse] = []
+    deliveries: List[AnnouncementDeliveryResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class AnnouncementListResponse(BaseModel):
+    items: List[AnnouncementResponse]
+    total: int
+    page: int
+    limit: int
+    pages: int
+
+
+class AnnouncementDeliveryStatsResponse(BaseModel):
+    announcement_id: int
+    announcement_title: str
+    deliveries: List[AnnouncementDeliveryResponse]
+    summary: Dict[str, Any]
+

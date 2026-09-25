@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import CitizenReportsPage from './CitizenReportsPage';
+import GovReportsDashboard from './GovReportsDashboard';
 import DispatcherDashboard from './DispatcherDashboard';
 import GovAnalyticsPage from './GovAnalyticsPage';
 import AdministrationWorkspacePage from './AdministrationWorkspacePage';
@@ -18,7 +18,7 @@ import {
 const VIEW_COMPONENTS = {
     operations: {
         dispatch: DispatcherDashboard,
-        reports: CitizenReportsPage,
+        reports: GovReportsDashboard,
         'work-orders': WorkOrdersPage,
         closed: () => <GovDivisionPage workspace="operations" activePathOverride="/gov/reports-archive" />,
         updates: () => <GovDivisionPage workspace="operations" activePathOverride="/gov/advisories" />,

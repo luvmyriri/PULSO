@@ -30,10 +30,11 @@ export default function GovLanding() {
     const [recoveryEmail, setRecoveryEmail] = useState('');
     const [captchaToken, setCaptchaToken] = useState(null);
     const recaptchaRef = useRef(null);
+    const passwordInputRef = useRef(null);
     const [activeModal, setActiveModal] = useState(null); // 'directives' | 'resources' | null
 
     const handleLogin = async (e) => {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         if (!captchaPaused && !captchaToken) {
             setError('Please complete the security puzzle to proceed.');
             return;
@@ -43,7 +44,7 @@ export default function GovLanding() {
                 const formData = new URLSearchParams();
                 formData.append('username', email);
                 formData.append('password', password);
-                if (!captchaPaused) formData.append('captcha_token', captchaToken || '');
+                formData.append('captcha_token', captchaToken || (captchaPaused ? 'dev_bypass' : ''));
 
                 const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
                     method: 'POST',
@@ -170,7 +171,7 @@ export default function GovLanding() {
                     <ThemeToggle />
                     <Link
                         to="/login"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
                         title="Return to Citizen Portal"
                     >
                         <Home size={14} className="text-[#ff6b00]" />
@@ -304,6 +305,14 @@ export default function GovLanding() {
                                                             type="text"
                                                             value={email}
                                                             onChange={(e) => setEmail(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    if (!password) {
+                                                                        e.preventDefault();
+                                                                        passwordInputRef.current?.focus();
+                                                                    }
+                                                                }
+                                                            }}
                                                             className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-3.5 py-3 transition-all"
                                                             placeholder="e.g. city.engineer@caloocan.gov.ph"
                                                             required
@@ -331,9 +340,16 @@ export default function GovLanding() {
                                                             <Lock size={16} />
                                                         </div>
                                                         <input
+                                                            ref={passwordInputRef}
                                                             type={showPassword ? 'text' : 'password'}
                                                             value={password}
                                                             onChange={(e) => setPassword(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    handleLogin(e);
+                                                                }
+                                                            }}
                                                             className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-10 py-3 transition-all"
                                                             placeholder="Enter password"
                                                             required

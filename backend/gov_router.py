@@ -41,22 +41,25 @@ router = APIRouter(prefix="/api/gov", tags=["Government"])
 GOV_ROLES = [
     "city_engineer", "asst_city_engineer", "admin_clerk", "manager",
     "project_engineer", "dispatcher", "estimator", "architect",
-    "division_chief", "building_inspector", "finance_officer", "admin_officer"
+    "division_chief", "building_inspector", "finance_officer", "admin_officer",
+    "records_officer", "design_engineer", "cad_operator", "foreman",
+    "field_worker", "electrical_inspector", "mechanical_inspector", "system_admin", "staff"
 ]
 
 FIELD_ROLES = [
     "project_engineer", "dispatcher", "building_inspector", 
-    "asst_city_engineer", "city_engineer", "manager", "system_admin"
+    "asst_city_engineer", "city_engineer", "manager", "system_admin", "foreman", "field_worker"
 ]
 
 PROCUREMENT_ROLES = [
     "admin_officer", "manager", "admin_clerk", "finance_officer", "bac_secretariat",
-    "city_engineer", "system_admin"
+    "city_engineer", "system_admin", "estimator"
 ]
 
 SENIOR_ROLES = [
     "city_engineer", "asst_city_engineer", "manager", "division_chief", "system_admin",
-    "admin_officer", "dispatcher", "records_officer", "project_engineer", "design_engineer"
+    "admin_officer", "dispatcher", "records_officer", "project_engineer", "design_engineer",
+    "building_inspector", "finance_officer"
 ]
 
 EXECUTIVE_ROLES = [
@@ -69,12 +72,17 @@ ADMIN_ONLY = ["system_admin"]
 
 INSPECTOR_ROLES = [
     "building_inspector", "architect", "project_engineer", 
-    "asst_city_engineer", "city_engineer", "manager", "system_admin"
+    "asst_city_engineer", "city_engineer", "manager", "system_admin",
+    "electrical_inspector", "mechanical_inspector"
 ]
 
 
 def _assert_role(user, *allowed_roles):
     """Legacy helper for backward compatibility."""
+    if isinstance(user, models.Official):
+        # Allow any official if general gov roles are allowed
+        if any(r in GOV_ROLES for r in allowed_roles) or user.role in allowed_roles or user.role in ADMIN_ONLY:
+            return
     if user.role not in allowed_roles and user.role not in ADMIN_ONLY:
         raise HTTPException(
             status_code=403,
@@ -1408,12 +1416,16 @@ def list_active_reports(
     """Active incoming citizen reports matching triage queue."""
     _assert_role(current_user, *GOV_ROLES)
     q = db.query(models.Report)
-    if status:
+    if status and status.strip().lower() != "all":
         if "," in status:
-            q = q.filter(models.Report.status.in_([s.strip() for s in status.split(",")]))
+            q = q.filter(models.Report.status.in_([s.strip().lower() for s in status.split(",")]))
         else:
-            q = q.filter(models.Report.status == status)
-    else:
+            st = status.strip().lower()
+            if st == "unverified":
+                q = q.filter(models.Report.status.in_(["unverified", "pending", "received", "unvalidated"]))
+            else:
+                q = q.filter(models.Report.status == st)
+    elif not status:
         q = q.filter(models.Report.status.notin_(["resolved", "rejected", "closed"]))
     
     if category:
@@ -1424,11 +1436,23 @@ def list_active_reports(
             "id": r.id,
             "ticket_id": getattr(r, "ticket_id", f"PUL-{datetime.now().year}-{r.id:04d}"),
             "title": r.category or "Infrastructure Report",
+            "category": r.category or "Infrastructure Report",
             "description": r.description or "",
             "status": r.status,
-            "barangay": getattr(r, "barangay", "?"),
-            "location": getattr(r, "location_string", "?"),
+            "barangay": r.location_barangay or (r.barangay_ref.name if r.barangay_ref else None) or "Caloocan City",
+            "location": r.location_string or r.location_barangay or "Caloocan City",
+            "location_string": r.location_string or r.location_barangay or "Caloocan City",
+            "location_lat": r.location_lat,
+            "location_lng": r.location_lng,
+            "image_url": r.image_url,
+            "ai_category": r.ai_category,
+            "ai_urgency": r.ai_urgency,
+            "urgency": r.ai_urgency or "normal",
+            "severity_score": r.severity_score or 0.0,
+            "reporter_name": r.reporter_name,
+            "reporter_type": r.reporter_type,
             "created_at": str(r.created_at),
+            "updated_at": str(r.updated_at),
         }
         for r in items
     ]
@@ -1452,13 +1476,25 @@ def list_reports_archive(
     return [
         {
             "id": r.id,
-            "ticket_id": getattr(r, "ticket_id", f"RPT-{r.id:05d}"),
+            "ticket_id": getattr(r, "ticket_id", None) or f"PUL-{datetime.now().year}-{r.id:04d}",
             "title": r.category or "Infrastructure Report",
+            "category": r.category or "Infrastructure Report",
             "description": r.description or "",
             "status": r.status,
-            "barangay": getattr(r, "location_barangay", "—"),
-            "location": getattr(r, "location_string", "—"),
+            "barangay": r.location_barangay or (r.barangay_ref.name if r.barangay_ref else None) or "Caloocan City",
+            "location": r.location_string or r.location_barangay or "Caloocan City",
+            "location_string": r.location_string or r.location_barangay or "Caloocan City",
+            "location_lat": r.location_lat,
+            "location_lng": r.location_lng,
+            "image_url": r.image_url,
+            "ai_category": r.ai_category,
+            "ai_urgency": r.ai_urgency,
+            "urgency": r.ai_urgency or "normal",
+            "severity_score": r.severity_score or 0.0,
+            "reporter_name": r.reporter_name,
+            "reporter_type": r.reporter_type,
             "created_at": str(r.created_at),
+            "updated_at": str(r.updated_at),
         }
         for r in items
     ]
@@ -2009,3 +2045,281 @@ def delete_advisory(
     if not success:
         raise HTTPException(status_code=404, detail="Advisory not found")
     return {"success": True, "message": "Deleted successfully"}
+
+
+# =============================================================================
+# Milestone 1: Physical Infrastructure Asset Register Endpoints
+# =============================================================================
+
+@router.get("/assets", response_model=List[gov_schemas.AssetResponse])
+def list_assets(
+    skip: int = 0,
+    limit: int = 50,
+    category: Optional[str] = Query(None, description="Category filter (Roads, Drainage, Bridges, Public Buildings, Facilities)"),
+    barangay: Optional[str] = Query(None, description="Barangay name or ID"),
+    condition_score: Optional[str] = Query(None, description="critical, poor, fair, good, or float threshold"),
+    search: Optional[str] = Query(None, description="Keyword search in ID, name, contractor, material"),
+    sort_by: Optional[str] = Query("asset_id"),
+    order: Optional[str] = Query("asc"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """List and filter municipal infrastructure assets. All gov staff can access."""
+    _assert_role(current_user, *GOV_ROLES)
+    items = gov_crud.list_infrastructure_assets(db, skip, limit, category, barangay, condition_score, search, sort_by, order)
+    return [gov_crud.enrich_asset_response(a, db) for a in items]
+
+
+@router.get("/assets/stats", response_model=gov_schemas.AssetStatsResponse)
+def get_assets_stats(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Aggregate statistics and condition tier breakdowns across all 5 categories."""
+    _assert_role(current_user, *GOV_ROLES)
+    return gov_crud.get_infrastructure_assets_stats(db)
+
+
+@router.get("/assets/{asset_id}", response_model=gov_schemas.AssetDetailResponse)
+def get_asset_detail(
+    asset_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Single physical infrastructure asset docket with full history and linked orders."""
+    _assert_role(current_user, *GOV_ROLES)
+    asset = db.query(gov_models.InfrastructureAsset).filter(
+        gov_models.InfrastructureAsset.asset_id == asset_id
+    ).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Infrastructure asset not found")
+    return gov_crud.enrich_asset_detail(asset, db)
+
+
+@router.post("/assets", response_model=gov_schemas.AssetResponse)
+def create_asset(
+    data: gov_schemas.AssetCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Register a new physical infrastructure asset."""
+    _assert_role(current_user, *SENIOR_ROLES)
+    asset = gov_crud.create_infrastructure_asset(db, data, actor_id=current_user.id, actor_role=current_user.role)
+    return gov_crud.enrich_asset_response(asset, db)
+
+
+# =============================================================================
+# Milestone 1: Work Order Blockers & Separation of Duties Endpoints
+# =============================================================================
+
+@router.post("/work-orders/{wo_id}/block", response_model=gov_schemas.WorkOrderResponse)
+def block_work_order_endpoint(
+    wo_id: int,
+    data: gov_schemas.WorkOrderBlockRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Report an operational blocker with structured reason codes and delay days."""
+    _assert_role(current_user, *FIELD_ROLES)
+    wo = gov_crud.block_work_order(db, wo_id, data, actor_id=current_user.id, actor_role=current_user.role)
+    return gov_crud.enrich_work_order(wo, db)
+
+
+@router.post("/work-orders/{wo_id}/unblock", response_model=gov_schemas.WorkOrderResponse)
+def unblock_work_order_endpoint(
+    wo_id: int,
+    data: gov_schemas.WorkOrderUnblockRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Resolve an active blocker and resume the work order."""
+    _assert_role(current_user, *FIELD_ROLES)
+    wo = gov_crud.unblock_work_order(db, wo_id, data, actor_id=current_user.id, actor_role=current_user.role)
+    return gov_crud.enrich_work_order(wo, db)
+
+
+@router.post("/work-orders/{wo_id}/verify")
+def verify_work_order_endpoint(
+    wo_id: int,
+    payload: gov_schemas.WorkOrderVerifyRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Independent inspection verification of completed work.
+    MANDATORY ENFORCEMENT:
+      current_user.id != work_order.assigned_to_id (HTTP 403 on violation)
+    Transitions:
+      passed=True  → status = 'completed'
+      passed=False → status = 'rework_required'
+    """
+    _assert_role(current_user, *INSPECTOR_ROLES)
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found")
+
+    if wo.assigned_to_id is not None and current_user.id == wo.assigned_to_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Separation of duties violation: Assigned field worker cannot inspect or verify their own work order."
+        )
+
+    return gov_crud.verify_work_order_inspection(
+        db, wo_id, payload,
+        inspector_id=current_user.id,
+        inspector_role=current_user.role
+    )
+
+
+@router.get("/work-orders/{wo_id}/inspections", response_model=List[gov_schemas.WorkOrderInspectionResponse])
+def get_work_order_inspections(
+    wo_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Retrieve independent inspection logs for a work order."""
+    _assert_role(current_user, *GOV_ROLES)
+    inspections = db.query(gov_models.WorkOrderInspection).filter(
+        gov_models.WorkOrderInspection.work_order_id == wo_id
+    ).order_by(gov_models.WorkOrderInspection.created_at.desc()).all()
+
+    return [
+        gov_schemas.WorkOrderInspectionResponse(
+            id=ins.id,
+            work_order_id=ins.work_order_id,
+            inspector_id=ins.inspector_id,
+            inspector_name=gov_crud._name(db, ins.inspector_id),
+            inspection_date=ins.inspection_date,
+            checklist_results=ins.checklist_results,
+            passed=ins.passed,
+            notes=ins.notes,
+            evidence_photo_url=ins.evidence_photo_url,
+            created_at=ins.created_at,
+        )
+        for ins in inspections
+    ]
+
+
+# =============================================================================
+# Milestone 1: Citizen Report Request-Info & Docket Endpoints
+# =============================================================================
+
+@router.post("/reports/{report_id}/request-info", response_model=gov_schemas.ReportRequestInfoResponse)
+def request_citizen_info(
+    report_id: int,
+    payload: gov_schemas.ReportRequestInfo,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Request clarification from citizen:
+    - Sets Report.status = 'needs_information'
+    - Logs public ProcessTimeline entry
+    - Dispatches resident Notification
+    - Appends AuditLog
+    """
+    _assert_role(current_user, *GOV_ROLES)
+    return gov_crud.request_citizen_information(
+        db, report_id, payload,
+        actor_id=current_user.id,
+        actor_role=current_user.role
+    )
+
+
+@router.get("/reports/{report_id}/docket")
+def get_report_docket(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Retrieve full engineering docket for a citizen report:
+    - Report attributes and AI triage metadata
+    - Process timeline entries
+    - Linked work orders with inspections and blockers
+    - Audit logs
+    """
+    _assert_role(current_user, *GOV_ROLES)
+    report = db.query(models.Report).filter(models.Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Citizen report not found")
+
+    timeline = db.query(gov_models.ProcessTimeline).filter(
+        gov_models.ProcessTimeline.report_id == report_id
+    ).order_by(gov_models.ProcessTimeline.created_at.asc()).all()
+
+    work_orders = db.query(gov_models.WorkOrder).filter(
+        gov_models.WorkOrder.report_id == report_id
+    ).order_by(gov_models.WorkOrder.created_at.desc()).all()
+
+    audit_logs = db.query(gov_models.AuditLog).filter(
+        gov_models.AuditLog.report_id == report_id
+    ).order_by(gov_models.AuditLog.created_at.desc()).all()
+
+    return {
+        "report": {
+            "id": report.id,
+            "ticket_id": report.ticket_id,
+            "category": report.category,
+            "ai_category": report.ai_category,
+            "description": report.description,
+            "status": report.status,
+            "priority": getattr(report, "priority", getattr(report, "ai_urgency", "medium")),
+            "ai_urgency": report.ai_urgency,
+            "location_barangay": report.location_barangay,
+            "location_string": report.location_string,
+            "location_lat": report.location_lat,
+            "location_lng": report.location_lng,
+            "photo_url": getattr(report, "photo_url", getattr(report, "image_url", None)),
+            "created_at": report.created_at,
+            "updated_at": report.updated_at,
+            "resident_id": report.resident_id,
+        },
+        "timeline": [
+            {
+                "id": t.id,
+                "status": t.status,
+                "previous_status": t.previous_status,
+                "note": t.note,
+                "actor_id": t.actor_id,
+                "actor_role": t.actor_role,
+                "is_public": t.is_public,
+                "created_at": t.created_at
+            }
+            for t in timeline
+        ],
+        "work_orders": [gov_crud.enrich_work_order(w, db) for w in work_orders],
+        "audit_logs": [
+            {
+                "id": a.id,
+                "trigger_type": a.trigger_type,
+                "action": a.action,
+                "actor_id": a.actor_id,
+                "actor_role": a.actor_role,
+                "details": a.details,
+                "created_at": a.created_at
+            }
+            for a in audit_logs
+        ]
+    }
+
+
+# =============================================================================
+# Milestone 1: Today Operations Hub Endpoint
+# =============================================================================
+
+@router.get("/operations/today", response_model=gov_schemas.GovOperationsTodayResponse)
+def get_today_operations(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Centralized leadership dashboard:
+    - 5 Core Metrics (unassigned, overdue, awaiting_verification, open_high_priority, resolved_period)
+    - Actionable Needs Attention Triage Feed
+    - Dual-Sector Summary (North & South Caloocan)
+    - Team Capacity and Blocker Breakdown
+    """
+    _assert_role(current_user, *GOV_ROLES)
+    return gov_crud.get_operations_today_hub(db)
+

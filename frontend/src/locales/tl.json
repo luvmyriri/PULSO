@@ -732,8 +732,8 @@
         "s1_desc": "Nangongolekta ang PULSO ng data na may kinalaman sa pag-uulat ng imprastraktura, kabilang ang eksaktong GPS coordinates, ebidensyang litrato, at impormasyon ng residente para sa beripikasyon."
       },
       "terms": {
-        "s1_title": "1. Sugnay sa Integridad",
-        "s1_desc": "May pananagutan ang mga residente sa katumpakan ng kanilang mga ulat. Ang maling pag-uulat ay magreresulta sa agarang pagbawas ng Trust Score at posibleng limitasyon sa serbisyo."
+        "s1_title": "1. Tapat na Pag-uulat",
+        "s1_desc": "May pananagutan ang mga residente sa katumpakan ng kanilang mga ulat. Ang pagsusumite ng maling ulat ay maaaring magresulta sa limitasyon o suspensyon ng account."
       },
       "topNav": {
         "searchPlaceholder": "Maghanap sa PULSO...",

@@ -24,8 +24,11 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import OrangeSelect from '../OrangeSelect';
+import GovBreadcrumb from '../GovBreadcrumb';
 import ThemeToggle from '../ThemeToggle';
 import GovSidebar from '../GovSidebar';
+import GovUserDropdown from '../GovUserDropdown';
+import GovNotificationDropdown from '../GovNotificationDropdown';
 import { API_BASE_URL } from '../../utils/apiBase';
 
 const API_BASE = API_BASE_URL;
@@ -509,21 +512,22 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                 {/* ─────────────────────────────────────────────────────────────
                     1. TOP NAVIGATION HEADER
                 ────────────────────────────────────────────────────────────── */}
-                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-6 sm:px-8 shrink-0 border-b border-slate-200 dark:border-slate-800 z-40 transition-colors">
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-6 sm:px-8 shrink-0 border-b border-slate-200 dark:border-slate-800 relative z-50 transition-colors">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-[#ff6b00] flex items-center justify-center shrink-0">
                             <Map size={18} />
                         </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h1 className="font-heading font-black text-base text-slate-900 dark:text-white leading-tight">
+                        <div className="flex flex-col text-left">
+                            <GovBreadcrumb category="Infrastructure" current="LGU Infrastructure Projects" />
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <h1 className="font-heading font-black text-base sm:text-lg text-slate-900 dark:text-white leading-tight">
                                     LGU Infrastructure Projects
                                 </h1>
                                 <span className="px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] font-mono-data text-[10px] font-bold">
                                     6-Phase Lifecycle
                                 </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block mt-0.5">
                                 Monitor all 6-phase infrastructure projects from request to certified completion.
                             </p>
                         </div>
@@ -552,6 +556,9 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                             <Plus size={15} strokeWidth={3} />
                             <span>+ New Project</span>
                         </button>
+
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 

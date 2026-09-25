@@ -352,7 +352,19 @@ export default function ReportWizardPage() {
             <Step3EvidenceUpload 
               evidenceData={formData.evidence}
               category={formData.category}
-              onEvidenceChange={(ev) => setFormData(p => ({ ...p, evidence: ev }))}
+              onEvidenceChange={(ev) => {
+                setFormData(p => {
+                  const updated = { ...p, evidence: ev };
+                  if (ev.autoDescription && !p.details.description) {
+                    updated.details = {
+                      ...p.details,
+                      description: ev.autoDescription,
+                      urgency: ev.urgency || p.details.urgency || 'medium',
+                    };
+                  }
+                  return updated;
+                });
+              }}
               onBack={goToPreviousStep}
               onContinue={goToNextStep}
             />
@@ -363,6 +375,7 @@ export default function ReportWizardPage() {
               detailsData={formData.details}
               locationData={formData.location}
               category={formData.category}
+              evidenceData={formData.evidence}
               onDetailsChange={(det) => setFormData(p => ({ ...p, details: det }))}
               onBack={goToPreviousStep}
               onContinue={goToNextStep}

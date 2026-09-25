@@ -91,35 +91,46 @@
 }
 
 .work-orders-tab.is-active {
-    color: var(--gov-action, #0b4f6c);
-    border-bottom-color: var(--gov-action, #0b4f6c);
+    color: #ff6b00;
+    border-bottom-color: #ff6b00;
+    font-weight: 700;
 }
 
 .work-orders-tab-count {
     background: var(--gov-surface-subtle, #f8faf9);
-    padding: 1px 6px;
-    border-radius: 10px;
+    padding: 1px 7px;
+    border-radius: 9999px;
     font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-weight: 700;
     border: 1px solid var(--gov-rule, #c9d4d9);
+}
+
+.work-orders-tab.is-active .work-orders-tab-count {
+    background: #ffefe5;
+    color: #ff6b00;
+    border-color: rgba(255, 107, 0, 0.3);
 }
 
 .work-orders-create-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 14px;
+    padding: 7px 16px;
     font-size: 12px;
-    font-weight: 600;
-    color: var(--gov-surface, #ffffff);
-    background: var(--gov-action, #0b4f6c);
-    border: 1px solid var(--gov-action, #0b4f6c);
-    border-radius: 6px;
+    font-weight: 700;
+    color: #ffffff;
+    background: #ff6b00;
+    border: 1px solid #ff6b00;
+    border-radius: 12px;
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(255, 107, 0, 0.2);
 }
 
 .work-orders-create-btn:hover {
-    background: var(--gov-action-strong, #083e55);
+    background: #e65c00;
+    border-color: #e65c00;
 }
 
 /* Content Area */

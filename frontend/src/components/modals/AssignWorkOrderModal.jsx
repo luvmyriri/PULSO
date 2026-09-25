@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle, CheckCircle, ShieldAlert, Truck, X } from 'lucide-react';
+import { formatTicketId } from '../../utils/reportWorkflow';
 import './modal-dialogs.css';
 
 const ELIGIBLE_TEAMS = [
@@ -11,15 +12,17 @@ const ELIGIBLE_TEAMS = [
 ];
 
 export default function AssignWorkOrderModal({ isOpen, onClose, report, onSubmit }) {
+    const [directTitle, setDirectTitle] = useState('');
+    const [directLocation, setDirectLocation] = useState('North Caloocan');
     const [team, setTeam] = useState('field_ops_a');
     const [priority, setPriority] = useState('normal');
     const [reason, setReason] = useState('Public safety & city maintenance repair');
     const [notifyOwner, setNotifyOwner] = useState(true);
     const [submitting, setSubmitting] = useState(false);
 
-    if (!isOpen || !report) return null;
+    if (!isOpen) return null;
 
-    const reportIdentifier = report.ticket_id || `RPT-${String(report.id).padStart(5, '0')}`;
+    const reportIdentifier = report ? formatTicketId(report.ticket_id, report.id, true) : null;
     const selectedTeamObj = ELIGIBLE_TEAMS.find((t) => t.id === team) || ELIGIBLE_TEAMS[0];
 
     const handleSubmit = async (e) => {
@@ -27,14 +30,17 @@ export default function AssignWorkOrderModal({ isOpen, onClose, report, onSubmit
         setSubmitting(true);
         try {
             await onSubmit({
-                reportId: report.id,
+                reportId: report?.id || null,
                 team: selectedTeamObj.name,
                 lead: selectedTeamObj.lead,
                 priority,
                 reason,
                 notifyOwner,
-                location: report.address || `Brgy. ${report.barangay || 'North Caloocan'}`,
-                title: `Work Order for ${reportIdentifier}: ${report.issue_category || report.title || 'City Maintenance'}`,
+                location: report ? (report.address || `Brgy. ${report.barangay || 'North Caloocan'}`) : directLocation,
+                title: report
+                    ? `Work Order for ${reportIdentifier}: ${report.issue_category || report.title || 'City Maintenance'}`
+                    : (directTitle || 'Civil engineering maintenance order'),
+                description: reason,
             });
             onClose();
         } catch (err) {
@@ -50,7 +56,7 @@ export default function AssignWorkOrderModal({ isOpen, onClose, report, onSubmit
                 <div className="gov-sheet-header">
                     <div className="gov-sheet-title-row">
                         <Truck size={18} className="gov-modal-icon-blue" />
-                        <h3 id="assign-wo-title">Assign work order</h3>
+                        <h3 id="assign-wo-title">{report ? 'Assign work order' : 'Create new work order'}</h3>
                     </div>
                     <button type="button" className="gov-modal-close" onClick={onClose} aria-label="Close sheet">
                         <X size={18} />
@@ -58,12 +64,40 @@ export default function AssignWorkOrderModal({ isOpen, onClose, report, onSubmit
                 </div>
 
                 <form onSubmit={handleSubmit} className="gov-sheet-form">
-                    <div className="gov-sheet-field-group">
-                        <label className="gov-modal-label">Source report</label>
-                        <div className="gov-modal-read-box">
-                            <strong>{reportIdentifier}</strong> — {report.issue_category || report.title || 'Reported city issue'}
+                    {report ? (
+                        <div className="gov-sheet-field-group">
+                            <label className="gov-modal-label">Source report</label>
+                            <div className="gov-modal-read-box">
+                                <strong>{reportIdentifier}</strong> — {report.issue_category || report.title || 'Reported city issue'}
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <>
+                            <div className="gov-sheet-field-group">
+                                <label htmlFor="assign-wo-name" className="gov-modal-label">Work Order Title (required)</label>
+                                <input
+                                    id="assign-wo-name"
+                                    type="text"
+                                    className="gov-modal-input"
+                                    value={directTitle}
+                                    onChange={(e) => setDirectTitle(e.target.value)}
+                                    placeholder="e.g., Road repair and asphalt repatching"
+                                    required
+                                />
+                            </div>
+                            <div className="gov-sheet-field-group">
+                                <label htmlFor="assign-wo-loc" className="gov-modal-label">Location / Barangay</label>
+                                <input
+                                    id="assign-wo-loc"
+                                    type="text"
+                                    className="gov-modal-input"
+                                    value={directLocation}
+                                    onChange={(e) => setDirectLocation(e.target.value)}
+                                    placeholder="e.g., Barangay 178, Camarin Road"
+                                />
+                            </div>
+                        </>
+                    )}
 
                     <div className="gov-sheet-field-group">
                         <label htmlFor="assign-team" className="gov-modal-label">Eligible team (required)</label>

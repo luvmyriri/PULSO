@@ -17,7 +17,10 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import OboScheduleModal from '../components/modals/OboScheduleModal';
 import OboFindingsModal from '../components/modals/OboFindingsModal';
 import OboTechnicalReviewModal from '../components/modals/OboTechnicalReviewModal';
@@ -504,8 +507,9 @@ export default function OboInspectionsPage() {
         <div className="obo-page">
             <GovSidebar currentUser={currentUser} />
             <div className="obo-shell">
-                <header className="obo-topbar">
-                    <div>
+                <header className="obo-topbar relative z-50">
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb category="Regulatory & OBO" current="Building Inspections & Permits" />
                         <h1>Office of the Building Official (OBO)</h1>
                         <p>Building safety inspections, PD 1096 discipline evaluations, code compliance, and permits.</p>
                     </div>
@@ -523,9 +527,12 @@ export default function OboInspectionsPage() {
                             className="citizen-reports-icon-button"
                             onClick={fetchInspections}
                             aria-label="Refresh OBO inspections"
+                            title="Refresh OBO inspections"
                         >
                             <RefreshCw size={16} />
                         </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 

@@ -57,6 +57,7 @@ export default function Login() {
 
     const otpRefs = useRef([]);
     const recaptchaRef = useRef(null);
+    const passwordInputRef = useRef(null);
 
     useEffect(() => {
         let interval = null;
@@ -73,7 +74,7 @@ export default function Login() {
 
     /* ── Auth handlers ──────────────────────────────────────────────────── */
     const handleLogin = async (e) => {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         setLoading(true);
         setError('');
 
@@ -391,16 +392,30 @@ export default function Login() {
         }
     };
 
-    const handleOtpKeyDown = (index, e, isVerify = false) => {
+    const handleOtpKeyDown = (index, e, mode = 'recovery') => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (mode === '2fa') {
+                handleVerify2FA(e);
+            } else if (mode === 'verify') {
+                handleVerifyRegistration(e);
+            } else if (mode === 'recovery') {
+                handleVerifyCode(e);
+            }
+            return;
+        }
         if (e.key === 'Backspace') {
-            const targetOtp = isVerify ? verificationOtp : recoveryOtp;
+            let targetOtp = recoveryOtp;
+            if (mode === 'verify') targetOtp = verificationOtp;
+            else if (mode === '2fa') targetOtp = twoFactorOtp;
+
             if (!targetOtp[index] && index > 0 && otpRefs.current[index - 1]) {
                 otpRefs.current[index - 1].focus();
             }
         }
     };
 
-    const handleOtpPaste = (e, isVerify = false) => {
+    const handleOtpPaste = (e, mode = 'recovery') => {
         e.preventDefault();
         const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
         if (!pastedData) return;
@@ -409,7 +424,8 @@ export default function Login() {
         const newOtp = Array(6).fill('');
         digits.forEach((d, i) => { if (i < 6) newOtp[i] = d; });
 
-        if (isVerify) setVerificationOtp(newOtp);
+        if (mode === 'verify') setVerificationOtp(newOtp);
+        else if (mode === '2fa') setTwoFactorOtp(newOtp);
         else setRecoveryOtp(newOtp);
 
         const nextIndex = Math.min(digits.length, 5);
@@ -459,7 +475,7 @@ export default function Login() {
                     <ThemeToggle />
                     <Link
                         to="/"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
                         title="Return to Home Section"
                     >
                         <Home size={14} className="text-[#ff6b00]" />
@@ -534,12 +550,12 @@ export default function Login() {
                                             exit={{ opacity: 0, y: -8 }}
                                             transition={{ duration: 0.2 }}
                                         >
-                                            <div className="mb-6 text-left">
+                                            <div className="mb-5 text-left">
                                                 <h2 className="text-xl sm:text-2xl font-heading font-black text-slate-900 dark:text-white tracking-tight">
                                                     Resident Portal Sign In
                                                 </h2>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                    Enter your registered email or mobile credentials.
+                                                    Sign in with your registered mobile number or email address.
                                                 </p>
                                             </div>
 
@@ -552,102 +568,118 @@ export default function Login() {
                                             )}
 
                                             <form onSubmit={handleLogin} className="space-y-4">
-                                                {/* Email / Mobile */}
-                                                <div className="space-y-1.5 text-left">
-                                                    <label className="block text-[11px] font-mono-data font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                                                        Mobile Number or Email
-                                                    </label>
-                                                    <div className="relative">
-                                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                                            <User size={16} />
-                                                        </div>
-                                                        <input
-                                                            type="text"
-                                                            value={email}
-                                                            onChange={(e) => setEmail(e.target.value)}
-                                                            className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-3.5 py-3 transition-all"
-                                                            placeholder="e.g. 09171234567 or juan@email.com"
-                                                            required
-                                                            autoComplete="username"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                {/* Password */}
-                                                <div className="space-y-1.5 text-left">
-                                                    <div className="flex justify-between items-center">
+                                                    {/* Email / Mobile */}
+                                                    <div className="space-y-1.5 text-left">
                                                         <label className="block text-[11px] font-mono-data font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                                                            Password
+                                                            Mobile Number or Email
                                                         </label>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => { setView('forgot'); setError(''); }}
-                                                            className="text-[11px] font-semibold text-[#ff6b00] hover:text-[#e65c00] transition-colors cursor-pointer"
-                                                        >
-                                                            Forgot Password?
-                                                        </button>
-                                                    </div>
-                                                    <div className="relative">
-                                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                                            <Lock size={16} />
-                                                        </div>
-                                                        <input
-                                                            type={showPassword ? 'text' : 'password'}
-                                                            value={password}
-                                                            onChange={(e) => setPassword(e.target.value)}
-                                                            className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-10 py-3 transition-all"
-                                                            placeholder="Enter password"
-                                                            required
-                                                            autoComplete="current-password"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowPassword(!showPassword)}
-                                                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-[#ff6b00] transition-colors cursor-pointer"
-                                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
-                                                        >
-                                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* ReCAPTCHA Checkbox */}
-                                                <AnimatePresence>
-                                                    {email && password && (
-                                                        <motion.div 
-                                                            initial={{ opacity: 0, height: 0 }}
-                                                            animate={{ opacity: 1, height: 'auto' }}
-                                                            exit={{ opacity: 0, height: 0 }}
-                                                            className="flex justify-center w-full py-1 overflow-hidden"
-                                                        >
-                                                            <div className="scale-90 origin-center">
-                                                                <ReCAPTCHA
-                                                                    ref={recaptchaRef}
-                                                                    sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                                                                    onChange={(val) => setCaptchaValue(val)}
-                                                                    theme="light"
-                                                                />
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                                                <User size={16} />
                                                             </div>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
+                                                            <input
+                                                                type="text"
+                                                                value={email}
+                                                                onChange={(e) => setEmail(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        if (!password) {
+                                                                            e.preventDefault();
+                                                                            passwordInputRef.current?.focus();
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-3.5 py-3 transition-all"
+                                                                placeholder="e.g. 09171234567 or juan@email.com"
+                                                                required
+                                                                autoComplete="username"
+                                                            />
+                                                        </div>
+                                                    </div>
 
-                                                {/* Submit CTA Button */}
-                                                <button
-                                                    type="submit"
-                                                    disabled={loading}
-                                                    className="w-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
-                                                >
-                                                    {loading ? (
-                                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                    ) : (
-                                                        <>
-                                                            <span>Sign In to Portal</span>
-                                                            <ChevronRight size={16} />
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </form>
+                                                    {/* Password */}
+                                                    <div className="space-y-1.5 text-left">
+                                                        <div className="flex justify-between items-center">
+                                                            <label className="block text-[11px] font-mono-data font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                                                Password
+                                                            </label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setView('forgot'); setError(''); }}
+                                                                className="text-[11px] font-semibold text-[#ff6b00] hover:text-[#e65c00] transition-colors cursor-pointer"
+                                                            >
+                                                                Forgot Password?
+                                                            </button>
+                                                        </div>
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                                                <Lock size={16} />
+                                                            </div>
+                                                            <input
+                                                                ref={passwordInputRef}
+                                                                type={showPassword ? 'text' : 'password'}
+                                                                value={password}
+                                                                onChange={(e) => setPassword(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        handleLogin(e);
+                                                                    }
+                                                                }}
+                                                                className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-10 py-3 transition-all"
+                                                                placeholder="Enter password"
+                                                                required
+                                                                autoComplete="current-password"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowPassword(!showPassword)}
+                                                                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-[#ff6b00] transition-colors cursor-pointer"
+                                                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                                            >
+                                                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* ReCAPTCHA Checkbox - Revealed when user inputs password */}
+                                                    <AnimatePresence>
+                                                        {(password || captchaValue) && (
+                                                            <motion.div 
+                                                                initial={{ opacity: 0, height: 0 }}
+                                                                animate={{ opacity: 1, height: 'auto' }}
+                                                                exit={{ opacity: 0, height: 0 }}
+                                                                transition={{ duration: 0.25, ease: 'easeOut' }}
+                                                                className="flex justify-center w-full py-1 overflow-hidden"
+                                                            >
+                                                                <div className="scale-90 origin-center">
+                                                                    <ReCAPTCHA
+                                                                        ref={recaptchaRef}
+                                                                        sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                                        onChange={(val) => setCaptchaValue(val)}
+                                                                        theme="light"
+                                                                    />
+                                                                </div>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+
+                                                    {/* Submit CTA Button */}
+                                                    <button
+                                                        type="submit"
+                                                        disabled={loading}
+                                                        className="w-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-3.5 px-4 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 min-h-[48px] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                                    >
+                                                        {loading ? (
+                                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                <span>Sign In to Portal</span>
+                                                                <ChevronRight size={16} />
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </form>
 
                                             <div className="pt-5 mt-5 border-t border-slate-100 dark:border-slate-800 text-center">
                                                 <p className="text-xs text-slate-500 dark:text-slate-400">

@@ -4,10 +4,11 @@ import math
 
 # Internal cache for border data
 _border_polygons = None
+_barangay_features = None
 
 def _load_border_data():
-    global _border_polygons
-    if _border_polygons is not None:
+    global _border_polygons, _barangay_features
+    if _border_polygons is not None and _barangay_features is not None:
         return _border_polygons
     
     try:
@@ -16,26 +17,94 @@ def _load_border_data():
         file_path = os.path.normpath(os.path.join(current_dir, "..", "caloocan_border.json"))
         
         if os.path.exists(file_path):
-            with open(file_path, "r") as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 _border_polygons = []
+                _barangay_features = []
                 for feature in data.get("features", []):
                     geom = feature.get("geometry")
                     if not geom:
                         continue
                     geom_type = geom.get("type")
                     coords = geom.get("coordinates", [])
+                    props = feature.get("properties", {})
                     if geom_type == "Polygon":
                         _border_polygons.append(coords)
+                        if coords:
+                            ring = coords[0]
+                            min_lng = min(pt[0] for pt in ring)
+                            max_lng = max(pt[0] for pt in ring)
+                            min_lat = min(pt[1] for pt in ring)
+                            max_lat = max(pt[1] for pt in ring)
+                            avg_lat = sum(pt[1] for pt in ring) / len(ring)
+                            avg_lng = sum(pt[0] for pt in ring) / len(ring)
+                            _barangay_features.append({
+                                "ring": ring,
+                                "bbox": (min_lng, max_lng, min_lat, max_lat),
+                                "centroid": (avg_lat, avg_lng),
+                                "props": props
+                            })
                     elif geom_type == "MultiPolygon":
                         _border_polygons.extend(coords)
+                        for poly in coords:
+                            if poly:
+                                ring = poly[0]
+                                min_lng = min(pt[0] for pt in ring)
+                                max_lng = max(pt[0] for pt in ring)
+                                min_lat = min(pt[1] for pt in ring)
+                                max_lat = max(pt[1] for pt in ring)
+                                avg_lat = sum(pt[1] for pt in ring) / len(ring)
+                                avg_lng = sum(pt[0] for pt in ring) / len(ring)
+                                _barangay_features.append({
+                                    "ring": ring,
+                                    "bbox": (min_lng, max_lng, min_lat, max_lat),
+                                    "centroid": (avg_lat, avg_lng),
+                                    "props": props
+                                })
         else:
             _border_polygons = []
+            _barangay_features = []
     except Exception as e:
         print(f"Error loading border data: {e}")
         _border_polygons = []
+        _barangay_features = []
     
     return _border_polygons
+
+def find_barangay_from_coords(lat: float, lng: float):
+    """
+    High-precision Ray-casting point-in-polygon lookup for all 188 Caloocan Barangays.
+    Falls back to nearest centroid if point is along boundary road or within Caloocan vicinity.
+    """
+    if lat is None or lng is None:
+        return None
+
+    _load_border_data()
+    if not _barangay_features:
+        return None
+
+    # 1. Ray-casting polygon match with bounding box check
+    for item in _barangay_features:
+        min_lng, max_lng, min_lat, max_lat = item["bbox"]
+        if lat < min_lat or lat > max_lat or lng < min_lng or lng > max_lng:
+            continue
+        if is_point_in_polygon(lng, lat, [item["ring"]]):
+            return item["props"]
+
+    # 2. Nearest centroid fallback (for boundary road points or slight GPS drift)
+    nearest = None
+    min_dist_sq = float("inf")
+    for item in _barangay_features:
+        c_lat, c_lng = item["centroid"]
+        dist_sq = (lat - c_lat) ** 2 + (lng - c_lng) ** 2
+        if dist_sq < min_dist_sq:
+            min_dist_sq = dist_sq
+            nearest = item
+
+    if nearest and min_dist_sq < 0.01:
+        return nearest["props"]
+
+    return None
 
 def is_point_in_polygon(lng: float, lat: float, polygon_rings: list) -> bool:
     """

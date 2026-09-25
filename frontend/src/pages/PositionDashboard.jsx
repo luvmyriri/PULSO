@@ -21,8 +21,12 @@ import {
     CircleDot, AlertCircle, CheckSquare, Brain
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import GovSystemBanner from '../components/GovSystemBanner';
 import GovBiDashboard from '../components/GovBiDashboard';
+import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import './position-dashboard.css';
 import { useTheme } from '../contexts/ThemeContext';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
@@ -667,14 +671,19 @@ const PositionDashboard = () => {
 
             <div className="gov-workspace">
                 <GovSystemBanner autoOffline={true} />
-                <header className="gov-workspace-header">
-                    <div>
-                        <p className="gov-eyebrow">Government workspace</p>
+                <header className="gov-workspace-header relative z-50">
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb category="Staff Workspace" current="Assigned Tasks & Roles" />
                         <h1>My work</h1>
                     </div>
-                    <div className="gov-workspace-header__scope" aria-label="Current role and division">
-                        <span>{config.division}</span>
-                        <strong>{config.label}</strong>
+                    <div className="flex items-center gap-3">
+                        <div className="gov-workspace-header__scope" aria-label="Current role and division">
+                            <span>{config.division}</span>
+                            <strong>{config.label}</strong>
+                        </div>
+                        <ThemeToggle />
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 

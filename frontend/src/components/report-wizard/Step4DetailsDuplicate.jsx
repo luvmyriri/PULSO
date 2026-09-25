@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   AlertTriangle, ArrowRight, ArrowLeft, 
-  CheckCircle2 
+  CheckCircle2, Sparkles 
 } from 'lucide-react';
 import { getHaversineDistanceMeters } from '../../utils/geospatial';
 
@@ -17,6 +17,7 @@ export default function Step4DetailsDuplicate({
   detailsData,
   locationData,
   category,
+  evidenceData,
   onDetailsChange,
   onBack,
   onContinue,
@@ -134,6 +135,30 @@ export default function Step4DetailsDuplicate({
 
       {/* ── DESCRIPTION TEXTAREA ────────────────────────────────────────────── */}
       <div className="space-y-2">
+        {evidenceData?.autoDescription && (
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/20 border border-orange-200 dark:border-orange-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs mb-2">
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
+              <Sparkles size={16} className="text-orange-500 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <span className="font-bold text-slate-900 dark:text-white">AI Vision Observation: </span>
+                <p className="text-slate-700 dark:text-slate-300 italic mt-0.5 leading-relaxed">
+                  "{evidenceData.autoDescription}"
+                </p>
+              </div>
+            </div>
+            {description !== evidenceData.autoDescription && (
+              <button
+                type="button"
+                onClick={() => onDetailsChange({ ...detailsData, description: evidenceData.autoDescription })}
+                className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold shrink-0 shadow-xs cursor-pointer transition-colors flex items-center gap-1.5"
+              >
+                <Sparkles size={13} />
+                <span>Use AI Description</span>
+              </button>
+            )}
+          </div>
+        )}
+
         <label
           htmlFor="report-description"
           className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300"

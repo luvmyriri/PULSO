@@ -21,7 +21,7 @@ export default function CivicFooter({ onOpenLegalModal }) {
     <footer
       role="contentinfo"
       aria-label="Official Municipal Portal Footer"
-      className="bg-slate-900 dark:bg-[#03060c] text-slate-300 border-t border-slate-800 transition-colors pt-12 pb-8 text-left"
+      className="civic-footer bg-slate-900 dark:bg-[#03060c] text-slate-300 border-t border-slate-800 transition-colors pt-12 pb-8 text-left"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
@@ -40,7 +40,7 @@ export default function CivicFooter({ onOpenLegalModal }) {
                   <span className="text-[10px] font-mono-data uppercase tracking-wider text-slate-400 font-semibold">
                     Lungsod ng Caloocan
                   </span>
-                  <span className="text-slate-600 text-[10px]">•</span>
+                  <span className="text-slate-500 text-[10px]">•</span>
                   <span className="text-[10px] font-mono-data font-bold text-[#ff6b00] uppercase tracking-wider">
                     Powered by PULSO
                   </span>
@@ -54,7 +54,7 @@ export default function CivicFooter({ onOpenLegalModal }) {
 
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 text-slate-300 text-xs font-mono-data border border-slate-700">
               <ShieldCheck size={14} className="text-emerald-400" />
-              <span>Republic Act No. 10173 (Data Privacy Act) Compliant</span>
+              <span className="text-slate-300">Republic Act No. 10173 (Data Privacy Act) Compliant</span>
             </div>
           </div>
 
@@ -63,25 +63,25 @@ export default function CivicFooter({ onOpenLegalModal }) {
             <h4 className="font-heading font-bold text-xs uppercase tracking-wider text-white mb-3.5">
               Portal Access
             </h4>
-            <ul className="space-y-2 text-xs text-slate-400">
+            <ul className="space-y-2 text-xs">
               <li>
-                <a href="/login" className="hover:text-[#ff6b00] transition-colors font-medium">
+                <a href="/login" className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium">
                   Resident Sign In
                 </a>
               </li>
               <li>
-                <a href="/register" className="hover:text-[#ff6b00] transition-colors font-medium">
+                <a href="/register" className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium">
                   Citizen Registration
                 </a>
               </li>
               <li>
-                <a href="/gov" className="hover:text-[#ff6b00] transition-colors font-medium flex items-center gap-1">
+                <a href="/gov" className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium flex items-center gap-1">
                   <span>Government Gateway</span>
                   <ExternalLink size={11} />
                 </a>
               </li>
               <li>
-                <a href="/dispatcher" className="hover:text-[#ff6b00] transition-colors font-medium">
+                <a href="/dispatcher" className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium">
                   Dispatch Operations
                 </a>
               </li>
@@ -93,14 +93,14 @@ export default function CivicFooter({ onOpenLegalModal }) {
             <h4 className="font-heading font-bold text-xs uppercase tracking-wider text-white mb-3.5">
               Office Locations
             </h4>
-            <div className="space-y-3 text-xs text-slate-400">
+            <div className="space-y-3 text-xs">
               <div>
-                <strong className="text-slate-200 block">North Caloocan Hub:</strong>
-                <span>City Hall Complex, Camarin Road, Caloocan City</span>
+                <strong className="text-white block font-semibold">North Caloocan Hub:</strong>
+                <span className="text-slate-400">City Hall Complex, Camarin Road, Caloocan City</span>
               </div>
               <div>
-                <strong className="text-slate-200 block">South Caloocan Hub:</strong>
-                <span>City Hall, 8th Avenue cor. F. Roxas, Caloocan City</span>
+                <strong className="text-white block font-semibold">South Caloocan Hub:</strong>
+                <span className="text-slate-400">City Hall, 8th Avenue cor. F. Roxas, Caloocan City</span>
               </div>
             </div>
           </div>
@@ -110,14 +110,14 @@ export default function CivicFooter({ onOpenLegalModal }) {
             <h4 className="font-heading font-bold text-xs uppercase tracking-wider text-white mb-3.5">
               Contact &amp; Assistance
             </h4>
-            <ul className="space-y-2.5 text-xs text-slate-400">
+            <ul className="space-y-2.5 text-xs">
               <li className="flex items-center gap-2">
                 <PhoneCall size={13} className="text-[#ff6b00] shrink-0" />
-                <span>Caloocan Rescue: <strong className="text-white font-mono-data">(02) 8888-2256</strong></span>
+                <span className="text-slate-400">Caloocan Rescue: <strong className="text-white font-mono-data">(02) 8888-2256</strong></span>
               </li>
               <li className="flex items-center gap-2">
                 <PhoneCall size={13} className="text-slate-400 shrink-0" />
-                <span>City Engineering: <strong className="text-white font-mono-data">(02) 8362-0220</strong></span>
+                <span className="text-slate-400">City Engineering: <strong className="text-white font-mono-data">(02) 8362-0220</strong></span>
               </li>
               <li className="flex items-center gap-2">
                 <Mail size={13} className="text-slate-400 shrink-0" />
@@ -130,7 +130,7 @@ export default function CivicFooter({ onOpenLegalModal }) {
 
         {/* Bottom Bar: Copyright & Compliance */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-          <div className="text-center sm:text-left">
+          <div className="text-center sm:text-left text-slate-400">
             &copy; {new Date().getFullYear()} City Government of Caloocan. All rights reserved.
           </div>
 
@@ -138,14 +138,14 @@ export default function CivicFooter({ onOpenLegalModal }) {
             <button
               type="button"
               onClick={() => onOpenLegalModal && onOpenLegalModal('privacy')}
-              className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+              className="text-slate-400 hover:text-[#ff6b00] transition-colors cursor-pointer"
             >
               Privacy Policy
             </button>
             <button
               type="button"
               onClick={() => onOpenLegalModal && onOpenLegalModal('terms')}
-              className="hover:text-[#ff6b00] transition-colors cursor-pointer"
+              className="text-slate-400 hover:text-[#ff6b00] transition-colors cursor-pointer"
             >
               Citizen&apos;s Charter
             </button>

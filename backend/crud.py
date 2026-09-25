@@ -111,12 +111,105 @@ def get_user(db: Session, user_id: int):
     if off: return off
     return None
 
-def get_user_by_email(db: Session, email: str):
-    res = db.query(models.Resident).filter(func.lower(models.Resident.email) == email.lower()).first()
+def normalize_ph_phone(raw: str) -> Optional[str]:
+    """
+    Normalizes Philippine mobile phone numbers into standard 11-digit format: 09XXXXXXXXX.
+    Handles:
+    - +639XXXXXXXXX -> 09XXXXXXXXX
+    - 639XXXXXXXXX  -> 09XXXXXXXXX
+    - 9XXXXXXXXX   -> 09XXXXXXXXX
+    - 09XXXXXXXXX  -> 09XXXXXXXXX
+    - Strip dashes, spaces, parentheses, dots.
+    """
+    if not raw or not isinstance(raw, str):
+        return None
+    digits = re.sub(r"\D", "", raw)
+    if digits.startswith("639") and len(digits) == 12:
+        return "0" + digits[2:]
+    if digits.startswith("9") and len(digits) == 10:
+        return "0" + digits
+    if digits.startswith("09") and len(digits) == 11:
+        return digits
+    return digits if digits else None
+
+def get_users_by_identifier(db: Session, identifier: str):
+    """
+    Finds all potential users (Resident or Official) matching an email or phone number.
+    Returns newest accounts first so recent credentials take precedence.
+    """
+    if not identifier:
+        return []
+    clean_id = identifier.strip()
+    
+    # 1. If it contains '@', query by email directly
+    if "@" in clean_id:
+        res = db.query(models.Resident).filter(func.lower(models.Resident.email) == clean_id.lower()).all()
+        if res: return res
+        off = db.query(models.Official).filter(func.lower(models.Official.email) == clean_id.lower()).all()
+        if off: return off
+        return []
+        
+    # 2. Treat as potential phone number
+    norm_phone = normalize_ph_phone(clean_id)
+    candidates = []
+    if norm_phone:
+        suffix_10 = norm_phone[-10:] if len(norm_phone) >= 10 else norm_phone
+        res_list = db.query(models.Resident).filter(
+            or_(
+                models.Resident.phone_number == norm_phone,
+                models.Resident.phone_number == clean_id,
+                models.Resident.phone_number.endswith(suffix_10)
+            )
+        ).order_by(models.Resident.id.desc()).all()
+        candidates.extend(res_list)
+        
+        off_list = db.query(models.Official).filter(
+            or_(
+                models.Official.phone_number == norm_phone,
+                models.Official.phone_number == clean_id,
+                models.Official.phone_number.endswith(suffix_10)
+            )
+        ).order_by(models.Official.id.desc()).all()
+        candidates.extend(off_list)
+
+    if candidates:
+        return candidates
+
+    # 3. Fallback: try raw match on email just in case
+    res = db.query(models.Resident).filter(func.lower(models.Resident.email) == clean_id.lower()).all()
     if res: return res
-    off = db.query(models.Official).filter(func.lower(models.Official.email) == email.lower()).first()
+    off = db.query(models.Official).filter(func.lower(models.Official.email) == clean_id.lower()).all()
     if off: return off
-    return None
+
+    return []
+
+def get_user_by_identifier(db: Session, identifier: str):
+    """
+    Finds a user (Resident or Official) by email or phone number.
+    Returns the newest registered account.
+    """
+    users = get_users_by_identifier(db, identifier)
+    return users[0] if users else None
+
+def get_resident_by_phone(db: Session, phone_number: str) -> Optional[models.Resident]:
+    """Finds a resident by normalized Philippine phone number."""
+    if not phone_number:
+        return None
+    norm_phone = normalize_ph_phone(phone_number)
+    if not norm_phone:
+        return None
+    suffix_10 = norm_phone[-10:] if len(norm_phone) >= 10 else norm_phone
+    return db.query(models.Resident).filter(
+        or_(
+            models.Resident.phone_number == norm_phone,
+            models.Resident.phone_number == phone_number.strip(),
+            models.Resident.phone_number.endswith(suffix_10)
+        )
+    ).first()
+
+def get_user_by_email(db: Session, email: str):
+    # Delegate to get_user_by_identifier to support both email and phone numbers seamlessly
+    return get_user_by_identifier(db, identifier=email)
 
 def update_resident(db: Session, resident_id: int, resident_update: schemas.ResidentUpdate):
     db_resident = db.query(models.Resident).filter(models.Resident.id == resident_id).first()

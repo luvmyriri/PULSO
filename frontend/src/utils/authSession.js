@@ -1,19 +1,33 @@
-﻿/**
+/**
  * authSession.js
  * Centralized Session-Only Authentication Management for PULSO.
  * 
- * Guarantees that when a user closes the page/tab/browser window,
- * any active account session is immediately terminated (no lingering credentials).
- * Active sessions survive page reloads (F5) and route navigation via sessionStorage.
+ * Guarantees reliable token access across components, supporting both
+ * sessionStorage and localStorage synchronization so active sessions
+ * function reliably across all pages, modals, and route navigations.
  */
 
-// Initialize and purge any legacy persistent credentials left in localStorage
+// Initialize and harmonize credentials across storage mechanisms
 export const initAuthSession = () => {
     try {
-        // If there's no active session in sessionStorage, remove any old localStorage tokens
-        if (!sessionStorage.getItem('pulso_token')) {
-            localStorage.removeItem('pulso_token');
-            localStorage.removeItem('pulso_user');
+        const token = sessionStorage.getItem('pulso_token') || 
+                      sessionStorage.getItem('token') || 
+                      localStorage.getItem('pulso_token') || 
+                      localStorage.getItem('token');
+        const user = sessionStorage.getItem('pulso_user') || 
+                     sessionStorage.getItem('user') || 
+                     localStorage.getItem('pulso_user') || 
+                     localStorage.getItem('user');
+
+        if (token) {
+            sessionStorage.setItem('pulso_token', token);
+            localStorage.setItem('pulso_token', token);
+            localStorage.setItem('token', token);
+        }
+        if (user) {
+            sessionStorage.setItem('pulso_user', user);
+            localStorage.setItem('pulso_user', user);
+            localStorage.setItem('user', user);
         }
     } catch (e) {
         console.error('Error initializing auth session:', e);
@@ -25,7 +39,11 @@ initAuthSession();
 
 export const getAuthToken = () => {
     try {
-        return sessionStorage.getItem('pulso_token') || null;
+        return sessionStorage.getItem('pulso_token') || 
+               sessionStorage.getItem('token') || 
+               localStorage.getItem('pulso_token') || 
+               localStorage.getItem('token') || 
+               null;
     } catch {
         return null;
     }
@@ -33,7 +51,10 @@ export const getAuthToken = () => {
 
 export const getAuthUser = () => {
     try {
-        const raw = sessionStorage.getItem('pulso_user');
+        const raw = sessionStorage.getItem('pulso_user') || 
+                    sessionStorage.getItem('user') || 
+                    localStorage.getItem('pulso_user') || 
+                    localStorage.getItem('user');
         return raw ? JSON.parse(raw) : null;
     } catch {
         return null;
@@ -44,13 +65,15 @@ export const setAuthSession = (token, user) => {
     try {
         if (token) {
             sessionStorage.setItem('pulso_token', token);
+            localStorage.setItem('pulso_token', token);
+            localStorage.setItem('token', token);
         }
         if (user) {
-            sessionStorage.setItem('pulso_user', typeof user === 'string' ? user : JSON.stringify(user));
+            const userStr = typeof user === 'string' ? user : JSON.stringify(user);
+            sessionStorage.setItem('pulso_user', userStr);
+            localStorage.setItem('pulso_user', userStr);
+            localStorage.setItem('user', userStr);
         }
-        // Ensure credentials are never kept in permanent localStorage
-        localStorage.removeItem('pulso_token');
-        localStorage.removeItem('pulso_user');
     } catch (e) {
         console.error('Error setting auth session:', e);
     }
@@ -59,9 +82,13 @@ export const setAuthSession = (token, user) => {
 export const clearAuthSession = () => {
     try {
         sessionStorage.removeItem('pulso_token');
+        sessionStorage.removeItem('token');
         sessionStorage.removeItem('pulso_user');
+        sessionStorage.removeItem('user');
         localStorage.removeItem('pulso_token');
+        localStorage.removeItem('token');
         localStorage.removeItem('pulso_user');
+        localStorage.removeItem('user');
     } catch (e) {
         console.error('Error clearing auth session:', e);
     }

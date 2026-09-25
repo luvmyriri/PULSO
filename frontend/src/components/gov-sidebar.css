@@ -8,13 +8,13 @@
     --gov-text-muted: #64748b;
     --gov-rule: #c9d4d9;
     --gov-rule-subtle: #e2e8f0;
-    --gov-action: #0b4f6c;
-    --gov-action-strong: #083e55;
-    --gov-action-soft: rgba(11, 79, 108, 0.08);
-    --gov-accent: #0b4f6c;
-    --gov-accent-soft: rgba(11, 79, 108, 0.1);
+    --gov-action: #ff6b00;
+    --gov-action-strong: #e65c00;
+    --gov-action-soft: rgba(255, 107, 0, 0.08);
+    --gov-accent: #ff6b00;
+    --gov-accent-soft: rgba(255, 107, 0, 0.1);
     --gov-selection: #e7f3f7;
-    --gov-focus: #2563eb;
+    --gov-focus: #ff6b00;
     --gov-resident-action: #c2410c;
     --gov-pulse: #f97316;
     --gov-survey-blue: #075985;
@@ -33,35 +33,35 @@
 }
 
 .dark {
-    --gov-canvas: #071a2b;
-    --gov-surface: #0e283e;
-    --gov-surface-subtle: #15364d;
-    --gov-surface-elevated: #15364d;
-    --gov-text: #f4f7f2;
-    --gov-text-secondary: #b9c7cf;
-    --gov-text-muted: #8ea4b2;
-    --gov-rule: #335166;
-    --gov-rule-subtle: #223f54;
-    --gov-action: #82c7d8;
-    --gov-action-strong: #a5d9e5;
-    --gov-action-soft: rgba(130, 199, 216, 0.15);
-    --gov-accent: #82c7d8;
-    --gov-accent-soft: rgba(130, 199, 216, 0.15);
-    --gov-selection: #15364d;
-    --gov-focus: #93c5fd;
-    --gov-resident-action: #ff8a3d;
-    --gov-pulse: #f97316;
-    --gov-survey-blue: #38bdf8;
-    --gov-resolved: #66d2c8;
-    --gov-resolved-soft: rgba(102, 210, 200, 0.15);
-    --gov-warning: #fdb022;
-    --gov-warning-soft: rgba(253, 176, 34, 0.15);
-    --gov-danger: #fda29b;
-    --gov-danger-soft: rgba(253, 162, 155, 0.15);
-    --gov-critical: #fda29b;
-    --gov-critical-soft: rgba(253, 162, 155, 0.15);
-    --gov-card-bg: #0e283e;
-    --gov-surface-hover: #15364d;
+    --gov-canvas: #070a12;
+    --gov-surface: #090e1a;
+    --gov-surface-subtle: #0f172a;
+    --gov-surface-elevated: #111a2e;
+    --gov-text: #f8fafc;
+    --gov-text-secondary: #94a3b8;
+    --gov-text-muted: #64748b;
+    --gov-rule: #1e293b;
+    --gov-rule-subtle: #162032;
+    --gov-action: #ff6b00;
+    --gov-action-strong: #e65c00;
+    --gov-action-soft: rgba(255, 107, 0, 0.15);
+    --gov-accent: #ff6b00;
+    --gov-accent-soft: rgba(255, 107, 0, 0.15);
+    --gov-selection: rgba(255, 107, 0, 0.18);
+    --gov-focus: #ff6b00;
+    --gov-resident-action: #ff6b00;
+    --gov-pulse: #ff6b00;
+    --gov-survey-blue: #0284c7;
+    --gov-resolved: #10b981;
+    --gov-resolved-soft: rgba(16, 185, 129, 0.15);
+    --gov-warning: #f59e0b;
+    --gov-warning-soft: rgba(245, 158, 11, 0.15);
+    --gov-danger: #ef4444;
+    --gov-danger-soft: rgba(239, 68, 68, 0.15);
+    --gov-critical: #ef4444;
+    --gov-critical-soft: rgba(239, 68, 68, 0.15);
+    --gov-card-bg: #0c1424;
+    --gov-surface-hover: #1e293b;
 }
 
 .gov-sidebar {

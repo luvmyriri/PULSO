@@ -25,6 +25,9 @@ import {
 import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import './records-workspace.css';
 
 const RECORDS_TABS = [
@@ -509,9 +512,10 @@ export default function RecordsWorkspacePage({ workspace = 'records' }) {
             <GovSidebar currentUser={currentUser} />
             <div className="records-shell">
                 {/* Topbar */}
-                <header className="records-topbar">
-                    <div className="records-topbar__title-group">
-                        <h1>Documents and official records</h1>
+                <header className="records-topbar relative z-50">
+                    <div className="records-topbar__title-group flex flex-col text-left">
+                        <GovBreadcrumb category="Records & Compliance" current="Official Records" />
+                        <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-snug whitespace-nowrap mt-0.5">Documents and official records</h1>
                         <p>Document registry, SHA-256 integrity custody, retention schedules, and immutable process audit trail.</p>
                     </div>
                     <div className="projects-topbar-actions">
@@ -528,9 +532,12 @@ export default function RecordsWorkspacePage({ workspace = 'records' }) {
                             className="citizen-reports-icon-button"
                             onClick={() => showToast('Records ledger and audit stream synchronized.')}
                             aria-label="Refresh records"
+                            title="Refresh records"
                         >
                             <RefreshCw size={16} />
                         </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 

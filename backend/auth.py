@@ -8,6 +8,13 @@ from sqlalchemy.orm import Session
 from database import get_db
 
 import os
+from dotenv import load_dotenv
+
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+else:
+    load_dotenv()
 
 # Import security token helpers
 from utils.security import (

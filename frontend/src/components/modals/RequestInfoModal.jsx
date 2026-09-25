@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle, HelpCircle, Send, X } from 'lucide-react';
+import { formatTicketId } from '../../utils/reportWorkflow';
 import './modal-dialogs.css';
 
 export default function RequestInfoModal({ isOpen, onClose, report, onSubmit }) {
@@ -9,7 +10,7 @@ export default function RequestInfoModal({ isOpen, onClose, report, onSubmit }) 
 
     if (!isOpen || !report) return null;
 
-    const reportIdentifier = report.ticket_id || `RPT-${String(report.id).padStart(5, '0')}`;
+    const reportIdentifier = formatTicketId(report.ticket_id, report.id, true);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

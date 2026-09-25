@@ -157,7 +157,7 @@ export default function LegalModal({ isOpen, onClose, initialTab = 'privacy' }) 
                                         <span className="w-2 h-2 rounded-full bg-[#ff6b00]" /> 1. Truthful &amp; Honest Incident Reporting
                                     </h4>
                                     <p className="pl-4 border-l-2 border-slate-200 dark:border-slate-800">
-                                        Residents are expected to submit accurate reports regarding water leaks, power issues, road damage, and drainage blockages. Submitting false, fabricated, or malicious reports will result in Trust Score deduction and potential account suspension.
+                                        Residents are expected to submit accurate reports regarding water leaks, power issues, road damage, and drainage blockages. Submitting false, fabricated, or malicious reports will result in Integrity Level reduction and potential account suspension.
                                     </p>
                                 </section>
 

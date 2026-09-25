@@ -3,8 +3,8 @@ gemini_service.py — PULSO AI Intelligence Layer
 Caloocan City Engineering Office — PULSO System
 
 SDK:   google-genai (Vertex AI mode via service account)
-Auth:  Service Account — vertex-express@pulso-backend-system
-Model: gemini-2.5-flash (Vertex AI — region-independent)
+Auth:  Configured service account credentials
+Model: Configurable Vertex AI model and serving region
 """
 
 import os
@@ -20,9 +20,9 @@ from typing import Dict, Any, Optional
 load_dotenv()
 
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google-credentials.json")
-GCP_PROJECT        = "pulso-backend-system"
-GCP_LOCATION       = "us-central1"          # Vertex AI serving region
-GEMINI_MODEL       = "gemini-2.5-flash"     # Latest stable 2026 High-Speed Flash model
+GCP_PROJECT        = os.getenv("GOOGLE_CLOUD_PROJECT", "pulso-509010")
+GCP_LOCATION       = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+GEMINI_MODEL       = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ── SDK Init ──────────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ def _init():
         print(f"[AI] [SUCCESS] Vertex AI SDK ready  |  Model: {GEMINI_MODEL}")
         print(f"[AI]    Project  : {GCP_PROJECT}")
         print(f"[AI]    Location : {GCP_LOCATION}")
-        print(f"[AI]    Auth     : Service Account (vertex-express@{GCP_PROJECT}) [OK]")
+        print("[AI]    Auth     : Configured service account; request access verified on use")
     except Exception as e:
         print(f"[AI] [ERROR] Vertex AI SDK init failed: {e}")
 
@@ -266,6 +266,19 @@ def _generate(prompt: str, json_mode: bool = True, user_id: str = "system") -> O
         return None
 
 
+def _detect_image_mime(image_bytes: bytes, default_mime: str = "image/jpeg") -> str:
+    """Detect image MIME from magic bytes."""
+    if not image_bytes:
+        return default_mime
+    if image_bytes.startswith(b'\x89PNG\r\n\x1a\n') or image_bytes.startswith(b'\x89PNG'):
+        return "image/png"
+    if image_bytes.startswith(b'RIFF') and len(image_bytes) >= 12 and image_bytes[8:12] == b'WEBP':
+        return "image/webp"
+    if image_bytes.startswith(b'\xff\xd8\xff'):
+        return "image/jpeg"
+    return default_mime
+
+
 def _generate_multimodal(prompt: str, image_bytes: bytes, mime: str = "image/jpeg", user_id: str = "system") -> Optional[str]:
     """Call Gemini with a text + image prompt (Vision) — rate-limited + cached."""
     if not _SDK_READY or _client is None:
@@ -285,7 +298,8 @@ def _generate_multimodal(prompt: str, image_bytes: bytes, mime: str = "image/jpe
 
     try:
         from google.genai import types
-        img_part = types.Part.from_bytes(data=image_bytes, mime_type=mime)
+        real_mime = _detect_image_mime(image_bytes, mime)
+        img_part = types.Part.from_bytes(data=image_bytes, mime_type=real_mime)
         cfg = types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.0,
@@ -324,8 +338,8 @@ def _generate_multimodal_dual(prompt: str, img1: bytes, img2: bytes, mime: str =
 
     try:
         from google.genai import types
-        part1 = types.Part.from_bytes(data=img1, mime_type=mime)
-        part2 = types.Part.from_bytes(data=img2, mime_type=mime)
+        part1 = types.Part.from_bytes(data=img1, mime_type=_detect_image_mime(img1, mime))
+        part2 = types.Part.from_bytes(data=img2, mime_type=_detect_image_mime(img2, mime))
         cfg = types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.0,

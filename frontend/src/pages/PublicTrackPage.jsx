@@ -7,6 +7,7 @@ import {
   Calendar, Loader2, Activity 
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/apiBase';
+import { formatFullAddress, parseAddressString } from '../utils/philippineAddress';
 import WizardHeader from '../components/report-wizard/WizardHeader';
 
 const LIFECYCLE_STAGES = [
@@ -208,7 +209,9 @@ export default function PublicTrackPage() {
                   <MapPin size={16} className="text-orange-500 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold text-slate-400 dark:text-slate-500 uppercase">Location:</span>
-                    <p className="text-slate-800 dark:text-slate-200 font-medium mt-0.5">{reportData.location_string || 'Caloocan City'}</p>
+                    <p className="text-slate-800 dark:text-slate-200 font-medium mt-0.5 select-text">
+                      {formatFullAddress(parseAddressString(reportData.location_string)) || reportData.location_string || 'Caloocan City'}
+                    </p>
                   </div>
                 </div>
 

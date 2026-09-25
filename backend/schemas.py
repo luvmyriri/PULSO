@@ -184,6 +184,9 @@ class ReportResponse(ReportBase):
     claimed_at: Optional[datetime] = None
     claimed_by_user_id: Optional[int] = None
     is_claimed: Optional[bool] = False
+    barangay: Optional[str] = None
+    urgency: Optional[str] = None
+    district: Optional[str] = None
     
     # Secure token fields (populated only upon initial guest creation response; None otherwise)
     tracking_token: Optional[str] = None

@@ -231,42 +231,53 @@ export const getUrgencyDescriptor = (urgency) => {
 };
 
 /**
- * Standardizes any report ticket ID to PUL-YYYY-XXXX (where YYYY is current year, XXXX is 4 digits).
- * Normalizes legacy tickets like 'RPT-31558743' or 'RPT-95' into 'PUL-2026-XXXX'.
+ * Standardizes any report ticket ID to #PUL-YYYY-XXXX (where YYYY is year, XXXX is 4 digits).
+ * Normalizes legacy tickets like 'RPT-20260413-946A128EFCE43554' into '#PUL-2026-3554'.
  */
-export const formatTicketId = (rawTicketId, fallbackId = null) => {
+export const formatTicketId = (rawTicketId, fallbackId = null, withHashPrefix = true) => {
     const currentYear = new Date().getFullYear();
     const raw = (rawTicketId || '').toString().trim();
-    
-    // If already in PUL-YYYY-XXXX format
-    if (/^PUL-\d{4}-\d{4,}$/i.test(raw)) {
-        return raw.toUpperCase();
+    const prefix = withHashPrefix ? '#' : '';
+
+    if (!raw && !fallbackId) return `${prefix}PUL-${currentYear}-0001`;
+
+    // If already in #PUL-YYYY-XXXX or PUL-YYYY-XXXX format
+    if (/^#?PUL-\d{4}-\d{4,}$/i.test(raw)) {
+        const clean = raw.replace(/^#/, '').toUpperCase();
+        return `${prefix}${clean}`;
     }
-    
-    // If it's a legacy RPT- ticket (e.g. RPT-31558743, RPT-12365318, RPT-8291)
-    if (/^RPT-/i.test(raw)) {
-        const digits = raw.replace(/^RPT-/i, '').replace(/\D/g, '');
-        if (digits.length >= 4) {
-            // Keep the last 4 digits (or first 4) consistently
-            const fourDigits = digits.slice(-4);
-            return `PUL-${currentYear}-${fourDigits}`;
+
+    // Determine year from raw string or fallback to current year
+    let year = String(currentYear);
+    const yearMatch = raw.match(/202\d/);
+    if (yearMatch) {
+        year = yearMatch[0];
+    }
+
+    // Extract 4-digit code
+    // If ticket has a hex/numeric hash after date e.g. RPT-20260413-946A128EFCE43554
+    const parts = raw.split('-');
+    let code = '';
+    if (parts.length >= 3) {
+        const hashPart = parts.slice(2).join('');
+        const hashDigits = hashPart.replace(/\D/g, '');
+        if (hashDigits.length >= 4) {
+            code = hashDigits.slice(-4);
         }
-        if (digits.length > 0) {
-            return `PUL-${currentYear}-${digits.padStart(4, '0')}`;
+    }
+
+    if (!code) {
+        const allDigits = raw.replace(/^RPT-?/i, '').replace(/^REP-?/i, '').replace(/\D/g, '');
+        if (allDigits.length >= 4) {
+            code = allDigits.slice(-4);
+        } else if (fallbackId !== null && fallbackId !== undefined) {
+            const idDigits = String(fallbackId).replace(/\D/g, '');
+            code = idDigits.padStart(4, '0').slice(-4);
+        } else {
+            code = '0001';
         }
     }
 
-    // If it's just numbers
-    if (/^\d+$/.test(raw)) {
-        return `PUL-${currentYear}-${raw.padStart(4, '0').slice(-4)}`;
-    }
-
-    // Fallback using report id or pseudo-random hash
-    if (fallbackId !== null && fallbackId !== undefined) {
-        const idDigits = String(fallbackId).replace(/\D/g, '');
-        return `PUL-${currentYear}-${idDigits.padStart(4, '0').slice(-4)}`;
-    }
-
-    return raw || `PUL-${currentYear}-0001`;
+    return `${prefix}PUL-${year}-${code}`;
 };
 

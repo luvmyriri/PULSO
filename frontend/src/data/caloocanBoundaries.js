@@ -3,6 +3,7 @@
  * Authoritative boundary polygons for North and South Caloocan
  * Sourced from OpenStreetMap Administrative Relation 273242 / PSA PSGC.
  */
+import caloocanBorderData from './caloocan_border.json';
 
 export const NORTH_CALOOCAN_CENTROID = {
   "lat": 14.769511,
@@ -49,4 +50,99 @@ function isPointInPolygon(pt, vs) {
         if (intersect) inside = !inside;
     }
     return inside;
+}
+
+// ---------------------------------------------------------------------------
+// Pre-index all 188 Caloocan Barangay boundaries for sub-millisecond lookup
+// ---------------------------------------------------------------------------
+const BARANGAY_POLYGONS = (caloocanBorderData?.features || []).map((feature) => {
+    const ring = feature.geometry?.coordinates?.[0] || [];
+    let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+    let sumLat = 0, sumLng = 0;
+    for (let i = 0; i < ring.length; i++) {
+        const lng = ring[i][0];
+        const lat = ring[i][1];
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        sumLat += lat;
+        sumLng += lng;
+    }
+    const count = ring.length || 1;
+    return {
+        ring,
+        bbox: [minLng, maxLng, minLat, maxLat],
+        centroid: [sumLat / count, sumLng / count],
+        name: feature.properties?.ADM4_EN || '',
+        number: feature.properties?.brgy_num || 0,
+        sector: feature.properties?.sector || '',
+        displayName: feature.properties?.display_name || (feature.properties?.brgy_num ? `Brgy. ${feature.properties.brgy_num}` : '')
+    };
+});
+
+/**
+ * High-precision point-in-polygon resolution for Caloocan Barangays (1 to 188).
+ * Authoritative PSA / LGU boundaries sourced from caloocan_border.json.
+ * @param {number} lat
+ * @param {number} lng
+ * @returns {{ name: string, number: number, sector: string, displayName: string } | null}
+ */
+export function findBarangayByCoordinates(lat, lng) {
+    if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return null;
+
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+
+    // 1. Ray-casting point-in-polygon test with bounding box acceleration
+    for (let k = 0; k < BARANGAY_POLYGONS.length; k++) {
+        const item = BARANGAY_POLYGONS[k];
+        const [minLng, maxLng, minLat, maxLat] = item.bbox;
+        if (latNum < minLat || latNum > maxLat || lngNum < minLng || lngNum > maxLng) {
+            continue;
+        }
+        const ring = item.ring;
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const xi = ring[i][0], yi = ring[i][1];
+            const xj = ring[j][0], yj = ring[j][1];
+            const intersect = ((yi > latNum) !== (yj > latNum)) &&
+                (lngNum < (xj - xi) * (latNum - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        if (inside) {
+            return {
+                name: item.name,
+                number: item.number,
+                sector: item.sector,
+                displayName: item.displayName
+            };
+        }
+    }
+
+    // 2. Nearest centroid fallback (for points along border roads or slight GPS drift within Caloocan vicinity)
+    let nearest = null;
+    let minDistSq = Infinity;
+    for (let k = 0; k < BARANGAY_POLYGONS.length; k++) {
+        const item = BARANGAY_POLYGONS[k];
+        const dLat = latNum - item.centroid[0];
+        const dLng = lngNum - item.centroid[1];
+        const distSq = dLat * dLat + dLng * dLng;
+        if (distSq < minDistSq) {
+            minDistSq = distSq;
+            nearest = item;
+        }
+    }
+
+    // Threshold approx ~10km (0.01 deg^2)
+    if (nearest && minDistSq < 0.01) {
+        return {
+            name: nearest.name,
+            number: nearest.number,
+            sector: nearest.sector,
+            displayName: nearest.displayName
+        };
+    }
+
+    return null;
 }

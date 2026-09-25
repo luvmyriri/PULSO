@@ -13,8 +13,11 @@ import {
     X,
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import './insights-workspace.css';
 
 const INSIGHTS_TABS = [
@@ -195,8 +198,9 @@ export default function InsightsWorkspacePage({ workspace = 'insights' }) {
             <GovSidebar currentUser={currentUser} />
             <div className="insights-shell">
                 {/* Topbar */}
-                <header className="insights-topbar">
+                <header className="insights-topbar relative z-50">
                     <div className="insights-topbar__title-group">
+                        <GovBreadcrumb category="Analytics" current="Operational Insights & SLA" />
                         <h1>Operational insights & predictive maintenance</h1>
                         <p>Executive performance metrics, SLA compliance trajectories, spatial issue clusters, and AI risk forecasts.</p>
                     </div>
@@ -214,9 +218,12 @@ export default function InsightsWorkspacePage({ workspace = 'insights' }) {
                             className="citizen-reports-icon-button"
                             onClick={() => showToast('Refreshed operational intelligence telemetry.')}
                             aria-label="Refresh insights"
+                            title="Refresh insights"
                         >
                             <RefreshCw size={16} />
                         </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 

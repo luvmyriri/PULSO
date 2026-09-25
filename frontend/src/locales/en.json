@@ -735,8 +735,8 @@
         "s1_desc": "PULSO collects data relevant to infrastructure reporting, including precise GPS coordinates, photographic evidence, and resident account details for verification purposes."
       },
       "terms": {
-        "s1_title": "1. Integrity Clause",
-        "s1_desc": "Residents are accountable for the accuracy of their reports. Fraudulent reporting will result in immediate Trust Score reduction and possible service restrictions."
+        "s1_title": "1. Truthful Reporting",
+        "s1_desc": "Residents are accountable for the accuracy of their reports. Submitting false or fake reports may result in account restrictions or suspension."
       },
       "topNav": {
         "searchPlaceholder": "Search PULSO...",

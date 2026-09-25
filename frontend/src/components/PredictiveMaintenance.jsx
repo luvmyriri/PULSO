@@ -24,6 +24,10 @@ import {
 } from 'lucide-react';
 
 import { API_BASE_URL as API } from '../utils/apiBase';
+import ThemeToggle from './ThemeToggle';
+import GovBreadcrumb from './GovBreadcrumb';
+import GovUserDropdown from './GovUserDropdown';
+import GovNotificationDropdown from './GovNotificationDropdown';
 
 // ─── Utility Helpers ──────────────────────────────────────────────────────────
 
@@ -724,25 +728,29 @@ export default function PredictiveMaintenance() {
     return (
         <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950">
             {/* Header */}
-            <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 shrink-0 shadow-sm">
+            <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 shrink-0 shadow-sm relative z-50">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center gap-3">
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb category="Operations" current="Predictive Maintenance" />
+                        <div className="flex items-center gap-3 mt-1">
                             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shadow-md">
                                 <Cpu size={18} className="text-white" />
                             </div>
                             <div>
-                                <h1 className="text-lg font-black text-slate-900 dark:text-white">Predictive Maintenance Engine</h1>
-                                <p className="text-xs text-slate-500">AI-driven infrastructure failure forecasting · Caloocan City Engineering Office</p>
+                                <h1 className="text-xl sm:text-2xl font-heading font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                                    Predictive Maintenance Engine
+                                </h1>
+                                <p className="text-xs text-slate-500 mt-0.5">AI-driven infrastructure failure forecasting · Caloocan City Engineering Office</p>
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                         {lastRefresh && (
                             <span className="text-[10px] text-slate-400">
                                 Updated {lastRefresh.toLocaleTimeString('en-PH')}
                             </span>
                         )}
+                        <ThemeToggle />
                         <button onClick={handleExport} className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                             <Download size={13} /> Export CSV
                         </button>
@@ -754,6 +762,8 @@ export default function PredictiveMaintenance() {
                             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
                             Refresh
                         </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown />
                     </div>
                 </div>
 

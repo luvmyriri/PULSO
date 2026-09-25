@@ -30,12 +30,12 @@
 }
 
 .obo-topbar h1 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    font-family: Archivo, Inter, sans-serif;
+    margin: 2px 0 0;
+    font-size: 22px;
+    font-weight: 900;
+    font-family: "Space Grotesk", sans-serif;
     color: var(--gov-text, #0f172a);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
 }
 
 .obo-topbar p {

@@ -1,3 +1,4 @@
+import { createDensityLayer } from '../components/maps/ReportDensityLayer';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -43,18 +44,28 @@ import {
     ArrowUpRight,
     Wrench,
     ShieldCheck,
-    Users
+    Users,
+    Compass,
+    RotateCcw
 } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, HeatmapLayerF, OverlayViewF } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, OverlayViewF } from '@react-google-maps/api';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
-import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
+import { useTheme } from '../contexts/ThemeContext';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import Swal from 'sweetalert2';
 import { CANONICAL_STATUS_LIST, getStatusDescriptor, formatTicketId } from '../utils/reportWorkflow';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
+import {
+    CALOOCAN_NORTH_BARANGAYS_DETAILED,
+    CALOOCAN_SOUTH_BARANGAYS_DETAILED,
+    CALOOCAN_ALL_BARANGAYS_OPTIONS
+} from '../utils/philippineAddress';
 
 import {
     NORTH_CALOOCAN_PATH,
@@ -65,20 +76,15 @@ import {
     getCaloocanDistrict,
     isInsideCaloocan
 } from '../data/caloocanBoundaries';
+import caloocanBorderData from '../data/caloocan_border.json';
 
 const CALOOCAN_CENTER = COMBINED_CALOOCAN_BOUNDS.center;
 const CALOOCAN_CITY_HALL_NORTH_LOC = { lat: 14.7505408, lng: 121.0540317 }; // Zapote Rd North HQ
 const CALOOCAN_CITY_HALL_SOUTH_LOC = { lat: 14.6469, lng: 120.9844 }; // 8th Ave South City Hall
 const MONUMENTO_CIRCLE_LOC = { lat: 14.6574, lng: 120.9840 }; // Bonifacio Monument Circle
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
-const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry', 'visualization'];
+const GOOGLE_MAPS_LIBRARIES = ['places', 'geometry'];
 
-const CALOOCAN_NORTH_BARANGAYS = [
-    'All Barangays', 'Brgy. 165', 'Brgy. 166', 'Brgy. 167', 'Brgy. 168', 'Brgy. 169', 
-    'Brgy. 170', 'Brgy. 171', 'Brgy. 172', 'Brgy. 173', 'Brgy. 174', 'Brgy. 175', 
-    'Brgy. 176', 'Brgy. 177', 'Brgy. 178', 'Brgy. 179', 'Brgy. 180', 'Brgy. 181', 
-    'Brgy. 182', 'Brgy. 183', 'Brgy. 184', 'Brgy. 185', 'Brgy. 186', 'Brgy. 187', 'Brgy. 188'
-];
 
 const INFRASTRUCTURE_CATEGORIES = [
     'All Categories',
@@ -98,6 +104,95 @@ const STATUS_OPTIONS = [
     'Resolved',
     'Rejected'
 ];
+
+export const CALOOCAN_AREA_OPTIONS = [
+    { value: 'all', label: 'All Caloocan (North & South)', description: 'All 188 Barangays across both sectors' },
+    { value: 'north', label: 'North Caloocan (District 3)', description: 'Brgy. 165–188 · Bagumbong, Camarin, Tala, Bagong Silang' },
+    { value: 'south', label: 'South Caloocan (Districts 1 & 2)', description: 'Brgy. 1–164 · Monumento, Grace Park, Bagong Barrio, Maypajo' }
+];
+
+/**
+ * Authoritative Caloocan Area & District classifier.
+ * Strictly divides Caloocan into:
+ *   - North Caloocan (District 3): Barangays 165–188
+ *   - South Caloocan (Districts 1 & 2): Barangays 1–164
+ *
+ * Evaluation hierarchy:
+ * 1. Primary Authority: Barangay number (never overridden by coordinates)
+ * 2. Distinct landmark / area keywords
+ * 3. Coordinate boundary fallback (~14.69 latitude)
+ */
+export const classifyReportArea = (report) => {
+    if (!report) return { area: 'unknown', district: null, brgyNum: null };
+
+    const brgyRaw = (report.barangay || report.location_barangay || '').toString();
+    const locStr = (report.location_string || report.address || '').toString().toLowerCase();
+
+    // 1. Primary Authority: Barangay number
+    let brgyNum = null;
+    const brgyMatch = brgyRaw.match(/(?:barangay|brgy\.?|bgy\.?)?\s*(\d{1,3})/i);
+    if (brgyMatch && brgyMatch[1]) {
+        const num = parseInt(brgyMatch[1], 10);
+        if (num >= 1 && num <= 188) {
+            brgyNum = num;
+        }
+    }
+
+    if (brgyNum === null) {
+        const locMatch = locStr.match(/(?:barangay|brgy\.?|bgy\.?)\s*(\d{1,3})/i);
+        if (locMatch && locMatch[1]) {
+            const num = parseInt(locMatch[1], 10);
+            if (num >= 1 && num <= 188) {
+                brgyNum = num;
+            }
+        }
+    }
+
+    if (brgyNum !== null) {
+        if (brgyNum >= 165 && brgyNum <= 188) {
+            return { area: 'north', district: 3, brgyNum };
+        } else if (brgyNum >= 1 && brgyNum <= 164) {
+            return { area: 'south', district: '1-2', brgyNum };
+        }
+    }
+
+    // 2. Named-Location Fallback
+    const combinedText = `${brgyRaw} ${locStr}`.toLowerCase();
+
+    const northKeywords = [
+        'north caloocan', 'bagong silang', 'bagumbong', 'camarin', 'tala', 
+        'deparo', 'kaybiga', 'llano', 'bagbaguin', 'amparo', 'malaria', 
+        'pangarap', 'urduja', 'vicas', 'congressional', 'kiko'
+    ];
+    const southKeywords = [
+        'south caloocan', 'monumento', 'grace park', 'bagong barrio', 
+        'maypajo', 'sangandaan', 'kaunlaran', 'c-3', 'c3', 'balintawak', 
+        'poblacion', 'morning breeze', '10th ave', '5th ave', 'samson rd', 
+        'rizal ave', 'a. mabini', 'dagat-dagatan', 'heroes del 96'
+    ];
+
+    const hasNorthKw = northKeywords.some(kw => combinedText.includes(kw));
+    const hasSouthKw = southKeywords.some(kw => combinedText.includes(kw));
+
+    if (hasNorthKw && !hasSouthKw) {
+        return { area: 'north', district: 3, brgyNum: null };
+    }
+    if (hasSouthKw && !hasNorthKw) {
+        return { area: 'south', district: '1-2', brgyNum: null };
+    }
+
+    // 3. Coordinate Fallback (only when no barangay or keyword matched)
+    const lat = typeof report.lat === 'number' ? report.lat : (typeof report.latitude === 'number' ? report.latitude : 0);
+    if (lat > 0) {
+        if (lat >= 14.69) {
+            return { area: 'north', district: 3, brgyNum: null };
+        } else {
+            return { area: 'south', district: '1-2', brgyNum: null };
+        }
+    }
+
+    return { area: 'unknown', district: null, brgyNum: null };
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PLAIN LANGUAGE CIVIC TRIAGE HELPERS
@@ -318,7 +413,6 @@ const DispatcherDashboard = () => {
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
-    const [activeTab, setActiveTab] = useState('queue'); // 'queue', 'fleet'
     const [dashboardMode, setDashboardMode] = useState('triage'); // 'triage', 'active'
     const [showHeatmap, setShowHeatmap] = useState(false);
     
@@ -334,11 +428,24 @@ const DispatcherDashboard = () => {
     const [selectedMarker, setSelectedMarker] = useState(null);
     const [map, setMap] = useState(null);
     const [panorama, setPanorama] = useState(null);
-    const heatmapLayerRef = useRef(null);
+
     const [zoomedImage, setZoomedImage] = useState(null);
     const pinIconCache = useRef(new Map());
     const iconCacheRef = useRef(new Map());
     const [photoPinIcons, setPhotoPinIcons] = useState({});
+    const [borderData, setBorderData] = useState(caloocanBorderData);
+
+    // Fetch live authoritative Caloocan barangay borders, fallback to bundled GeoJSON
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/geo/caloocan-border`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data?.features?.length > 0) {
+                    setBorderData(data);
+                }
+            })
+            .catch(err => console.debug('Caloocan border fetch fallback to bundled:', err));
+    }, []);
 
     // Deep-link auto-selection listener from Citizen Reports (?reportId=...)
     useEffect(() => {
@@ -400,6 +507,7 @@ const DispatcherDashboard = () => {
     const [jurisdictionErrorMsg, setJurisdictionErrorMsg] = useState("");
     const [svHeading, setSvHeading] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedArea, setSelectedArea] = useState('all');
     const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
     const [selectedCategory, setSelectedCategory] = useState('All Categories');
     const [selectedStatus, setSelectedStatus] = useState('All Statuses');
@@ -412,15 +520,50 @@ const DispatcherDashboard = () => {
 
     const handleClearAllFilters = () => {
         setSearchQuery('');
+        setSelectedArea('all');
         setSelectedBarangay('All Barangays');
         setSelectedCategory('All Categories');
         setSelectedStatus('All Statuses');
     };
 
     const isFiltersActive = searchQuery.trim() !== '' || 
+        selectedArea !== 'all' ||
         selectedBarangay !== 'All Barangays' || 
         selectedCategory !== 'All Categories' || 
         selectedStatus !== 'All Statuses';
+
+    const handleAreaChange = (area) => {
+        setSelectedArea(area);
+        setSelectedBarangay('All Barangays');
+        if (map) {
+            if (area === 'north') {
+                map.panTo(CALOOCAN_CITY_HALL_NORTH_LOC);
+                map.setZoom(13);
+            } else if (area === 'south') {
+                map.panTo(CALOOCAN_CITY_HALL_SOUTH_LOC);
+                map.setZoom(13);
+            } else {
+                map.panTo(CALOOCAN_CENTER);
+                map.setZoom(12);
+            }
+        }
+    };
+
+    const barangaySelectOptions = React.useMemo(() => {
+        if (selectedArea === 'north') {
+            return [
+                { value: 'All Barangays', label: 'All North Barangays (Brgy. 165–188)' },
+                ...CALOOCAN_NORTH_BARANGAYS_DETAILED
+            ];
+        }
+        if (selectedArea === 'south') {
+            return [
+                { value: 'All Barangays', label: 'All South Barangays (Brgy. 1–164)' },
+                ...CALOOCAN_SOUTH_BARANGAYS_DETAILED
+            ];
+        }
+        return CALOOCAN_ALL_BARANGAYS_OPTIONS;
+    }, [selectedArea]);
 
     // AI Omni-Assistant State
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -1151,12 +1294,21 @@ const DispatcherDashboard = () => {
                 if (!matchesSearch) return false;
             }
 
-            // 3. Barangay Filter (Robust Match)
-            if (selectedBarangay !== 'All Barangays') {
+            // 3a. District / Sector Filter (North vs South Caloocan)
+            if (selectedArea === 'north') {
+                const cl = classifyReportArea(report);
+                if (cl.area !== 'north') return false;
+            } else if (selectedArea === 'south') {
+                const cl = classifyReportArea(report);
+                if (cl.area !== 'south') return false;
+            }
+
+            // 3b. Barangay Filter (Robust Match)
+            if (selectedBarangay !== 'All Barangays' && selectedBarangay !== 'All North Barangays (Brgy. 165–188)' && selectedBarangay !== 'All South Barangays (Brgy. 1–164)') {
                 const selectedDigits = selectedBarangay.replace(/\D/g, '');
-                const reportBarangayRaw = (report.barangay || '').toString();
+                const reportBarangayRaw = (report.barangay || report.location_barangay || '').toString();
                 const reportBarangayDigits = reportBarangayRaw.replace(/\D/g, '');
-                const locationString = (report.location_string || '').toLowerCase();
+                const locationString = (report.location_string || report.address || '').toLowerCase();
                 
                 const matchesBarangay = 
                     (reportBarangayDigits && reportBarangayDigits === selectedDigits) ||
@@ -1191,7 +1343,7 @@ const DispatcherDashboard = () => {
             
             return true;
         });
-    }, [allReports, dashboardMode, searchQuery, selectedBarangay, selectedCategory, selectedStatus]);
+    }, [allReports, dashboardMode, searchQuery, selectedArea, selectedBarangay, selectedCategory, selectedStatus]);
 
     // ── Tactical Pinpoint Filter ──────────────────────────────────────────────
     // When launched from Analytics with exact report_ids, bypass fuzzy filters
@@ -1474,37 +1626,11 @@ const DispatcherDashboard = () => {
         return { individualMarkers, clusterMarkers };
     }, [filteredReports, currentZoom, currentBounds]);
 
-    // Manual Heatmap Lifecycle Management (Fixes the "Stacking/Persistence" bug)
+    // Supported canvas overlay replaces Google's retired visualization layer.
     useEffect(() => {
-        if (!map || !window.google || !window.google.maps || !window.google.maps.visualization) return;
-
-        // Cleanup: remove if toggle is OFF or no data
-        if (!showHeatmap || heatmapData.length === 0) {
-            if (heatmapLayerRef.current) {
-                heatmapLayerRef.current.setMap(null);
-            }
-            return;
-        }
-
-        // Initialize layer if it doesn't exist
-        if (!heatmapLayerRef.current) {
-            heatmapLayerRef.current = new window.google.maps.visualization.HeatmapLayer({
-                map: map,
-                ...heatmapOptions
-            });
-        }
-
-        // Sync data and map instance
-        heatmapLayerRef.current.setData(heatmapData);
-        heatmapLayerRef.current.setOptions(heatmapOptions);
-        heatmapLayerRef.current.setMap(map);
-
-        return () => {
-            // Safe cleanup on component unmount or dependency change
-            if (heatmapLayerRef.current) {
-                heatmapLayerRef.current.setMap(null);
-            }
-        };
+        if (!map || !showHeatmap || !heatmapData.length) return;
+        const layer = createDensityLayer(map, heatmapData, heatmapOptions);
+        return () => layer.setMap(null);
     }, [map, showHeatmap, heatmapData, heatmapOptions]);
 
     // Fallback UI mapping for DB fields
@@ -1581,15 +1707,6 @@ const DispatcherDashboard = () => {
         return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
     };
 
-    // Fleet Data (Mock teams removed per request; now powered by live tracking when available)
-    // Fleet Data: Real-time engineering units currently active in North Caloocan
-    const fleetStatus = [
-        { id: 1, name: 'Team Alpha', type: 'Electrical / Street Lights', status: 'Available', lat: 14.7505, lng: 121.0540, location: 'Zapote Rd (HQ)', lead: 'Engr. Dela Cruz' },
-        { id: 2, name: 'Team Beta', type: 'Civil / Roads & Bridges', status: 'En Route', lat: 14.7650, lng: 121.0350, location: 'Camarin', lead: 'Engr. Bautista' },
-        { id: 3, name: 'Team Gamma', type: 'Water & Drainage', status: 'On Site', lat: 14.7800, lng: 121.0800, location: 'Bagong Silang (Phase 1)', lead: 'Engr. Reyes' },
-        { id: 4, name: 'Team Delta', type: 'Public Safety / General', status: 'Available', lat: 14.7400, lng: 121.0200, location: 'Deparo', lead: 'Engr. Santos' }
-    ];
-
     return (
         <div className="min-h-screen bg-neutral-bg dark:bg-[#070a12] text-neutral-text dark:text-slate-100 font-sans flex text-sm overflow-hidden transition-colors duration-150">
             
@@ -1644,19 +1761,16 @@ const DispatcherDashboard = () => {
                 )}
                 
                 {/* Top Header & Unified Navigation */}
-                <header className="min-h-16 h-auto py-2 lg:py-0 lg:h-18 bg-white dark:bg-[#090e1a] flex items-center justify-between px-4 lg:px-6 shrink-0 z-40 relative border-b border-neutral-border dark:border-slate-800 transition-colors duration-150 gap-2 lg:gap-4 overflow-hidden">
+                <header className="min-h-16 h-auto py-2 lg:py-0 lg:h-18 bg-white dark:bg-[#090e1a] flex items-center justify-between px-4 lg:px-6 shrink-0 z-50 relative border-b border-neutral-border dark:border-slate-800 transition-colors duration-150 gap-2 lg:gap-4 overflow-visible">
                     <div className="flex items-center gap-3 lg:gap-5 min-w-0">
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-lg lg:text-xl font-display font-bold text-neutral-text dark:text-white leading-none whitespace-nowrap">
+                        <div className="min-w-0 flex flex-col text-left">
+                            <GovBreadcrumb category="Operations" current="Command Center & GIS Map" />
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <h1 className="font-heading font-black text-xl sm:text-2xl text-neutral-text dark:text-white tracking-tight leading-none whitespace-nowrap">
                                     LGU Command Center
                                 </h1>
-                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 whitespace-nowrap">
-                                    <span className="hidden sm:inline">Field Dispatch & Operations</span>
-                                    <span className="sm:hidden">Dispatch</span>
-                                </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden 2xl:block mt-1 truncate max-w-md">
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden 2xl:block mt-0.5 truncate max-w-md">
                                 Spatial Dispatch & Geographic Routing — Coordinate repair fleets and dispatch crews.
                             </p>
                         </div>
@@ -1665,7 +1779,7 @@ const DispatcherDashboard = () => {
                         {/* Dashboard Mode Toggle */}
                         <div className="flex bg-neutral-bg dark:bg-slate-950 p-0.5 sm:p-1 rounded-lg border border-neutral-border dark:border-slate-800 shrink-0">
                             <button
-                                onClick={() => { setDashboardMode('triage'); setActiveTab('queue'); setSelectedReport(null); }}
+                                onClick={() => { setDashboardMode('triage'); setSelectedReport(null); }}
                                 className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all ${dashboardMode === 'triage' ? 'bg-white dark:bg-slate-800 text-primary dark:text-white shadow-sm border border-neutral-border/50' : 'text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
                                 title="Triage Mode — Screen and verify incoming citizen reports"
                             >
@@ -1673,7 +1787,7 @@ const DispatcherDashboard = () => {
                                 <span>Triage</span>
                             </button>
                             <button
-                                onClick={() => { setDashboardMode('active'); setActiveTab('fleet'); setSelectedReport(null); }}
+                                onClick={() => { setDashboardMode('active'); setSelectedReport(null); }}
                                 className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all ${dashboardMode === 'active' ? 'bg-white dark:bg-slate-800 text-secondary dark:text-white shadow-sm border border-neutral-border/50' : 'text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
                                 title="Active Operations — Track and coordinate deployed field crews"
                             >
@@ -1729,6 +1843,8 @@ const DispatcherDashboard = () => {
                             <span className="font-semibold text-slate-500 dark:text-slate-400"><span className="text-slate-900 dark:text-white">8/12</span> Teams</span>
                         </div>
                         <ThemeToggle />
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 
@@ -1779,10 +1895,21 @@ const DispatcherDashboard = () => {
                                         )}
                                     </div>
                                     <div className="flex flex-col gap-2">
+                                        {/* Area / Sector Filter (North vs South Caloocan) */}
+                                        <OrangeSelect
+                                            value={selectedArea}
+                                            onChange={handleAreaChange}
+                                            options={CALOOCAN_AREA_OPTIONS}
+                                            icon={Compass}
+                                            placeholder="All Caloocan"
+                                            minWidth="100%"
+                                        />
+
+                                        {/* Barangay Filter (Separated into North & South Caloocan) */}
                                         <OrangeSelect
                                             value={selectedBarangay}
                                             onChange={setSelectedBarangay}
-                                            options={CALOOCAN_NORTH_BARANGAYS.map(b => ({ value: b, label: b }))}
+                                            options={barangaySelectOptions}
                                             icon={MapPin}
                                             placeholder="All Barangays"
                                             minWidth="100%"
@@ -1836,14 +1963,14 @@ const DispatcherDashboard = () => {
                                         <button
                                             type="button"
                                             onClick={() => setShowLegend(!showLegend)}
-                                            className="w-full px-3 py-2 flex items-center justify-between text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 transition-colors"
+                                            className="w-full px-3 py-2 flex items-center justify-between text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer group"
                                             aria-expanded={showLegend}
                                         >
                                             <span className="flex items-center gap-1.5">
                                                 <Info size={13} className="text-orange-500 shrink-0" />
                                                 <span className="text-[11px] font-bold tracking-tight">Status & Priority Guide</span>
                                             </span>
-                                            {showLegend ? <ChevronUp size={13} className="text-slate-400" /> : <ChevronDown size={13} className="text-slate-400" />}
+                                            {showLegend ? <ChevronUp size={13} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" /> : <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" />}
                                         </button>
                                         {showLegend && (
                                             <div className="px-3 pb-3 pt-1 border-t border-slate-200/60 dark:border-slate-800/60 space-y-2.5 text-[11px]">
@@ -2031,7 +2158,7 @@ const DispatcherDashboard = () => {
                                                     </div>
                                                     <span className="truncate">{report.category || report.ai_category || 'General Issue'}</span>
                                                     <span className="text-slate-400 dark:text-slate-600 font-mono text-[10px]">
-                                                        #{report.ticket_id || report.id}
+                                                        {formatTicketId(report.ticket_id, report.id)}
                                                     </span>
                                                 </div>
                                                 <span className="text-[10px] text-slate-400 shrink-0 font-medium">
@@ -2076,7 +2203,7 @@ const DispatcherDashboard = () => {
                                                             e.stopPropagation(); 
                                                             handleStreetViewClick({ lat: report.location_lat, lng: report.location_lng });
                                                         }}
-                                                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-orange-50 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-500 hover:text-orange-500 transition-all cursor-pointer shadow-sm active:scale-95"
+                                                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-orange-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-orange-500 transition-all cursor-pointer shadow-sm active:scale-95"
                                                         title={`View street view for ${report.ticket_id || `Report #${report.id}`}`}
                                                         aria-label={`View street view for ${report.ticket_id || `Report #${report.id}`}`}
                                                     >
@@ -2303,16 +2430,28 @@ const DispatcherDashboard = () => {
                             ))}
 
                             {/* TOP-LEVEL TACTICAL CARD: Dynamic anchoring to Map or SV */}
-                            {selectedMarker && (
-                                <InfoWindowF
-                                    map={isStreetViewVisible ? panorama : undefined} 
-                                    position={{ lat: selectedMarker.location_lat, lng: selectedMarker.location_lng }}
-                                    onCloseClick={() => setSelectedMarker(null)}
-                                    options={{ 
-                                        pixelOffset: new window.google.maps.Size(0, -35),
-                                        zIndex: 1000 
-                                    }}
-                                >
+                            {(() => {
+                                if (!selectedMarker) return null;
+                                const rawLat = selectedMarker.location_lat ?? selectedMarker.lat ?? selectedMarker.latitude;
+                                const rawLng = selectedMarker.location_lng ?? selectedMarker.lng ?? selectedMarker.longitude;
+                                const markerLat = typeof rawLat === 'function' ? rawLat() : parseFloat(rawLat);
+                                const markerLng = typeof rawLng === 'function' ? rawLng() : parseFloat(rawLng);
+
+                                if (!Number.isFinite(markerLat) || !Number.isFinite(markerLng)) {
+                                    return null;
+                                }
+
+                                return (
+                                    <InfoWindowF
+                                        key={`tactical-card-${selectedMarker.id || 'hq'}-${markerLat}-${markerLng}`}
+                                        map={isStreetViewVisible ? panorama : undefined} 
+                                        position={{ lat: markerLat, lng: markerLng }}
+                                        onCloseClick={() => setSelectedMarker(null)}
+                                        options={{ 
+                                            pixelOffset: new window.google.maps.Size(0, -35),
+                                            zIndex: 1000 
+                                        }}
+                                    >
                                     {/* Professional Tactical Map Card */}
                                     <div 
                                         onMouseDown={(e) => e.stopPropagation()}
@@ -2414,7 +2553,7 @@ const DispatcherDashboard = () => {
                                                 {/* Ticket Code & Barangay Reference */}
                                                 <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mb-2">
                                                     <span className="font-mono font-bold text-orange-600 dark:text-orange-400">
-                                                        #{formatTicketId(selectedMarker.ticket_id, selectedMarker.id)}
+                                                        {formatTicketId(selectedMarker.ticket_id, selectedMarker.id)}
                                                     </span>
                                                     {selectedMarker.barangay && (
                                                         <>
@@ -2491,38 +2630,71 @@ const DispatcherDashboard = () => {
                                         )}
                                     </div>
                                 </InfoWindowF>
-                            )}
+                            );
+                        })()}
 
 
                             {/* User Position Marker */}
                             {/* ═══════════════════════════════════════════════════════════════════
-                                AUTHORITATIVE NORTH & SOUTH CALOOCAN BOUNDARY OVERLAYS (OSM PSGC)
+                                AUTHORITATIVE BARANGAY JURISDICTION BOUNDARIES (ALL 188 BARANGAYS)
                             ══════════════════════════════════════════════════════════════════════ */}
-                            {/* North Caloocan Jurisdiction Boundary Polygon */}
-                            <PolygonF
-                                paths={NORTH_CALOOCAN_PATH}
-                                options={{
-                                    fillColor: "#ff6b00",
-                                    fillOpacity: 0.08,
-                                    strokeColor: "#ff6b00",
-                                    strokeOpacity: 0.85,
-                                    strokeWeight: 2.5,
-                                    clickable: false,
-                                }}
-                            />
+                            {borderData?.features?.map((feature, i) => {
+                                const props = feature.properties || {};
+                                const sector = props.sector || 'Caloocan';
+                                const isNorth = sector === 'North';
 
-                            {/* South Caloocan Jurisdiction Boundary Polygon */}
-                            <PolygonF
-                                paths={SOUTH_CALOOCAN_PATH}
-                                options={{
-                                    fillColor: "#ff6b00",
-                                    fillOpacity: 0.08,
-                                    strokeColor: "#ff6b00",
-                                    strokeOpacity: 0.85,
-                                    strokeWeight: 2.5,
+                                const polygonOptions = {
+                                    strokeColor: isNorth ? '#f97316' : '#ff6b00',
+                                    strokeOpacity: 1.0,
+                                    strokeWeight: 2.2,
+                                    fillColor: isNorth ? '#f97316' : '#ff6b00',
+                                    fillOpacity: isNorth
+                                        ? (isDarkMode ? 0.10 : 0.06)
+                                        : (isDarkMode ? 0.08 : 0.05),
                                     clickable: false,
-                                }}
-                            />
+                                    zIndex: isNorth ? 2 : 1,
+                                };
+
+                                const paths = feature.geometry.type === 'MultiPolygon'
+                                    ? feature.geometry.coordinates.map(poly => poly[0].map(c => ({ lng: c[0], lat: c[1] })))
+                                    : [feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))];
+
+                                return paths.map((path, pi) => (
+                                    <PolygonF
+                                        key={`caloocan-brgy-border-${i}-${pi}`}
+                                        paths={path}
+                                        options={polygonOptions}
+                                    />
+                                ));
+                            })}
+
+                            {/* Fallback boundary outlines if borderData has no features */}
+                            {(!borderData?.features || borderData.features.length === 0) && (
+                                <>
+                                    <PolygonF
+                                        paths={NORTH_CALOOCAN_PATH}
+                                        options={{
+                                            fillColor: "#ff6b00",
+                                            fillOpacity: 0.08,
+                                            strokeColor: "#ff6b00",
+                                            strokeOpacity: 0.85,
+                                            strokeWeight: 2.5,
+                                            clickable: false,
+                                        }}
+                                    />
+                                    <PolygonF
+                                        paths={SOUTH_CALOOCAN_PATH}
+                                        options={{
+                                            fillColor: "#ff6b00",
+                                            fillOpacity: 0.08,
+                                            strokeColor: "#ff6b00",
+                                            strokeOpacity: 0.85,
+                                            strokeWeight: 2.5,
+                                            clickable: false,
+                                        }}
+                                    />
+                                </>
+                            )}
 
                             {/* North Caloocan District Centroid Label */}
                             <MarkerF
@@ -2655,29 +2827,6 @@ const DispatcherDashboard = () => {
                                     }
                                 }}
                             />
-
-                            {/* Fleet unit markers */}
-                            {fleetStatus.map(team => (
-                                <MarkerF
-                                    key={team.id}
-                                    position={{ lat: team.lat, lng: team.lng }}
-                                    onClick={() => {
-                                        setActiveTab('fleet');
-                                        if (map) map.panTo({ lat: team.lat, lng: team.lng });
-                                    }}
-                                    icon={window.google && window.google.maps ? {
-                                        path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                                        scale: 6,
-                                        fillColor: team.status === 'Available' ? '#22c55e' : (team.status === 'En Route' ? '#3b82f6' : '#f97316'),
-                                        fillOpacity: 1,
-                                        strokeWeight: 2,
-                                        strokeColor: 'white',
-                                        rotation: team.status === 'En Route' ? 45 : 0
-                                    } : undefined}
-                                    title={`${team.name} (${team.status})`}
-                                />
-                            ))}
-
                             {/* Route to Selected Hazard - NAVIGATION VISUALS (On Main Map) */}
                             {directionsResponse && (
                                 <DirectionsRenderer
@@ -2712,12 +2861,18 @@ const DispatcherDashboard = () => {
                                     }}
                                 />
                             )}
-                            {directionsResponse && directionsResponse.routes && directionsResponse.routes[0] && (
-                                <>
-                                    {/* Floating Duration Label at Midpoint */}
-                                    {directionsResponse.routes[0].midpoint && (
+                            {directionsResponse && (
+                                (() => {
+                                    const rawMidpoint = directionsResponse?.routes?.[0]?.midpoint || directionsResponse?.midpoint;
+                                    if (!rawMidpoint) return null;
+                                    const midLat = typeof rawMidpoint.lat === 'function' ? rawMidpoint.lat() : parseFloat(rawMidpoint.lat);
+                                    const midLng = typeof rawMidpoint.lng === 'function' ? rawMidpoint.lng() : parseFloat(rawMidpoint.lng);
+                                    if (!Number.isFinite(midLat) || !Number.isFinite(midLng)) return null;
+
+                                    return (
                                         <InfoWindowF
-                                            position={directionsResponse.routes[0].midpoint}
+                                            key={`route-midpoint-${midLat}-${midLng}`}
+                                            position={{ lat: midLat, lng: midLng }}
                                             options={{ 
                                                 disableAutoPan: true,
                                                 closeBoxURL: "", 
@@ -2739,8 +2894,8 @@ const DispatcherDashboard = () => {
                                                 {duration}
                                             </div>
                                         </InfoWindowF>
-                                    )}
-                                </>
+                                    );
+                                })()
                             )}
 
                             {/* Tactical Overlays (VISIBLE ONLY IN STREET VIEW) */}
@@ -3016,27 +3171,17 @@ const DispatcherDashboard = () => {
                         className="w-72 2xl:w-80 bg-white dark:bg-slate-900 flex flex-col z-30 shrink-0 relative border-l border-neutral-border"
                     >
                         {/* Removed left sidebar inner shadow */}
-                    <div className="flex relative border-b border-neutral-border">
-                        {/* Removed lower shadow */}
-                        {dashboardMode === 'triage' && (
-                            <button 
-                                onClick={() => setActiveTab('queue')}
-                                className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'queue' ? 'border-primary text-primary dark:text-white' : 'border-transparent text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
-                            >
+                    <div className="flex items-center justify-between px-4 py-3.5 border-b border-neutral-border bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="flex items-center gap-2">
+                            <ShieldAlert className="text-orange-500" size={16} />
+                            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                                 Triage Queue
-                            </button>
-                        )}
-                        <button 
-                            onClick={() => setActiveTab('fleet')}
-                            className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'fleet' ? 'border-secondary text-secondary dark:text-white' : 'border-transparent text-neutral-muted hover:text-neutral-text dark:hover:text-slate-300'}`}
-                        >
-                            Field Fleets
-                        </button>
+                            </h3>
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                        {activeTab === 'queue' && dashboardMode === 'triage' && (
-                            <div className="space-y-4">
+                        <div className="space-y-4">
                                 {selectedReport ? (
                                     <div className="bg-white dark:bg-slate-950/50 border border-neutral-border dark:border-slate-800 rounded-xl p-4">
                                         <div className="flex flex-col gap-3">
@@ -3058,7 +3203,7 @@ const DispatcherDashboard = () => {
                                                     {getReportPlainTitle(selectedReport)}
                                                 </h4>
                                                 <div className="text-[10px] font-mono text-orange-500 font-semibold mt-0.5">
-                                                    #{formatTicketId(selectedReport.ticket_id, selectedReport.id)}
+                                                    {formatTicketId(selectedReport.ticket_id, selectedReport.id)}
                                                 </div>
                                             </div>
 
@@ -3360,76 +3505,6 @@ const DispatcherDashboard = () => {
                                     </div>
                                 )}
                             </div>
-                        )}
-
-                        {activeTab === 'fleet' && (
-                            <div className="space-y-3">
-                                {fleetStatus.map(team => (
-                                    <div 
-                                        key={team.id} 
-                                        className={`bg-white dark:bg-slate-950/50 border border-neutral-border dark:border-slate-800 rounded-xl p-3 shadow-sm transition-all duration-200 ${
-                                            team.status === 'Available' 
-                                                ? 'hover:border-secondary hover:bg-secondary-light/30' 
-                                                : 'hover:border-primary hover:bg-primary-light/30'
-                                        }`}
-                                    >
-                                        <div className="flex justify-between items-center mb-2">
-                                            <h4 className="font-bold text-sm text-neutral-text dark:text-white flex items-center gap-2"><Truck size={14} className="text-primary"/> {team.name}</h4>
-                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border shadow-sm ${
-                                                team.status === 'Available' ? 'bg-secondary-light text-secondary border-secondary/20' :
-                                                team.status === 'En Route' ? 'bg-primary-light text-primary border-primary/20' :
-                                                'bg-orange-500/10 text-orange-600 border-orange-500/20'
-                                            }`}>
-                                                {team.status}
-                                            </span>
-                                        </div>
-                                        <div className="text-xs text-neutral-muted dark:text-slate-400 mb-1">Lead: <span className="text-neutral-text dark:text-slate-300 font-bold">{team.lead}</span></div>
-                                        <div className="text-xs text-neutral-muted dark:text-slate-400 mb-1">Specialization: <span className="text-neutral-text dark:text-slate-300 font-medium">{team.type}</span></div>
-                                        <div className="text-xs text-neutral-muted dark:text-slate-400 flex justify-between items-center mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
-                                            <span>Loc: <span className="text-neutral-text dark:text-slate-300 font-medium">{team.location}</span></span>
-                                            <div className="flex items-center gap-2">
-                                                <button 
-                                                    onClick={() => map?.panTo({ lat: team.lat, lng: team.lng })}
-                                                    className="p-1.5 rounded bg-neutral-bg hover:bg-primary-light text-neutral-muted hover:text-primary transition-all border border-neutral-border shadow-sm active:scale-95 flex items-center justify-center cursor-pointer"
-                                                    title="Locate Team"
-                                                >
-                                                    <MapPin size={12}/>
-                                                </button>
-                                                {selectedReport && (
-                                                    <button 
-                                                        onClick={() => handleGetDirections(selectedReport, { lat: team.lat, lng: team.lng })}
-                                                        className="text-[10px] bg-primary-light text-primary border border-primary/20 px-2 py-1 rounded uppercase font-bold tracking-wider hover:bg-primary hover:text-white transition-colors cursor-pointer flex items-center gap-1 active:scale-95"
-                                                    >
-                                                        <Navigation size={10}/> Route
-                                                    </button>
-                                                )}
-                                                {team.status === 'Available' && (
-                                                    <button 
-                                                        onClick={() => {
-                                                            if (selectedReport) {
-                                                                setDispatchForm(prev => ({ ...prev, assigned_to_id: team.id + 1 })); // Offset to match dummy select IDs 2,3,4
-                                                                setIsDispatchModalOpen(true);
-                                                            } else {
-                                                                Swal.fire({
-                                                                    icon: 'info',
-                                                                    title: 'No Report Selected',
-                                                                    text: 'Please select an approved report from the queue before assigning a field team.',
-                                                                    background: '#1e293b',
-                                                                    color: '#fff'
-                                                                });
-                                                            }
-                                                        }}
-                                                        className="text-[10px] bg-primary hover:bg-primary-hover text-white px-2.5 py-1 rounded uppercase font-black tracking-wider transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-95 flex items-center gap-1"
-                                                    >
-                                                        Assign Task
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </div>
                     </motion.div>
                 )}
@@ -3478,7 +3553,7 @@ const DispatcherDashboard = () => {
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 mb-0.5">
                                                 <span className="font-mono text-xs font-extrabold text-orange-500">
-                                                    #{formatTicketId(selectedReport.ticket_id, selectedReport.id)}
+                                                    {formatTicketId(selectedReport.ticket_id, selectedReport.id)}
                                                 </span>
                                                 {selectedReport.barangay && (
                                                     <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
@@ -3985,7 +4060,7 @@ const DispatcherDashboard = () => {
                                     Confirm Permanent Deletion
                                 </h3>
                                 <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                                    Are you sure you want to permanently remove <strong className="text-slate-900 dark:text-white">"{getReportPlainTitle(reportToDelete)}"</strong> (<span className="font-mono text-red-500 font-bold">#{reportToDelete.ticket_id || reportToDelete.id}</span>)? 
+                                    Are you sure you want to permanently remove <strong className="text-slate-900 dark:text-white">"{getReportPlainTitle(reportToDelete)}"</strong> (<span className="font-mono text-red-500 font-bold">{formatTicketId(reportToDelete.ticket_id, reportToDelete.id)}</span>)? 
                                     This action is irreversible and will remove all associated logs and work orders.
                                 </p>
                                 
@@ -4050,7 +4125,7 @@ const DispatcherDashboard = () => {
                             exit={{ scale: 0.94, opacity: 0, y: 16 }}
                             transition={{ type: 'spring', damping: 26, stiffness: 280 }}
                             onClick={(e) => e.stopPropagation()}
-                            className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[88vh]"
+                            className="relative w-full max-w-5xl xl:max-w-6xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]"
                         >
                             {/* Top Accent Gradient Strip */}
                             <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
@@ -4058,60 +4133,106 @@ const DispatcherDashboard = () => {
                             {/* Modal Header */}
                             <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
                                 <div className="flex items-center justify-between gap-3 mb-2.5">
-                                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-[11px] font-bold text-orange-600 dark:text-orange-400">
-                                        <span className="relative flex h-2 w-2">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-                                        </span>
-                                        <span>PULSO DISPATCH LIFECYCLE AUDIT</span>
+                                    <div className="flex items-center gap-2.5 flex-wrap">
+                                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                                            </span>
+                                            <span>PULSO DISPATCH LIFECYCLE AUDIT</span>
+                                        </div>
+                                        {(() => {
+                                            const raw = (selectedReport.status || '').toLowerCase();
+                                            const isResolved = ['resolved', 'completed', 'fixed', 'closed'].some(k => raw.includes(k));
+                                            const isDispatched = ['dispatched', 'in progress', 'in_progress', 'ongoing'].some(k => raw.includes(k));
+                                            const isAssigned = ['assigned', 'approved_internal', 'approved for w.o.', 'approved for work order', 'approved'].some(k => raw.includes(k)) || isDispatched || isResolved;
+                                            const isVerified = ['verified', 'pending_approval', 'awaiting approval'].some(k => raw.includes(k)) || isAssigned || isDispatched || isResolved;
+                                            const currentStage = isResolved ? 5 : isDispatched ? 4 : isAssigned ? 3 : isVerified ? 2 : 1;
+                                            const progressPct = currentStage * 20;
+
+                                            return (
+                                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-mono-data font-bold text-slate-700 dark:text-slate-300">
+                                                    <span>Phase {currentStage} of 5</span>
+                                                    <span className="text-slate-400">•</span>
+                                                    <span className={isResolved ? 'text-emerald-500' : 'text-[#ff6b00]'}>
+                                                        {progressPct}% {isResolved ? 'Completed' : 'Dispatched'}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                     <button
                                         onClick={() => setIsAuditModalOpen(false)}
-                                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
                                         aria-label="Close modal"
                                     >
                                         <X size={16} />
                                     </button>
                                 </div>
 
-                                <h2 className="text-xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-                                    Milestone Progress & Audit
-                                </h2>
+                                <div className="flex items-baseline justify-between flex-wrap gap-2">
+                                    <h2 className="text-xl sm:text-2xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                                        Milestone Progress & Audit
+                                    </h2>
+                                    <span className="text-xs font-mono-data text-slate-500 dark:text-slate-400">
+                                        Authoritative Municipal Dispatch Sequence & SLA Telemetry
+                                    </span>
+                                </div>
                                 
-                                {/* Report Summary Lockup */}
-                                <div className="mt-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2 mb-0.5">
-                                            <span className="font-mono text-xs font-extrabold text-orange-500">
-                                                #{formatTicketId(selectedReport.ticket_id, selectedReport.id)}
-                                            </span>
-                                            {selectedReport.barangay && (
-                                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
-                                                    <span>•</span>
-                                                    <MapPin size={10} className="text-slate-400 shrink-0" />
-                                                    <span>Brgy. {selectedReport.barangay}</span>
-                                                </span>
-                                            )}
+                                {/* Report Summary Lockup Banner */}
+                                <div className="mt-3.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between flex-wrap gap-3">
+                                    <div className="min-w-0 flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-orange-500/10 dark:bg-orange-950/40 text-[#ff6b00] border border-orange-500/20 flex items-center justify-center font-mono-data font-black text-xs shrink-0">
+                                            WO
                                         </div>
-                                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-                                            {getReportPlainTitle(selectedReport)}
-                                        </h4>
-                                    </div>
-                                    {(() => {
-                                        const desc = getStatusDescriptor(selectedReport.status);
-                                        const StatusIcon = desc.icon || Clock;
-                                        return (
-                                            <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${desc.badgeClass}`}>
-                                                <StatusIcon size={12} className="shrink-0" />
-                                                <span>{desc.label}</span>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <span className="font-mono text-xs font-extrabold text-orange-500">
+                                                    {formatTicketId(selectedReport.ticket_id, selectedReport.id)}
+                                                </span>
+                                                {selectedReport.barangay && (
+                                                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
+                                                        <span>•</span>
+                                                        <MapPin size={10} className="text-slate-400 shrink-0" />
+                                                        <span>Brgy. {selectedReport.barangay}</span>
+                                                    </span>
+                                                )}
+                                                {selectedReport.category && (
+                                                    <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 truncate hidden sm:inline-flex items-center gap-1">
+                                                        <span>•</span>
+                                                        <span>{selectedReport.category}</span>
+                                                    </span>
+                                                )}
                                             </div>
-                                        );
-                                    })()}
+                                            <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                                                {getReportPlainTitle(selectedReport)}
+                                            </h4>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2.5 shrink-0">
+                                        {selectedReport.assigned_to && (
+                                            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-mono-data text-slate-600 dark:text-slate-300">
+                                                <span className="text-slate-400">Fleet:</span>
+                                                <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">{selectedReport.assigned_to}</span>
+                                            </div>
+                                        )}
+                                        {(() => {
+                                            const desc = getStatusDescriptor(selectedReport.status);
+                                            const StatusIcon = desc.icon || Clock;
+                                            return (
+                                                <div className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${desc.badgeClass}`}>
+                                                    <StatusIcon size={13} className="shrink-0" />
+                                                    <span>{desc.label}</span>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Stepper Body */}
-                            <div className="p-6 overflow-y-auto space-y-6">
+                            {/* Stepper Body: Landscape 5-Phase Assembly Pipeline */}
+                            <div className="p-6 overflow-y-auto space-y-5">
                                 {/* Rejected Alert Banner if applicable */}
                                 {['rejected', 'cancelled', 'canceled', 'spam', 'invalid'].some(k => (selectedReport.status || '').toLowerCase().includes(k)) && (
                                     <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-400 text-xs flex items-start gap-2.5">
@@ -4123,119 +4244,156 @@ const DispatcherDashboard = () => {
                                     </div>
                                 )}
 
-                                {/* Timeline List */}
-                                <div className="relative pl-7 space-y-6 before:absolute before:left-[11px] before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
-                                    {(() => {
-                                        const raw = (selectedReport.status || '').toLowerCase();
-                                        const isResolved = ['resolved', 'completed', 'fixed', 'closed'].some(k => raw.includes(k));
-                                        const isDispatched = ['dispatched', 'in progress', 'in_progress', 'ongoing'].some(k => raw.includes(k));
-                                        const isAssigned = ['assigned', 'approved_internal', 'approved for w.o.', 'approved for work order', 'approved'].some(k => raw.includes(k)) || isDispatched || isResolved;
-                                        const isVerified = ['verified', 'pending_approval', 'awaiting approval'].some(k => raw.includes(k)) || isAssigned || isDispatched || isResolved;
-                                        const isRejected = ['rejected', 'cancelled', 'canceled', 'spam', 'invalid'].some(k => raw.includes(k));
+                                {(() => {
+                                    const raw = (selectedReport.status || '').toLowerCase();
+                                    const isResolved = ['resolved', 'completed', 'fixed', 'closed'].some(k => raw.includes(k));
+                                    const isDispatched = ['dispatched', 'in progress', 'in_progress', 'ongoing'].some(k => raw.includes(k));
+                                    const isAssigned = ['assigned', 'approved_internal', 'approved for w.o.', 'approved for work order', 'approved'].some(k => raw.includes(k)) || isDispatched || isResolved;
+                                    const isVerified = ['verified', 'pending_approval', 'awaiting approval'].some(k => raw.includes(k)) || isAssigned || isDispatched || isResolved;
+                                    const isRejected = ['rejected', 'cancelled', 'canceled', 'spam', 'invalid'].some(k => raw.includes(k));
 
-                                        const milestones = [
-                                            {
-                                                phase: 'Phase 1',
-                                                title: 'Citizen Intake & AI Vision Analysis',
-                                                description: 'Citizen report logged with photo evidence, GPS geotagging, and Gemini AI auto-classification.',
-                                                meta: selectedReport.created_at ? `Logged on ${new Date(selectedReport.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Logged in PULSO Portal',
-                                                isDone: true,
-                                                isActive: false
-                                            },
-                                            {
-                                                phase: 'Phase 2',
-                                                title: 'Staff Triage & Hazard Verification',
-                                                description: 'LGU desk dispatcher confirms physical report authenticity, inspects street hazards, and validates municipal service category.',
-                                                meta: isVerified ? 'Verified by Staff Dispatcher' : (isRejected ? 'Declined at Triage' : 'Awaiting Desk Verification'),
-                                                isDone: isVerified,
-                                                isActive: !isVerified && !isRejected
-                                            },
-                                            {
-                                                phase: 'Phase 3',
-                                                title: 'Work Order & Division Dispatch',
-                                                description: 'Department chief approves work order, locks required engineering resources, and assigns the responsible field fleet.',
-                                                meta: isAssigned ? `Assigned: ${selectedReport.assigned_to || 'City Engineering Fleet'}` : (isVerified ? 'Ready for Division Assignment' : 'Pending Verification'),
-                                                isDone: isAssigned,
-                                                isActive: isVerified && !isAssigned && !isRejected
-                                            },
-                                            {
-                                                phase: 'Phase 4',
-                                                title: 'Field Operations & On-Site Repair',
-                                                description: 'Dispatched engineering crew arrives on site with heavy equipment, safety perimeters, and executes infrastructure repair.',
-                                                meta: isResolved ? 'Field Work Completed' : (isDispatched ? 'Field Crew Active On-Site' : 'Pending Crew Deployment'),
-                                                isDone: isResolved,
-                                                isActive: isDispatched && !isResolved
-                                            },
-                                            {
-                                                phase: 'Phase 5',
-                                                title: 'Final Quality Audit & Resolution',
-                                                description: 'Field supervisor captures completion photo evidence, signs off on resolution, and triggers automated citizen SMS/email notification.',
-                                                meta: isResolved ? 'Audit Complete • Citizen Notified' : 'Awaiting Work Completion Sign-Off',
-                                                isDone: isResolved,
-                                                isActive: false
-                                            }
-                                        ];
+                                    const milestones = [
+                                        {
+                                            phase: 'Phase 1',
+                                            title: 'Citizen Intake & AI Vision Analysis',
+                                            description: 'Citizen report logged with photo evidence, GPS geotagging, and Gemini AI auto-classification.',
+                                            meta: selectedReport.created_at ? `Logged on ${new Date(selectedReport.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Logged in PULSO Portal',
+                                            isDone: true,
+                                            isActive: false
+                                        },
+                                        {
+                                            phase: 'Phase 2',
+                                            title: 'Staff Triage & Hazard Verification',
+                                            description: 'LGU desk dispatcher confirms physical report authenticity, inspects street hazards, and validates municipal service category.',
+                                            meta: isVerified ? 'Verified by Staff Dispatcher' : (isRejected ? 'Declined at Triage' : 'Awaiting Desk Verification'),
+                                            isDone: isVerified,
+                                            isActive: !isVerified && !isRejected
+                                        },
+                                        {
+                                            phase: 'Phase 3',
+                                            title: 'Work Order & Division Dispatch',
+                                            description: 'Department chief approves work order, locks required engineering resources, and assigns the responsible field fleet.',
+                                            meta: isAssigned ? `Assigned: ${selectedReport.assigned_to || 'City Engineering Fleet'}` : (isVerified ? 'Ready for Division Assignment' : 'Pending Verification'),
+                                            isDone: isAssigned,
+                                            isActive: isVerified && !isAssigned && !isRejected
+                                        },
+                                        {
+                                            phase: 'Phase 4',
+                                            title: 'Field Operations & On-Site Repair',
+                                            description: 'Dispatched engineering crew arrives on site with heavy equipment, safety perimeters, and executes infrastructure repair.',
+                                            meta: isResolved ? 'Field Work Completed' : (isDispatched ? 'Field Crew Active On-Site' : 'Pending Crew Deployment'),
+                                            isDone: isResolved,
+                                            isActive: isDispatched && !isResolved
+                                        },
+                                        {
+                                            phase: 'Phase 5',
+                                            title: 'Final Quality Audit & Resolution',
+                                            description: 'Field supervisor captures completion photo evidence, signs off on resolution, and triggers automated citizen SMS/email notification.',
+                                            meta: isResolved ? 'Audit Complete • Citizen Notified' : 'Awaiting Work Completion Sign-Off',
+                                            isDone: isResolved,
+                                            isActive: false
+                                        }
+                                    ];
 
-                                        return milestones.map((m, idx) => (
-                                            <div key={idx} className="relative flex items-start gap-4">
-                                                {/* Icon Indicator */}
-                                                <div className="absolute -left-7 mt-0.5">
-                                                    {m.isDone ? (
-                                                        <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/25 ring-4 ring-white dark:ring-slate-900">
-                                                            <CheckCircle2 size={13} />
-                                                        </div>
-                                                    ) : m.isActive ? (
-                                                        <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-md shadow-orange-500/25 ring-4 ring-orange-500/20 animate-pulse">
-                                                            <Activity size={12} />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-[10px] font-bold flex items-center justify-center ring-4 ring-white dark:ring-slate-900">
-                                                            {idx + 1}
-                                                        </div>
-                                                    )}
-                                                </div>
+                                    return (
+                                        <div className="space-y-4">
+                                            {/* Horizontal Stepper Connector Bar (Visible on tablet/desktop) */}
+                                            <div className="hidden md:flex items-center justify-between relative px-8 py-2">
+                                                {/* Background Track Line */}
+                                                <div className="absolute left-14 right-14 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 dark:bg-slate-800 z-0" />
 
-                                                {/* Content Card */}
-                                                <div className={`flex-1 p-3.5 rounded-2xl transition-all ${
-                                                    m.isActive 
-                                                        ? 'bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/25 shadow-sm' 
-                                                        : m.isDone
-                                                            ? 'bg-slate-50/80 dark:bg-slate-950/40 border border-slate-200/70 dark:border-slate-800/70'
-                                                            : 'opacity-60 bg-transparent border border-transparent'
-                                                }`}>
-                                                    <div className="flex items-center justify-between gap-2 mb-1">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-500 shrink-0">
-                                                                {m.phase}
-                                                            </span>
-                                                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                                                                {m.title}
-                                                            </h4>
-                                                        </div>
-                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                                                            m.isDone 
-                                                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
-                                                                : m.isActive
-                                                                    ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
-                                                                    : 'text-slate-400 dark:text-slate-500'
+                                                {/* Active Progress Track Line */}
+                                                <div
+                                                    className="absolute left-14 top-1/2 -translate-y-1/2 h-0.5 bg-gradient-to-r from-emerald-500 via-emerald-500 to-orange-500 z-0 transition-all duration-500"
+                                                    style={{
+                                                        width: isResolved ? 'calc(100% - 112px)' : isDispatched ? 'calc(75% - 84px)' : isAssigned ? 'calc(50% - 56px)' : isVerified ? 'calc(25% - 28px)' : '0%'
+                                                    }}
+                                                />
+
+                                                {/* 5 Step Nodes */}
+                                                {milestones.map((m, idx) => (
+                                                    <div key={`node-${idx}`} className="relative z-10 flex flex-col items-center">
+                                                        {m.isDone ? (
+                                                            <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/25 ring-4 ring-white dark:ring-slate-900 transition-transform">
+                                                                <CheckCircle2 size={16} />
+                                                            </div>
+                                                        ) : m.isActive ? (
+                                                            <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 ring-4 ring-orange-500/25 animate-pulse">
+                                                                <Activity size={15} />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-xs font-bold flex items-center justify-center ring-4 ring-white dark:ring-slate-900">
+                                                                {idx + 1}
+                                                            </div>
+                                                        )}
+                                                        <span className={`text-[10px] font-mono-data font-bold mt-1.5 uppercase tracking-wider ${
+                                                            m.isActive ? 'text-orange-500' : m.isDone ? 'text-emerald-500' : 'text-slate-400 dark:text-slate-500'
                                                         }`}>
-                                                            {m.isDone ? 'Completed' : (m.isActive ? 'In Progress' : 'Queued')}
+                                                            {m.phase}
                                                         </span>
                                                     </div>
-
-                                                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
-                                                        {m.description}
-                                                    </p>
-
-                                                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800/80 text-[10px] font-mono font-medium text-slate-600 dark:text-slate-300">
-                                                        <Sparkles size={10} className="text-orange-500 shrink-0" />
-                                                        <span>{m.meta}</span>
-                                                    </div>
-                                                </div>
+                                                ))}
                                             </div>
-                                        ));
-                                    })()}
-                                </div>
+
+                                            {/* 5-Column Landscape Milestone Grid */}
+                                            <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5 items-stretch">
+                                                {milestones.map((m, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className={`p-3.5 rounded-2xl flex flex-col justify-between min-h-[190px] transition-all relative overflow-hidden ${
+                                                            m.isActive
+                                                                ? 'bg-orange-500/5 dark:bg-orange-500/10 border-2 border-orange-500/40 shadow-lg shadow-orange-500/10'
+                                                                : m.isDone
+                                                                    ? 'bg-slate-50/80 dark:bg-slate-950/40 border border-emerald-500/20 dark:border-emerald-500/20'
+                                                                    : 'opacity-70 bg-slate-50/40 dark:bg-slate-950/20 border border-slate-200/60 dark:border-slate-800/60'
+                                                        }`}
+                                                    >
+                                                        {/* Active Phase Top Accent */}
+                                                        {m.isActive && (
+                                                            <div className="absolute top-0 left-0 right-0 h-1 bg-[#ff6b00]" />
+                                                        )}
+
+                                                        <div>
+                                                            {/* Header: Phase badge & Status Pill */}
+                                                            <div className="flex items-center justify-between gap-1.5 mb-2">
+                                                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-500 font-mono-data">
+                                                                    {m.phase}
+                                                                </span>
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 font-mono-data ${
+                                                                    m.isDone
+                                                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                                                        : m.isActive
+                                                                            ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 animate-pulse'
+                                                                            : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50'
+                                                                }`}>
+                                                                    {m.isDone ? 'Completed' : (m.isActive ? 'In Progress' : 'Queued')}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Phase Title */}
+                                                            <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-snug mb-1.5">
+                                                                {m.title}
+                                                            </h4>
+
+                                                            {/* Description */}
+                                                            <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                                                {m.description}
+                                                            </p>
+                                                        </div>
+
+                                                        {/* Meta Pill pinned at bottom */}
+                                                        <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
+                                                            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800/80 text-[10px] font-mono-data font-medium text-slate-600 dark:text-slate-300 max-w-full">
+                                                                <Sparkles size={11} className="text-orange-500 shrink-0" />
+                                                                <span className="truncate">{m.meta}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {/* Footer Controls */}
@@ -4257,7 +4415,7 @@ const DispatcherDashboard = () => {
                                 <button
                                     type="button"
                                     onClick={() => setIsAuditModalOpen(false)}
-                                    className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                                    className="px-6 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
                                 >
                                     Done
                                 </button>

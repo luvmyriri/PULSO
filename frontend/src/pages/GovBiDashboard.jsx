@@ -33,6 +33,8 @@ import {
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
 import ThemeToggle from '../components/ThemeToggle';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovUserDropdown from '../components/GovUserDropdown';
 import Swal from 'sweetalert2';
 
 // ─── Constants & Fallback Reference BI Data ──────────────────────────────────
@@ -72,6 +74,40 @@ const GENERATE_TIME_SERIES = () => [
     { date: 'Aug 29', total: 61, resolved: 53, critical: 9 },
     { date: 'Sep 02', total: 58, resolved: 50, critical: 6 },
     { date: 'Sep 04', total: 65, resolved: 57, critical: 7 }
+];
+
+const TIME_SERIES_TOTALS = {
+    total: 430,
+    resolved: 369,
+    critical: 55,
+    rate: '85.8%'
+};
+
+function buildSmoothPath(points) {
+    if (!points || !points.length) return '';
+    return points.reduce((acc, pt, i, arr) => {
+        if (i === 0) return `M ${pt.x},${pt.y}`;
+        const prev = arr[i - 1];
+        const cpX = (prev.x + pt.x) / 2;
+        return `${acc} C ${cpX},${prev.y} ${cpX},${pt.y} ${pt.x},${pt.y}`;
+    }, '');
+}
+
+// Status Pipeline Breakdown Dataset
+const STATUS_PIPELINE_DATA = [
+    { stage: 'Received', count: 48, pct: 3.7, cumulative: 3.7, role: 'Citizen Intake & Geotagging', color: '#64748b' },
+    { stage: 'Verified', count: 64, pct: 5.0, cumulative: 8.7, role: 'Dispatcher Hazard Review', color: '#ff6b00' },
+    { stage: 'Assigned', count: 90, pct: 7.0, cumulative: 15.7, role: 'Work Order Dispatched', color: '#0284c7' },
+    { stage: 'In progress', count: 128, pct: 10.0, cumulative: 25.7, role: 'Field Crew Operations', color: '#10b981' },
+    { stage: 'Resolved', count: 954, pct: 74.3, cumulative: 100.0, role: 'Audit Verified & Citizen SMS', color: '#14b8a6' }
+];
+
+// Severity Distribution Dataset
+const SEVERITY_DISTRIBUTION_DATA = [
+    { level: 'Critical', count: 105, pct: 8.2, sla: '4h SLA', color: '#ef4444', desc: 'Immediate risk to life / high traffic artery' },
+    { level: 'High', count: 293, pct: 22.8, sla: '24h SLA', color: '#ff6b00', desc: 'Significant structural impairment / hazard' },
+    { level: 'Medium', count: 686, pct: 53.4, sla: '72h SLA', color: '#f59e0b', desc: 'Standard deterioration / maintenance repair' },
+    { level: 'Low', count: 200, pct: 15.6, sla: '15.6%', color: '#64748b', desc: 'Cosmetic or preventive civil intervention' }
 ];
 
 // Top 10 Barangays by Volume
@@ -134,6 +170,9 @@ export default function GovBiDashboard() {
         bottleneck: 'chart',
         teams: 'chart'
     });
+
+    // Hovered index for interactive trend graph
+    const [hoveredTrendIndex, setHoveredTrendIndex] = useState(null);
 
     // Loading indicator
     const [isLoading, setIsLoading] = useState(false);
@@ -229,7 +268,7 @@ export default function GovBiDashboard() {
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
 
                 {/* ── TOP APP BAR ───────────────────────────────────────────── */}
-                <header className="h-16 px-6 flex items-center justify-between shrink-0 bg-white dark:bg-[#0c1424] border-b border-slate-200 dark:border-slate-800/80 z-20">
+                <header className="h-16 px-6 flex items-center justify-between shrink-0 bg-white dark:bg-[#0c1424] border-b border-slate-200 dark:border-slate-800/80 relative z-50">
                     {/* Left: Breadcrumbs & Heading */}
                     <div className="flex flex-col text-left">
                         <div className="flex items-center gap-1.5 text-[11px] font-mono-data text-slate-400">
@@ -264,36 +303,15 @@ export default function GovBiDashboard() {
                         <ThemeToggle />
 
                         {/* Notification Bell */}
-                        <button
-                            type="button"
-                            className="relative p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors cursor-pointer"
-                            title="3 Active Operational Alerts"
-                        >
-                            <Bell size={18} />
-                            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#ff6b00] text-white text-[10px] font-mono-data font-bold flex items-center justify-center">
-                                3
-                            </span>
-                        </button>
+                        <GovNotificationDropdown />
 
-                        {/* User Badge */}
-                        <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center font-heading font-bold text-xs shadow-inner">
-                                AR
-                            </div>
-                            <div className="hidden lg:flex flex-col text-left leading-none">
-                                <span className="font-heading font-bold text-xs text-slate-800 dark:text-white">
-                                    {currentUser?.name || 'Ana Reyes'}
-                                </span>
-                                <span className="text-[10px] font-mono-data text-slate-400 mt-0.5">
-                                    {currentUser?.roleLabel || 'Dispatcher'}
-                                </span>
-                            </div>
-                        </div>
+                        {/* User Profile & Sign Out Dropdown */}
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 
                 {/* ── TOP FILTER BAR (Citizen Reports Pattern) ──────────────── */}
-                <div ref={dropdownRef} className="px-6 py-3 shrink-0 bg-white/70 dark:bg-[#09101f] border-b border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 z-10 backdrop-blur-sm">
+                <div ref={dropdownRef} className="px-6 py-3 shrink-0 bg-white/70 dark:bg-[#09101f] border-b border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 relative z-30 backdrop-blur-sm">
                     <div className="flex flex-wrap items-center gap-2">
                         {/* 1. Date Range Picker */}
                         <div className="relative">
@@ -577,7 +595,7 @@ export default function GovBiDashboard() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                         {/* ───────────────────────────────────────────────────────
-                            Chart 1: Reports Over Time (Line Chart, Hero Curve)
+                            Chart 1: Reports Over Time (Line Chart, Hero Curve with Numbers)
                         ──────────────────────────────────────────────────────── */}
                         <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-5 shadow-xs flex flex-col justify-between">
                             {/* Card Header */}
@@ -605,97 +623,251 @@ export default function GovBiDashboard() {
                                 </div>
                             </div>
 
-                            {/* Legend */}
-                            <div className="flex items-center gap-4 text-xs font-mono-data pt-3">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-1 rounded-full bg-[#ff6b00]" />
-                                    <span className="text-slate-700 dark:text-slate-300 font-bold">Total Intake</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-1 rounded-full bg-[#10b981]" />
-                                    <span className="text-slate-500">Resolved Cases</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-1 rounded-full bg-[#ef4444]" />
-                                    <span className="text-slate-500">Critical Alerts</span>
+                            {/* Legend with Number Format Metrics */}
+                            <div className="flex items-center justify-between flex-wrap gap-2 pt-3 text-xs font-mono-data">
+                                <div className="flex items-center gap-2.5 flex-wrap">
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-orange-500/10 dark:bg-orange-950/30 border border-orange-500/20">
+                                        <span className="w-2.5 h-1.5 rounded-full bg-[#ff6b00]" />
+                                        <span className="text-slate-700 dark:text-slate-300 font-bold">Intake:</span>
+                                        <span className="text-[#ff6b00] font-black">{TIME_SERIES_TOTALS.total}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/20">
+                                        <span className="w-2.5 h-1.5 rounded-full bg-[#10b981]" />
+                                        <span className="text-slate-700 dark:text-slate-300 font-bold">Resolved:</span>
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-black">{TIME_SERIES_TOTALS.resolved} <span className="text-[10px] font-semibold text-emerald-500/80">({TIME_SERIES_TOTALS.rate})</span></span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-500/10 dark:bg-red-950/30 border border-red-500/20">
+                                        <span className="w-2.5 h-1.5 rounded-full bg-[#ef4444]" />
+                                        <span className="text-slate-700 dark:text-slate-300 font-bold">Critical:</span>
+                                        <span className="text-red-600 dark:text-red-400 font-black">{TIME_SERIES_TOTALS.critical} <span className="text-[10px] font-semibold text-red-500/80">({(TIME_SERIES_TOTALS.critical / TIME_SERIES_TOTALS.total * 100).toFixed(1)}%)</span></span>
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Visualization Body */}
                             <div className="h-64 mt-3 flex items-center justify-center">
-                                {viewMode.trend === 'chart' ? (
-                                    <svg viewBox="0 0 500 220" className="w-full h-full overflow-visible" role="img" aria-label="Line chart of Reports Over Time">
-                                        {/* Grid lines */}
-                                        {[0, 50, 100, 150, 200].map((y) => (
-                                            <line key={y} x1="30" y1={y} x2="490" y2={y} stroke="currentColor" className="text-slate-100 dark:text-slate-800/60" strokeDasharray="3 3" />
-                                        ))}
-                                        {/* Hero Curve - Total Intake (PULSO Orange #ff6b00) */}
-                                        <path
-                                            d="M 30,170 Q 85,150 145,120 T 260,110 T 375,60 T 490,40"
-                                            fill="none"
-                                            stroke="#ff6b00"
-                                            strokeWidth="3.5"
-                                            strokeLinecap="round"
-                                        />
-                                        {/* Resolved Curve - Emerald */}
-                                        <path
-                                            d="M 30,185 Q 85,165 145,135 T 260,125 T 375,80 T 490,65"
-                                            fill="none"
-                                            stroke="#10b981"
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                        />
-                                        {/* Critical Curve - Red */}
-                                        <path
-                                            d="M 30,205 Q 85,198 145,195 T 260,190 T 375,185 T 490,180"
-                                            fill="none"
-                                            stroke="#ef4444"
-                                            strokeWidth="2"
-                                            strokeDasharray="4 4"
-                                        />
-                                        {/* Dynamic Data Points on Hero Curve */}
-                                        {[
-                                            { cx: 30, cy: 170, val: 28 },
-                                            { cx: 145, cy: 120, val: 42 },
-                                            { cx: 260, cy: 110, val: 48 },
-                                            { cx: 375, cy: 60, val: 61 },
-                                            { cx: 490, cy: 40, val: 65 }
-                                        ].map((pt, i) => (
-                                            <g key={i} className="group cursor-pointer">
-                                                <circle cx={pt.cx} cy={pt.cy} r="5" fill="#ff6b00" className="stroke-white dark:stroke-[#0c1424] stroke-2 transition-transform group-hover:scale-125" />
-                                                <text x={pt.cx} y={pt.cy - 9} textAnchor="middle" className="text-[10px] font-mono-data font-bold fill-slate-700 dark:fill-slate-200">
-                                                    {pt.val}
+                                {viewMode.trend === 'chart' ? (() => {
+                                    const timeSeries = GENERATE_TIME_SERIES();
+                                    const getY = (val) => 175 - (val / 70) * 150;
+                                    const trendPoints = timeSeries.map((d, i) => ({
+                                        ...d,
+                                        x: 44 + i * 55.5,
+                                        yTotal: getY(d.total),
+                                        yResolved: getY(d.resolved),
+                                        yCritical: getY(d.critical)
+                                    }));
+                                    const totalPath = buildSmoothPath(trendPoints.map(p => ({ x: p.x, y: p.yTotal })));
+                                    const resolvedPath = buildSmoothPath(trendPoints.map(p => ({ x: p.x, y: p.yResolved })));
+                                    const criticalPath = buildSmoothPath(trendPoints.map(p => ({ x: p.x, y: p.yCritical })));
+                                    const areaPath = totalPath ? `${totalPath} L ${trendPoints[trendPoints.length - 1].x},175 L ${trendPoints[0].x},175 Z` : '';
+                                    const activePt = hoveredTrendIndex !== null ? trendPoints[hoveredTrendIndex] : null;
+
+                                    return (
+                                        <svg viewBox="0 0 520 220" className="w-full h-full overflow-visible" role="img" aria-label="Line chart of Reports Over Time with numbers">
+                                            <defs>
+                                                <linearGradient id="hero-trend-gradient" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#ff6b00" stopOpacity="0.22" />
+                                                    <stop offset="100%" stopColor="#ff6b00" stopOpacity="0.0" />
+                                                </linearGradient>
+                                            </defs>
+
+                                            {/* Y-Axis scale numbers and horizontal gridlines */}
+                                            {[
+                                                { val: 70, y: 25 },
+                                                { val: 50, y: 68 },
+                                                { val: 30, y: 111 },
+                                                { val: 10, y: 154 },
+                                                { val: 0, y: 175 }
+                                            ].map(({ val, y }) => (
+                                                <g key={val}>
+                                                    <line x1="42" y1={y} x2="492" y2={y} stroke="currentColor" className="text-slate-100 dark:text-slate-800/70" strokeDasharray="3 3" />
+                                                    <text x="36" y={y + 3.5} textAnchor="end" className="text-[10px] font-mono-data font-bold fill-slate-400 dark:fill-slate-500">
+                                                        {val}
+                                                    </text>
+                                                </g>
+                                            ))}
+
+                                            {/* Area Gradient Under Intake Curve */}
+                                            {areaPath && (
+                                                <path d={areaPath} fill="url(#hero-trend-gradient)" />
+                                            )}
+
+                                            {/* Critical Curve - Red Dashed */}
+                                            <path
+                                                d={criticalPath}
+                                                fill="none"
+                                                stroke="#ef4444"
+                                                strokeWidth="1.8"
+                                                strokeDasharray="4 3"
+                                                strokeLinecap="round"
+                                            />
+
+                                            {/* Resolved Curve - Emerald */}
+                                            <path
+                                                d={resolvedPath}
+                                                fill="none"
+                                                stroke="#10b981"
+                                                strokeWidth="2.2"
+                                                strokeLinecap="round"
+                                            />
+
+                                            {/* Hero Curve - Total Intake (PULSO Orange #ff6b00) */}
+                                            <path
+                                                d={totalPath}
+                                                fill="none"
+                                                stroke="#ff6b00"
+                                                strokeWidth="3.2"
+                                                strokeLinecap="round"
+                                            />
+
+                                            {/* Data Points on Critical Line */}
+                                            {trendPoints.map((pt, i) => (
+                                                <circle
+                                                    key={`crit-${i}`}
+                                                    cx={pt.x}
+                                                    cy={pt.yCritical}
+                                                    r={hoveredTrendIndex === i ? 4.5 : 2.5}
+                                                    fill="#ef4444"
+                                                    className="stroke-white dark:stroke-[#0c1424] stroke-1 transition-all"
+                                                />
+                                            ))}
+
+                                            {/* Data Points on Resolved Line */}
+                                            {trendPoints.map((pt, i) => (
+                                                <circle
+                                                    key={`res-${i}`}
+                                                    cx={pt.x}
+                                                    cy={pt.yResolved}
+                                                    r={hoveredTrendIndex === i ? 5 : 3}
+                                                    fill="#10b981"
+                                                    className="stroke-white dark:stroke-[#0c1424] stroke-1.5 transition-all"
+                                                />
+                                            ))}
+
+                                            {/* Hero Curve Data Points with Prominent Number Format */}
+                                            {trendPoints.map((pt, i) => {
+                                                const isHovered = hoveredTrendIndex === i;
+                                                return (
+                                                    <g key={`intake-${i}`} className="cursor-pointer">
+                                                        <circle
+                                                            cx={pt.x}
+                                                            cy={pt.yTotal}
+                                                            r={isHovered ? 6 : 4}
+                                                            fill="#ff6b00"
+                                                            className="stroke-white dark:stroke-[#0c1424] stroke-2 transition-transform"
+                                                        />
+                                                        {/* Number Format Pill on Hero Curve */}
+                                                        <text
+                                                            x={pt.x}
+                                                            y={pt.yTotal - 8}
+                                                            textAnchor="middle"
+                                                            className={`text-[10px] font-mono-data font-black transition-all ${
+                                                                isHovered 
+                                                                    ? 'fill-[#ff6b00] text-[11px]' 
+                                                                    : 'fill-slate-900 dark:fill-slate-100'
+                                                            }`}
+                                                        >
+                                                            {pt.total}
+                                                        </text>
+                                                    </g>
+                                                );
+                                            })}
+
+                                            {/* Active Hover Guideline & HUD Tooltip */}
+                                            {activePt && (
+                                                <g>
+                                                    <line
+                                                        x1={activePt.x}
+                                                        y1="25"
+                                                        x2={activePt.x}
+                                                        y2="175"
+                                                        stroke="#ff6b00"
+                                                        strokeWidth="1.2"
+                                                        strokeDasharray="3 3"
+                                                        opacity="0.8"
+                                                    />
+                                                    <g transform={`translate(${Math.min(340, Math.max(45, activePt.x - 85))}, 4)`}>
+                                                        <rect
+                                                            width="170"
+                                                            height="22"
+                                                            rx="6"
+                                                            className="fill-slate-900 dark:fill-[#030712] stroke-slate-700/80 stroke-1 shadow-xl"
+                                                        />
+                                                        <text x="85" y="15" textAnchor="middle" className="text-[10px] font-mono-data font-bold fill-white">
+                                                            {activePt.date}: <tspan fill="#ff6b00">{activePt.total}</tspan> in · <tspan fill="#10b981">{activePt.resolved}</tspan> res · <tspan fill="#ef4444">{activePt.critical}</tspan> crit
+                                                        </text>
+                                                    </g>
+                                                </g>
+                                            )}
+
+                                            {/* Invisible Hover Hit Zones */}
+                                            {trendPoints.map((pt, i) => (
+                                                <rect
+                                                    key={`hit-${i}`}
+                                                    x={pt.x - 27}
+                                                    y={15}
+                                                    width={54}
+                                                    height={185}
+                                                    fill="transparent"
+                                                    className="cursor-pointer"
+                                                    onMouseEnter={() => setHoveredTrendIndex(i)}
+                                                    onMouseLeave={() => setHoveredTrendIndex(null)}
+                                                />
+                                            ))}
+
+                                            {/* X-Axis Date Labels */}
+                                            {trendPoints.map((pt, i) => (
+                                                <text
+                                                    key={`date-${i}`}
+                                                    x={pt.x}
+                                                    y="198"
+                                                    textAnchor="middle"
+                                                    className={`text-[9.5px] font-mono-data transition-colors ${
+                                                        hoveredTrendIndex === i
+                                                            ? 'fill-[#ff6b00] font-bold'
+                                                            : 'fill-slate-400 dark:fill-slate-500'
+                                                    }`}
+                                                >
+                                                    {i === trendPoints.length - 1 ? 'Today' : pt.date}
                                                 </text>
-                                            </g>
-                                        ))}
-                                        {/* X-Axis labels */}
-                                        <text x="30" y="215" className="text-[10px] font-mono-data fill-slate-400">Aug 05</text>
-                                        <text x="145" y="215" className="text-[10px] font-mono-data fill-slate-400">Aug 13</text>
-                                        <text x="260" y="215" className="text-[10px] font-mono-data fill-slate-400">Aug 21</text>
-                                        <text x="375" y="215" className="text-[10px] font-mono-data fill-slate-400">Aug 29</text>
-                                        <text x="490" y="215" textAnchor="end" className="text-[10px] font-mono-data fill-slate-400">Today</text>
-                                    </svg>
-                                ) : (
+                                            ))}
+                                        </svg>
+                                    );
+                                })() : (
                                     <div className="w-full h-full overflow-y-auto custom-scrollbar">
                                         <table className="w-full text-left text-xs font-mono-data">
                                             <thead>
-                                                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400">
-                                                    <th className="py-2">Date</th>
-                                                    <th className="py-2">Intake</th>
-                                                    <th className="py-2">Resolved</th>
-                                                    <th className="py-2">Critical</th>
+                                                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                                                    <th className="py-2 px-2">Date</th>
+                                                    <th className="py-2 px-2">Intake</th>
+                                                    <th className="py-2 px-2">Resolved</th>
+                                                    <th className="py-2 px-2">Critical</th>
+                                                    <th className="py-2 px-2 text-right">Clearance %</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                                                {GENERATE_TIME_SERIES().map((r, i) => (
-                                                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                                                        <td className="py-1.5 text-slate-600 dark:text-slate-300">{r.date}</td>
-                                                        <td className="py-1.5 font-bold text-[#ff6b00]">{r.total}</td>
-                                                        <td className="py-1.5 text-emerald-500">{r.resolved}</td>
-                                                        <td className="py-1.5 text-red-500">{r.critical}</td>
-                                                    </tr>
-                                                ))}
+                                                {GENERATE_TIME_SERIES().map((r, i) => {
+                                                    const pct = ((r.resolved / r.total) * 100).toFixed(1);
+                                                    return (
+                                                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                            <td className="py-2 px-2 text-slate-700 dark:text-slate-300 font-semibold">{r.date}</td>
+                                                            <td className="py-2 px-2 font-bold text-[#ff6b00]">{r.total}</td>
+                                                            <td className="py-2 px-2 font-bold text-emerald-600 dark:text-emerald-400">{r.resolved}</td>
+                                                            <td className="py-2 px-2 font-bold text-red-600 dark:text-red-400">{r.critical}</td>
+                                                            <td className="py-2 px-2 text-right font-mono-data font-bold text-slate-700 dark:text-slate-300">{pct}%</td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
+                                            <tfoot>
+                                                <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white bg-slate-50/50 dark:bg-slate-900/40">
+                                                    <td className="py-2 px-2">30D Total</td>
+                                                    <td className="py-2 px-2 text-[#ff6b00]">{TIME_SERIES_TOTALS.total}</td>
+                                                    <td className="py-2 px-2 text-emerald-600 dark:text-emerald-400">{TIME_SERIES_TOTALS.resolved}</td>
+                                                    <td className="py-2 px-2 text-red-600 dark:text-red-400">{TIME_SERIES_TOTALS.critical}</td>
+                                                    <td className="py-2 px-2 text-right text-emerald-600 dark:text-emerald-400">{TIME_SERIES_TOTALS.rate}</td>
+                                                </tr>
+                                            </tfoot>
                                         </table>
                                     </div>
                                 )}
@@ -717,69 +889,108 @@ export default function GovBiDashboard() {
                                 <button
                                     type="button"
                                     onClick={() => setViewMode(v => ({ ...v, status: v.status === 'chart' ? 'table' : 'chart' }))}
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-                                    title="Toggle Table"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                                    title={viewMode.status === 'chart' ? 'Switch to Accessible Table' : 'Switch to Visual Chart'}
                                     aria-label="Toggle Status table view"
                                 >
                                     {viewMode.status === 'chart' ? <Table size={14} /> : <BarChart2 size={14} />}
                                 </button>
                             </div>
 
-                            {/* Main Horizontal Stacked Bar */}
-                            <div className="my-auto py-4">
-                                <div className="text-xs font-mono-data flex justify-between text-slate-400 mb-2">
-                                    <span>Total Tracked Reports: <strong className="text-slate-800 dark:text-white">1,284</strong></span>
-                                    <span className="text-emerald-500 font-bold">87.4% Completed</span>
-                                </div>
+                            {viewMode.status === 'chart' ? (
+                                /* Main Horizontal Stacked Bar */
+                                <div className="my-auto py-4">
+                                    <div className="text-xs font-mono-data flex justify-between text-slate-400 mb-2">
+                                        <span>Total Tracked Reports: <strong className="text-slate-800 dark:text-white">1,284</strong></span>
+                                        <span className="text-emerald-500 font-bold">87.4% Completed</span>
+                                    </div>
 
-                                {/* Stacked Progress Strip */}
-                                <div className="h-9 w-full rounded-xl overflow-hidden flex bg-slate-100 dark:bg-slate-800/50 p-1 gap-1">
-                                    <div style={{ width: '4%' }} className="h-full rounded-md bg-[#64748b] transition-all hover:opacity-90" title="Received: 48 reports (3.7%)" />
-                                    <div style={{ width: '5%' }} className="h-full rounded-md bg-[#ff6b00] transition-all hover:opacity-90" title="Verified: 64 reports (5.0%)" />
-                                    <div style={{ width: '7%' }} className="h-full rounded-md bg-[#0284c7] transition-all hover:opacity-90" title="Assigned: 90 reports (7.0%)" />
-                                    <div style={{ width: '10%' }} className="h-full rounded-md bg-[#10b981] transition-all hover:opacity-90" title="In progress: 128 reports (10.0%)" />
-                                    <div style={{ width: '74%' }} className="h-full rounded-md bg-[#14b8a6] transition-all hover:opacity-90" title="Resolved: 954 reports (74.3%)" />
-                                </div>
+                                    {/* Stacked Progress Strip */}
+                                    <div className="h-9 w-full rounded-xl overflow-hidden flex bg-slate-100 dark:bg-slate-800/50 p-1 gap-1">
+                                        <div style={{ width: '4%' }} className="h-full rounded-md bg-[#64748b] transition-all hover:opacity-90" title="Received: 48 reports (3.7%)" />
+                                        <div style={{ width: '5%' }} className="h-full rounded-md bg-[#ff6b00] transition-all hover:opacity-90" title="Verified: 64 reports (5.0%)" />
+                                        <div style={{ width: '7%' }} className="h-full rounded-md bg-[#0284c7] transition-all hover:opacity-90" title="Assigned: 90 reports (7.0%)" />
+                                        <div style={{ width: '10%' }} className="h-full rounded-md bg-[#10b981] transition-all hover:opacity-90" title="In progress: 128 reports (10.0%)" />
+                                        <div style={{ width: '74%' }} className="h-full rounded-md bg-[#14b8a6] transition-all hover:opacity-90" title="Resolved: 954 reports (74.3%)" />
+                                    </div>
 
-                                {/* Detailed Stage Badges & Counts */}
-                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 text-xs font-mono-data">
-                                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800">
-                                        <div className="flex items-center gap-1.5 text-slate-400 text-[10px] uppercase font-bold">
-                                            <span className="w-2 h-2 rounded-full bg-[#64748b]" /> Received
+                                    {/* Detailed Stage Badges & Counts */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 text-xs font-mono-data">
+                                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800">
+                                            <div className="flex items-center gap-1.5 text-slate-400 text-[10px] uppercase font-bold">
+                                                <span className="w-2 h-2 rounded-full bg-[#64748b]" /> Received
+                                            </div>
+                                            <div className="text-base font-black text-slate-800 dark:text-white mt-1">48</div>
+                                            <div className="text-[10px] text-slate-400">3.7%</div>
                                         </div>
-                                        <div className="text-base font-black text-slate-800 dark:text-white mt-1">48</div>
-                                        <div className="text-[10px] text-slate-400">3.7%</div>
-                                    </div>
-                                    <div className="p-2.5 rounded-xl bg-orange-50/50 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-900/40">
-                                        <div className="flex items-center gap-1.5 text-[#ff6b00] text-[10px] uppercase font-bold">
-                                            <span className="w-2 h-2 rounded-full bg-[#ff6b00]" /> Verified
+                                        <div className="p-2.5 rounded-xl bg-orange-50/50 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-900/40">
+                                            <div className="flex items-center gap-1.5 text-[#ff6b00] text-[10px] uppercase font-bold">
+                                                <span className="w-2 h-2 rounded-full bg-[#ff6b00]" /> Verified
+                                            </div>
+                                            <div className="text-base font-black text-[#ff6b00] mt-1">64</div>
+                                            <div className="text-[10px] text-[#ff6b00]/80">5.0%</div>
                                         </div>
-                                        <div className="text-base font-black text-[#ff6b00] mt-1">64</div>
-                                        <div className="text-[10px] text-[#ff6b00]/80">5.0%</div>
-                                    </div>
-                                    <div className="p-2.5 rounded-xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-900/40">
-                                        <div className="flex items-center gap-1.5 text-sky-500 text-[10px] uppercase font-bold">
-                                            <span className="w-2 h-2 rounded-full bg-[#0284c7]" /> Assigned
+                                        <div className="p-2.5 rounded-xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-900/40">
+                                            <div className="flex items-center gap-1.5 text-sky-500 text-[10px] uppercase font-bold">
+                                                <span className="w-2 h-2 rounded-full bg-[#0284c7]" /> Assigned
+                                            </div>
+                                            <div className="text-base font-black text-sky-500 mt-1">90</div>
+                                            <div className="text-[10px] text-sky-400">7.0%</div>
                                         </div>
-                                        <div className="text-base font-black text-sky-500 mt-1">90</div>
-                                        <div className="text-[10px] text-sky-400">7.0%</div>
-                                    </div>
-                                    <div className="p-2.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40">
-                                        <div className="flex items-center gap-1.5 text-emerald-500 text-[10px] uppercase font-bold">
-                                            <span className="w-2 h-2 rounded-full bg-[#10b981]" /> In Prog.
+                                        <div className="p-2.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40">
+                                            <div className="flex items-center gap-1.5 text-emerald-500 text-[10px] uppercase font-bold">
+                                                <span className="w-2 h-2 rounded-full bg-[#10b981]" /> In Prog.
+                                            </div>
+                                            <div className="text-base font-black text-emerald-500 mt-1">128</div>
+                                            <div className="text-[10px] text-emerald-400">10.0%</div>
                                         </div>
-                                        <div className="text-base font-black text-emerald-500 mt-1">128</div>
-                                        <div className="text-[10px] text-emerald-400">10.0%</div>
-                                    </div>
-                                    <div className="p-2.5 rounded-xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40">
-                                        <div className="flex items-center gap-1.5 text-teal-500 text-[10px] uppercase font-bold">
-                                            <span className="w-2 h-2 rounded-full bg-[#14b8a6]" /> Resolved
+                                        <div className="p-2.5 rounded-xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-900/40">
+                                            <div className="flex items-center gap-1.5 text-teal-500 text-[10px] uppercase font-bold">
+                                                <span className="w-2 h-2 rounded-full bg-[#14b8a6]" /> Resolved
+                                            </div>
+                                            <div className="text-base font-black text-teal-500 mt-1">954</div>
+                                            <div className="text-[10px] text-teal-400">74.3%</div>
                                         </div>
-                                        <div className="text-base font-black text-teal-500 mt-1">954</div>
-                                        <div className="text-[10px] text-teal-400">74.3%</div>
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                /* Accessible Table View with rich number formatting */
+                                <div className="w-full h-64 overflow-y-auto custom-scrollbar my-auto py-2">
+                                    <table className="w-full text-left text-xs font-mono-data">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                                                <th className="py-2.5 px-3">Stage / Status</th>
+                                                <th className="py-2.5 px-3">Phase Role</th>
+                                                <th className="py-2.5 px-3 text-right">Reports</th>
+                                                <th className="py-2.5 px-3 text-right">Share %</th>
+                                                <th className="py-2.5 px-3 text-right">Cumulative</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                                            {STATUS_PIPELINE_DATA.map((row) => (
+                                                <tr key={row.stage} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                    <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: row.color }} />
+                                                        <span>{row.stage}</span>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 text-[11px]">{row.role}</td>
+                                                    <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">{row.count.toLocaleString()}</td>
+                                                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: row.color }}>{row.pct}%</td>
+                                                    <td className="py-2.5 px-3 text-right font-mono-data text-slate-600 dark:text-slate-400">{row.cumulative}%</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white bg-slate-50/50 dark:bg-slate-900/40">
+                                                <td className="py-2.5 px-3" colSpan={2}>Total Tracked Reports</td>
+                                                <td className="py-2.5 px-3 text-right text-[#ff6b00]">1,284</td>
+                                                <td className="py-2.5 px-3 text-right text-emerald-500">100.0%</td>
+                                                <td className="py-2.5 px-3 text-right text-emerald-500">87.4% Done</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
                         {/* ───────────────────────────────────────────────────────
@@ -797,49 +1008,88 @@ export default function GovBiDashboard() {
                                 <button
                                     type="button"
                                     onClick={() => setViewMode(v => ({ ...v, barangay: v.barangay === 'chart' ? 'table' : 'chart' }))}
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-                                    title="Toggle Table"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                                    title={viewMode.barangay === 'chart' ? 'Switch to Accessible Table' : 'Switch to Visual Chart'}
                                     aria-label="Toggle Barangay table view"
                                 >
                                     {viewMode.barangay === 'chart' ? <Table size={14} /> : <BarChart2 size={14} />}
                                 </button>
                             </div>
 
-                            {/* Horizontal Bar List */}
-                            <div className="h-80 overflow-y-auto custom-scrollbar mt-3 space-y-2.5 pr-2">
-                                {BARANGAY_VOLUME_DATA.map((b, idx) => {
-                                    const isTop1 = idx === 0;
-                                    return (
-                                        <div key={b.name} className="group">
-                                            <div className="flex items-center justify-between text-xs mb-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`w-5 h-5 rounded-md text-[10px] font-mono-data font-bold flex items-center justify-center ${
-                                                        isTop1 ? 'bg-[#ff6b00] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                                                    }`}>
-                                                        {idx + 1}
-                                                    </span>
-                                                    <span className={`font-heading font-bold ${
-                                                        isTop1 ? 'text-[#ff6b00]' : 'text-slate-800 dark:text-slate-200'
-                                                    }`}>
-                                                        {b.name}
+                            {viewMode.barangay === 'chart' ? (
+                                /* Horizontal Bar List */
+                                <div className="h-80 overflow-y-auto custom-scrollbar mt-3 space-y-2.5 pr-2">
+                                    {BARANGAY_VOLUME_DATA.map((b, idx) => {
+                                        const isTop1 = idx === 0;
+                                        return (
+                                            <div key={b.name} className="group">
+                                                <div className="flex items-center justify-between text-xs mb-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`w-5 h-5 rounded-md text-[10px] font-mono-data font-bold flex items-center justify-center ${
+                                                            isTop1 ? 'bg-[#ff6b00] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                                                        }`}>
+                                                            {idx + 1}
+                                                        </span>
+                                                        <span className={`font-heading font-bold ${
+                                                            isTop1 ? 'text-[#ff6b00]' : 'text-slate-800 dark:text-slate-200'
+                                                        }`}>
+                                                            {b.name}
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-mono-data text-xs text-slate-500 dark:text-slate-400">
+                                                        <strong className={isTop1 ? 'text-[#ff6b00]' : 'text-slate-900 dark:text-white'}>{b.count}</strong> reports ({b.pct}%)
                                                     </span>
                                                 </div>
-                                                <span className="font-mono-data text-xs text-slate-500 dark:text-slate-400">
-                                                    <strong className={isTop1 ? 'text-[#ff6b00]' : 'text-slate-900 dark:text-white'}>{b.count}</strong> reports ({b.pct}%)
-                                                </span>
+                                                <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-800/80 overflow-hidden">
+                                                    <div
+                                                        style={{ width: `${b.pct * 3.2}%` }}
+                                                        className={`h-full rounded-full transition-all duration-500 ${
+                                                            isTop1 ? 'bg-[#ff6b00]' : 'bg-slate-400 dark:bg-slate-600 group-hover:bg-[#ff6b00]'
+                                                        }`}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-800/80 overflow-hidden">
-                                                <div
-                                                    style={{ width: `${b.pct * 3.2}%` }}
-                                                    className={`h-full rounded-full transition-all duration-500 ${
-                                                        isTop1 ? 'bg-[#ff6b00]' : 'bg-slate-400 dark:bg-slate-600 group-hover:bg-[#ff6b00]'
-                                                    }`}
-                                                />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                /* Accessible Table View */
+                                <div className="w-full h-80 overflow-y-auto custom-scrollbar mt-3">
+                                    <table className="w-full text-left text-xs font-mono-data">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                                                <th className="py-2 px-2">#</th>
+                                                <th className="py-2 px-2">Barangay</th>
+                                                <th className="py-2 px-2 text-right">Resolved</th>
+                                                <th className="py-2 px-2 text-right">Active</th>
+                                                <th className="py-2 px-2 text-right">Total</th>
+                                                <th className="py-2 px-2 text-right">Share %</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                                            {BARANGAY_VOLUME_DATA.map((b, idx) => (
+                                                <tr key={b.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                    <td className="py-2 px-2 text-slate-400 font-bold">{idx + 1}</td>
+                                                    <td className="py-2 px-2 font-semibold text-slate-800 dark:text-slate-200">{b.name}</td>
+                                                    <td className="py-2 px-2 text-right text-emerald-600 dark:text-emerald-400 font-bold">{b.resolved}</td>
+                                                    <td className="py-2 px-2 text-right text-orange-600 dark:text-orange-400 font-bold">{b.active}</td>
+                                                    <td className="py-2 px-2 text-right font-black text-slate-900 dark:text-white">{b.count}</td>
+                                                    <td className="py-2 px-2 text-right font-bold text-slate-600 dark:text-slate-300">{b.pct}%</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white bg-slate-50/50 dark:bg-slate-900/40">
+                                                <td className="py-2 px-2" colSpan={2}>Top 10 Aggregate</td>
+                                                <td className="py-2 px-2 text-right text-emerald-600 dark:text-emerald-400">1,131</td>
+                                                <td className="py-2 px-2 text-right text-orange-600 dark:text-orange-400">153</td>
+                                                <td className="py-2 px-2 text-right text-[#ff6b00]">1,284</td>
+                                                <td className="py-2 px-2 text-right">100.0%</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
                         {/* ───────────────────────────────────────────────────────
@@ -857,64 +1107,103 @@ export default function GovBiDashboard() {
                                 <button
                                     type="button"
                                     onClick={() => setViewMode(v => ({ ...v, severity: v.severity === 'chart' ? 'table' : 'chart' }))}
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-                                    title="Toggle Table"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                                    title={viewMode.severity === 'chart' ? 'Switch to Accessible Table' : 'Switch to Visual Chart'}
                                     aria-label="Toggle Severity table view"
                                 >
                                     {viewMode.severity === 'chart' ? <Table size={14} /> : <BarChart2 size={14} />}
                                 </button>
                             </div>
 
-                            {/* Donut & Legend Container */}
-                            <div className="h-80 flex flex-col sm:flex-row items-center justify-center gap-8 py-2">
-                                {/* SVG Donut */}
-                                <div className="relative w-44 h-44 shrink-0 flex items-center justify-center">
-                                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                                        {/* Background Circle */}
-                                        <circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" className="text-slate-100 dark:text-slate-800/40" strokeWidth="16" />
-                                        {/* Critical: 8.2% (circumference ~ 238.76) */}
-                                        <circle cx="50" cy="50" r="38" fill="none" stroke="#ef4444" strokeWidth="16" strokeDasharray="19.5 238.76" strokeDashoffset="0" />
-                                        {/* High: 22.8% */}
-                                        <circle cx="50" cy="50" r="38" fill="none" stroke="#ff6b00" strokeWidth="16" strokeDasharray="54.4 238.76" strokeDashoffset="-19.5" />
-                                        {/* Medium: 53.4% */}
-                                        <circle cx="50" cy="50" r="38" fill="none" stroke="#f59e0b" strokeWidth="16" strokeDasharray="127.5 238.76" strokeDashoffset="-73.9" />
-                                        {/* Low: 15.6% */}
-                                        <circle cx="50" cy="50" r="38" fill="none" stroke="#64748b" strokeWidth="16" strokeDasharray="37.2 238.76" strokeDashoffset="-201.4" />
-                                    </svg>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                        <span className="font-mono-data font-black text-xl text-slate-900 dark:text-white">1,284</span>
-                                        <span className="text-[10px] font-heading font-semibold text-slate-400 uppercase">Total Cases</span>
+                            {viewMode.severity === 'chart' ? (
+                                /* Donut & Legend Container */
+                                <div className="h-80 flex flex-col sm:flex-row items-center justify-center gap-8 py-2">
+                                    {/* SVG Donut */}
+                                    <div className="relative w-44 h-44 shrink-0 flex items-center justify-center">
+                                        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                                            {/* Background Circle */}
+                                            <circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" className="text-slate-100 dark:text-slate-800/40" strokeWidth="16" />
+                                            {/* Critical: 8.2% (circumference ~ 238.76) */}
+                                            <circle cx="50" cy="50" r="38" fill="none" stroke="#ef4444" strokeWidth="16" strokeDasharray="19.5 238.76" strokeDashoffset="0" />
+                                            {/* High: 22.8% */}
+                                            <circle cx="50" cy="50" r="38" fill="none" stroke="#ff6b00" strokeWidth="16" strokeDasharray="54.4 238.76" strokeDashoffset="-19.5" />
+                                            {/* Medium: 53.4% */}
+                                            <circle cx="50" cy="50" r="38" fill="none" stroke="#f59e0b" strokeWidth="16" strokeDasharray="127.5 238.76" strokeDashoffset="-73.9" />
+                                            {/* Low: 15.6% */}
+                                            <circle cx="50" cy="50" r="38" fill="none" stroke="#64748b" strokeWidth="16" strokeDasharray="37.2 238.76" strokeDashoffset="-201.4" />
+                                        </svg>
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                            <span className="font-mono-data font-black text-xl text-slate-900 dark:text-white">1,284</span>
+                                            <span className="text-[10px] font-heading font-semibold text-slate-400 uppercase">Total Cases</span>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Donut Legend & Stats */}
-                                <div className="space-y-3 w-full sm:w-48 font-mono-data text-xs">
-                                    <div className="flex items-center justify-between p-2 rounded-xl bg-red-50/60 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/30">
-                                        <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-bold">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" /> Critical
-                                        </span>
-                                        <span className="font-bold text-slate-800 dark:text-white">105 (8.2%)</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded-xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200/50 dark:border-orange-900/30">
-                                        <span className="flex items-center gap-1.5 text-[#ff6b00] font-bold">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-[#ff6b00]" /> High
-                                        </span>
-                                        <span className="font-bold text-slate-800 dark:text-white">293 (22.8%)</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30">
-                                        <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-bold">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" /> Medium
-                                        </span>
-                                        <span className="font-bold text-slate-800 dark:text-white">686 (53.4%)</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800">
-                                        <span className="flex items-center gap-1.5 text-slate-500 font-bold">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-[#64748b]" /> Low
-                                        </span>
-                                        <span className="font-bold text-slate-800 dark:text-white">200 (15.6%)</span>
+                                    {/* Donut Legend & Stats */}
+                                    <div className="space-y-3 w-full sm:w-48 font-mono-data text-xs">
+                                        <div className="flex items-center justify-between p-2 rounded-xl bg-red-50/60 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/30">
+                                            <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-bold">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" /> Critical
+                                            </span>
+                                            <span className="font-bold text-slate-800 dark:text-white">105 (8.2%)</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200/50 dark:border-orange-900/30">
+                                            <span className="flex items-center gap-1.5 text-[#ff6b00] font-bold">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-[#ff6b00]" /> High
+                                            </span>
+                                            <span className="font-bold text-slate-800 dark:text-white">293 (22.8%)</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30">
+                                            <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-bold">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" /> Medium
+                                            </span>
+                                            <span className="font-bold text-slate-800 dark:text-white">686 (53.4%)</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800">
+                                            <span className="flex items-center gap-1.5 text-slate-500 font-bold">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-[#64748b]" /> Low
+                                            </span>
+                                            <span className="font-bold text-slate-800 dark:text-white">200 (15.6%)</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                /* Accessible Table View */
+                                <div className="w-full h-80 overflow-y-auto custom-scrollbar mt-3">
+                                    <table className="w-full text-left text-xs font-mono-data">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                                                <th className="py-2 px-2">Severity Tier</th>
+                                                <th className="py-2 px-2 text-center">SLA</th>
+                                                <th className="py-2 px-2 text-right">Reports</th>
+                                                <th className="py-2 px-2 text-right">Share %</th>
+                                                <th className="py-2 px-2">Operational Directive</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                                            {SEVERITY_DISTRIBUTION_DATA.map((s) => (
+                                                <tr key={s.level} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                    <td className="py-2 px-2 font-bold flex items-center gap-2">
+                                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                                                        <span className="text-slate-800 dark:text-slate-200">{s.level}</span>
+                                                    </td>
+                                                    <td className="py-2 px-2 text-center text-slate-500 font-semibold">{s.sla}</td>
+                                                    <td className="py-2 px-2 text-right font-black text-slate-900 dark:text-white">{s.count.toLocaleString()}</td>
+                                                    <td className="py-2 px-2 text-right font-bold text-slate-700 dark:text-slate-300">{s.pct}%</td>
+                                                    <td className="py-2 px-2 text-[11px] text-slate-400 truncate max-w-[150px]">{s.desc}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white bg-slate-50/50 dark:bg-slate-900/40">
+                                                <td className="py-2 px-2" colSpan={2}>Total Incident Universe</td>
+                                                <td className="py-2 px-2 text-right text-[#ff6b00]">1,284</td>
+                                                <td className="py-2 px-2 text-right">100.0%</td>
+                                                <td className="py-2 px-2 text-[11px] text-slate-400">All severity levels</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
                         {/* ───────────────────────────────────────────────────────
@@ -935,55 +1224,109 @@ export default function GovBiDashboard() {
                                 <button
                                     type="button"
                                     onClick={() => setViewMode(v => ({ ...v, bottleneck: v.bottleneck === 'chart' ? 'table' : 'chart' }))}
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-                                    title="Toggle Table"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                                    title={viewMode.bottleneck === 'chart' ? 'Switch to Accessible Table' : 'Switch to Visual Chart'}
                                     aria-label="Toggle Category resolution table view"
                                 >
                                     {viewMode.bottleneck === 'chart' ? <Table size={14} /> : <BarChart2 size={14} />}
                                 </button>
                             </div>
 
-                            {/* Bar Visualizer */}
-                            <div className="mt-4 space-y-3.5">
-                                {CATEGORY_RESOLUTION_DATA.map((cat) => {
-                                    const isExceeded = cat.hours > cat.sla;
-                                    return (
-                                        <div key={cat.category}>
-                                            <div className="flex items-center justify-between text-xs mb-1">
-                                                <span className="font-heading font-bold text-slate-800 dark:text-slate-200">
-                                                    {cat.category}
-                                                </span>
-                                                <div className="flex items-center gap-2 font-mono-data text-xs">
-                                                    <span className={`font-bold ${isExceeded ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
-                                                        {cat.hours} hrs avg
-                                                    </span>
-                                                    <span className="text-slate-400 text-[10px]">
-                                                        (Target: {cat.target})
-                                                    </span>
+                            {viewMode.bottleneck === 'chart' ? (
+                                <>
+                                    {/* Bar Visualizer */}
+                                    <div className="mt-4 space-y-3.5">
+                                        {CATEGORY_RESOLUTION_DATA.map((cat) => {
+                                            const isExceeded = cat.hours > cat.sla;
+                                            return (
+                                                <div key={cat.category}>
+                                                    <div className="flex items-center justify-between text-xs mb-1">
+                                                        <span className="font-heading font-bold text-slate-800 dark:text-slate-200">
+                                                            {cat.category}
+                                                        </span>
+                                                        <div className="flex items-center gap-2 font-mono-data text-xs">
+                                                            <span className={`font-bold ${isExceeded ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                                {cat.hours} hrs avg
+                                                            </span>
+                                                            <span className="text-slate-400 text-[10px]">
+                                                                (Target: {cat.target})
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {/* Bar Container */}
+                                                    <div className="relative w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800/70 overflow-hidden">
+                                                        <div
+                                                            style={{ width: `${Math.min(cat.hours * 2, 100)}%` }}
+                                                            className={`h-full rounded-full transition-all duration-500 ${
+                                                                isExceeded
+                                                                    ? 'bg-red-500'
+                                                                    : cat.category === 'Electrical Hazard'
+                                                                    ? 'bg-emerald-500'
+                                                                    : 'bg-[#ff6b00]'
+                                                            }`}
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            {/* Bar Container */}
-                                            <div className="relative w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800/70 overflow-hidden">
-                                                <div
-                                                    style={{ width: `${Math.min(cat.hours * 2, 100)}%` }}
-                                                    className={`h-full rounded-full transition-all duration-500 ${
-                                                        isExceeded
-                                                            ? 'bg-red-500'
-                                                            : cat.category === 'Electrical Hazard'
-                                                            ? 'bg-emerald-500'
-                                                            : 'bg-[#ff6b00]'
-                                                    }`}
-                                                />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                            );
+                                        })}
+                                    </div>
 
-                            <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 text-xs flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
-                                <Info size={15} className="text-[#ff6b00] shrink-0" />
-                                <span>Drainage and flooding incidents currently exceed municipal SLA threshold due to monsoon surge. Heavy machinery dispatched.</span>
-                            </div>
+                                    <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 text-xs flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                                        <Info size={15} className="text-[#ff6b00] shrink-0" />
+                                        <span>Drainage and flooding incidents currently exceed municipal SLA threshold due to monsoon surge. Heavy machinery dispatched.</span>
+                                    </div>
+                                </>
+                            ) : (
+                                /* Accessible Table View */
+                                <div className="w-full h-80 overflow-y-auto custom-scrollbar mt-3">
+                                    <table className="w-full text-left text-xs font-mono-data">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                                                <th className="py-2 px-2">Category</th>
+                                                <th className="py-2 px-2 text-right">Reports</th>
+                                                <th className="py-2 px-2 text-right">Avg Turnaround</th>
+                                                <th className="py-2 px-2 text-right">Target SLA</th>
+                                                <th className="py-2 px-2 text-center">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                                            {CATEGORY_RESOLUTION_DATA.map((cat) => {
+                                                const isExceeded = cat.hours > cat.sla;
+                                                return (
+                                                    <tr key={cat.category} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                        <td className="py-2 px-2 font-semibold text-slate-800 dark:text-slate-200">{cat.category}</td>
+                                                        <td className="py-2 px-2 text-right font-black text-slate-900 dark:text-white">{cat.count.toLocaleString()}</td>
+                                                        <td className={`py-2 px-2 text-right font-bold ${isExceeded ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                            {cat.hours} hrs
+                                                        </td>
+                                                        <td className="py-2 px-2 text-right text-slate-400">{cat.target}</td>
+                                                        <td className="py-2 px-2 text-center">
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                cat.status === 'Optimal'
+                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50'
+                                                                    : cat.status === 'Warning'
+                                                                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
+                                                                    : 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-800/50'
+                                                            }`}>
+                                                                {cat.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white bg-slate-50/50 dark:bg-slate-900/40">
+                                                <td className="py-2 px-2">Municipal Benchmark</td>
+                                                <td className="py-2 px-2 text-right text-[#ff6b00]">1,284</td>
+                                                <td className="py-2 px-2 text-right text-slate-900 dark:text-white">21.8 hrs avg</td>
+                                                <td className="py-2 px-2 text-right text-slate-400">28.8 hrs max</td>
+                                                <td className="py-2 px-2 text-center text-emerald-600 dark:text-emerald-400">Within SLA</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
                         {/* ───────────────────────────────────────────────────────
@@ -1001,47 +1344,88 @@ export default function GovBiDashboard() {
                                 <button
                                     type="button"
                                     onClick={() => setViewMode(v => ({ ...v, teams: v.teams === 'chart' ? 'table' : 'chart' }))}
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-                                    title="Toggle Table"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                                    title={viewMode.teams === 'chart' ? 'Switch to Accessible Table' : 'Switch to Visual Chart'}
                                     aria-label="Toggle Team throughput table view"
                                 >
                                     {viewMode.teams === 'chart' ? <Table size={14} /> : <BarChart2 size={14} />}
                                 </button>
                             </div>
 
-                            {/* Team Cards / Rows */}
-                            <div className="mt-3 space-y-2.5">
-                                {FIELD_TEAMS_DATA.map((team) => (
-                                    <div
-                                        key={team.name}
-                                        className="p-3 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between"
-                                    >
-                                        <div>
-                                            <h3 className="font-heading font-bold text-xs text-slate-800 dark:text-white">
-                                                {team.name}
-                                            </h3>
-                                            <p className="text-[10px] font-mono-data text-slate-400 mt-0.5">
-                                                {team.lead} · <strong className="text-slate-700 dark:text-slate-300">{team.active} active</strong> / {team.resolved} resolved
-                                            </p>
-                                        </div>
+                            {viewMode.teams === 'chart' ? (
+                                <>
+                                    {/* Team Cards / Rows */}
+                                    <div className="mt-3 space-y-2.5">
+                                        {FIELD_TEAMS_DATA.map((team) => (
+                                            <div
+                                                key={team.name}
+                                                className="p-3 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between"
+                                            >
+                                                <div>
+                                                    <h3 className="font-heading font-bold text-xs text-slate-800 dark:text-white">
+                                                        {team.name}
+                                                    </h3>
+                                                    <p className="text-[10px] font-mono-data text-slate-400 mt-0.5">
+                                                        {team.lead} · <strong className="text-slate-700 dark:text-slate-300">{team.active} active</strong> / {team.resolved} resolved
+                                                    </p>
+                                                </div>
 
-                                        <div className="text-right font-mono-data">
-                                            <div className="flex items-center justify-end gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                                <span>{team.slaRate}%</span>
-                                                <span className="text-[10px] text-slate-400 font-normal">SLA</span>
+                                                <div className="text-right font-mono-data">
+                                                    <div className="flex items-center justify-end gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                                        <span>{team.slaRate}%</span>
+                                                        <span className="text-[10px] text-slate-400 font-normal">SLA</span>
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400 mt-0.5">
+                                                        ~{team.avgHrs} hrs avg
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="text-[10px] text-slate-400 mt-0.5">
-                                                ~{team.avgHrs} hrs avg
-                                            </div>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
 
-                            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs font-mono-data text-slate-400">
-                                <span>Overall Fleet Readiness</span>
-                                <span className="text-emerald-500 font-bold">93.8% In Service</span>
-                            </div>
+                                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs font-mono-data text-slate-400">
+                                        <span>Overall Fleet Readiness</span>
+                                        <span className="text-emerald-500 font-bold">93.8% In Service</span>
+                                    </div>
+                                </>
+                            ) : (
+                                /* Accessible Table View */
+                                <div className="w-full h-80 overflow-y-auto custom-scrollbar mt-3">
+                                    <table className="w-full text-left text-xs font-mono-data">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                                                <th className="py-2 px-2">Squad / Unit</th>
+                                                <th className="py-2 px-2">Lead Officer</th>
+                                                <th className="py-2 px-2 text-right">Active</th>
+                                                <th className="py-2 px-2 text-right">Resolved</th>
+                                                <th className="py-2 px-2 text-right">SLA %</th>
+                                                <th className="py-2 px-2 text-right">Avg Turnaround</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                                            {FIELD_TEAMS_DATA.map((team) => (
+                                                <tr key={team.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                    <td className="py-2 px-2 font-semibold text-slate-800 dark:text-slate-200">{team.name}</td>
+                                                    <td className="py-2 px-2 text-slate-500">{team.lead}</td>
+                                                    <td className="py-2 px-2 text-right font-bold text-orange-600 dark:text-orange-400">{team.active}</td>
+                                                    <td className="py-2 px-2 text-right font-bold text-emerald-600 dark:text-emerald-400">{team.resolved}</td>
+                                                    <td className="py-2 px-2 text-right font-black text-slate-900 dark:text-white">{team.slaRate}%</td>
+                                                    <td className="py-2 px-2 text-right text-slate-600 dark:text-slate-300">~{team.avgHrs}h</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white bg-slate-50/50 dark:bg-slate-900/40">
+                                                <td className="py-2 px-2" colSpan={2}>Fleet Aggregate</td>
+                                                <td className="py-2 px-2 text-right text-orange-600 dark:text-orange-400">53 Active</td>
+                                                <td className="py-2 px-2 text-right text-emerald-600 dark:text-emerald-400">923 Resolved</td>
+                                                <td className="py-2 px-2 text-right text-[#ff6b00]">91.9%</td>
+                                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">~22.8h</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
                     </div>

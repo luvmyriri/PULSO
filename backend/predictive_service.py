@@ -92,14 +92,14 @@ def _failure_probability(
     decay = profile["decay_rate"]
 
     freq_factor       = min(1.0, report_frequency / 5.0)
-    time_factor       = 1.0 - math.exp(-decay * days_since_last_action / 30)
+    time_factor       = 1.0 - math.exp(-decay * (days_since_last_action + target_days) / 30.0)
     recurrence_factor = 0.5 + (recurrence_rate * 0.5)
 
     now = datetime.now(timezone.utc)
     seasonal = _seasonal_multiplier(now + timedelta(days=target_days))
 
     raw = (freq_factor * 0.35 + time_factor * 0.35 + recurrence_factor * 0.30) * seasonal
-    return round(min(1.0, raw), 3)
+    return round(min(1.0, max(0.0, raw)), 3)
 
 
 def _health_score(failure_prob_30d: float, recurrence_rate: float, severity: float) -> int:

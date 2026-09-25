@@ -2,41 +2,38 @@ import React from 'react';
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
-export default function ThemeToggle({ size = 14, className = "" }) {
+export default function ThemeToggle({ size = 15, className = "" }) {
     const { theme, changeTheme } = useTheme();
 
+    const options = [
+        { key: 'light', label: 'Light mode', icon: Sun },
+        { key: 'system', label: 'System theme', icon: Monitor },
+        { key: 'dark', label: 'Dark mode', icon: Moon },
+    ];
+
     return (
-        <div className={`flex bg-slate-100 dark:bg-slate-800/50 rounded-xl p-1 border border-slate-200 dark:border-slate-700/50 ${className}`}>
-            <button 
-                type="button"
-                onClick={() => changeTheme('light')} 
-                aria-label="Use light theme"
-                aria-pressed={theme === 'light'}
-                className={`min-h-11 min-w-11 p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                title="Light Mode"
-            >
-                <Sun size={size} />
-            </button>
-            <button 
-                type="button"
-                onClick={() => changeTheme('system')} 
-                aria-label="Use system theme"
-                aria-pressed={theme === 'system'}
-                className={`min-h-11 min-w-11 p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                title="System Theme"
-            >
-                <Monitor size={size} />
-            </button>
-            <button 
-                type="button"
-                onClick={() => changeTheme('dark')} 
-                aria-label="Use dark theme"
-                aria-pressed={theme === 'dark'}
-                className={`min-h-11 min-w-11 p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                title="Dark Mode"
-            >
-                <Moon size={size} />
-            </button>
+        <div className={`inline-flex items-center bg-slate-100 dark:bg-slate-800/90 rounded-xl p-1 border border-slate-200 dark:border-slate-700 shadow-xs ${className}`}>
+            {options.map((opt) => {
+                const Icon = opt.icon;
+                const isSelected = theme === opt.key;
+                return (
+                    <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => changeTheme(opt.key)}
+                        aria-label={opt.label}
+                        aria-pressed={isSelected}
+                        title={opt.label}
+                        className={`relative flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                            isSelected
+                                ? 'bg-white dark:bg-slate-700 text-[#ff6b00] shadow-xs border border-slate-200/80 dark:border-slate-600 font-bold'
+                                : 'text-slate-400 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700/70'
+                        }`}
+                    >
+                        <Icon size={size} className={isSelected ? 'text-[#ff6b00]' : 'currentColor transition-colors'} />
+                    </button>
+                );
+            })}
         </div>
     );
 }

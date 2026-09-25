@@ -20,6 +20,14 @@ import GovProjectsPage   from './pages/GovProjectsPage';
 import GovAnalyticsPage  from './pages/GovAnalyticsPage';
 import GovReportsDashboard from './pages/GovReportsDashboard';
 import GovBiDashboard      from './pages/GovBiDashboard';
+import GovTodayPage        from './pages/GovTodayPage';
+import CitizenReportsPage  from './pages/CitizenReportsPage';
+import GovReportDetailPage from './pages/GovReportDetailPage';
+import WorkOrdersPage      from './pages/WorkOrdersPage';
+import GovAssetsPage       from './pages/GovAssetsPage';
+import GovAssetDetailPage  from './pages/GovAssetDetailPage';
+import GovAnnouncementsPage from './pages/GovAnnouncementsPage';
+import GovAnnouncementEditor from './pages/GovAnnouncementEditor';
 import GovernmentWorkspaceRoute from './pages/GovernmentWorkspaceRoute';
 import ProtectedRoute, {
     GOV_ROLES,
@@ -92,6 +100,9 @@ function App() {
                         <Route path="/gov/my-dashboard" element={
                             <GovOnly><GovBiDashboard /></GovOnly>
                         } />
+                        <Route path="/gov/today" element={
+                            <GovOnly><GovTodayPage /></GovOnly>
+                        } />
 
                         {/* Consolidated government workspaces */}
                         <Route path="/gov/operations" element={
@@ -107,9 +118,12 @@ function App() {
                             <AdminOnly><GovernmentWorkspaceRoute workspace="administration" /></AdminOnly>
                         } />
 
-                        {/* ── CITIZEN REPORTS (GovReportsDashboard) ────────────────── */}
+                        {/* ── CITIZEN REPORTS & FULL DOCKET ────────────────────────── */}
                         <Route path="/gov/reports" element={
                             <GovOnly><GovReportsDashboard /></GovOnly>
+                        } />
+                        <Route path="/gov/reports/:reportId" element={
+                            <GovOnly><GovReportDetailPage /></GovOnly>
                         } />
                         <Route path="/gov/citizen-reports" element={
                             <Navigate to="/gov/reports" replace />
@@ -136,7 +150,26 @@ function App() {
 
                         {/* Work Orders — all gov staff can view */}
                         <Route path="/gov/work-orders" element={
-                            <GovOnly><Navigate to="/gov/operations?view=work-orders" replace /></GovOnly>
+                            <GovOnly><WorkOrdersPage /></GovOnly>
+                        } />
+
+                        {/* Physical Infrastructure Assets Register */}
+                        <Route path="/gov/assets" element={
+                            <GovOnly><GovAssetsPage /></GovOnly>
+                        } />
+                        <Route path="/gov/assets/:assetId" element={
+                            <GovOnly><GovAssetDetailPage /></GovOnly>
+                        } />
+
+                        {/* Governed Updates & Announcements */}
+                        <Route path="/gov/announcements" element={
+                            <GovOnly><GovAnnouncementsPage /></GovOnly>
+                        } />
+                        <Route path="/gov/announcements/new" element={
+                            <GovOnly><GovAnnouncementEditor /></GovOnly>
+                        } />
+                        <Route path="/gov/announcements/:announcementId/edit" element={
+                            <GovOnly><GovAnnouncementEditor /></GovOnly>
                         } />
 
                         {/* Combined planning and delivery workspace */}
@@ -232,7 +265,7 @@ function App() {
 
                         {/* System Settings — admin + exec only */}
                         <Route path="/gov/settings" element={
-                            <AdminOnly><Navigate to="/gov/administration?view=settings" replace /></AdminOnly>
+                            <AdminOnly><Navigate to="/gov/administration?view=staff" replace /></AdminOnly>
                         } />
 
                         {/* Analytics Intelligence BI Engine — government staff & dispatchers */}

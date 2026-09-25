@@ -290,6 +290,25 @@ class Report(Base):
         """Helper property indicating whether report is linked to an authenticated resident account."""
         return self.claimed_by_user_id is not None or (self.reporter_type == "registered" and self.resident_id is not None)
 
+    @property
+    def barangay(self):
+        """Returns the barangay name for schema and government portal compatibility."""
+        return self.location_barangay or (self.barangay_ref.name if self.barangay_ref else None) or "Caloocan City"
+
+    @property
+    def urgency(self):
+        """Returns urgency string for frontend mapping compatibility."""
+        return self.ai_urgency or "normal"
+
+    @property
+    def district(self):
+        """Returns the district name based on barangay reference or coordinates."""
+        if self.barangay_ref and self.barangay_ref.district:
+            return self.barangay_ref.district.name
+        if self.location_lat and self.location_lat < 14.70:
+            return "South Caloocan"
+        return "North Caloocan"
+
     # Relationships
     barangay_ref = relationship("Barangay", foreign_keys=[barangay_id])
     reporter = relationship("Resident", foreign_keys=[resident_id], back_populates="reports")

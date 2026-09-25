@@ -37,6 +37,9 @@ import {
 import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import { API_BASE_URL } from '../utils/apiBase';
 import './projects-workspace.css';
 
@@ -629,12 +632,13 @@ export default function ProjectsWorkspacePage({ workspace = 'delivery' }) {
             <GovSidebar currentUser={currentUser} />
             <div className="projects-shell">
                 {/* Topbar */}
-                <header className="projects-topbar">
+                <header className="projects-topbar relative z-50">
                     <div className="projects-topbar-left">
                         <div className="projects-title-cluster">
                             <span className="projects-signal-indicator" aria-hidden="true" />
-                            <div>
-                                <h1>Projects & delivery</h1>
+                            <div className="flex flex-col text-left">
+                                <GovBreadcrumb category="Infrastructure" current="Capital Projects & Delivery" />
+                                <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-snug whitespace-nowrap mt-0.5">Projects & delivery</h1>
                                 <p>Capital engineering projects, technical planning, BoQ and construction lifecycle.</p>
                             </div>
                         </div>
@@ -661,6 +665,8 @@ export default function ProjectsWorkspacePage({ workspace = 'delivery' }) {
                         >
                             <RefreshCw size={15} />
                         </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 

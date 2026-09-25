@@ -23,9 +23,13 @@ import {
 import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import RequestInfoModal from '../components/modals/RequestInfoModal';
 import AssignWorkOrderModal from '../components/modals/AssignWorkOrderModal';
 import { checkPermission } from '../utils/rbac_utils';
+import { formatTicketId } from '../utils/reportWorkflow';
 import { API_BASE_URL } from '../utils/apiBase';
 import './citizen-reports.css';
 
@@ -41,7 +45,8 @@ const PULSELINE_STEPS = [
 
 const readUser = () => {
     try {
-        return JSON.parse(localStorage.getItem('pulso_user') || 'null');
+        const raw = sessionStorage.getItem('pulso_user') || localStorage.getItem('pulso_user') || sessionStorage.getItem('user') || localStorage.getItem('user');
+        return raw ? JSON.parse(raw) : null;
     } catch {
         return null;
     }
@@ -52,7 +57,10 @@ const humanize = (value, fallback = 'Not available') => {
     return String(value).replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
-const reportId = (report) => report.ticket_id || `RPT-${String(report.id).padStart(5, '0')}`;
+const reportId = (report) => {
+    if (!report) return '#PUL-2026-0001';
+    return formatTicketId(report.ticket_id, report.id, true);
+};
 
 const formatDateTime = (value) => {
     if (!value) return 'Time not available';
@@ -103,7 +111,7 @@ const ReportSkeleton = () => (
 
 export default function CitizenReportsPage({ workspace }) {
     const prefersReducedMotion = useReducedMotion();
-    const token = localStorage.getItem('pulso_token');
+    const token = sessionStorage.getItem('pulso_token') || sessionStorage.getItem('token') || localStorage.getItem('pulso_token') || localStorage.getItem('token');
     const currentUser = readUser();
     const [params, setParams] = useSearchParams();
     const [reports, setReports] = useState([]);
@@ -312,6 +320,7 @@ export default function CitizenReportsPage({ workspace }) {
         if (!term) return reports;
         return reports.filter((report) => [
             reportId(report),
+            report.ticket_id,
             report.title,
             report.description,
             report.barangay,
@@ -341,9 +350,10 @@ export default function CitizenReportsPage({ workspace }) {
             <GovSidebar currentUser={currentUser} />
             <div className="citizen-reports-shell">
                 <header className="citizen-reports-topbar">
-                    <div>
-                        <h1>Citizen reports</h1>
-                        <p>Review incoming public reports and open authorized work in context.</p>
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb category="Citizen Services" current="Citizen Reports" />
+                        <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-snug whitespace-nowrap mt-0.5">Citizen reports</h1>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Review incoming public reports and open authorized work in context.</p>
                     </div>
                     <div className="citizen-reports-topbar__actions">
                         {toastMessage && (
@@ -357,6 +367,8 @@ export default function CitizenReportsPage({ workspace }) {
                         <button type="button" className="citizen-reports-icon-button" onClick={() => loadReports({ background: true })} aria-label="Refresh reports">
                             <RefreshCw size={17} aria-hidden="true" />
                         </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 

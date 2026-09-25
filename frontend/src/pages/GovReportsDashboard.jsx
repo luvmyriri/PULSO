@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     ClipboardList, Wrench, Building2, MapPin, BarChart2,
     Users, Settings, ChevronLeft, ChevronRight, Search,
-    Bell, Check, AlertTriangle, ShieldCheck, Clock, CheckSquare,
+    Bell, Check, AlertTriangle, ShieldCheck, ShieldAlert, Clock, CheckSquare,
     Square, ChevronDown, Filter, X, Copy, ExternalLink,
     MessageSquare, Phone, Flag, Shield, Lock, FileText,
     Share2, Pin, PinOff, Eye, RefreshCw, Layers, ArrowUpRight,
@@ -15,8 +15,12 @@ import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
 import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import Swal from 'sweetalert2';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
+import { getCaloocanDistrict } from '../data/caloocanBoundaries';
 import { 
     getStatusDescriptor, 
     getReportPlainTitle, 
@@ -264,6 +268,52 @@ const INITIAL_REPORTS = [
     }
 ];
 
+const DISPATCH_FLEET_OPTIONS = [
+    {
+        value: 3,
+        label: 'Team Beta — Engr. Bautista',
+        description: 'Roads, Bridges & Civil Infrastructure (Heavy Equipment)'
+    },
+    {
+        value: 2,
+        label: 'Team Alpha — Engr. Dela Cruz',
+        description: 'Electrical, Power & Municipal Street Lighting Crew'
+    },
+    {
+        value: 4,
+        label: 'Team Gamma — Engr. Reyes',
+        description: 'Drainage, Culverts & Flood Mitigation Operations'
+    },
+    {
+        value: 5,
+        label: 'Team Delta — Sanitation Task Force',
+        description: 'Solid Waste, Debris & Environmental Sanitation'
+    }
+];
+
+const DISPATCH_PRIORITY_OPTIONS = [
+    {
+        value: 'critical',
+        label: 'Critical (Immediate Hazard)',
+        description: 'Urgent Safety Threat · Immediate Field Dispatch SLA'
+    },
+    {
+        value: 'high',
+        label: 'High (Urgent Infrastructure Repair)',
+        description: 'Active Structural Defect · 24-48h Expedited SLA'
+    },
+    {
+        value: 'normal',
+        label: 'Normal (Standard Dispatch SLA)',
+        description: 'Standard Field Maintenance Dispatch (48-72h SLA)'
+    },
+    {
+        value: 'low',
+        label: 'Low (Routine Maintenance Sweep)',
+        description: 'Scheduled Preventive Infrastructure Maintenance'
+    }
+];
+
 export default function GovReportsDashboard() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -274,16 +324,30 @@ export default function GovReportsDashboard() {
 
     // ── Narrow-layout navigation state ──
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1280 : false);
 
-    // ── Reports & Selection state ──
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 1280);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // ── Reports & Selection state (Hidden initially until clicked) ──
     const [reports, setReports] = useState(INITIAL_REPORTS);
-    const [selectedReportId, setSelectedReportId] = useState(INITIAL_REPORTS[0].id);
-    const [selectedRowIds, setSelectedRowIds] = useState([INITIAL_REPORTS[0].id]);
+    const [selectedReportId, setSelectedReportId] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const p = new URLSearchParams(window.location.search).get('reportId');
+            if (p) {
+                const found = INITIAL_REPORTS.find(r => r.id?.toString() === p || r.ticket_id === p);
+                return found ? found.id : null;
+            }
+        }
+        return null;
+    });
+    const [selectedRowIds, setSelectedRowIds] = useState([]);
     const [isPinned, setIsPinned] = useState(false);
-
-    // ── Live Sync State ──
     const [isSyncing, setIsSyncing] = useState(false);
-    const [lastSynced, setLastSynced] = useState('just now');
+    const [lastSynced, setLastSynced] = useState(null);
 
     // ── Filters & Search state ──
     const [searchQuery, setSearchQuery] = useState('');
@@ -292,7 +356,7 @@ export default function GovReportsDashboard() {
     const [severityFilter, setSeverityFilter] = useState('All');
     const [barangayFilter, setBarangayFilter] = useState('All');
     const [dateFilter, setDateFilter] = useState('All');
-    const [districtFilter, setDistrictFilter] = useState('North Caloocan');
+    const [districtFilter, setDistrictFilter] = useState('All Districts');
 
     // ── Pagination state ──
     const [pageSize, setPageSize] = useState(20);
@@ -303,6 +367,10 @@ export default function GovReportsDashboard() {
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     const [newNoteText, setNewNoteText] = useState('');
     const [escalateReason, setEscalateReason] = useState('High risk to public pedestrian safety');
+    const [isRequestChangesModalOpen, setIsRequestChangesModalOpen] = useState(false);
+    const [requestChangesText, setRequestChangesText] = useState('');
+    const [requestTarget, setRequestTarget] = useState('field_crew');
+    const [isEscalateModalOpen, setIsEscalateModalOpen] = useState(false);
     
     // ── Unified Work Order Dispatch Modal State ──
     const [isWorkOrderModalOpen, setIsWorkOrderModalOpen] = useState(false);
@@ -414,49 +482,71 @@ export default function GovReportsDashboard() {
         if (!token) return;
         setIsSyncing(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/api/reports?limit=50&t=${Date.now()}`, {
+            const res = await fetch(`${API_BASE_URL}/api/reports?limit=100&t=${Date.now()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data) && data.length > 0) {
-                    const mapped = data.map((r, index) => ({
-                        id: r.id || index + 10,
-                        ticket_id: formatTicketId(r.ticket_id, r.id),
-                        issue: getReportPlainTitle(r),
-                        barangay: r.barangay ? `Barangay ${r.barangay.replace(/[^0-9]/g, '')}` : 'Barangay 176',
-                        district: 'North Caloocan',
-                        severity: r.urgency === 'critical' ? 'Critical' : r.urgency === 'high' ? 'High' : 'Medium',
-                        status: r.status === 'verified' ? 'Verified' :
-                                r.status === 'assigned' || r.status === 'approved_internal' ? 'Assigned' :
-                                r.status === 'in_progress' || r.status === 'dispatched' ? 'In Progress' :
-                                r.status === 'resolved' ? 'Resolved' : 
-                                r.status === 'rejected' ? 'Rejected' : 'Pending Review',
-                        updated: 'Just now',
-                        report_type: r.ai_category || r.category || 'General',
-                        reporter: {
-                            name: 'Name withheld',
-                            is_private: true,
-                            contact_method: 'Contact via Pulseline'
-                        },
-                        location: {
-                            address: r.location_string || 'North Caloocan City',
-                            lat: r.location_lat || 14.7566,
-                            lng: r.location_lng || 121.0450,
-                            landmark: 'Reported location'
-                        },
-                        evidence: r.image_url ? [
-                            r.image_url.startsWith('http') ? r.image_url : `${API_BASE_URL}${r.image_url}`
-                        ] : INITIAL_REPORTS[0].evidence,
-                        steps: buildReportWorkflowSteps(r.status, {
-                            received: 'Today',
-                            verified: ['verified', 'reviewed', 'under_review', 'assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—',
-                            assigned: ['assigned', 'approved_internal', 'dispatched', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—',
-                            in_progress: ['dispatched', 'in_progress', 'resolved'].includes(r.status) ? 'Today' : '—',
-                            resolved: r.status === 'resolved' ? 'Today' : '—'
-                        }),
-                        activity: INITIAL_REPORTS[0].activity
-                    }));
+                    const mapped = data.map((r, index) => {
+                        const rawBrgy = (r.barangay || r.location_barangay || '').toString().trim();
+                        const brgyDigits = rawBrgy.replace(/\D/g, '');
+                        const barangay = brgyDigits ? `Barangay ${brgyDigits}` : (rawBrgy || 'Barangay 176');
+
+                        const lat = parseFloat(r.location_lat);
+                        const lng = parseFloat(r.location_lng);
+                        const dist = getCaloocanDistrict(lat, lng);
+                        const district = dist === 'south' ? 'South Caloocan' : dist === 'north' ? 'North Caloocan' : (r.district || 'North Caloocan');
+
+                        const rawUrg = (r.urgency || r.ai_urgency || '').toLowerCase();
+                        const severityScore = typeof r.severity_score === 'number' ? r.severity_score : 0;
+                        const severity = rawUrg === 'critical' || severityScore >= 80 ? 'Critical' :
+                                         rawUrg === 'high' || severityScore >= 60 ? 'High' :
+                                         rawUrg === 'low' || (severityScore > 0 && severityScore < 40) ? 'Low' : 'Medium';
+
+                        const rawStatus = (r.status || '').toLowerCase().trim();
+                        const status = rawStatus === 'verified' ? 'Verified' :
+                                       ['assigned', 'approved_internal'].includes(rawStatus) ? 'Assigned' :
+                                       ['in_progress', 'dispatched'].includes(rawStatus) ? 'In Progress' :
+                                       rawStatus === 'resolved' ? 'Resolved' : 
+                                       rawStatus === 'rejected' ? 'Rejected' : 'Received';
+
+                        const hasReporterName = Boolean(r.reporter_name && r.reporter_name.trim() && !r.is_anonymous);
+
+                        return {
+                            id: r.id || index + 10,
+                            ticket_id: formatTicketId(r.ticket_id, r.id, false),
+                            issue: getReportPlainTitle(r),
+                            barangay,
+                            district,
+                            severity,
+                            status,
+                            updated: r.updated_at ? new Date(r.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
+                            report_type: r.ai_category || r.category || 'General',
+                            reporter: {
+                                name: hasReporterName ? r.reporter_name.trim() : (r.is_anonymous ? 'Anonymous Citizen' : 'Citizen Reporter'),
+                                is_private: Boolean(r.is_anonymous),
+                                contact_method: r.reporter_contact || 'Contact via Pulseline'
+                            },
+                            location: {
+                                address: r.location_string || `${barangay}, ${district}, Caloocan City`,
+                                lat: lat || 14.7566,
+                                lng: lng || 121.0450,
+                                landmark: r.landmark || 'Reported location'
+                            },
+                            evidence: r.image_url ? [
+                                r.image_url.startsWith('http') ? r.image_url : `${API_BASE_URL}${r.image_url}`
+                            ] : INITIAL_REPORTS[0].evidence,
+                            steps: buildReportWorkflowSteps(status, {
+                                received: 'Today',
+                                verified: ['Verified', 'Assigned', 'In Progress', 'Resolved'].includes(status) ? 'Today' : '—',
+                                assigned: ['Assigned', 'In Progress', 'Resolved'].includes(status) ? 'Today' : '—',
+                                in_progress: ['In Progress', 'Resolved'].includes(status) ? 'Today' : '—',
+                                resolved: status === 'Resolved' ? 'Today' : '—'
+                            }),
+                            activity: INITIAL_REPORTS[0].activity
+                        };
+                    });
                     setReports(mapped);
                     setLastSynced(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
                     
@@ -469,8 +559,6 @@ export default function GovReportsDashboard() {
                             return;
                         }
                     }
-                    setSelectedReportId(mapped[0].id);
-                    setSelectedRowIds([mapped[0].id]);
                 }
             }
         } catch (err) {
@@ -482,33 +570,75 @@ export default function GovReportsDashboard() {
 
     useEffect(() => {
         fetchLiveReports();
+        const interval = setInterval(fetchLiveReports, 30000);
+        return () => clearInterval(interval);
     }, []);
+
+    // Dynamic barangay list computed from active dataset
+    const dynamicBarangayOptions = useMemo(() => {
+        const set = new Set();
+        reports.forEach(r => {
+            if (r.barangay) set.add(r.barangay);
+        });
+        ['Barangay 176', 'Barangay 165', 'Barangay 162', 'Barangay 170', 'Barangay 183'].forEach(b => set.add(b));
+        const sorted = Array.from(set).sort((a, b) => {
+            const numA = parseInt(a.replace(/\D/g, ''), 10) || 0;
+            const numB = parseInt(b.replace(/\D/g, ''), 10) || 0;
+            return numA - numB;
+        });
+        return [
+            { value: 'All', label: 'Barangay: All' },
+            ...sorted.map(b => {
+                const num = parseInt(b.replace(/\D/g, ''), 10) || 0;
+                const isNorth = num >= 165 && num <= 188;
+                return {
+                    value: b,
+                    label: b,
+                    group: isNorth ? 'North Caloocan (District 3)' : 'South Caloocan (Districts 1 & 2)',
+                    description: isNorth ? 'District 3 · North Sector' : 'Districts 1 & 2 · South Sector'
+                };
+            })
+        ];
+    }, [reports]);
 
     // ── Filter computation ──
     const filteredReports = useMemo(() => {
         return reports.filter(r => {
             if (searchQuery.trim()) {
-                const q = searchQuery.toLowerCase();
-                const matchTicket = r.ticket_id.toLowerCase().includes(q);
-                const matchIssue = r.issue.toLowerCase().includes(q);
-                const matchBarangay = r.barangay.toLowerCase().includes(q);
+                const q = searchQuery.toLowerCase().trim();
+                const cleanQ = q.replace(/^#/, '');
+                const matchTicket = (r.ticket_id || '').toLowerCase().includes(q) || (r.ticket_id || '').toLowerCase().includes(cleanQ);
+                const matchIssue = (r.issue || '').toLowerCase().includes(q);
+                const matchBarangay = (r.barangay || '').toLowerCase().includes(q);
                 if (!matchTicket && !matchIssue && !matchBarangay) return false;
             }
-            if (statusFilter !== 'All' && r.status !== statusFilter) return false;
-            if (severityFilter !== 'All' && r.severity !== severityFilter) return false;
-            if (barangayFilter !== 'All' && r.barangay !== barangayFilter) return false;
+            if (statusFilter !== 'All') {
+                const s1 = (r.status || '').toLowerCase().replace(/\s+/g, '_');
+                const s2 = statusFilter.toLowerCase().replace(/\s+/g, '_');
+                const isPendingOrReceived = ['received', 'pending', 'pending_review', 'unverified'].includes(s1) && ['received', 'pending', 'pending_review', 'unverified'].includes(s2);
+                if (!isPendingOrReceived && s1 !== s2) return false;
+            }
+            if (severityFilter !== 'All') {
+                if ((r.severity || '').toLowerCase() !== severityFilter.toLowerCase()) return false;
+            }
+            if (barangayFilter !== 'All') {
+                const b1 = (r.barangay || '').toLowerCase().replace(/\s+/g, '');
+                const b2 = barangayFilter.toLowerCase().replace(/\s+/g, '');
+                if (b1 !== b2) return false;
+            }
             if (districtFilter !== 'All Districts' && r.district !== districtFilter) return false;
             return true;
         });
     }, [reports, searchQuery, statusFilter, severityFilter, barangayFilter, districtFilter]);
 
-    // Currently selected report object
+    // Currently selected report object (null when nothing is selected)
     const selectedReport = useMemo(() => {
-        return reports.find(r => r.id === selectedReportId) || filteredReports[0] || reports[0];
-    }, [reports, selectedReportId, filteredReports]);
+        if (!selectedReportId) return null;
+        return reports.find(r => r.id === selectedReportId) || null;
+    }, [reports, selectedReportId]);
 
     // Check if any filter is active
-    const hasActiveFilters = searchQuery || statusFilter !== 'All' || severityFilter !== 'All' || barangayFilter !== 'All' || dateFilter !== 'All';
+    const hasActiveFilters = searchQuery || statusFilter !== 'All' || severityFilter !== 'All' || barangayFilter !== 'All' || dateFilter !== 'All' || districtFilter !== 'All Districts';
 
     const clearAllFilters = () => {
         setSearchQuery('');
@@ -516,6 +646,7 @@ export default function GovReportsDashboard() {
         setSeverityFilter('All');
         setBarangayFilter('All');
         setDateFilter('All');
+        setDistrictFilter('All Districts');
         setSavedView('All reports');
     };
 
@@ -642,50 +773,76 @@ export default function GovReportsDashboard() {
         }
     };
 
-    const handleEscalateReport = () => {
-        Swal.fire({
-            title: 'Escalate Report',
-            text: `Escalate ${selectedReport.ticket_id} to City Engineer Executive Desk?`,
-            icon: 'warning',
-            input: 'textarea',
-            inputPlaceholder: 'Enter urgent escalation justification...',
-            inputValidator: (value) => {
-                if (!value) return 'You must provide an escalation reason.';
-            },
-            showCancelButton: true,
-            confirmButtonText: 'Escalate to City Engineer',
-            confirmButtonColor: '#dc2626',
-            cancelButtonText: 'Cancel'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                setReports(prev => prev.map(r => {
-                    if (r.id === selectedReport.id) {
-                        return {
-                            ...r,
-                            severity: 'Critical',
-                            updated: 'Just now',
-                            activity: [
-                                {
-                                    id: Date.now(),
-                                    icon: Flag,
-                                    color: 'text-red-500',
-                                    title: 'Escalated by Dispatcher to City Engineer Desk',
-                                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                    desc: result.value
-                                },
-                                ...r.activity
-                            ]
-                        };
-                    }
-                    return r;
-                }));
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Report Escalated',
-                    text: `Executive alert sent for ${selectedReport.ticket_id}`,
-                    confirmButtonColor: '#ff6b00'
-                });
+    const handleExecuteEscalation = (e) => {
+        if (e) e.preventDefault();
+        if (!escalateReason.trim() || !selectedReport) return;
+        setReports(prev => prev.map(r => {
+            if (r.id === selectedReport.id) {
+                return {
+                    ...r,
+                    severity: 'Critical',
+                    updated: 'Just now',
+                    activity: [
+                        {
+                            id: Date.now(),
+                            icon: Flag,
+                            color: 'text-red-500',
+                            title: 'Escalated by Dispatcher to City Engineer Desk',
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            desc: escalateReason.trim()
+                        },
+                        ...r.activity
+                    ]
+                };
             }
+            return r;
+        }));
+        setIsEscalateModalOpen(false);
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'warning',
+            title: 'Report Escalated',
+            text: `Executive alert sent for ${selectedReport.ticket_id}`,
+            showConfirmButton: false,
+            timer: 3000
+        });
+    };
+
+    const handleExecuteRequestChanges = (e) => {
+        if (e) e.preventDefault();
+        if (!requestChangesText.trim() || !selectedReport) return;
+        const targetLabel = requestTarget === 'citizen' ? 'Citizen Reporter' : 'Field Inspection Crew';
+        setReports(prev => prev.map(r => {
+            if (r.id === selectedReport.id) {
+                return {
+                    ...r,
+                    updated: 'Just now',
+                    activity: [
+                        {
+                            id: Date.now(),
+                            icon: MessageSquare,
+                            color: 'text-amber-500',
+                            title: `Modification requested (${targetLabel})`,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            desc: requestChangesText.trim()
+                        },
+                        ...r.activity
+                    ]
+                };
+            }
+            return r;
+        }));
+        setIsRequestChangesModalOpen(false);
+        setRequestChangesText('');
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Modification Request Sent',
+            text: `Dispatched revision notice to ${targetLabel} for ${selectedReport.ticket_id}`,
+            showConfirmButton: false,
+            timer: 3000
         });
     };
 
@@ -765,9 +922,9 @@ export default function GovReportsDashboard() {
                 {/* ─────────────────────────────────────────────────────────────
                     2. TOP BAR & UNIFIED WORKFLOW CONTROLS
                 ────────────────────────────────────────────────────────────── */}
-                <header className="min-h-16 h-auto py-2.5 lg:py-0 lg:h-20 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800/80 px-3 sm:px-4 lg:px-6 flex items-center justify-between z-20 gap-3 flex-nowrap">
+                <header className="min-h-[80px] py-3.5 sm:py-4 px-3 sm:px-4 lg:px-6 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between relative z-50 gap-3 flex-nowrap">
                     {/* Left: Breadcrumbs + Title + Persistent Role Subtitle */}
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                         <button
                             ref={mobileNavTriggerRef}
                             type="button"
@@ -779,25 +936,16 @@ export default function GovReportsDashboard() {
                         >
                             <Menu size={20} />
                         </button>
-                        <div className="min-w-0">
-                        <nav className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 font-medium">
-                            <Link to="/gov/my-dashboard" className="hidden sm:inline hover:text-slate-700 dark:hover:text-slate-300 transition-colors">Home</Link>
-                            <span className="hidden sm:inline">/</span>
-                            <span className="hidden sm:inline text-slate-500 dark:text-slate-400">Reports</span>
-                            <span className="hidden sm:inline">/</span>
-                            <span className="text-slate-800 dark:text-slate-200 font-semibold">Citizen reports</span>
-                        </nav>
-                        <div className="flex items-center gap-2 mt-1">
-                            <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-none">
-                                Citizen reports
-                            </h1>
-                            <span className="hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
-                                Report Processing & Audit
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden xl:block mt-0.5 truncate max-w-lg">
-                            Administrative Triage — Review citizen submissions, verify evidence, inspect audit trails, and manage compliance.
-                        </p>
+                        <div className="min-w-0 pt-1 pb-0.5">
+                            <GovBreadcrumb category="Citizen Services" current="Citizen Reports Docket" />
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-snug whitespace-nowrap">
+                                    Citizen reports
+                                </h1>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden xl:block mt-0.5 truncate max-w-lg">
+                                Administrative Triage — Review citizen submissions, verify evidence, inspect audit trails, and manage compliance.
+                            </p>
                         </div>
                     </div>
 
@@ -824,30 +972,36 @@ export default function GovReportsDashboard() {
                             </div>
                         </div>
 
-                        {/* Live Database Sync Indicator */}
-                        <div className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300">
-                            <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-orange-500 animate-ping' : 'bg-emerald-500'}`} />
-                            <span className="font-mono text-[10px] hidden xl:inline">Live Sync</span>
-                            <button
-                                type="button"
-                                onClick={fetchLiveReports}
-                                disabled={isSyncing}
-                                className="p-0.5 hover:text-orange-500 transition-colors cursor-pointer"
-                                title="Force sync with live database"
-                                aria-label="Synchronize live reports"
-                            >
-                                <RefreshCw size={12} className={isSyncing ? 'animate-spin text-orange-500' : ''} />
-                            </button>
-                        </div>
 
                         {/* District Filter Dropdown */}
                         <div className="relative hidden sm:block">
-                            <div className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 transition-all">
-                                <MapPin size={14} className="text-[#ff6b00]" />
-                                <span>{districtFilter}</span>
-                                <ChevronDown size={14} className="text-slate-400" />
-                            </div>
+                            <OrangeSelect
+                                value={districtFilter}
+                                onChange={setDistrictFilter}
+                                size="sm"
+                                minWidth="140px"
+                                icon={MapPin}
+                                searchable={false}
+                                placeholder="All Districts"
+                                options={[
+                                    { value: 'All Districts', label: 'All Districts' },
+                                    { value: 'North Caloocan', label: 'North Caloocan' },
+                                    { value: 'South Caloocan', label: 'South Caloocan' }
+                                ]}
+                            />
                         </div>
+
+                        {/* On-demand Live Sync Button */}
+                        <button
+                            type="button"
+                            onClick={fetchLiveReports}
+                            disabled={isSyncing}
+                            className="hidden md:flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-300 dark:hover:border-orange-500/40 transition-all cursor-pointer disabled:opacity-50"
+                            title={lastSynced ? `Last synced at ${lastSynced}` : "Sync with live citizen database"}
+                        >
+                            <RefreshCw size={13} className={isSyncing ? "animate-spin text-[#ff6b00]" : "text-slate-400"} />
+                            <span className="hidden lg:inline">{isSyncing ? "Syncing..." : "Sync"}</span>
+                        </button>
 
                         {/* Search Input with '/' shortcut */}
                         <div className="relative hidden md:block w-56 lg:w-64">
@@ -870,43 +1024,21 @@ export default function GovReportsDashboard() {
                         </div>
 
                         {/* Notification Bell */}
-                        <button
-                            type="button"
-                            title="3 urgent notifications"
-                            className="relative p-2.5 text-slate-600 dark:text-slate-300 hover:text-[#ff6b00] hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
-                        >
-                            <Bell size={18} />
-                            <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-[#ff6b00] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
-                                3
-                            </span>
-                        </button>
+                        <GovNotificationDropdown />
 
                         {/* Theme Toggle */}
                         <ThemeToggle className="hidden sm:flex" />
 
                         {/* User Avatar + Role Dropdown */}
-                        <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-slate-800">
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#0a1324] to-[#1e293b] text-white flex items-center justify-center text-xs font-heading font-black border border-slate-300 dark:border-slate-700 shadow-xs">
-                                AR
-                            </div>
-                            <div className="hidden lg:flex flex-col text-left leading-tight">
-                                <span className="font-heading font-bold text-xs text-slate-900 dark:text-white">
-                                    {currentUser.name}
-                                </span>
-                                <span className="text-[10px] text-slate-400">
-                                    {currentUser.roleLabel}
-                                </span>
-                            </div>
-                            <ChevronDown size={14} className="text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 
                 {/* ─────────────────────────────────────────────────────────────
                     3. FILTER BAR
                 ────────────────────────────────────────────────────────────── */}
-                <div className="min-h-14 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800 px-3 sm:px-6 flex items-center text-xs font-medium relative z-40 overflow-x-auto overflow-y-visible custom-scrollbar">
-                    <div className="flex min-w-max items-center gap-2.5 py-2 overflow-visible">
+                <div className="min-h-14 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800 px-3 sm:px-6 flex items-center text-xs font-medium relative z-30 overflow-visible">
+                    <div className="flex flex-wrap items-center gap-2.5 py-2 overflow-visible">
                         {/* Saved View */}
                         <OrangeSelect
                             value={savedView}
@@ -976,14 +1108,7 @@ export default function GovReportsDashboard() {
                             minWidth="135px"
                             searchable={true}
                             placeholder="Barangay: All"
-                            options={[
-                                { value: 'All', label: 'Barangay: All' },
-                                { value: 'Barangay 176', label: 'Barangay 176' },
-                                { value: 'Barangay 165', label: 'Barangay 165' },
-                                { value: 'Barangay 162', label: 'Barangay 162' },
-                                { value: 'Barangay 170', label: 'Barangay 170' },
-                                { value: 'Barangay 183', label: 'Barangay 183' }
-                            ]}
+                            options={dynamicBarangayOptions}
                         />
 
                         {/* Date Filter */}
@@ -1018,10 +1143,10 @@ export default function GovReportsDashboard() {
                 {/* ─────────────────────────────────────────────────────────────
                     4. CONTENT WORKSPACE: REPORTS TABLE (LEFT) + DETAIL PANEL (RIGHT)
                 ────────────────────────────────────────────────────────────── */}
-                <div className="flex-1 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden p-3 sm:p-4 lg:p-6 gap-3 sm:gap-4 lg:gap-6">
+                <div className="flex-1 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden p-3 sm:p-4 lg:p-6 gap-0">
 
                     <div
-                        className="xl:hidden flex shrink-0 gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#090e1a] custom-scrollbar"
+                        className="xl:hidden flex shrink-0 gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#090e1a] custom-scrollbar mb-3"
                         role="listbox"
                         aria-label="Citizen reports"
                     >
@@ -1033,10 +1158,10 @@ export default function GovReportsDashboard() {
                                     type="button"
                                     role="option"
                                     aria-selected={isSelected}
-                                    onClick={() => setSelectedReportId(report.id)}
+                                    onClick={() => setSelectedReportId(prev => prev === report.id ? null : report.id)}
                                     className={`min-h-14 min-w-44 rounded-lg border px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] ${
                                         isSelected
-                                            ? 'border-[#0B4F6C] bg-[#0B4F6C]/10 text-[#0B4F6C] dark:border-[#82C7D8] dark:bg-[#82C7D8]/10 dark:text-[#82C7D8]'
+                                            ? 'border-[#ff6b00] bg-[#ff6b00]/10 text-[#ff6b00] dark:border-[#ff6b00] dark:bg-[#ff6b00]/15 dark:text-[#ff6b00]'
                                             : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200'
                                     }`}
                                 >
@@ -1093,12 +1218,12 @@ export default function GovReportsDashboard() {
                                         return (
                                             <tr
                                                 key={report.id}
-                                                onClick={() => setSelectedReportId(report.id)}
+                                                onClick={() => setSelectedReportId(prev => prev === report.id ? null : report.id)}
                                                 tabIndex={0}
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter' || e.key === ' ') {
                                                         e.preventDefault();
-                                                        setSelectedReportId(report.id);
+                                                        setSelectedReportId(prev => prev === report.id ? null : report.id);
                                                     }
                                                 }}
                                                 className={`transition-colors cursor-pointer group focus:outline-none ${
@@ -1236,6 +1361,8 @@ export default function GovReportsDashboard() {
                                     size="sm"
                                     minWidth="105px"
                                     searchable={false}
+                                    dropUp={true}
+                                    align="right"
                                     options={[
                                         { value: 10, label: '10 / page' },
                                         { value: 20, label: '20 / page' },
@@ -1246,33 +1373,62 @@ export default function GovReportsDashboard() {
                         </div>
                     </div>
 
-                    {/* ── RIGHT: DETAIL PANEL (Persistent) ───────────────────── */}
-                    {selectedReport && (
-                        <aside className="w-full xl:w-[420px] min-h-[620px] xl:min-h-0 shrink-0 bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col overflow-hidden">
+                    {/* ── RIGHT: DETAIL PANEL (Simultaneous Aperture Reveal) ───────────────────── */}
+                    <AnimatePresence initial={false}>
+                        {selectedReport && (
+                            <motion.aside
+                                key="report-detail-rail"
+                                initial={!isMobile ? { width: 0, opacity: 0, marginLeft: 0 } : { opacity: 0, y: 16 }}
+                                animate={!isMobile ? { width: 440, opacity: 1, marginLeft: 24 } : { opacity: 1, y: 0 }}
+                                exit={!isMobile ? { width: 0, opacity: 0, marginLeft: 0 } : { opacity: 0, y: 16 }}
+                                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                                className="w-full xl:w-[440px] shrink-0 overflow-hidden flex flex-col mt-3 xl:mt-0"
+                                style={{ flexShrink: 0 }}
+                            >
+                                <div className="w-full xl:w-[440px] xl:min-w-[440px] h-full min-h-[620px] xl:min-h-0 shrink-0 bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col overflow-hidden">
 
-                            {/* Detail Panel Header */}
-                            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                                <div className="flex items-center gap-2 truncate pr-2">
-                                    <h2 className="font-heading font-black text-sm text-slate-900 dark:text-white truncate">
-                                        {selectedReport.ticket_id}
-                                    </h2>
-                                    <span className="text-slate-400">•</span>
-                                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
-                                        {selectedReport.issue}
-                                    </span>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsPinned(!isPinned)}
-                                    title={isPinned ? 'Unpin panel' : 'Pin panel'}
-                                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
-                                >
-                                    {isPinned ? <Pin className="text-[#ff6b00]" size={15} /> : <Pin size={15} />}
-                                </button>
-                            </div>
+                                    {/* Detail Panel Header */}
+                                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                                        <div className="flex items-center gap-2 truncate pr-2">
+                                            <h2 className="font-heading font-black text-sm text-slate-900 dark:text-white truncate">
+                                                {selectedReport.ticket_id}
+                                            </h2>
+                                            <span className="text-slate-400">•</span>
+                                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
+                                                {selectedReport.issue}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsPinned(!isPinned)}
+                                                title={isPinned ? 'Unpin panel' : 'Pin panel'}
+                                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
+                                            >
+                                                {isPinned ? <Pin className="text-[#ff6b00]" size={15} /> : <Pin size={15} />}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedReportId(null)}
+                                                title="Close details panel"
+                                                aria-label="Close details panel"
+                                                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer shrink-0"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            {/* Detail Panel Body */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
+                                    {/* Instant inner transition when switching reports */}
+                                    <motion.div
+                                        key={selectedReport.id}
+                                        initial={{ opacity: 0.6 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ duration: 0.1 }}
+                                        className="flex-1 flex flex-col overflow-hidden min-h-0"
+                                    >
+                                        {/* Detail Panel Body */}
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
 
                                 {/* Evidence Photo & Reporter Meta */}
                                 <div className="grid grid-cols-2 gap-4 items-start">
@@ -1516,15 +1672,8 @@ export default function GovReportsDashboard() {
                                 {/* 1. Request Changes (Outline) */}
                                 <button
                                     type="button"
-                                    onClick={() => Swal.fire({
-                                        title: 'Request Changes',
-                                        input: 'textarea',
-                                        inputPlaceholder: 'Specify required modifications from field crew or citizen...',
-                                        showCancelButton: true,
-                                        confirmButtonText: 'Submit Request',
-                                        confirmButtonColor: '#ff6b00'
-                                    })}
-                                    className="order-2 inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-heading text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] sm:order-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                    onClick={() => setIsRequestChangesModalOpen(true)}
+                                    className="order-2 inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-heading text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] sm:order-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
                                 >
                                     <MessageSquare size={14} />
                                     <span>Request changes</span>
@@ -1534,7 +1683,7 @@ export default function GovReportsDashboard() {
                                 <button
                                     type="button"
                                     onClick={handleOpenWorkOrderModal}
-                                    className="order-1 col-span-2 inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#0B4F6C] px-3 py-2.5 font-heading text-xs font-bold text-white shadow-md shadow-sky-900/15 transition-all hover:bg-[#083F57] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] active:scale-[0.98] sm:order-none dark:bg-[#82C7D8] dark:text-[#071A2B] dark:hover:bg-[#A6DBE7]"
+                                    className="order-1 col-span-2 inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#ff6b00] px-3 py-2.5 font-heading text-xs font-bold text-white shadow-md shadow-orange-500/20 transition-all hover:bg-[#e65c00] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff6b00] active:scale-[0.98] cursor-pointer sm:order-none dark:bg-[#ff6b00] dark:hover:bg-[#e65c00] dark:text-white"
                                 >
                                     <Wrench size={14} />
                                     <span>Assign work order</span>
@@ -1543,15 +1692,18 @@ export default function GovReportsDashboard() {
                                 {/* 3. Escalate (Red/Destructive Outline) */}
                                 <button
                                     type="button"
-                                    onClick={handleEscalateReport}
-                                    className="order-3 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-300 bg-red-50/50 px-3 py-2.5 font-heading text-xs font-bold text-red-600 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] sm:order-none dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-900/40"
+                                    onClick={() => setIsEscalateModalOpen(true)}
+                                    className="order-3 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-300 bg-red-50/50 px-3 py-2.5 font-heading text-xs font-bold text-red-600 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] sm:order-none dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-900/40 cursor-pointer"
                                 >
                                     <Flag size={14} />
                                     <span>Escalate</span>
                                 </button>
                             </div>
-                        </aside>
-                    )}
+                        </motion.div>
+                    </div>
+                </motion.aside>
+            )}
+        </AnimatePresence>
 
                 </div>
             </div>
@@ -1590,13 +1742,13 @@ export default function GovReportsDashboard() {
             ═══════════════════════════════════════════════════════════════════ */}
             <AnimatePresence>
                 {isWorkOrderModalOpen && selectedReport && (
-                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md">
                         <motion.div 
-                            initial={{ opacity: 0, scale: 0.94, y: 16 }}
+                            initial={{ opacity: 0, scale: 0.95, y: 16 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 16 }}
                             transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-                            className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden max-w-lg w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]"
+                            className="bg-white dark:bg-[#090e1a] rounded-3xl shadow-2xl overflow-hidden max-w-4xl w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh]"
                             role="dialog"
                             aria-modal="true"
                             aria-labelledby="wo-modal-title"
@@ -1605,10 +1757,10 @@ export default function GovReportsDashboard() {
                             <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
 
                             {/* Modal Header */}
-                            <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                                <div className="flex items-center justify-between gap-3 mb-2.5">
-                                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-[11px] font-bold text-orange-600 dark:text-orange-400">
-                                        <Briefcase size={13} className="text-orange-500" />
+                            <div className="px-6 py-4.5 sm:px-7 sm:py-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40 shrink-0">
+                                <div className="flex items-center justify-between gap-3 mb-2">
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                                        <Briefcase size={13} className="text-[#ff6b00]" />
                                         <span>MUNICIPAL WORK ORDER DISPATCH</span>
                                     </div>
                                     <button 
@@ -1621,180 +1773,528 @@ export default function GovReportsDashboard() {
                                     </button>
                                 </div>
 
-                                <h2 id="wo-modal-title" className="text-xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                                <h2 id="wo-modal-title" className="text-xl sm:text-2xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
                                     Create & Dispatch Work Order
                                 </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                                     Authorize and deploy engineering field teams with official dispatch parameters.
                                 </p>
-
-                                {/* Incident Summary Lockup */}
-                                <div className="mt-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2 mb-0.5">
-                                            <span className="font-mono text-xs font-extrabold text-orange-500">
-                                                #{formatTicketId(selectedReport.ticket_id, selectedReport.id)}
-                                            </span>
-                                            {selectedReport.barangay && (
-                                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
-                                                    <span>•</span>
-                                                    <MapPin size={10} className="text-slate-400 shrink-0" />
-                                                    <span>{selectedReport.barangay.startsWith('Barangay') ? selectedReport.barangay : `Brgy. ${selectedReport.barangay}`}</span>
-                                                </span>
-                                            )}
-                                        </div>
-                                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-                                            {getReportPlainTitle(selectedReport)}
-                                        </h4>
-                                    </div>
-                                    {(() => {
-                                        const desc = getStatusDescriptor(selectedReport.status);
-                                        const StatusIcon = desc?.icon || Clock;
-                                        return (
-                                            <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${desc?.badgeClass || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-                                                <StatusIcon size={12} className="shrink-0" />
-                                                <span>{desc?.label || selectedReport.status}</span>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
                             </div>
                             
-                            {/* Modal Scrollable Form Body */}
-                            <form onSubmit={handleExecuteWorkOrder} className="p-6 overflow-y-auto space-y-4 text-xs">
-                                {/* Issue Verified Location Card */}
-                                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800/80 flex items-start gap-3">
-                                    <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 mt-0.5 border border-orange-500/20">
-                                        <MapPin size={15} />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
-                                            Field Operations Site
+                            {/* Modal Landscape Form Body */}
+                            <form onSubmit={handleExecuteWorkOrder} className="flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-between">
+                                <div className="p-6 sm:p-7 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                                    {/* ── LEFT COLUMN: Incident Target & Location Dossier (5 cols) ── */}
+                                    <div className="lg:col-span-5 flex flex-col gap-4">
+                                        {/* Target Incident Summary Card */}
+                                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#030712]/60 border border-slate-200/80 dark:border-slate-800/80 flex flex-col gap-2.5 shadow-xs">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="font-mono text-xs font-extrabold text-[#ff6b00]">
+                                                        {formatTicketId(selectedReport.ticket_id, selectedReport.id)}
+                                                    </span>
+                                                    {selectedReport.barangay && (
+                                                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                                            <span>•</span>
+                                                            <MapPin size={10} className="text-slate-400 shrink-0" />
+                                                            <span>{selectedReport.barangay.startsWith('Barangay') ? selectedReport.barangay : `Brgy. ${selectedReport.barangay}`}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {(() => {
+                                                    const desc = getStatusDescriptor(selectedReport.status);
+                                                    const StatusIcon = desc?.icon || Clock;
+                                                    return (
+                                                        <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${desc?.badgeClass || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                                                            <StatusIcon size={11} className="shrink-0" />
+                                                            <span>{desc?.label || selectedReport.status}</span>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                            <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                                {getReportPlainTitle(selectedReport)}
+                                            </h4>
+                                            {selectedReport.description && (
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                                                    {selectedReport.description}
+                                                </p>
+                                            )}
                                         </div>
-                                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug break-words">
-                                            {selectedReport.location?.address || selectedReport.location_string || `${selectedReport.location?.lat || selectedReport.location_lat || 14.7566}°N, ${selectedReport.location?.lng || selectedReport.location_lng || 121.0450}°E (Caloocan)`}
+
+                                        {/* Field Operations Site Card */}
+                                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#030712]/60 border border-slate-200/80 dark:border-slate-800/80 flex items-start gap-3 shadow-xs">
+                                            <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-[#ff6b00] flex items-center justify-center shrink-0 mt-0.5 border border-orange-500/20">
+                                                <MapPin size={15} />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
+                                                    Field Operations Site
+                                                </div>
+                                                <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug break-words">
+                                                    {selectedReport.location?.address || selectedReport.location_string || `${selectedReport.location?.lat || selectedReport.location_lat || 14.7566}°N, ${selectedReport.location?.lng || selectedReport.location_lng || 121.0450}°E (Caloocan)`}
+                                                </div>
+                                                {selectedReport.barangay && (
+                                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
+                                                        {selectedReport.barangay}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Information Notice Strip */}
+                                        <div className="p-3.5 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-slate-700 dark:text-slate-300 text-[11px] flex items-start gap-2.5">
+                                            <Sparkles size={15} className="text-[#ff6b00] shrink-0 mt-0.5" />
+                                            <div className="leading-relaxed">
+                                                Executing dispatch sets report status to <strong className="text-orange-600 dark:text-orange-400 font-bold">In Progress</strong>, logs an audit trail event, and synchronizes telemetry across the Tactical GIS Command Map and field crew tablets.
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* 2-Column Responsive Form Controls */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                    {/* Assigned Fleet / Engineer */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                            <Truck size={13} className="text-orange-500" />
-                                            <span>Assign To Fleet / Lead</span>
-                                        </label>
-                                        <select 
-                                            required
-                                            value={workOrderForm.assigned_to_id || 3}
-                                            onChange={(e) => {
-                                                const teamId = parseInt(e.target.value, 10);
-                                                const teamNames = {
-                                                    2: 'Team Alpha — Engr. Dela Cruz (Electrical & Lighting)',
-                                                    3: 'Team Beta — Engr. Bautista (Roads & Bridges)',
-                                                    4: 'Team Gamma — Engr. Reyes (Drainage & Waterworks)',
-                                                    5: 'Team Delta — Environmental Sanitation Task Force'
-                                                };
-                                                setWorkOrderForm({ 
-                                                    ...workOrderForm, 
-                                                    assigned_to_id: teamId, 
-                                                    team: teamNames[teamId] || 'Team Beta — Roads & Bridges' 
-                                                });
-                                            }}
-                                            className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all cursor-pointer shadow-xs"
-                                        >
-                                            <option value="2">Team Alpha — Engr. Dela Cruz (Electrical & Lighting)</option>
-                                            <option value="3">Team Beta — Engr. Bautista (Roads & Bridges)</option>
-                                            <option value="4">Team Gamma — Engr. Reyes (Drainage & Waterworks)</option>
-                                            <option value="5">Team Delta — Environmental Sanitation Task Force</option>
-                                        </select>
-                                    </div>
+                                    {/* ── RIGHT COLUMN: Directive & Fleet Allocation Form (7 cols) ── */}
+                                    <div className="lg:col-span-7 flex flex-col gap-4">
+                                        {/* Row 1: Designed Dropdowns */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 relative z-30">
+                                            {/* Assigned Fleet / Lead */}
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                                    <Truck size={13} className="text-[#ff6b00]" />
+                                                    <span>Assign To Fleet / Lead</span>
+                                                </label>
+                                                <OrangeSelect 
+                                                    value={Number(workOrderForm.assigned_to_id) || 3}
+                                                    onChange={(val) => {
+                                                        const teamId = Number(val);
+                                                        const found = DISPATCH_FLEET_OPTIONS.find(f => f.value === teamId);
+                                                        setWorkOrderForm(prev => ({
+                                                            ...prev,
+                                                            assigned_to_id: teamId,
+                                                            team: found ? found.label : 'Team Beta — Engr. Bautista'
+                                                        }));
+                                                    }}
+                                                    options={DISPATCH_FLEET_OPTIONS}
+                                                    searchable={false}
+                                                    icon={Truck}
+                                                    className="w-full"
+                                                />
+                                            </div>
 
-                                    {/* Priority Level */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                            <ShieldCheck size={13} className="text-orange-500" />
-                                            <span>Priority Level</span>
-                                        </label>
-                                        <select 
-                                            value={workOrderForm.priority}
-                                            onChange={(e) => setWorkOrderForm({ ...workOrderForm, priority: e.target.value })}
-                                            className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all cursor-pointer shadow-xs"
-                                        >
-                                            <option value="critical">Critical (Immediate Danger / Safety Hazard)</option>
-                                            <option value="high">High (Urgent Infrastructure Repair)</option>
-                                            <option value="normal">Normal (Standard Dispatch SLA)</option>
-                                            <option value="low">Low (Routine Maintenance Sweep)</option>
-                                        </select>
-                                    </div>
-                                </div>
+                                            {/* Priority Level */}
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                                    <ShieldCheck size={13} className="text-[#ff6b00]" />
+                                                    <span>Priority Level</span>
+                                                </label>
+                                                <OrangeSelect 
+                                                    value={workOrderForm.priority || 'normal'}
+                                                    onChange={(val) => setWorkOrderForm(prev => ({ ...prev, priority: val }))}
+                                                    options={DISPATCH_PRIORITY_OPTIONS}
+                                                    searchable={false}
+                                                    icon={ShieldCheck}
+                                                    align="right"
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                        </div>
 
-                                {/* Task Title */}
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                        <Wrench size={13} className="text-orange-500" />
-                                        <span>Work Order Task Title</span>
-                                    </label>
-                                    <input 
-                                        type="text"
-                                        required
-                                        placeholder={`e.g. Repair ${selectedReport.report_type || selectedReport.issue || 'damaged infrastructure'}`}
-                                        value={workOrderForm.title}
-                                        onChange={(e) => setWorkOrderForm({ ...workOrderForm, title: e.target.value })}
-                                        className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all shadow-xs"
-                                    />
-                                </div>
+                                        {/* Task Title */}
+                                        <div className="relative z-10">
+                                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                                <Wrench size={13} className="text-[#ff6b00]" />
+                                                <span>Work Order Task Title</span>
+                                            </label>
+                                            <input 
+                                                type="text"
+                                                required
+                                                placeholder={`e.g. Repair ${selectedReport.report_type || selectedReport.issue || 'damaged infrastructure'}`}
+                                                value={workOrderForm.title}
+                                                onChange={(e) => setWorkOrderForm({ ...workOrderForm, title: e.target.value })}
+                                                className="w-full bg-slate-50 dark:bg-[#030712] border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]/30 focus:border-[#ff6b00] transition-all shadow-xs"
+                                            />
+                                        </div>
 
-                                {/* Instructions & Action Plan */}
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                        <FileText size={13} className="text-orange-500" />
-                                        <span>Dispatcher Instructions & Action Plan</span>
-                                    </label>
-                                    <textarea 
-                                        rows="3"
-                                        placeholder="Specify field instructions, required heavy equipment, safety perimeters, or coordinate notes..."
-                                        value={workOrderForm.description}
-                                        onChange={(e) => setWorkOrderForm({ ...workOrderForm, description: e.target.value })}
-                                        className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all shadow-xs resize-none"
-                                    ></textarea>
-                                </div>
-
-                                {/* Information Notice Strip */}
-                                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-slate-700 dark:text-slate-300 text-[11px] flex items-start gap-2.5">
-                                    <Sparkles size={14} className="text-orange-500 shrink-0 mt-0.5" />
-                                    <div className="leading-relaxed">
-                                        Executing dispatch sets report status to <strong className="text-orange-600 dark:text-orange-400 font-bold">In Progress</strong>, logs an audit trail event, and synchronizes across the Tactical GIS Command Map and field crew tablets.
+                                        {/* Instructions & Action Plan */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                                <FileText size={13} className="text-[#ff6b00]" />
+                                                <span>Dispatcher Instructions & Action Plan</span>
+                                            </label>
+                                            <textarea 
+                                                rows="4"
+                                                placeholder="Specify field instructions, required heavy equipment, safety perimeters, or coordinate notes..."
+                                                value={workOrderForm.description}
+                                                onChange={(e) => setWorkOrderForm({ ...workOrderForm, description: e.target.value })}
+                                                className="w-full bg-slate-50 dark:bg-[#030712] border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]/30 focus:border-[#ff6b00] transition-all shadow-xs resize-none leading-relaxed"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Footer Controls */}
-                                <div className="pt-2 flex items-center gap-3 border-t border-slate-100 dark:border-slate-800">
-                                    <button 
+                                <div className="px-6 py-4 sm:px-7 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between gap-3 shrink-0">
+                                    <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">
+                                        Department of Engineering & Public Works • Caloocan City
+                                    </span>
+                                    <div className="flex items-center gap-3 ml-auto">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setIsWorkOrderModalOpen(false)}
+                                            disabled={isSubmittingWo}
+                                            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            type="submit"
+                                            disabled={isSubmittingWo}
+                                            className="px-6 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-white text-xs font-bold shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                                        >
+                                            {isSubmittingWo ? (
+                                                <div className="flex items-center gap-2">
+                                                    <RefreshCw size={14} className="animate-spin" />
+                                                    <span>Dispatching...</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <Navigation size={14} />
+                                                    <span>Confirm & Dispatch Crew</span>
+                                                </div>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ═══════════════════════════════════════════════════════════════════
+                MODAL: REQUEST CHANGES / REQUIRED MODIFICATIONS
+            ══════════════════════════════════════════════════════════════════════ */}
+            <AnimatePresence>
+                {isRequestChangesModalOpen && selectedReport && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                            transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+                            className="bg-white dark:bg-[#090e1a] rounded-3xl shadow-2xl overflow-hidden max-w-4xl w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh]"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="rc-modal-title"
+                        >
+                            {/* Top Accent Gradient Strip */}
+                            <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 shrink-0" />
+
+                            {/* Modal Header */}
+                            <div className="px-6 py-4.5 sm:px-7 sm:py-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40 shrink-0">
+                                <div className="flex items-center justify-between gap-3 mb-2">
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                                        <MessageSquare size={13} className="text-amber-500" />
+                                        <span>REVISION & CLARIFICATION DISPATCH</span>
+                                    </div>
+                                    <button
                                         type="button"
-                                        onClick={() => setIsWorkOrderModalOpen(false)}
-                                        disabled={isSubmittingWo}
-                                        className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                        onClick={() => setIsRequestChangesModalOpen(false)}
+                                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        aria-label="Close dialog"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+
+                                <h2 id="rc-modal-title" className="text-xl sm:text-2xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                                    Request Modifications
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                                    Specify required modifications, supplementary evidence, or clarifications.
+                                </p>
+                            </div>
+
+                            {/* Modal Landscape Form Body */}
+                            <form onSubmit={handleExecuteRequestChanges} className="flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-between">
+                                <div className="p-6 sm:p-7 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                                    {/* ── LEFT COLUMN: Incident Target & Dispatch Channel (5 cols) ── */}
+                                    <div className="lg:col-span-5 flex flex-col gap-4">
+                                        {/* Target Incident Summary Card */}
+                                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#030712]/60 border border-slate-200/80 dark:border-slate-800/80 flex flex-col gap-2.5 shadow-xs">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="font-mono text-xs font-extrabold text-amber-500">
+                                                        {formatTicketId(selectedReport.ticket_id, selectedReport.id)}
+                                                    </span>
+                                                    {selectedReport.barangay && (
+                                                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                                            <span>•</span>
+                                                            <MapPin size={10} className="text-slate-400 shrink-0" />
+                                                            <span>{selectedReport.barangay.startsWith('Barangay') ? selectedReport.barangay : `Brgy. ${selectedReport.barangay}`}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {(() => {
+                                                    const desc = getStatusDescriptor(selectedReport.status);
+                                                    const StatusIcon = desc?.icon || Clock;
+                                                    return (
+                                                        <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${desc?.badgeClass || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                                                            <StatusIcon size={11} className="shrink-0" />
+                                                            <span>{desc?.label || selectedReport.status}</span>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                            <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                                {getReportPlainTitle(selectedReport)}
+                                            </h4>
+                                            {selectedReport.description && (
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                                                    {selectedReport.description}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Target Recipient Selection Cards */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                                Send Request To:
+                                            </label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setRequestTarget('field_crew')}
+                                                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                                                        requestTarget === 'field_crew'
+                                                            ? 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 shadow-xs ring-1 ring-amber-500/30 font-bold'
+                                                            : 'bg-slate-50 dark:bg-[#030712]/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 font-medium'
+                                                    }`}
+                                                >
+                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${requestTarget === 'field_crew' ? 'bg-amber-500 text-white' : 'bg-slate-200/60 dark:bg-slate-800 text-slate-500'}`}>
+                                                        <Truck size={17} />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-xs font-bold leading-snug">Field Crew / Lead</div>
+                                                        <div className="text-[11px] opacity-75 truncate mt-0.5">Work order inspection team</div>
+                                                    </div>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setRequestTarget('citizen')}
+                                                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                                                        requestTarget === 'citizen'
+                                                            ? 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 shadow-xs ring-1 ring-amber-500/30 font-bold'
+                                                            : 'bg-slate-50 dark:bg-[#030712]/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 font-medium'
+                                                    }`}
+                                                >
+                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${requestTarget === 'citizen' ? 'bg-amber-500 text-white' : 'bg-slate-200/60 dark:bg-slate-800 text-slate-500'}`}>
+                                                        <Users size={17} />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-xs font-bold leading-snug">Citizen Reporter</div>
+                                                        <div className="text-[11px] opacity-75 truncate mt-0.5">Via Pulseline mobile notification</div>
+                                                    </div>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Regulatory Audit Notice */}
+                                        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-slate-700 dark:text-slate-300 text-[11px] flex items-start gap-2.5">
+                                            <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                                            <div className="leading-relaxed">
+                                                Dispatching revisions notifies the target recipient immediately and logs a permanent entry in the civic audit history.
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* ── RIGHT COLUMN: Clarification Directives & Presets (7 cols) ── */}
+                                    <div className="lg:col-span-7 flex flex-col gap-4">
+                                        {/* Quick Clarification Presets */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                                Quick Clarification Presets:
+                                            </label>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {[
+                                                    'Need clearer defect photos from multiple angles',
+                                                    'Exact street landmark or pole number missing',
+                                                    'Verify barangay jurisdiction boundary',
+                                                    'Requires physical on-site re-inspection',
+                                                    'Structural dimension / pothole depth measurements needed'
+                                                ].map((preset, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => setRequestChangesText(prev => prev ? `${prev}. ${preset}` : preset)}
+                                                        className="px-3 py-1.5 rounded-xl text-[11.5px] font-medium bg-slate-100 hover:bg-amber-100 dark:bg-slate-800/80 dark:hover:bg-amber-950/40 text-slate-700 hover:text-amber-700 dark:text-slate-300 dark:hover:text-amber-300 border border-slate-200/80 dark:border-slate-700 transition-colors cursor-pointer"
+                                                    >
+                                                        + {preset}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Revision Details Textarea */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label htmlFor="rc-textarea" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                    Specific Instructions & Modifications *
+                                                </label>
+                                                <span className="text-[11px] text-slate-400 font-mono">
+                                                    {requestChangesText.length} chars
+                                                </span>
+                                            </div>
+                                            <textarea
+                                                id="rc-textarea"
+                                                required
+                                                rows={6}
+                                                value={requestChangesText}
+                                                onChange={(e) => setRequestChangesText(e.target.value)}
+                                                placeholder="Detail the exact corrections, supplementary photographs, or technical clarifications needed before proceeding..."
+                                                className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#030712] text-slate-800 dark:text-slate-100 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all resize-none shadow-xs leading-relaxed"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Modal Actions Footer */}
+                                <div className="px-6 py-4 sm:px-7 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between gap-3 shrink-0">
+                                    <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">
+                                        PULSO Civic Records Oversight • Quality Assurance Desk
+                                    </span>
+                                    <div className="flex items-center gap-3 ml-auto">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsRequestChangesModalOpen(false)}
+                                            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={!requestChangesText.trim()}
+                                            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-xs font-bold text-white shadow-md shadow-orange-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-98"
+                                        >
+                                            <MessageSquare size={14} />
+                                            <span>Submit Revision Request</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ═══════════════════════════════════════════════════════════════════
+                MODAL: ESCALATE REPORT TO CITY ENGINEER
+            ══════════════════════════════════════════════════════════════════════ */}
+            <AnimatePresence>
+                {isEscalateModalOpen && selectedReport && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.94, y: 16 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+                            transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+                            className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden max-w-lg w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="esc-modal-title"
+                        >
+                            {/* Top Accent Gradient Strip */}
+                            <div className="h-1.5 w-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-600 shrink-0" />
+
+                            {/* Modal Header */}
+                            <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                                <div className="flex items-center justify-between gap-3 mb-2.5">
+                                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-[11px] font-bold text-red-600 dark:text-red-400">
+                                        <ShieldAlert size={13} className="text-red-500" />
+                                        <span>EXECUTIVE ESCALATION DISPATCH</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEscalateModalOpen(false)}
+                                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                        aria-label="Close dialog"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+
+                                <h2 id="esc-modal-title" className="text-xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                                    Escalate Incident Docket
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                                    Directly alert the City Engineer Executive Desk for emergency review and priority dispatch.
+                                </p>
+
+                                {/* Warning Callout */}
+                                <div className="mt-3.5 p-3 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200/80 dark:border-red-900/40 flex items-start gap-2.5">
+                                    <AlertTriangle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                                    <div className="text-[11.5px] leading-relaxed text-red-700 dark:text-red-300">
+                                        <strong>Emergency SLA Escalation:</strong> This upgrades {formatTicketId(selectedReport.ticket_id, selectedReport.id)} to <strong>Critical Severity</strong> and issues high-priority notification to on-duty city engineers.
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Modal Body */}
+                            <form onSubmit={handleExecuteEscalation} className="p-6 overflow-y-auto space-y-4 text-xs">
+                                {/* Quick Justification Presets */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                                        Urgent Justification Presets:
+                                    </label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {[
+                                            'Imminent public pedestrian/vehicular safety hazard',
+                                            'Major arterial road blocked / structural erosion',
+                                            'High-pressure watermain burst or electrical hazard',
+                                            'Severe canal embankment collapse risking flood'
+                                        ].map((preset, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => setEscalateReason(preset)}
+                                                className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-red-100 dark:bg-slate-800 dark:hover:bg-red-950/40 text-slate-700 hover:text-red-700 dark:text-slate-300 dark:hover:text-red-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                                            >
+                                                {preset}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Textarea */}
+                                <div>
+                                    <label htmlFor="esc-textarea" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                                        Escalation Justification & Executive Notes *
+                                    </label>
+                                    <textarea
+                                        id="esc-textarea"
+                                        required
+                                        rows={4}
+                                        value={escalateReason}
+                                        onChange={(e) => setEscalateReason(e.target.value)}
+                                        placeholder="Explain why this requires expedited executive intervention..."
+                                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all resize-y"
+                                    />
+                                </div>
+
+                                {/* Modal Actions Footer */}
+                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEscalateModalOpen(false)}
+                                        className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                     >
                                         Cancel
                                     </button>
-                                    <button 
+                                    <button
                                         type="submit"
-                                        disabled={isSubmittingWo}
-                                        className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                                        disabled={!escalateReason.trim()}
+                                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-xs font-bold text-white shadow-md shadow-red-600/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                     >
-                                        {isSubmittingWo ? (
-                                            <div className="flex items-center gap-2">
-                                                <RefreshCw size={14} className="animate-spin" />
-                                                <span>Dispatching...</span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <Navigation size={14} />
-                                                <span>Confirm & Dispatch Crew</span>
-                                            </div>
-                                        )}
+                                        <Flag size={14} />
+                                        <span>Confirm Executive Escalation</span>
                                     </button>
                                 </div>
                             </form>

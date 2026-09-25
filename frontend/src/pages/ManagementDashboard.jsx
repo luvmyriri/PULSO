@@ -45,9 +45,13 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
+import { formatTicketId } from '../utils/reportWorkflow';
 
 import { API_BASE_URL } from '../utils/apiBase';
 
@@ -272,20 +276,38 @@ const ManagementDashboard = ({ workspace }) => {
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 
                 {/* Top Header */}
-                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 relative z-40 border-b border-neutral-border dark:border-slate-800 transition-colors duration-150">
-                    <h1 className="text-xl font-display font-bold text-neutral-text dark:text-white">
-                        {activeTab === 'overview' && 'Executive Performance Overview'}
-                        {activeTab === 'approvals' && 'Engineering Work Order Approvals'}
-                        {activeTab === 'procurement' && 'Public Bidding Pipeline (RA 9184)'}
-                        {activeTab === 'permits' && 'OBO Permit Tracking Masterlist'}
-                        {activeTab === 'predictive' && 'AI Predictive Maintenance Alerts'}
-                        {activeTab === 'advisories' && 'Post a Public Advisory'}
-                        {activeTab === 'users' && 'Registered Users'}
-                        {activeTab === 'archive' && 'Reports Archive'}
-                        {activeTab === 'documents' && 'Document Registry'}
-                        {activeTab === 'audit' && 'Audit Command'}
-                        {activeTab === 'timeline' && 'Process Timeline'}
-                    </h1>
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 relative z-50 border-b border-neutral-border dark:border-slate-800 transition-colors duration-150">
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb
+                            category="Executive"
+                            current={
+                                activeTab === 'overview' ? 'Executive Performance Overview' :
+                                activeTab === 'approvals' ? 'Work Order Approvals' :
+                                activeTab === 'procurement' ? 'Public Bidding Pipeline' :
+                                activeTab === 'permits' ? 'OBO Permit Tracking' :
+                                activeTab === 'predictive' ? 'AI Predictive Maintenance' :
+                                activeTab === 'advisories' ? 'Public Advisory' :
+                                activeTab === 'users' ? 'User Directory' :
+                                activeTab === 'archive' ? 'Reports Archive' :
+                                activeTab === 'documents' ? 'Document Registry' :
+                                activeTab === 'audit' ? 'Audit Command' :
+                                activeTab === 'timeline' ? 'Process Timeline' : 'Executive Command Overview'
+                            }
+                        />
+                        <h1 className="text-xl sm:text-2xl font-heading font-black tracking-tight text-neutral-text dark:text-white mt-0.5 leading-none">
+                            {activeTab === 'overview' && 'Executive Performance Overview'}
+                            {activeTab === 'approvals' && 'Engineering Work Order Approvals'}
+                            {activeTab === 'procurement' && 'Public Bidding Pipeline (RA 9184)'}
+                            {activeTab === 'permits' && 'OBO Permit Tracking Masterlist'}
+                            {activeTab === 'predictive' && 'AI Predictive Maintenance Alerts'}
+                            {activeTab === 'advisories' && 'Post a Public Advisory'}
+                            {activeTab === 'users' && 'Registered Users'}
+                            {activeTab === 'archive' && 'Reports Archive'}
+                            {activeTab === 'documents' && 'Document Registry'}
+                            {activeTab === 'audit' && 'Audit Command'}
+                            {activeTab === 'timeline' && 'Process Timeline'}
+                        </h1>
+                    </div>
                     
                     <div className="flex items-center gap-4">
                         <select value={dateRange} onChange={e => setDateRange(e.target.value)} className="bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-xs font-bold">
@@ -296,18 +318,8 @@ const ManagementDashboard = ({ workspace }) => {
                             <Download size={14} /> Export Audit
                         </button>
                         <ThemeToggle />
-                        <button
-                            onClick={() => { 
-                                const user = getAuthUser();
-                                const wasGov = user?.role && user.role !== 'resident';
-                                clearAuthSession();
-                                navigate(wasGov ? '/gov' : '/login'); 
-                            }}
-                            className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                            title="Sign Out"
-                        >
-                            <LogOut size={18}/>
-                        </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 
@@ -420,7 +432,7 @@ const ManagementDashboard = ({ workspace }) => {
                                         {loadingTab ? <tr><td colSpan="4" className="py-20 text-center"><Loader2 size={24} className="animate-spin mx-auto text-indigo-500" /></td></tr> : 
                                             reportsArchive.length > 0 ? reportsArchive.map(rpt => (
                                             <tr key={rpt.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                                <td className="px-6 py-4 font-black text-indigo-500">{rpt.ticket_id}</td>
+                                                <td className="px-6 py-4 font-black text-indigo-500">{formatTicketId(rpt.ticket_id, rpt.id, true)}</td>
                                                 <td className="px-6 py-4 opacity-70 truncate max-w-md">{rpt.description}</td>
                                                 <td className="px-6 py-4 text-center"><span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] font-black uppercase">resolved</span></td>
                                                 <td className="px-6 py-4 text-right opacity-50">{new Date(rpt.updated_at).toLocaleDateString()}</td>

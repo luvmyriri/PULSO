@@ -3,6 +3,7 @@
  * Ray-casting Point-in-Polygon boundary verification, Haversine distance calculations,
  * and district resolution.
  */
+import { findBarangayByCoordinates } from '../data/caloocanBoundaries';
 
 export const CALOOCAN_CENTERS = {
   north: { lat: 14.7565, lng: 121.0450, label: 'North Caloocan (City Hall North)' },
@@ -172,6 +173,11 @@ export function getHaversineDistanceMeters(lat1, lon1, lat2, lon2) {
  */
 export function estimateBarangayFromCoords(lat, lng) {
   if (!isInCaloocan(lat, lng)) return '';
+
+  const detected = findBarangayByCoordinates(lat, lng);
+  if (detected) {
+    return detected.displayName ? `${detected.name} (${detected.displayName})` : detected.name;
+  }
 
   if (lat >= 14.77) return 'Barangay 176 (Bagong Silang)';
   if (lat >= 14.75) return 'Barangay 174 (Camarin)';

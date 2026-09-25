@@ -1,17 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     AlertCircle,
     AlertTriangle,
-    ArrowLeft,
     CheckCircle2,
     Clock3,
     ExternalLink,
-    FileCheck,
-    FileImage,
     Filter,
-    FolderKanban,
-    History,
     Inbox,
     MapPin,
     Plus,
@@ -21,184 +17,143 @@ import {
     ShieldCheck,
     Truck,
     Wrench,
+    X,
+    Unlock,
+    User,
+    Calendar,
+    FileImage
 } from 'lucide-react';
 import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
-import WorkOrderUpdateModal from '../components/modals/WorkOrderUpdateModal';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
+import GovInspectionModal from '../components/modals/GovInspectionModal';
+import GovBlockerModal from '../components/modals/GovBlockerModal';
+import AssignWorkOrderModal from '../components/modals/AssignWorkOrderModal';
 import { API_BASE_URL } from '../utils/apiBase';
+import { checkPermission } from '../utils/rbac_utils';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 import './work-orders.css';
+import './citizen-reports.css';
+import './records-workspace.css';
+import './administration-workspace.css';
 
 const WO_TABS = [
     { key: 'all', label: 'All orders' },
     { key: 'assigned', label: 'Assigned' },
     { key: 'active', label: 'Active' },
     { key: 'blocked', label: 'Blocked' },
-    { key: 'for_review', label: 'For review' },
+    { key: 'awaiting_verification', label: 'Awaiting verification' },
     { key: 'completed', label: 'Completed' },
 ];
 
 const PULSELINE_WO_STEPS = [
-    { key: 'open', label: 'Open' },
     { key: 'assigned', label: 'Assigned' },
     { key: 'in_progress', label: 'In progress' },
+    { key: 'awaiting_verification', label: 'Inspection' },
     { key: 'completed', label: 'Completed' },
-    { key: 'reviewed', label: 'Reviewed' },
 ];
 
-const SAMPLE_WORK_ORDERS = [
-    {
-        id: 1197,
-        wo_number: 'WO-2026-1197',
-        report_id: 822,
-        source_report: 'PUL-2026-0822',
-        title: 'Exposed electrical wire',
-        description: 'Verify exposed electrical wire along utility pole and secure the area to eliminate public risk.',
-        location_string: '176 Deparo St., Brgy. 176, North Caloocan City',
-        barangay: 'Brgy. 176',
-        priority: 'high',
-        assigned_team: 'Field Ops Team: Ana Reyes (Engineer II)',
-        status: 'in_progress',
-        target_date: 'May 15, 2026 (within 24h)',
-        policy_label: 'Policy: High priority – 24h',
-        updated_at: new Date(Date.now() - 14 * 60000).toISOString(),
-        image_url: 'https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&q=80&w=800',
-        blocker: 'Awaiting traffic safety plan',
-        blocker_plan: 'Requested from Traffic Management Office on May 15, 2026.',
-        latest_update: 'Photo evidence uploaded by Ana Reyes (Mobile app)',
-        completion_proof: null,
-        approvals: 'Not requested',
-    },
-    {
-        id: 1182,
-        wo_number: 'WO-2026-1182',
-        report_id: 820,
-        source_report: 'PUL-2026-0820',
-        title: 'Garbage collection area clearing',
-        description: 'Clear heavy illegal trash accumulation obstructing sidewalk and drainage culvert.',
-        location_string: 'Camarin Rd., Brgy. 172, North Caloocan City',
-        barangay: 'Brgy. 172',
-        priority: 'medium',
-        assigned_team: 'Field Crew B: Miguel Santos',
-        status: 'for_review',
-        target_date: 'May 15, 2026',
-        updated_at: new Date(Date.now() - 32 * 60000).toISOString(),
-        image_url: 'https://images.unsplash.com/photo-1618060932014-4deda4932554?auto=format&fit=crop&q=80&w=800',
-        blocker: null,
-        latest_update: 'Clearing completed, awaiting supervisor inspection',
-        completion_proof: 'Photo uploaded: clean sidewalk and clear culvert',
-        approvals: 'Pending review by Division Chief',
-    },
-    {
-        id: 1170,
-        wo_number: 'WO-2026-1170',
-        report_id: 816,
-        source_report: 'PUL-2026-0816',
-        title: 'Broken streetlight restoration',
-        description: 'Replace burned luminaire and inspect underground conduit wiring.',
-        location_string: 'Bagumbong Rd., Brgy. 170, North Caloocan City',
-        barangay: 'Brgy. 170',
-        priority: 'medium',
-        assigned_team: 'Field Crew A: Jose Dela Cruz',
-        status: 'completed',
-        target_date: 'May 15, 2026',
-        updated_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-        image_url: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&q=80&w=800',
-        blocker: null,
-        latest_update: 'Luminaire replaced and energized',
-        completion_proof: 'Verified operational at night test',
-        approvals: 'Approved by City Engineer',
-    },
-    {
-        id: 1165,
-        wo_number: 'WO-2026-1165',
-        report_id: 815,
-        source_report: 'PUL-2026-0815',
-        title: 'Drainage culvert desilting',
-        description: 'Remove heavy silt and debris buildup causing backflow during high tide / rainfall.',
-        location_string: '10th Ave., Brgy. 167, North Caloocan City',
-        barangay: 'Brgy. 167',
-        priority: 'high',
-        assigned_team: 'Field Ops Team: Ana Reyes',
-        status: 'in_progress',
-        target_date: 'May 16, 2026',
-        updated_at: new Date(Date.now() - 3 * 3600000).toISOString(),
-        image_url: 'https://images.unsplash.com/photo-1541888946425-d0fbb186156a?auto=format&fit=crop&q=80&w=800',
-        blocker: 'Awaiting high-pressure flusher truck',
-        blocker_plan: 'Equipment dispatched from Central Depot',
-        latest_update: 'Initial manual clearing complete (30%)',
-        completion_proof: null,
-        approvals: 'Not requested',
-    },
-    {
-        id: 1156,
-        wo_number: 'WO-2026-1156',
-        report_id: 813,
-        source_report: 'PUL-2026-0813',
-        title: 'Pothole restoration on road',
-        description: 'Cold-mix asphalt application and mechanical compaction for surface depression.',
-        location_string: 'St. Jude St., Brgy. 165, North Caloocan City',
-        barangay: 'Brgy. 165',
-        priority: 'high',
-        assigned_team: 'Field Crew B: Miguel Santos',
-        status: 'blocked',
-        target_date: 'May 16, 2026',
-        updated_at: new Date(Date.now() - 4 * 3600000).toISOString(),
-        image_url: 'https://images.unsplash.com/photo-1515263487990-61b07816b324?auto=format&fit=crop&q=80&w=800',
-        blocker: 'Severe torrential rainfall',
-        blocker_plan: 'Work rescheduled immediately upon road surface dryout',
-        latest_update: 'Work paused due to standing water',
-        completion_proof: null,
-        approvals: 'Not requested',
-    },
-];
+const readUser = () => {
+    try {
+        return JSON.parse(localStorage.getItem('pulso_user') || 'null');
+    } catch {
+        return null;
+    }
+};
+
+const formatDateTime = (value) => {
+    if (!value) return 'Time not available';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Time not available';
+    return date.toLocaleString('en-PH', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+};
+
+const ageLabel = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const minutes = Math.max(1, Math.floor((Date.now() - date.getTime()) / 60000));
+    if (minutes <= 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+};
+
+const priorityTone = (priority) => {
+    const p = String(priority || '').toLowerCase();
+    if (p === 'critical' || p === 'urgent' || p === 'high') return 'critical';
+    if (p === 'medium') return 'pending';
+    return 'progress';
+};
+
+const statusTone = (status) => {
+    const s = String(status || '').toLowerCase();
+    if (s === 'completed' || s === 'resolved') return 'resolved';
+    if (s === 'blocked') return 'critical';
+    if (s === 'awaiting_verification' || s === 'for_review') return 'attention';
+    if (s === 'in_progress') return 'progress';
+    return 'neutral';
+};
 
 export default function WorkOrdersPage({ workspace }) {
-    const token = localStorage.getItem('pulso_token');
+    const token = getAuthToken();
+    const currentUser = getAuthUser() || readUser();
     const [params, setParams] = useSearchParams();
     const [workOrders, setWorkOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [refreshTime, setRefreshTime] = useState(new Date().toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }));
     const [toastMessage, setToastMessage] = useState(null);
-    const [updateModalOpen, setUpdateModalOpen] = useState(false);
+
+    // Modals
+    const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
+    const [blockerModalOpen, setBlockerModalOpen] = useState(false);
+    const [isResolvingBlocker, setIsResolvingBlocker] = useState(false);
+    const [assignModalOpen, setAssignModalOpen] = useState(false);
 
     const activeTab = params.get('tab') || 'all';
     const searchQuery = params.get('search') || '';
     const selectedWoId = Number(params.get('wo')) || null;
 
-    const readUser = () => {
-        try {
-            return JSON.parse(localStorage.getItem('pulso_user') || 'null');
-        } catch {
-            return null;
-        }
+    const showToast = (text) => {
+        setToastMessage(text);
+        setTimeout(() => setToastMessage(null), 5000);
     };
-    const currentUser = readUser();
 
     const fetchWorkOrders = async () => {
+        setLoading(true);
+        setError(null);
         try {
+            const currentToken = getAuthToken();
             const res = await fetch(`${API_BASE_URL}/api/gov/work-orders`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : {},
             });
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    const merged = data.map((d, index) => ({
-                        ...SAMPLE_WORK_ORDERS[index % SAMPLE_WORK_ORDERS.length],
-                        ...d,
-                        id: d.id,
-                        wo_number: d.wo_number || `WO-2026-${String(d.id).padStart(4, '0')}`,
-                        title: d.title || 'Civil engineering work order',
-                        status: d.status || 'in_progress',
-                        priority: d.priority || 'normal',
-                    }));
-                    setWorkOrders(merged);
-                } else {
-                    setWorkOrders(SAMPLE_WORK_ORDERS);
-                }
-            } else {
-                setWorkOrders(SAMPLE_WORK_ORDERS);
+            if (!res.ok) {
+                throw new Error(`Failed to load work orders from server (HTTP ${res.status})`);
             }
-        } catch {
-            setWorkOrders(SAMPLE_WORK_ORDERS);
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                setWorkOrders(data);
+            } else {
+                setWorkOrders([]);
+            }
+            setRefreshTime(new Date().toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }));
+        } catch (err) {
+            setError(err.message || 'Unable to connect to Work Orders service.');
+            setWorkOrders([]);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -206,11 +161,6 @@ export default function WorkOrdersPage({ workspace }) {
         fetchWorkOrders();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const showToast = (text) => {
-        setToastMessage(text);
-        setTimeout(() => setToastMessage(null), 5000);
-    };
 
     const updateParam = (key, value) => {
         setParams((current) => {
@@ -226,17 +176,16 @@ export default function WorkOrdersPage({ workspace }) {
             if (activeTab === 'assigned' && wo.status !== 'assigned') return false;
             if (activeTab === 'active' && wo.status !== 'in_progress') return false;
             if (activeTab === 'blocked' && wo.status !== 'blocked') return false;
-            if (activeTab === 'for_review' && wo.status !== 'for_review') return false;
-            if (activeTab === 'completed' && wo.status !== 'completed') return false;
+            if (activeTab === 'awaiting_verification' && wo.status !== 'awaiting_verification' && wo.status !== 'for_review') return false;
+            if (activeTab === 'completed' && wo.status !== 'completed' && wo.status !== 'resolved') return false;
 
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                return (
-                    wo.wo_number?.toLowerCase().includes(q) ||
-                    wo.title?.toLowerCase().includes(q) ||
-                    wo.barangay?.toLowerCase().includes(q) ||
-                    wo.assigned_team?.toLowerCase().includes(q)
-                );
+                const woNum = (wo.wo_number || `WO-2026-${String(wo.id).padStart(4, '0')}`).toLowerCase();
+                const title = (wo.title || '').toLowerCase();
+                const brgy = (wo.barangay || wo.location_string || '').toLowerCase();
+                const team = (wo.assigned_team || wo.assigned_to_name || '').toLowerCase();
+                return woNum.includes(q) || title.includes(q) || brgy.includes(q) || team.includes(q);
             }
             return true;
         });
@@ -247,533 +196,480 @@ export default function WorkOrdersPage({ workspace }) {
         return workOrders.find((w) => w.id === selectedWoId) || null;
     }, [workOrders, selectedWoId]);
 
-    const handleUpdateSubmit = async (updateData) => {
-        try {
-            await fetch(`${API_BASE_URL}/api/gov/work-orders/${updateData.workOrderId}/updates`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    comment: updateData.comment,
-                    new_status: updateData.status,
-                    image_url: updateData.imageUrl,
-                }),
-            });
-        } catch {
-            // Local state update
-        }
-
-        setWorkOrders((prev) =>
-            prev.map((w) => {
-                if (w.id === updateData.workOrderId) {
-                    return {
-                        ...w,
-                        status: updateData.status,
-                        blocker: updateData.blockerReason || null,
-                        blocker_plan: updateData.safetyPlan || null,
-                        latest_update: updateData.comment,
-                        image_url: updateData.imageUrl || w.image_url,
-                        updated_at: new Date().toISOString(),
-                    };
-                }
-                return w;
-            })
-        );
-        showToast(`Work order update recorded for ${selectedWo?.wo_number || 'order'}.`);
+    // Handle inspection verified callback
+    const handleInspectionComplete = (data) => {
+        showToast(`Inspection submitted: ${data.work_order?.status === 'completed' ? 'Certified Complete' : 'Rework Requested'}`);
+        fetchWorkOrders();
     };
 
-    const handleApproveComplete = async () => {
-        if (!selectedWo) return;
-        try {
-            await fetch(`${API_BASE_URL}/api/gov/work-orders/${selectedWo.id}/approval`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    action: 'approve',
-                    notes: 'Work order certified and approved for closure.',
-                }),
-            });
-        } catch {
-            // Local fallback
-        }
-
-        setWorkOrders((prev) =>
-            prev.map((w) =>
-                w.id === selectedWo.id
-                    ? { ...w, status: 'completed', approvals: 'Approved by City Engineer' }
-                    : w
-            )
-        );
-        showToast(`${selectedWo.wo_number} approved and marked completed.`);
+    // Handle blocker updated callback
+    const handleBlockerUpdated = (data) => {
+        showToast(`Work order status updated to ${data.status}`);
+        fetchWorkOrders();
     };
 
-    // Calculate active pulseline step
-    const currentStepIndex = useMemo(() => {
-        if (!selectedWo) return 0;
-        const st = selectedWo.status;
-        if (st === 'open') return 0;
-        if (st === 'assigned') return 1;
-        if (st === 'in_progress' || st === 'blocked') return 2;
-        if (st === 'for_review' || st === 'completed') return 3;
-        if (st === 'reviewed') return 4;
-        return 2;
-    }, [selectedWo]);
+    const getStepIndex = (wo) => {
+        if (!wo) return 0;
+        const st = wo.status;
+        if (st === 'assigned' || st === 'open') return 0;
+        if (st === 'in_progress' || st === 'blocked') return 1;
+        if (st === 'awaiting_verification' || st === 'for_review' || st === 'rework_required') return 2;
+        if (st === 'completed' || st === 'resolved') return 3;
+        return 1;
+    };
 
     return (
         <div className="work-orders-page">
             <GovSidebar currentUser={currentUser} />
             <div className="work-orders-shell">
-                <header className="work-orders-topbar">
-                    <div>
-                        <h1>Work orders</h1>
-                        <p>Track, dispatch, and review engineering work orders across field teams.</p>
+                <header className="min-h-[80px] py-3.5 sm:py-4 px-4 sm:px-6 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between relative z-50 gap-3 flex-nowrap">
+                    <div className="min-w-0 pt-1 pb-0.5">
+                        <GovBreadcrumb category="Field Operations" current="Work Orders & Execution" />
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-snug whitespace-nowrap">
+                                Work Orders & Field Execution
+                            </h1>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden xl:block mt-0.5 truncate max-w-lg">
+                            Track assignments, report blockers, and perform independent inspection verification.
+                        </p>
                     </div>
-                    <div className="work-orders-topbar-actions">
+                    <div className="flex items-center gap-3 shrink-0 ml-auto">
                         {toastMessage && (
-                            <div className="citizen-reports-toast-pill" role="status">
-                                <CheckCircle2 size={14} className="text-emerald-500" />
+                            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800/60 text-xs font-semibold" role="status">
+                                <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
                                 <span>{toastMessage}</span>
                             </div>
                         )}
-                        <span className="work-orders-freshness">Data as of today 08:42 AM</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 hidden md:inline">Updated today {refreshTime}</span>
                         <ThemeToggle />
                         <button
                             type="button"
-                            className="citizen-reports-icon-button"
+                            className="p-2.5 text-slate-600 dark:text-slate-300 hover:text-[#ff6b00] hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700"
                             onClick={fetchWorkOrders}
                             aria-label="Refresh work orders"
+                            title="Refresh work orders"
                         >
-                            <RefreshCw size={16} />
+                            <RefreshCw size={15} />
                         </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 
                 {workspace && <GovernmentWorkspaceTabs workspace={workspace} currentUser={currentUser} />}
 
-                {/* Workspace Tab Bar (Image 2 Panel 1) */}
-                <div className="work-orders-tabs-bar">
-                    <div className="work-orders-tabs-list" role="tablist">
+                {/* Tab Bar */}
+                <div className="min-h-14 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between text-xs font-medium relative z-30 overflow-x-auto gap-4">
+                    <div className="flex items-center gap-4 sm:gap-6">
                         {WO_TABS.map((tab) => {
                             const count =
                                 tab.key === 'all'
                                     ? workOrders.length
-                                    : workOrders.filter((w) =>
-                                          tab.key === 'active'
-                                              ? w.status === 'in_progress'
-                                              : tab.key === 'for_review'
-                                              ? w.status === 'for_review'
-                                              : w.status === tab.key
-                                      ).length;
+                                    : workOrders.filter((w) => {
+                                          if (tab.key === 'active') return w.status === 'in_progress';
+                                          if (tab.key === 'awaiting_verification') return w.status === 'awaiting_verification' || w.status === 'for_review';
+                                          if (tab.key === 'completed') return w.status === 'completed' || w.status === 'resolved';
+                                          return w.status === tab.key;
+                                      }).length;
+                            const isActive = activeTab === tab.key;
                             return (
                                 <button
                                     key={tab.key}
                                     type="button"
                                     role="tab"
-                                    aria-selected={activeTab === tab.key}
-                                    className={`work-orders-tab${activeTab === tab.key ? ' is-active' : ''}`}
+                                    aria-selected={isActive}
+                                    className={`py-3.5 px-0.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                                        isActive
+                                            ? 'text-[#ff6b00] border-[#ff6b00]'
+                                            : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white'
+                                    }`}
                                     onClick={() => {
                                         updateParam('tab', tab.key);
                                         updateParam('wo', null);
                                     }}
                                 >
-                                    {tab.label}
-                                    <span className="work-orders-tab-count">{count}</span>
+                                    <span>{tab.label}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold ${
+                                        isActive
+                                            ? 'bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                                    }`}>
+                                        {count}
+                                    </span>
                                 </button>
                             );
                         })}
                     </div>
                     <button
                         type="button"
-                        className="work-orders-create-btn"
-                        onClick={() => showToast('Use Citizen Reports triage or Dispatch to create work orders.')}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-[#ff6b00] hover:bg-[#e65c00] rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0"
+                        onClick={() => setAssignModalOpen(true)}
                     >
-                        <Plus size={15} /> Create work order
+                        <Plus size={15} /> <span>Create work order</span>
                     </button>
                 </div>
 
-                <main className="work-orders-main">
-                    {!selectedWo ? (
-                        /* ── PANEL 1: LIST VIEW ─────────────────────────────────────── */
-                        <>
-                            <div className="work-orders-controls">
-                                <div className="work-orders-search-box">
-                                    <Search size={16} />
-                                    <input
-                                        type="search"
-                                        placeholder="Search work orders..."
-                                        className="work-orders-search-input"
-                                        value={searchQuery}
-                                        onChange={(e) => updateParam('search', e.target.value)}
-                                    />
-                                </div>
-                                <div className="work-orders-filter-actions">
-                                    <button
-                                        type="button"
-                                        className="gov-btn-secondary"
-                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                                    >
-                                        <Filter size={14} /> Filters
+                {/* Main Split Area */}
+                <main className="admin-layout-split flex flex-col xl:flex-row items-start w-full flex-1 overflow-y-auto p-4 sm:p-6 min-w-0" style={{ gap: 0 }}>
+                    {/* Left Column: Orders Queue */}
+                    <div className="citizen-reports-queue flex-1 min-w-0" style={{ height: 'auto', padding: 0 }}>
+                        {/* Search & Filter Header */}
+                        <div className="relative mb-3.5 max-w-md">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <Search size={14} />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search by order ID, title, barangay, or assigned team..."
+                                value={searchQuery}
+                                onChange={(e) => updateParam('search', e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ff6b00] transition-all shadow-xs"
+                            />
+                        </div>
+
+                        {/* Error Banner */}
+                        {error && (
+                            <div className="citizen-reports-state is-error" style={{ marginBottom: '16px' }}>
+                                <AlertCircle size={20} />
+                                <div>
+                                    <strong>Unable to load work orders</strong>
+                                    <p>{error}</p>
+                                    <button type="button" onClick={fetchWorkOrders} style={{ marginTop: '8px' }}>
+                                        Retry
                                     </button>
-                                    <select className="work-orders-select-filter">
-                                        <option value="newest">Sort: Updated (newest)</option>
-                                        <option value="priority">Sort: Priority (critical first)</option>
-                                        <option value="sla">Sort: Target SLA</option>
-                                    </select>
-                                    <span className="work-orders-result-meta">
-                                        {filteredOrders.length} results · Updated 2m ago
-                                    </span>
                                 </div>
                             </div>
+                        )}
 
-                            <div className="work-orders-layout-split">
-                                <div className="work-orders-table-wrapper">
-                                    <table className="work-orders-table" aria-label="Work orders table">
-                                        <thead>
-                                            <tr>
-                                                <th>WO ID</th>
-                                                <th>Source report</th>
-                                                <th>Work</th>
-                                                <th>Barangay</th>
-                                                <th>Priority</th>
-                                                <th>Team / Assignee</th>
-                                                <th>State</th>
-                                                <th>Target</th>
-                                                <th>Updated</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredOrders.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={9} style={{ textAlign: 'center', padding: '36px' }}>
-                                                        <Inbox size={24} style={{ margin: '0 auto 8px', color: '#94a3b8' }} />
-                                                        <strong>No work orders found</strong>
-                                                        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 12 }}>
-                                                            No work orders match the selected filter or search query.
-                                                        </p>
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                filteredOrders.map((wo) => (
-                                                    <tr key={wo.id}>
-                                                        <td>
-                                                            <button
-                                                                type="button"
-                                                                className="work-orders-table-btn-link"
-                                                                onClick={() => updateParam('wo', String(wo.id))}
-                                                            >
-                                                                {wo.wo_number}
-                                                            </button>
-                                                        </td>
-                                                        <td style={{ fontFamily: 'monospace', color: '#64748b' }}>
-                                                            {wo.source_report || '—'}
-                                                        </td>
-                                                        <td>
-                                                            <strong>{wo.title}</strong>
-                                                        </td>
-                                                        <td>{wo.barangay || 'North Caloocan'}</td>
-                                                        <td>
-                                                            <span className={`gov-priority-badge is-${wo.priority}`}>
-                                                                {wo.priority}
-                                                            </span>
-                                                        </td>
-                                                        <td>{wo.assigned_team}</td>
-                                                        <td>
-                                                            <span className={`gov-state-badge is-${wo.status}`}>
-                                                                {wo.status.replace('_', ' ')}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ whiteSpace: 'nowrap' }}>{wo.target_date}</td>
-                                                        <td style={{ color: '#64748b', whiteSpace: 'nowrap' }}>
-                                                            {new Date(wo.updated_at).toLocaleTimeString([], {
-                                                                hour: '2-digit',
-                                                                minute: '2-digit',
-                                                            })}
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
+                        {/* Loading State */}
+                        {loading && (
+                            <div className="citizen-reports-list">
+                                <div className="citizen-reports-skeleton"><span /><span /><span /></div>
+                                <div className="citizen-reports-skeleton"><span /><span /><span /></div>
+                                <div className="citizen-reports-skeleton"><span /><span /><span /></div>
+                            </div>
+                        )}
+
+                        {/* Empty State */}
+                        {!loading && !error && filteredOrders.length === 0 && (
+                            <div className="citizen-reports-state">
+                                <Inbox size={28} />
+                                <div>
+                                    <strong>No work orders found</strong>
+                                    <p>
+                                        {searchQuery
+                                            ? `No records matching "${searchQuery}" in this view.`
+                                            : `No work orders currently categorized under "${activeTab}".`}
+                                    </p>
                                 </div>
+                            </div>
+                        )}
 
-                                {/* Right-Rail Summary (Image 2 Panel 1) */}
-                                <aside className="work-orders-rail-summary">
-                                    <div className="work-orders-summary-card">
-                                        <h4>Next action</h4>
-                                        <strong>Continue field verification</strong>
-                                        <p>Confirm the location and take safe clearance measurement.</p>
+                        {/* Work Orders List */}
+                        {!loading && !error && filteredOrders.length > 0 && (
+                            <div className="citizen-reports-list">
+                                {filteredOrders.map((wo) => {
+                                    const woNum = wo.wo_number || `WO-2026-${String(wo.id).padStart(4, '0')}`;
+                                    const isSelected = selectedWoId === wo.id;
+                                    const sTone = statusTone(wo.status);
+
+                                    return (
                                         <button
+                                            key={wo.id}
                                             type="button"
-                                            className="work-orders-summary-card-link"
-                                            onClick={() => updateParam('wo', '1197')}
+                                            className={`citizen-report-row ${isSelected ? 'is-selected' : ''}`}
+                                            aria-selected={isSelected}
+                                            aria-expanded={isSelected}
+                                            onClick={() => updateParam('wo', isSelected ? null : String(wo.id))}
                                         >
-                                            Open work order →
-                                        </button>
-                                    </div>
-
-                                    <div className="work-orders-summary-card">
-                                        <h4>Top blocker</h4>
-                                        <strong>Awaiting traffic safety plan</strong>
-                                        <p>Requested from Traffic Management Office on May 15, 2026.</p>
-                                        <button
-                                            type="button"
-                                            className="work-orders-summary-card-link"
-                                            onClick={() => updateParam('wo', '1197')}
-                                        >
-                                            View details →
-                                        </button>
-                                    </div>
-
-                                    <div className="work-orders-summary-card">
-                                        <h4>Latest field update</h4>
-                                        <strong>Photo evidence uploaded</strong>
-                                        <p>Ana Reyes · 14 min ago · Mobile app</p>
-                                    </div>
-                                </aside>
-                            </div>
-                        </>
-                    ) : (
-                        /* ── PANEL 2: DETAIL DOCKET VIEW ────────────────────────────── */
-                        <article className="wo-docket-container">
-                            <div className="wo-docket-breadcrumb-bar">
-                                <div className="wo-docket-breadcrumbs">
-                                    <button
-                                        type="button"
-                                        className="wo-docket-btn-back"
-                                        onClick={() => updateParam('wo', null)}
-                                    >
-                                        <ArrowLeft size={14} style={{ display: 'inline', marginRight: 4 }} />
-                                        Work orders
-                                    </button>
-                                    <span>/</span>
-                                    <strong>{selectedWo.wo_number}</strong>
-                                    <span className={`gov-priority-badge is-${selectedWo.priority}`}>
-                                        {selectedWo.priority}
-                                    </span>
-                                </div>
-                                <span style={{ fontSize: 11, color: '#64748b' }}>
-                                    Reported 14 min ago · By Juan Dela Cruz · {selectedWo.source_report}
-                                </span>
-                            </div>
-
-                            <div className="wo-docket-header-row">
-                                <div className="wo-docket-title-area">
-                                    <h2>
-                                        {selectedWo.wo_number}{' '}
-                                        <span className={`gov-priority-badge is-${selectedWo.priority}`}>
-                                            {selectedWo.priority}
-                                        </span>
-                                    </h2>
-                                    <p>{selectedWo.title}</p>
-                                </div>
-                                <div className="wo-docket-actions-row">
-                                    <button
-                                        type="button"
-                                        className="gov-btn-primary"
-                                        onClick={() => setUpdateModalOpen(true)}
-                                    >
-                                        <Wrench size={14} style={{ display: 'inline', marginRight: 6 }} />
-                                        Add field update
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="gov-btn-secondary"
-                                        onClick={handleApproveComplete}
-                                    >
-                                        <FileCheck size={14} style={{ display: 'inline', marginRight: 6 }} />
-                                        {selectedWo.status === 'completed' ? 'Approved' : 'Request review'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* 2px Pulseline Progress Bar (Image 2 Panel 2) */}
-                            <div className="wo-pulseline-bar-box" aria-label="Work order progress">
-                                <div className="wo-pulseline-track">
-                                    <div
-                                        className="wo-pulseline-fill"
-                                        style={{
-                                            width: `${(currentStepIndex / (PULSELINE_WO_STEPS.length - 1)) * 100}%`,
-                                        }}
-                                    />
-                                </div>
-                                <div className="wo-pulseline-steps">
-                                    {PULSELINE_WO_STEPS.map((st, idx) => {
-                                        const isDone = idx <= currentStepIndex;
-                                        const isCurrent = idx === currentStepIndex;
-                                        return (
-                                            <div
-                                                key={st.key}
-                                                className={`wo-pulseline-step${isDone ? ' is-done' : ''}${
-                                                    isCurrent ? ' is-current' : ''
-                                                }`}
-                                            >
-                                                <span className="wo-pulseline-dot" />
-                                                <span className="wo-pulseline-label">{st.label}</span>
+                                            <span className="citizen-report-row__signal" />
+                                            <span className="citizen-report-row__id">{woNum}</span>
+                                            <div className="citizen-report-row__issue">
+                                                <strong>{wo.title}</strong>
+                                                <small className="flex items-center gap-1">
+                                                    <MapPin size={11} className="shrink-0 text-slate-400" />
+                                                    <span>{wo.location_string || wo.barangay || 'Caloocan City'}</span>
+                                                </small>
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                            <span className={`citizen-reports-status is-${sTone}`}>
+                                                <span aria-hidden="true" />
+                                                {String(wo.status || 'unknown').replace(/_/g, ' ')}
+                                            </span>
+                                            <span className="citizen-report-row__age">
+                                                <Clock3 size={11} className="shrink-0 text-slate-400" />
+                                                <span>{ageLabel(wo.updated_at || wo.created_at)}</span>
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
+                        )}
+                    </div>
 
-                            {/* 2-Column Grid */}
-                            <div className="wo-docket-grid">
-                                {/* Left Column */}
-                                <div className="wo-docket-col">
-                                    <div className="wo-card">
-                                        <h4>Scope</h4>
-                                        <p>{selectedWo.description}</p>
-                                    </div>
-
-                                    <div className="wo-card">
-                                        <h4>Location</h4>
-                                        <p style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <MapPin size={16} className="text-sky-600" />
-                                            <strong>{selectedWo.location_string}</strong>
-                                        </p>
-                                        <Link
-                                            to="/gov/operations?view=dispatch"
-                                            className="work-orders-summary-card-link"
+                    {/* Right Column: Docket Detail (Simultaneous Aperture Reveal) */}
+                    <AnimatePresence initial={false}>
+                        {selectedWo && (
+                            <motion.aside
+                                key="wo-docket-rail"
+                                initial={{ width: 0, opacity: 0, marginLeft: 0 }}
+                                animate={{ width: 440, opacity: 1, marginLeft: 20 }}
+                                exit={{ width: 0, opacity: 0, marginLeft: 0 }}
+                                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                                className="admin-editor-rail shrink-0 overflow-hidden flex flex-col mt-4 xl:mt-0"
+                                style={{ flexShrink: 0 }}
+                            >
+                                <div className="admin-editor-card w-[440px] max-w-[440px] box-border" style={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
+                                    <div className="admin-editor-header flex items-center justify-between">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className="records-docket-signal-cut shrink-0" />
+                                            <div className="min-w-0">
+                                                <span className="citizen-report-docket__id block">
+                                                    {selectedWo.wo_number || `WO-2026-${String(selectedWo.id).padStart(4, '0')}`}
+                                                </span>
+                                                <h3 className="truncate m-0 text-[15px] font-bold text-slate-900 dark:text-white leading-tight">
+                                                    {selectedWo.title}
+                                                </h3>
+                                                <span className="admin-editor-sub block text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                    Priority: <strong style={{ textTransform: 'capitalize' }}>{selectedWo.priority || 'Normal'}</strong>
+                                                    {selectedWo.target_date && ` · Due: ${selectedWo.target_date}`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => updateParam('wo', null)}
+                                            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                                            title="Close docket"
+                                            aria-label="Close docket"
                                         >
-                                            View on map →
-                                        </Link>
+                                            <X size={16} />
+                                        </button>
                                     </div>
 
-                                    <div className="wo-card">
-                                        <h4>Source report</h4>
-                                        <p>
-                                            <Link
-                                                to={`/gov/operations?view=reports&report=${selectedWo.report_id}`}
-                                                className="work-orders-table-btn-link"
-                                            >
-                                                {selectedWo.source_report}
-                                            </Link>{' '}
-                                            — {selectedWo.title}
-                                        </p>
-                                    </div>
+                                    {/* Instant inner transition when switching work orders */}
+                                    <motion.div
+                                        key={selectedWo.id}
+                                        initial={{ opacity: 0.6 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ duration: 0.1 }}
+                                        className="flex flex-col gap-4"
+                                    >
+                                        {/* 2px Pulseline Lifecycle */}
+                                        <div className="citizen-report-pulseline" style={{ marginTop: '4px' }}>
+                                            <div className="citizen-pulseline-track">
+                                                <div
+                                                    className="citizen-pulseline-bar"
+                                                    style={{ width: `${(getStepIndex(selectedWo) / (PULSELINE_WO_STEPS.length - 1)) * 100}%` }}
+                                                />
+                                            </div>
+                                            <div className="citizen-pulseline-steps">
+                                                {PULSELINE_WO_STEPS.map((step, idx) => {
+                                                    const currentIdx = getStepIndex(selectedWo);
+                                                    const isDone = idx <= currentIdx;
+                                                    const isCurrent = idx === currentIdx;
+                                                    return (
+                                                        <div
+                                                            key={step.key}
+                                                            className={`citizen-pulseline-node ${isDone ? 'is-done' : ''} ${isCurrent ? 'is-current' : ''}`}
+                                                        >
+                                                            <div className="citizen-pulseline-dot" />
+                                                            <span className="citizen-pulseline-label">{step.label}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
 
-                                    <div className="wo-card">
-                                        <h4>Field photo evidence</h4>
-                                        <div className="wo-evidence-aperture">
-                                            {selectedWo.image_url ? (
-                                                <div className="wo-evidence-frame">
-                                                    <img
-                                                        src={selectedWo.image_url}
-                                                        alt="Field evidence"
-                                                        className="wo-evidence-img"
-                                                    />
+                                        {/* Blocker Alert Banner (if order is blocked) */}
+                                        {selectedWo.status === 'blocked' && (
+                                            <div style={{
+                                                margin: '8px 0 0',
+                                                padding: '12px 14px',
+                                                background: 'rgba(217, 119, 6, 0.08)',
+                                                border: '1px solid rgba(217, 119, 6, 0.3)',
+                                                borderRadius: '8px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                gap: '12px'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                                    <AlertTriangle size={18} style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
+                                                    <div style={{ fontSize: '12px' }}>
+                                                        <strong style={{ display: 'block', color: '#b45309', fontWeight: 600 }}>
+                                                            Work Order Blocked: {selectedWo.blocker_reason || selectedWo.blocker || 'Operational Impediment'}
+                                                        </strong>
+                                                        <p style={{ margin: '2px 0 0', color: 'var(--gov-text-secondary)' }}>
+                                                            {selectedWo.blocker_notes || selectedWo.blocker_plan || 'Awaiting clearance to resume.'}
+                                                        </p>
+                                                    </div>
                                                 </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsResolvingBlocker(true);
+                                                        setBlockerModalOpen(true);
+                                                    }}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 600,
+                                                        background: '#d97706',
+                                                        color: '#ffffff',
+                                                        border: 'none',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                >
+                                                    Clear Blocker
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Location Section */}
+                                        <div className="citizen-report-docket__section citizen-report-location">
+                                            <h3>Location Context</h3>
+                                            <div>
+                                                <MapPin size={16} />
+                                                <span>
+                                                    <strong>{selectedWo.location_string || selectedWo.barangay || 'Caloocan City'}</strong>
+                                                    <small>{selectedWo.barangay || 'North Caloocan'}</small>
+                                                </span>
+                                            </div>
+                                            {selectedWo.location_lat && selectedWo.location_lng && (
+                                                <code>{selectedWo.location_lat.toFixed(5)}, {selectedWo.location_lng.toFixed(5)}</code>
+                                            )}
+                                        </div>
+
+                                        {/* Assignment & Source Report */}
+                                        <div className="citizen-report-docket__section">
+                                            <h3>Assignment & Source</h3>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
+                                                <div>
+                                                    <span style={{ color: 'var(--gov-text-secondary)', display: 'block' }}>Assigned Team:</span>
+                                                    <strong>{selectedWo.assigned_team || selectedWo.assigned_to_name || `Worker ID #${selectedWo.assigned_to_id || 'N/A'}`}</strong>
+                                                </div>
+                                                {selectedWo.report_id && (
+                                                    <div>
+                                                        <span style={{ color: 'var(--gov-text-secondary)', display: 'block' }}>Source Report:</span>
+                                                        <Link
+                                                            to={`/gov/reports?reportId=${selectedWo.report_id}`}
+                                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ff6b00', fontWeight: 700 }}
+                                                        >
+                                                            <span>View Report #{selectedWo.report_id}</span>
+                                                            <ExternalLink size={12} />
+                                                        </Link>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Field Evidence Photo */}
+                                        <div className="citizen-report-docket__section">
+                                            <h3>Field Completion Evidence</h3>
+                                            {selectedWo.completion_photo_url || selectedWo.image_url ? (
+                                                <figure className="citizen-report-evidence">
+                                                    <img
+                                                        src={selectedWo.completion_photo_url || selectedWo.image_url}
+                                                        alt={`Evidence for ${selectedWo.title}`}
+                                                    />
+                                                    <figcaption>
+                                                        <CheckCircle2 size={14} style={{ color: 'var(--gov-resolved, #0f766e)' }} />
+                                                        <span>Field completion photo recorded</span>
+                                                    </figcaption>
+                                                </figure>
                                             ) : (
                                                 <div className="citizen-report-empty-evidence">
-                                                    <FileImage size={24} /> No photo uploaded yet.
+                                                    <FileImage size={18} />
+                                                    <span>No field completion photo uploaded yet</span>
                                                 </div>
                                             )}
-                                            <div className="wo-evidence-meta">
-                                                <span>Photo • May 15, 2026 08:12 AM</span>
-                                                <span>Source: Mobile app</span>
-                                            </div>
                                         </div>
-                                    </div>
+
+                                        {/* Action Bar */}
+                                        <div className="citizen-report-docket__actions" style={{ position: 'relative', bottom: 'auto', margin: '12px 0 0', padding: '14px 0 0', borderTop: '1px solid var(--gov-rule)' }}>
+                                            {selectedWo.status !== 'blocked' && (
+                                                <button
+                                                    type="button"
+                                                    className="citizen-report-secondary-action"
+                                                    onClick={() => {
+                                                        setIsResolvingBlocker(false);
+                                                        setBlockerModalOpen(true);
+                                                    }}
+                                                >
+                                                    <AlertTriangle size={14} style={{ color: '#d97706' }} />
+                                                    Report Blocker
+                                                </button>
+                                            )}
+
+                                            <button
+                                                type="button"
+                                                className="citizen-report-primary-action"
+                                                onClick={() => setInspectionModalOpen(true)}
+                                            >
+                                                <ShieldCheck size={14} />
+                                                Independent Inspection
+                                            </button>
+                                        </div>
+                                    </motion.div>
                                 </div>
-
-                                {/* Right Column */}
-                                <div className="wo-docket-col">
-                                    <div className="wo-card">
-                                        <h4>Team / Assignee</h4>
-                                        <p>
-                                            <strong>{selectedWo.assigned_team}</strong>
-                                        </p>
-                                    </div>
-
-                                    <div className="wo-card">
-                                        <h4>Priority & Target</h4>
-                                        <p>
-                                            <strong>Priority:</strong>{' '}
-                                            <span className={`gov-priority-badge is-${selectedWo.priority}`}>
-                                                {selectedWo.priority}
-                                            </span>
-                                        </p>
-                                        <p>
-                                            <strong>Target:</strong> {selectedWo.target_date}
-                                        </p>
-                                        <small style={{ color: '#64748b' }}>{selectedWo.policy_label}</small>
-                                    </div>
-
-                                    <div className="wo-card">
-                                        <h4>Blockers and changes</h4>
-                                        {selectedWo.blocker ? (
-                                            <div className="gov-blocker-section" style={{ margin: '4px 0' }}>
-                                                <strong style={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    <AlertTriangle size={14} /> Top blocker: {selectedWo.blocker}
-                                                </strong>
-                                                <p style={{ fontSize: 12 }}>{selectedWo.blocker_plan}</p>
-                                            </div>
-                                        ) : (
-                                            <p style={{ color: '#64748b' }}>No active blockers flagged.</p>
-                                        )}
-                                        <div style={{ marginTop: 8 }}>
-                                            <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>
-                                                Latest field update:
-                                            </span>
-                                            <p style={{ fontSize: 12, marginTop: 2 }}>{selectedWo.latest_update}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="wo-card">
-                                        <h4>Completion proof</h4>
-                                        <p style={{ color: selectedWo.completion_proof ? '#059669' : '#64748b' }}>
-                                            {selectedWo.completion_proof || 'No completion proof yet'}
-                                        </p>
-                                    </div>
-
-                                    <div className="wo-card">
-                                        <h4>Approvals</h4>
-                                        <p>{selectedWo.approvals}</p>
-                                    </div>
-
-                                    <div className="wo-card">
-                                        <h4>Activity (Immutable)</h4>
-                                        <div className="wo-timeline">
-                                            <div className="wo-timeline-item">
-                                                <span className="wo-timeline-dot" />
-                                                <div className="wo-timeline-content">
-                                                    <strong>Added field update with photo evidence</strong>
-                                                    <span>14 min ago · Ana Reyes</span>
-                                                </div>
-                                            </div>
-                                            <div className="wo-timeline-item">
-                                                <span className="wo-timeline-dot" />
-                                                <div className="wo-timeline-content">
-                                                    <strong>Work order assigned to Field Ops Team</strong>
-                                                    <span>32 min ago · Dispatcher / System</span>
-                                                </div>
-                                            </div>
-                                            <div className="wo-timeline-item">
-                                                <span className="wo-timeline-dot" />
-                                                <div className="wo-timeline-content">
-                                                    <strong>Work order created from {selectedWo.source_report}</strong>
-                                                    <span>36 min ago · System</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </article>
-                    )}
+                            </motion.aside>
+                        )}
+                    </AnimatePresence>
                 </main>
             </div>
 
-            {/* Update Drawer Modal */}
-            <WorkOrderUpdateModal
-                isOpen={updateModalOpen}
-                onClose={() => setUpdateModalOpen(false)}
-                workOrder={selectedWo}
-                onSubmit={handleUpdateSubmit}
+            {/* Modals */}
+            {selectedWo && (
+                <>
+                    <GovInspectionModal
+                        isOpen={inspectionModalOpen}
+                        onClose={() => setInspectionModalOpen(false)}
+                        workOrder={selectedWo}
+                        currentUser={currentUser}
+                        onVerified={handleInspectionComplete}
+                    />
+                    <GovBlockerModal
+                        isOpen={blockerModalOpen}
+                        onClose={() => setBlockerModalOpen(false)}
+                        workOrder={selectedWo}
+                        isResolving={isResolvingBlocker}
+                        onUpdated={handleBlockerUpdated}
+                    />
+                </>
+            )}
+
+            <AssignWorkOrderModal
+                isOpen={assignModalOpen}
+                onClose={() => setAssignModalOpen(false)}
+                report={null}
+                onSubmit={async (assignedData) => {
+                    try {
+                        const res = await fetch(`${API_BASE_URL}/api/gov/work-orders`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({
+                                title: assignedData.title || 'Civil engineering field order',
+                                wo_type: 'standard',
+                                assigned_to_id: assignedData.assigned_to_id || currentUser?.id,
+                                description: assignedData.description || 'Standard maintenance order',
+                                priority: assignedData.priority || 'normal',
+                            }),
+                        });
+                        if (res.ok) {
+                            showToast('New work order created successfully.');
+                            fetchWorkOrders();
+                        }
+                    } catch {
+                        showToast('Failed to create work order.');
+                    }
+                    setAssignModalOpen(false);
+                }}
             />
         </div>
     );

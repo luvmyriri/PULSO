@@ -20,6 +20,9 @@ import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import OrangeSelect from '../components/OrangeSelect';
 import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 import DocumentUploadModal from '../components/DocumentUploadModal';
 import ComplianceReminder from '../components/ComplianceReminder';
 import './planning-delivery-workspace.css';
@@ -1111,13 +1114,14 @@ const GovDivisionPage = ({ workspace, activePathOverride }) => {
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 {/* Header */}
-                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 border-b border-neutral-border dark:border-slate-800 z-40 transition-colors duration-150">
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 border-b border-neutral-border dark:border-slate-800 relative z-50 transition-colors duration-150">
                     <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${colors.icon}`}>
                             <HeaderIcon size={18} />
                         </div>
-                        <div>
-                            <h1 className="text-base font-black text-neutral-text dark:text-white leading-tight">
+                        <div className="flex flex-col text-left">
+                            <GovBreadcrumb category="Organization" current={isDeliveryWorkspace ? 'Projects and delivery' : config.title} />
+                            <h1 className="text-base sm:text-lg font-heading font-black text-neutral-text dark:text-white leading-tight mt-0.5">
                                 {isDeliveryWorkspace ? 'Projects and delivery' : config.title}
                             </h1>
                             <p className="text-[11px] text-neutral-muted dark:text-slate-400 hidden sm:block">
@@ -1142,6 +1146,8 @@ const GovDivisionPage = ({ workspace, activePathOverride }) => {
                                 <Plus size={14} /> New
                             </button>
                         )}
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 

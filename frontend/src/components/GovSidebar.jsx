@@ -14,7 +14,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, ClipboardList, Wrench, Building2, MapPin, BarChart2,
-    Users, Settings, ChevronLeft
+    Users, Settings, ChevronLeft, Megaphone, Activity
 } from 'lucide-react';
 
 export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
@@ -46,7 +46,14 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
             label: 'Dashboard',
             icon: LayoutDashboard,
             to: '/gov/dashboard',
-            matches: ['/gov/dashboard', '/gov/my-dashboard']
+            matches: ['/gov/dashboard', '/gov/my-dashboard', '/gov/bi']
+        },
+        {
+            id: 'today',
+            label: 'Today',
+            icon: Activity,
+            to: '/gov/today',
+            matches: ['/gov/today']
         },
         {
             id: 'reports',
@@ -60,14 +67,21 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
             label: 'Work orders',
             icon: Wrench,
             to: '/gov/work-orders',
-            matches: ['/gov/work-orders', '/gov/timeline']
+            matches: ['/gov/work-orders']
         },
         {
             id: 'assets',
             label: 'Assets',
             icon: Building2,
-            to: '/gov/projects',
-            matches: ['/gov/projects', '/gov/obo', '/gov/procurement', '/gov/records']
+            to: '/gov/assets',
+            matches: ['/gov/assets']
+        },
+        {
+            id: 'announcements',
+            label: 'Announcements',
+            icon: Megaphone,
+            to: '/gov/announcements',
+            matches: ['/gov/announcements']
         },
         {
             id: 'map',
@@ -81,21 +95,14 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
             label: 'Analytics',
             icon: BarChart2,
             to: '/gov/analytics',
-            matches: ['/gov/analytics', '/management']
-        },
-        {
-            id: 'directory',
-            label: 'Directory',
-            icon: Users,
-            to: '/gov/users',
-            matches: ['/gov/users']
+            matches: ['/gov/analytics', '/management', '/gov/bi']
         },
         {
             id: 'settings',
             label: 'Settings',
             icon: Settings,
-            to: '/gov/settings',
-            matches: ['/gov/settings', '/gov/audit-logs']
+            to: '/gov/administration?view=staff',
+            matches: ['/gov/settings', '/gov/administration', '/gov/audit-logs', '/gov/users', '/gov/residents']
         }
     ];
 
@@ -153,7 +160,7 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
                                     !isCollapsed ? 'justify-start' : 'justify-center'
                                 } ${
                                     isCurrentActive
-                                        ? 'bg-[#ff6b00] text-white shadow-md shadow-orange-500/25'
+                                        ? 'bg-[#ff6b00] text-white shadow-md shadow-orange-500/25 hover:bg-[#ea5f00] hover:shadow-lg hover:shadow-orange-500/30'
                                         : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 font-medium'
                                 }`}
                             >

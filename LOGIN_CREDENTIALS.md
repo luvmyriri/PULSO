@@ -9,7 +9,7 @@ System Admin has a unique password.
 | Role | Email | Password |
 |---|---|---|
 | **City Engineer** | `city.engineer@caloocan.gov.ph` | `CEO@pulso2025!` |
-| **Asst. City Engineer** | `asst.engineer@caloocan.gov.ph` | ``CEO@pulso2025!`` |
+| **Asst. City Engineer** | `asst.engineer@caloocan.gov.ph` | `CEO@pulso2025!` |
 | **Admin Officer** | `admin.officer@caloocan.gov.ph` | `CEO@pulso2025!` |
 | **Admin Clerk** | `admin.clerk@caloocan.gov.ph` | `CEO@pulso2025!` |
 | **Records Officer** | `records.officer@caloocan.gov.ph` | `CEO@pulso2025!` |

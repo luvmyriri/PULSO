@@ -5,6 +5,10 @@ import { API_BASE_URL } from '../utils/apiBase';
 import { getToken } from '../utils/auth';
 import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
+import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 
 const GOV_ROLES = [
     { value: 'admin_officer', label: 'Admin Officer' },
@@ -200,22 +204,23 @@ export default function GovernmentUserManagementPage({ workspace }) {
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            <GovSidebar activeTab="users" currentUser={currentUser} />
+            <GovSidebar activeTab="settings" currentUser={currentUser} />
             
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Header */}
-                <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4">
+                <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 relative z-50">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                            <Shield className="text-indigo-600" />
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb category="System Admin" current="Staff Directory & Access" />
+                        <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-snug whitespace-nowrap flex items-center gap-2 mt-0.5">
+                            <Shield className="text-orange-600 dark:text-orange-400" size={22} />
                             System Access Control
                         </h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
                             Manage user accounts, dynamic roles, and fine-grained capabilities.
                         </p>
                     </div>
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4">
                         <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                             <button 
                                 onClick={() => setActiveView('users')}
@@ -252,6 +257,9 @@ export default function GovernmentUserManagementPage({ workspace }) {
                                 <Plus size={16} /> Create Role
                             </button>
                         )}
+                        <ThemeToggle />
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </div>
             </div>
