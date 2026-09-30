@@ -45,6 +45,7 @@ import philsys_router                   # PhilSys Check Authentication (PSA)
 import predictive_router                # Predictive Maintenance Engine
 import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
+import pulseai_router                    # PULSEAI Persistent Chat & History Engine
 from database import engine, get_db
 from utils.geometry_utils import is_in_caloocan, calculate_haversine_distance
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter
@@ -326,6 +327,8 @@ app.include_router(document_router.router, prefix="/api/gov/documents", tags=["S
 # Governed Announcements & Notices Module (R6)
 app.include_router(announcements_router.router)
 app.include_router(announcements_router.public_router)
+# PULSEAI Persistent Chat & History Module
+app.include_router(pulseai_router.router)
 
 # ---------------------------------------------------------------------------
 # Health & Root
@@ -376,15 +379,21 @@ class AIChatRequest(BaseModel):
 @app.post("/api/ai/assistant")
 async def ai_omni_assistant(
     req: AIChatRequest,
-    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     PULSO Omni-Assistant: AI integration for all screens and inputs.
-    Contextual assistance for citizens and LGU engineers.
+    Contextual assistance for citizens and LGU engineers grounded in real PULSO database records.
     """
     # Auto-inject user identity into context
     user_ctx = f"User: {current_user.full_name} ({current_user.role}). Context: {req.context or 'General Dashboard'}"
-    return gemini_service.get_ai_assistant_response(req.query, context=user_ctx)
+    return gemini_service.get_ai_assistant_response(
+        req.query,
+        context=user_ctx,
+        user=current_user,
+        db=db
+    )
 
 # ---------------------------------------------------------------------------
 # OCR / ID Verification

@@ -9,6 +9,7 @@ import { getAuthToken } from '../utils/authSession';
 
 import { useInteractionHarden } from '../hooks/useInteractionHarden';
 import { API_BASE_URL } from '../utils/apiBase';
+import PulseAIMarkdown from '../components/PulseAIMarkdown';
 
 export default function DashboardOverlay({ onNavigate }) {
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -30,7 +31,7 @@ export default function DashboardOverlay({ onNavigate }) {
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
     const [aiQuery, setAiQuery] = useState('');
     const [aiMessages, setAiMessages] = useState([
-        { role: 'assistant', text: "Hello! I'm your PULSO Assistant. How can I help you with Caloocan city services today?" }
+        { role: 'assistant', text: "Hello! I am **PULSEAI**, the official assistant for Caloocan City services. How may I assist you today?" }
     ]);
     const [isAILoading, setIsAILoading] = useState(false);
     
@@ -500,10 +501,14 @@ export default function DashboardOverlay({ onNavigate }) {
                             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                                 {aiMessages.map((msg, i) => (
                                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[85%] p-3 rounded-2xl text-[11px] font-semibold leading-relaxed ${
+                                        <div className={`max-w-[85%] p-3 rounded-2xl text-[12px] font-medium leading-relaxed ${
                                             msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-700'
                                         }`}>
-                                            {msg.text}
+                                            {msg.role === 'assistant' ? (
+                                                <PulseAIMarkdown content={msg.text} />
+                                            ) : (
+                                                <p className="whitespace-pre-wrap">{msg.text}</p>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

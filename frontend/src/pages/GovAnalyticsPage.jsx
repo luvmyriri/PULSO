@@ -444,6 +444,7 @@ export default function GovAnalyticsPage({ workspace }) {
         if (c.includes('light') || c.includes('electr')) return '#eab308';
         if (c.includes('structural')) return '#ef4444';
         if (c.includes('garbage')) return '#8b5cf6';
+        if (c.includes('other')) return '#8b5cf6';
         return '#6366f1';
     };
 
@@ -963,7 +964,8 @@ export default function GovAnalyticsPage({ workspace }) {
                                         { value: 'water_drainage', label: 'Water & Drainage' },
                                         { value: 'street_lighting', label: 'Street Lighting' },
                                         { value: 'public_safety_regulatory', label: 'Public Safety & Regulatory' },
-                                        { value: 'public_facilities', label: 'Public Facilities' }
+                                        { value: 'public_facilities', label: 'Public Facilities' },
+                                        { value: 'other', label: 'Others' }
                                     ].map(c => (
                                         <option key={c.value} value={c.value}>{c.label}</option>
                                     ))}

@@ -240,7 +240,8 @@ def get_analytics_reports(
     if status:
         q = q.filter(models.Report.status == status)
     if category:
-        q = q.filter(models.Report.category.ilike(f"%{category}%"))
+        clean_cat = category.replace('_', '%')
+        q = q.filter(models.Report.category.ilike(f"%{clean_cat}%"))
 
     reports = q.order_by(models.Report.created_at.desc()).limit(limit).all()
 

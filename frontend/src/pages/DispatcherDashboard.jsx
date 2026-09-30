@@ -92,7 +92,8 @@ const INFRASTRUCTURE_CATEGORIES = [
     'Water & Drainage',
     'Street Lighting',
     'Public Safety & Regulatory',
-    'Public Facilities'
+    'Public Facilities',
+    'Others'
 ];
 
 const STATUS_OPTIONS = [
@@ -1331,7 +1332,8 @@ const DispatcherDashboard = () => {
                     'Water & Drainage': ['water', 'drain', 'flood', 'leak', 'pipe', 'sewage', 'canal', 'clog'],
                     'Street Lighting': ['light', 'lamp', 'electric', 'power', 'post', 'wire', 'dark', 'bulb'],
                     'Public Safety & Regulatory': ['safety', 'hazard', 'regulatory', 'security', 'emergency', 'danger', 'risk', 'collapsed', 'obstacle'],
-                    'Public Facilities': ['facility', 'building', 'park', 'playground', 'library', 'school', 'office', 'center']
+                    'Public Facilities': ['facility', 'building', 'park', 'playground', 'library', 'school', 'office', 'center'],
+                    'Others': ['other', 'others', 'uncategorized', 'misc']
                 };
 
                 const keywords = CATEGORY_KEYWORDS[selectedCategory] || [];
@@ -1642,6 +1644,7 @@ const DispatcherDashboard = () => {
         if (cat.includes('road') || cat.includes('pothole') || cat.includes('bridge') || cat.includes('infrastructure')) return 'HardHat';
         if (cat.includes('safety') || cat.includes('hazard') || cat.includes('security')) return 'ShieldAlert';
         if (cat.includes('facility') || cat.includes('building') || cat.includes('park') || cat.includes('public')) return 'Building2';
+        if (cat.includes('other')) return 'HelpCircle';
         return 'AlertTriangle';
     };
 
@@ -1652,6 +1655,7 @@ const DispatcherDashboard = () => {
         if (cat.includes('electric') || cat.includes('wire') || cat.includes('light') || cat.includes('power')) return 'red';
         if (cat.includes('road') || cat.includes('pothole') || cat.includes('bridge') || cat.includes('infrastructure')) return 'orange';
         if (cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public')) return 'green';
+        if (cat.includes('other')) return 'purple';
         return 'slate';
     };
 
@@ -1660,15 +1664,18 @@ const DispatcherDashboard = () => {
         let color = '#f97316'; // Default Active
         const cat = (category || '').toLowerCase();
         const isPublicFacility = cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public');
+        const isOthers = cat.includes('other');
 
         if (status === 'resolved') color = '#22c55e';
         else if (status === 'pending' || status === 'unverified') color = '#ef4444';
         else if (status === 'rejected') color = '#64748b';
         else if (status === 'cancelled') color = '#0f172a';
         
-        // Overwrite color for Public Facilities if selected or if user wants them themed
+        // Overwrite color for Public Facilities or Others if selected or themed
         if (isPublicFacility) {
             color = isSelected ? '#16a34a' : (status === 'resolved' ? '#22c55e' : '#22c55e'); // Using green for all public facilities per request
+        } else if (isOthers && status !== 'resolved' && status !== 'rejected') {
+            color = isSelected ? '#7c3aed' : '#8b5cf6';
         }
         
         let svgIcon = ''; 
@@ -1686,6 +1693,9 @@ const DispatcherDashboard = () => {
         } else if (isPublicFacility) {
             // Building/Facility icon
             svgIcon = `<path d="M4 22V4c0-1.1.9-2 2-2h12a2 2 0 0 1 2 2v18H4zm4-4h2v-2H8v2zm0-4h2v-2H8v2zm0-4h2V8H8v2zm4 8h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2V8h-2v2zm4 8h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2V8h-2v2z" fill="white"/>`;
+        } else if (isOthers) {
+            // Help / Question mark icon
+            svgIcon = `<circle cx="12" cy="12" r="10" stroke="white" stroke-width="2" fill="none"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="white"/>`;
         } else {
             // Alert triangle
             svgIcon = `<path d="M12 2L1 21h22L12 2zm0 3.5l7 13.5H5l7-13.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z" fill="white"/>`;
@@ -2144,6 +2154,7 @@ const DispatcherDashboard = () => {
                                                         color === 'orange' ? 'text-orange-500' :
                                                         color === 'blue' ? 'text-blue-500' :
                                                         color === 'green' ? 'text-green-500' :
+                                                        color === 'purple' ? 'text-purple-500' :
                                                         color === 'red' ? 'text-red-500' : 'text-slate-400'
                                                     }`}>
                                                         {(() => {
@@ -2153,6 +2164,7 @@ const DispatcherDashboard = () => {
                                                             if (iconName === 'Zap') return <Zap size={12} />;
                                                             if (iconName === 'ShieldAlert') return <ShieldAlert size={12} />;
                                                             if (iconName === 'Building2') return <Building2 size={12} />;
+                                                            if (iconName === 'HelpCircle') return <HelpCircle size={12} />;
                                                             return <AlertTriangle size={12} />;
                                                         })()}
                                                     </div>
@@ -2518,6 +2530,7 @@ const DispatcherDashboard = () => {
                                                             if (iconName === 'Zap') return <Zap size={13} className="text-yellow-500 shrink-0" />;
                                                             if (iconName === 'ShieldAlert') return <ShieldAlert size={13} className="text-red-500 shrink-0" />;
                                                             if (iconName === 'Building2') return <Building2 size={13} className="text-indigo-500 shrink-0" />;
+                                                            if (iconName === 'HelpCircle') return <HelpCircle size={13} className="text-purple-500 shrink-0" />;
                                                             return <AlertTriangle size={13} className="text-orange-500 shrink-0" />;
                                                         })()}
                                                         <span className="truncate max-w-[130px]">{selectedMarker.category || selectedMarker.ai_category || 'Public Report'}</span>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,11 +21,15 @@ import {
     ChevronLeft,
     ChevronRight,
     ChevronDown,
+    ChevronUp,
     MessageSquare,
     X,
     Camera,
     MapPin,
     PhoneCall,
+    Globe,
+    Star,
+    Share2,
     Search,
     BookOpen,
     Handshake,
@@ -85,13 +89,17 @@ import {
     RotateCcw,
     CameraOff,
     Copy,
-    Link2,
     Layers,
     Crosshair,
     Navigation,
-    LocateFixed
+    LocateFixed,
+    Compass,
+    HelpCircle,
+    History,
+    Trash2
 } from 'lucide-react';
 
+import PulseAIMarkdown from '../components/PulseAIMarkdown';
 import { useTheme } from '../contexts/ThemeContext';
 import Swal from 'sweetalert2';
 import Branding from '../components/Branding';
@@ -217,16 +225,23 @@ const LIGHT_CIVIC_MAP_STYLE = [
     { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
     { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] },
     { featureType: "road.local", elementType: "labels", stylers: [{ visibility: "off" }] },
-    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#334155" }] },
-    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] }
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+    { featureType: "administrative.neighborhood", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
+    { featureType: "administrative.province", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
+    { featureType: "administrative.province", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] },
+    { featureType: "administrative.country", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
+    { featureType: "administrative.country", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] }
 ];
 
 const REPORT_CATEGORIES = (t) => [
-    { value: 'Water Supply Network', label: t('landing.solutions.s1_title', { defaultValue: 'Water Supply Network' }) },
+    { value: 'Water Supply Network', label: t('landing.solutions.s1_title', { defaultValue: 'Water Supply & Distribution' }) },
     { value: 'Power & Street Lighting', label: t('landing.solutions.s2_title', { defaultValue: 'Power & Street Lighting' }) },
-    { value: 'Roads & Drainage', label: t('landing.solutions.s3_title', { defaultValue: 'Roads & Drainage' }) },
-    { value: 'Public Safety & Regulatory', label: t('landing.solutions.s4_title', { defaultValue: 'Public Safety & Regulatory' }) },
-    { value: 'Public Facilities', label: t('landing.solutions.s5_title', { defaultValue: 'Public Facilities' }) },
+    { value: 'Roads & Drainage', label: t('landing.solutions.s3_title', { defaultValue: 'Roads & Bridges' }) },
+    { value: 'Public Safety & Regulatory', label: t('landing.solutions.s4_title', { defaultValue: 'Public Safety & Hazards' }) },
+    { value: 'Public Facilities', label: t('landing.solutions.s5_title', { defaultValue: 'Public Buildings & Facilities' }) },
+    { value: 'Others', label: t('landing.solutions.s6_title', { defaultValue: 'Others' }) },
 ];
 
 const SIMULATED_HAZARDS = [
@@ -507,8 +522,19 @@ const ResidentHomeView = ({
     setSelectedPost,
     t
 }) => {
+    const [isAdvisoryExpanded, setIsAdvisoryExpanded] = useState(false);
+
     // 1. Alert Banner Data (Dynamic from urgent advisory or authoritative municipal alert)
-    const topAlert = lguUpdates?.find(u => u.priority === 'urgent' || u.priority === 'critical');
+    const topAlert = (lguUpdates && lguUpdates.find(u => u.priority === 'urgent' || u.priority === 'critical')) || {
+        id: 'alert-default',
+        advisory_id: 'ADV-2026-0723',
+        department: 'Caloocan Disaster Risk Reduction and Management Office (DRRMO)',
+        title: 'WALANG PASOK SA CALOOCAN NORTH',
+        description: 'Due to the continuous heavy rainfall and expected flooding brought by the southwest monsoon, all levels of public and private schools, as well as local government work in Caloocan North, are suspended today. Emergency services remain operational. Stay safe.',
+        priority: 'urgent',
+        category: 'Weather / Public Safety',
+        created_at: new Date().toISOString()
+    };
 
     // 2. Latest Report Data: Most recent user report (null for new accounts with 0 reports)
     const latestReport = (userReports && userReports.length > 0) ? userReports[0] : null;
@@ -527,81 +553,105 @@ const ResidentHomeView = ({
 
     // 4. Services & Emergency Contacts Data
     const emergencyContacts = [
-        { id: 'ndrrmc', title: 'NDRRMC', num: '911', tel: '911', icon: ShieldCheck },
-        { id: 'pnp', title: 'Caloocan PNP', num: '8892-6166', tel: '0288926166', icon: ShieldAlert },
-        { id: 'bfp', title: 'BFP Caloocan', num: '8896-5700', tel: '0288965700', icon: Flame },
-        { id: 'drrmo', title: 'Caloocan DRRMO', num: '8397-6212', tel: '0283976212', icon: Truck }
+        { id: 'ndrrmc', title: 'NDRRMC', num: '911', icon: ShieldCheck },
+        { id: 'pnp', title: 'Caloocan PNP', num: '8892-6166', icon: ShieldAlert },
+        { id: 'bfp', title: 'BFP Caloocan', num: '8896-5700', icon: Flame },
+        { id: 'drrmo', title: 'Caloocan DRRMO', num: '8397-6212', icon: Truck }
     ];
 
     // Top city updates for sidebar / teaser
     const displayUpdates = (lguUpdates || []).slice(0, 3);
 
-    const copyOrCall = (e, tel, title) => {
-        if (!navigator.userAgent.match(/Mobi|Android|iPhone/i)) {
-            // Desktop helper: copy to clipboard
-            navigator.clipboard?.writeText(tel);
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: `${title || 'Hotline'}: ${tel}`,
-                text: 'Hotline number copied to clipboard!',
-                timer: 2500,
-                showConfirmButton: false
-            });
+    const copyHotlineNumber = (num) => {
+        if (num) {
+            navigator.clipboard?.writeText(num).catch(() => {});
         }
     };
 
     return (
-        <div className="w-full max-w-[1400px] mx-auto pb-36 sm:pb-40 lg:pb-12 pt-2 sm:pt-4 px-3.5 sm:px-4 lg:px-6">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
+        <div className="w-full max-w-[720px] lg:max-w-[1400px] mx-auto pb-36 sm:pb-40 lg:pb-16 pt-3 sm:pt-6 px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-7 lg:gap-8 xl:gap-9 items-start">
 
                 {/* ── LEFT COLUMN (Primary, ~65-70% on desktop) ── */}
-                <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4 sm:gap-5 w-full">
+                <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6 sm:gap-7 lg:gap-8 w-full">
 
-                    {/* Published urgent advisory only */}
-                    {topAlert && <div
-                        onClick={() => {
-                            if (topAlert.title.includes('JULY 23')) {
-                                setActiveModal('services');
-                            } else {
-                                setSelectedPost(topAlert);
-                                setActiveModal('post-details');
-                            }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPost(topAlert); setActiveModal('post-details'); } }}
-                        title="Click to view complete advisory details and instructions"
-                        className="w-full p-4 sm:p-4.5 rounded-2xl bg-red-50/95 dark:bg-red-950/40 border-l-4 border-l-red-600 border-y border-r border-red-200/90 dark:border-red-900/60 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 cursor-pointer group"
-                    >
-                        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                            <div className="w-10 h-10 rounded-xl bg-red-600/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 shadow-2xs">
-                                <AlertTriangle size={22} className="text-red-600 dark:text-red-400" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-600 text-white shadow-2xs">
-                                        Priority Advisory
-                                    </span>
-                                    <h4 className="font-heading font-black text-xs sm:text-sm text-red-950 dark:text-red-100 tracking-wide uppercase leading-tight">
-                                        {topAlert.title}
-                                    </h4>
+                    {/* Priority Advisory Banner (Sentences hidden until 'Read Advisory' is clicked) */}
+                    {topAlert && (
+                        <div
+                            role="region"
+                            aria-label="Priority Advisory"
+                            className="w-full p-4 sm:p-5 rounded-2xl bg-red-50/95 dark:bg-red-950/40 border-l-4 border-l-red-600 border-y border-r border-red-200/90 dark:border-red-900/60 shadow-xs hover:shadow-sm transition-all"
+                        >
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 sm:gap-4">
+                                <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-red-600/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                        <AlertTriangle size={22} className="text-red-600 dark:text-red-400" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 flex flex-col">
+                                        <div className="mb-0.5">
+                                            <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-600 text-white shadow-2xs">
+                                                Priority Advisory
+                                            </span>
+                                        </div>
+                                        <h4 className="font-heading font-black text-xs sm:text-sm md:text-base text-red-950 dark:text-red-100 tracking-wide uppercase leading-snug">
+                                            {topAlert.title}
+                                        </h4>
+                                    </div>
                                 </div>
-                                <p className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 font-medium line-clamp-2 leading-relaxed">
-                                    {topAlert.description}
-                                </p>
+
+                                {/* Read Advisory Trigger Button */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAdvisoryExpanded(prev => !prev)}
+                                    title={isAdvisoryExpanded ? "Collapse advisory details" : "Read advisory details"}
+                                    aria-expanded={isAdvisoryExpanded}
+                                    className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/80 text-xs font-bold text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-white hover:bg-red-50/60 dark:hover:bg-red-950/50 shrink-0 shadow-2xs transition-all self-end sm:self-auto min-h-[40px] sm:min-h-[44px] cursor-pointer"
+                                >
+                                    <span>{isAdvisoryExpanded ? 'Hide Advisory' : 'Read Advisory'}</span>
+                                    {isAdvisoryExpanded ? (
+                                        <ChevronUp size={15} />
+                                    ) : (
+                                        <ChevronDown size={15} />
+                                    )}
+                                </button>
                             </div>
-                        </div>
 
-                        {/* Explicit Non-Truncated Action Cue */}
-                        <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/80 text-xs font-bold text-red-700 dark:text-red-300 group-hover:text-red-900 dark:group-hover:text-white group-hover:bg-red-50/60 dark:group-hover:bg-red-950/50 shrink-0 shadow-2xs transition-all self-end sm:self-auto min-h-[44px]">
-                            <span>Read Advisory</span>
-                            <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                            {/* Sentences are only shown when "Read Advisory" is clicked */}
+                            <AnimatePresence>
+                                {isAdvisoryExpanded && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="pt-3.5 mt-3 border-t border-red-200/80 dark:border-red-900/60">
+                                            <p className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 font-medium leading-relaxed mb-3">
+                                                {topAlert.description}
+                                            </p>
+                                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-red-100 dark:border-red-900/40">
+                                                <span className="text-[11px] font-mono text-red-700/80 dark:text-red-300/80">
+                                                    Bulletin Ref: <strong>{topAlert.advisory_id || 'ADV-2026-0723'}</strong>
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedPost(topAlert);
+                                                        setActiveModal('post-details');
+                                                    }}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-white hover:underline cursor-pointer"
+                                                >
+                                                    <span>View Official Bulletin Modal</span>
+                                                    <ChevronRight size={13} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
-                    </div>
-
-                    }
+                    )}
                     {/* 2. Latest Report Card / Loading Skeleton / First-Use Empty State */}
                     {loadingReports ? (
                         <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs animate-pulse">
@@ -617,25 +667,25 @@ const ResidentHomeView = ({
                         </div>
                     ) : latestReport ? (
                         <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-                            <div className="p-4 sm:p-5">
+                            <div className="p-5 sm:p-6">
                                 {/* Header: Title, Ticket ID, Status Badge, and + New Report link */}
-                                <div className="flex items-start justify-between gap-2 mb-4 sm:mb-6">
+                                <div className="flex items-start justify-between gap-3 mb-6 sm:mb-7">
                                     <div>
-                                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-0.5">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1.5">
                                             Latest report
                                         </span>
-                                        <h3 className="font-mono-data font-black text-base sm:text-lg text-slate-900 dark:text-white tracking-wide">
+                                        <h3 className="font-mono-data font-black text-base sm:text-xl text-slate-900 dark:text-white tracking-wide whitespace-nowrap">
                                             {formatTicketId ? formatTicketId(latestReport.ticket_id || latestReport.id) : (latestReport.ticket_id || `PUL-${latestReport.id}`)}
                                         </h3>
                                     </div>
-                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800/80 text-orange-600 dark:text-orange-400 text-xs font-bold capitalize">
+                                    <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-orange-50 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800/80 text-orange-600 dark:text-orange-400 text-xs font-bold capitalize">
                                         <User size={13} className="shrink-0" />
                                         <span>{latestStatus?.label || 'Submitted'}</span>
                                     </div>
                                 </div>
 
-                                {/* 3-Step Horizontal Tracker */}
-                                <div className="w-full py-2 sm:py-3 px-0.5 sm:px-3">
+                                {/* Step Horizontal Tracker with generous breathing room */}
+                                <div className="w-full py-4 sm:py-6 px-1 sm:px-4">
                                     <div className="flex items-start w-full">
                                         {trackerSteps.map((step, idx) => {
                                             const isCompleted = idx < currentStepIndex;
@@ -645,7 +695,7 @@ const ResidentHomeView = ({
                                                     {/* Step Node */}
                                                     <div className="flex flex-col items-center shrink-0">
                                                         <div
-                                                            className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
+                                                            className={`w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all ${
                                                                 isCompleted
                                                                     ? 'bg-[#ff6b00] text-white shadow-xs'
                                                                     : isCurrent
@@ -654,13 +704,13 @@ const ResidentHomeView = ({
                                                             }`}
                                                         >
                                                             {isCompleted ? (
-                                                                <Check size={12} strokeWidth={3} className="sm:w-3.5 sm:h-3.5" />
+                                                                <Check size={14} strokeWidth={3} className="sm:w-4 sm:h-4" />
                                                             ) : isCurrent ? (
-                                                                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#ff6b00]" />
+                                                                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#ff6b00]" />
                                                             ) : null}
                                                         </div>
                                                         <span
-                                                            className={`text-[9px] sm:text-xs mt-1.5 text-center leading-tight max-w-[54px] sm:max-w-none break-words ${
+                                                            className={`text-[10px] sm:text-xs mt-2.5 sm:mt-3 text-center leading-tight max-w-[56px] sm:max-w-none break-words ${
                                                                 idx <= currentStepIndex
                                                                     ? 'text-slate-900 dark:text-white font-bold'
                                                                     : 'text-slate-500 dark:text-slate-400 font-medium'
@@ -672,7 +722,7 @@ const ResidentHomeView = ({
 
                                                     {/* Connector segment between steps — no circle overlap */}
                                                     {idx < trackerSteps.length - 1 && (
-                                                        <div className="flex-1 mt-[11px] sm:mt-[15px] mx-1 h-[3px] rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
+                                                        <div className="flex-1 mt-[13px] sm:mt-[17px] mx-1 sm:mx-1.5 h-[3px] rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
                                                             <div
                                                                 className="h-full bg-[#ff6b00] rounded-full transition-all duration-500"
                                                                 style={{ width: isCompleted ? '100%' : '0%' }}
@@ -686,33 +736,33 @@ const ResidentHomeView = ({
                                 </div>
                             </div>
 
-                            {/* Location Footer Strip with Explicit Affordance */}
+                            {/* Location Footer Strip with Explicit Affordance and clear division */}
                             <div
                                 onClick={() => setActiveModal('map')}
                                 role="button"
                                 tabIndex={0}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveModal('map'); } }}
                                 title="Click to view this reported incident and assigned crews on the interactive municipal map"
-                                className="px-4 py-3 sm:py-3.5 bg-slate-50/90 dark:bg-slate-800/60 border-t border-slate-200/80 dark:border-slate-800 flex flex-col xs:flex-row xs:items-center justify-between gap-2.5 sm:gap-3 text-xs cursor-pointer group hover:bg-orange-50/60 dark:hover:bg-orange-950/20 transition-all min-h-[48px]"
+                                className="px-5 py-4 sm:py-4.5 bg-slate-50/90 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800/80 flex flex-col xs:flex-row xs:items-center justify-between gap-3 sm:gap-4 text-xs cursor-pointer group hover:bg-orange-50/60 dark:hover:bg-orange-950/20 transition-all min-h-[52px]"
                             >
-                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                        <MapPin size={15} className="text-[#ff6b00]" />
+                                <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
+                                        <MapPin size={17} className="text-[#ff6b00]" />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block leading-tight">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block leading-tight mb-0.5">
                                             Reported Incident Location
                                         </span>
-                                        <span className="font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 break-words block text-xs group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors leading-snug select-text">
+                                        <span className="font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 break-words block text-xs sm:text-[13px] group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors leading-snug select-text">
                                             {formatCardAddress(latestReport.location_string || latestReport.address) || 'Caloocan City'}
                                         </span>
                                     </div>
                                 </div>
 
-                                <div className="inline-flex items-center self-start xs:self-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/80 text-[11px] font-bold text-slate-700 dark:text-slate-300 group-hover:text-[#ff6b00] group-hover:border-orange-300 dark:group-hover:border-orange-800/60 transition-all shrink-0 shadow-2xs min-h-[36px]">
-                                    <MapIcon size={12} className="text-[#ff6b00]" />
+                                <div className="inline-flex items-center self-start xs:self-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-[#ff6b00] group-hover:border-orange-300 dark:group-hover:border-orange-800/60 transition-all shrink-0 shadow-2xs min-h-[40px]">
+                                    <MapIcon size={13} className="text-[#ff6b00]" />
                                     <span>View on Map</span>
-                                    <ChevronRight size={13} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-transform" />
+                                    <ChevronRight size={14} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-transform" />
                                 </div>
                             </div>
                         </div>
@@ -736,7 +786,7 @@ const ResidentHomeView = ({
                                     <button
                                         type="button"
                                         onClick={() => setActiveModal('file-report')}
-                                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-extrabold text-xs sm:text-sm shadow-md hover:shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer"
+                                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-extrabold text-xs sm:text-sm shadow-md hover:shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer min-h-[44px]"
                                     >
                                         <PlusCircle size={16} strokeWidth={2.5} />
                                         <span>Report an Issue</span>
@@ -744,14 +794,14 @@ const ResidentHomeView = ({
                                     <button
                                         type="button"
                                         onClick={() => setActiveModal('map')}
-                                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm transition-all cursor-pointer min-h-[44px]"
                                     >
                                         <MapPin size={15} className="text-[#ff6b00]" />
                                         <span>Browse City Map</span>
                                     </button>
                                 </div>
                             </div>
-                            <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                            <div className="px-5 py-3.5 bg-slate-50/80 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                                 <span className="flex items-center gap-2 text-[11px] font-medium">
                                     <ShieldCheck size={14} className="text-emerald-500 shrink-0" />
                                     Reports are directly routed to the City Engineering Department for field inspection.
@@ -762,29 +812,29 @@ const ResidentHomeView = ({
 
                     {/* 4. Nearby Issues Card */}
                     <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-                        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <MapPin size={18} className="text-[#ff6b00]" />
+                        <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <MapPin size={20} className="text-[#ff6b00]" />
                                 <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
                                     Nearby issues
                                 </h3>
-                                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300">
                                     {nearbyList.length} nearby
                                 </span>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setActiveModal('map')}
-                                className="text-xs font-bold text-[#ff6b00] hover:underline flex items-center gap-1 cursor-pointer min-h-[44px] px-2 py-1"
+                                className="text-xs font-bold text-[#ff6b00] hover:underline flex items-center gap-1.5 cursor-pointer min-h-[44px] px-2.5 py-1"
                             >
                                 <span>View map</span>
-                                <ChevronRight size={13} />
+                                <ChevronRight size={14} />
                             </button>
                         </div>
 
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                             {nearbyList.length === 0 && (
-                                <p className="p-4 text-sm text-slate-500">
+                                <p className="p-5 sm:p-6 text-sm text-slate-500">
                                     {loadingReports || loadingPublicReports ? 'Loading reports...' : 'No nearby reports in your immediate vicinity.'}
                                 </p>
                             )}
@@ -794,28 +844,28 @@ const ResidentHomeView = ({
                                     <div
                                         key={item.id}
                                         onClick={() => setActiveModal('map')}
-                                        className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer group min-h-[48px]"
+                                        className="p-4 sm:p-5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between gap-3 sm:gap-4 cursor-pointer group min-h-[58px]"
                                     >
-                                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                                            <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0 group-hover:text-[#ff6b00] transition-colors">
-                                                <ItemIcon size={18} />
+                                        <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0 group-hover:text-[#ff6b00] transition-colors shadow-2xs">
+                                                <ItemIcon size={19} />
                                             </div>
-                                            <div className="min-w-0 flex-1 pr-1">
+                                            <div className="min-w-0 flex-1 pr-2">
                                                 <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white line-clamp-2 break-words group-hover:text-[#ff6b00] transition-colors leading-snug">
                                                     {item.title}
                                                 </h4>
-                                                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-1 break-words mt-0.5">
+                                                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-1 break-words mt-1">
                                                     {item.address}
                                                 </p>
                                             </div>
                                         </div>
-                                        {/* High-Contrast Scannable Distance Pill */}
-                                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-1">
-                                            <span className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[11px] sm:text-xs font-mono font-extrabold bg-orange-100 dark:bg-orange-950/70 text-orange-900 dark:text-orange-200 border border-orange-200 dark:border-orange-800/60 shadow-2xs whitespace-nowrap">
-                                                <MapPin size={10} className="text-orange-600 dark:text-orange-400 shrink-0" />
+                                        {/* High-Contrast Scannable Distance Pill with ample breathing room */}
+                                        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-2">
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-mono font-extrabold bg-orange-100 dark:bg-orange-950/70 text-orange-900 dark:text-orange-200 border border-orange-200 dark:border-orange-800/60 shadow-2xs whitespace-nowrap">
+                                                <MapPin size={11} className="text-orange-600 dark:text-orange-400 shrink-0" />
                                                 {item.distance}
                                             </span>
-                                            <ChevronRight size={15} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                            <ChevronRight size={16} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
                                         </div>
                                     </div>
                                 );
@@ -826,40 +876,40 @@ const ResidentHomeView = ({
                         <button
                             type="button"
                             onClick={() => setActiveModal('map')}
-                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/50 hover:bg-orange-50/70 dark:hover:bg-orange-950/30 border-t border-slate-100 dark:border-slate-800 text-center text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] cursor-pointer transition-colors flex items-center justify-center gap-1.5 min-h-[48px]"
+                            className="w-full p-4 sm:p-4.5 bg-slate-50 dark:bg-slate-800/50 hover:bg-orange-50/70 dark:hover:bg-orange-950/30 border-t border-slate-100 dark:border-slate-800 text-center text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] cursor-pointer transition-colors flex items-center justify-center gap-2 min-h-[50px]"
                         >
                             <span>Explore your reports on the map</span>
-                            <ArrowRight size={14} />
+                            <ArrowRight size={15} />
                         </button>
                     </div>
 
                 </div>
 
                 {/* ── RIGHT COLUMN (Secondary Sidebar Content, ~30-35% on desktop) ── */}
-                <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-4 sm:gap-5 w-full">
+                <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 sm:gap-7 lg:gap-8 w-full">
 
                     {/* 1. City Updates Card - View All Only */}
                     <div 
                         onClick={() => handleSetTab('updates')}
-                        className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-4 sm:p-5 flex items-center justify-between hover:border-orange-500/50 hover:shadow-sm transition-all cursor-pointer group"
+                        className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-5 sm:p-6 flex items-center justify-between hover:border-orange-500/50 hover:shadow-sm transition-all cursor-pointer group"
                     >
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                <Radio size={20} />
+                        <div className="flex items-center gap-3.5 sm:gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
+                                <Radio size={22} />
                             </div>
-                            <div>
-                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                            <div className="space-y-0.5">
+                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors leading-snug">
                                     City updates
                                 </h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    Official bulletins & advisories
+                                    Official bulletins &amp; advisories
                                 </p>
                             </div>
                         </div>
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleSetTab('updates'); }}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] hover:bg-[#ff6b00] hover:text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs group-hover:bg-[#ff6b00] group-hover:text-white"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] hover:bg-[#ff6b00] hover:text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs group-hover:bg-[#ff6b00] group-hover:text-white min-h-[44px]"
                         >
                             <span>View all</span>
                             <ChevronRight size={14} />
@@ -867,10 +917,10 @@ const ResidentHomeView = ({
                     </div>
 
                     {/* 2. Services & Emergency Contacts Grid (High-urgency Call Affordance) */}
-                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-4 sm:p-5">
-                        <div className="flex items-center justify-between mb-3.5">
-                            <div className="flex items-center gap-2">
-                                <PhoneCall size={18} className="text-red-500" />
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-5 sm:p-6">
+                        <div className="flex items-center justify-between mb-4 sm:mb-5">
+                            <div className="flex items-center gap-2.5">
+                                <PhoneCall size={20} className="text-red-500" />
                                 <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
                                     Services &amp; emergency contacts
                                 </h3>
@@ -880,29 +930,27 @@ const ResidentHomeView = ({
                             </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                        <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
                             {emergencyContacts.map(ec => {
                                 const IconComp = ec.icon;
                                 return (
-                                    <a
+                                    <div
                                         key={ec.id}
-                                        href={`tel:${ec.tel}`}
-                                        onClick={(e) => copyOrCall(e, ec.tel, ec.title)}
-                                        title={`Direct emergency hotline: Click to call ${ec.title} (${ec.num})`}
-                                        className="flex flex-col items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 hover:border-red-400 hover:bg-red-50/40 dark:hover:bg-red-950/20 transition-all text-center group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 shadow-2xs hover:shadow-xs active:scale-[0.98]"
+                                        onClick={() => copyHotlineNumber(ec.num, ec.title)}
+                                        title={`Hotline: ${ec.title} (${ec.num}) — Click to copy`}
+                                        className="flex flex-col items-center justify-between p-3.5 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 hover:border-orange-300 dark:hover:border-orange-800/60 transition-all text-center group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 shadow-2xs hover:shadow-xs active:scale-[0.98] min-h-[92px]"
                                     >
-                                        <div className="w-9 h-9 rounded-lg bg-white dark:bg-slate-700 text-red-500 dark:text-red-400 flex items-center justify-center mb-1.5 shadow-2xs group-hover:scale-110 transition-transform">
-                                            <IconComp size={18} />
+                                        <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-700 text-red-500 dark:text-red-400 flex items-center justify-center mb-1.5 shadow-2xs group-hover:scale-105 transition-transform">
+                                            <IconComp size={19} />
                                         </div>
                                         <span className="text-[11px] font-extrabold text-slate-900 dark:text-white leading-tight">
                                             {ec.title}
                                         </span>
-                                        {/* Explicit Call Button Pill */}
-                                        <span className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-600 hover:bg-red-700 text-white text-[11px] font-mono font-extrabold shadow-2xs group-hover:bg-red-700 transition-colors w-full justify-center">
-                                            <PhoneCall size={10} strokeWidth={2.5} className="shrink-0" />
-                                            <span>Call {ec.num}</span>
+                                        {/* Hotline text display without call button / without tel protocol */}
+                                        <span className="mt-1.5 text-xs sm:text-[13px] font-mono font-extrabold text-red-600 dark:text-red-400 tracking-wide select-all">
+                                            {ec.num}
                                         </span>
-                                    </a>
+                                    </div>
                                 );
                             })}
                         </div>
@@ -953,6 +1001,56 @@ const LguFeed = ({
     t
 }) => {
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const tabsScrollRef = useRef(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    const checkTabsScroll = useCallback(() => {
+        const el = tabsScrollRef.current;
+        if (!el) return;
+        const { scrollLeft, scrollWidth, clientWidth } = el;
+        setCanScrollLeft(prev => {
+            const nextVal = scrollLeft > 6;
+            return prev !== nextVal ? nextVal : prev;
+        });
+        setCanScrollRight(prev => {
+            const nextVal = scrollLeft < scrollWidth - clientWidth - 6;
+            return prev !== nextVal ? nextVal : prev;
+        });
+    }, []);
+
+    useEffect(() => {
+        const el = tabsScrollRef.current;
+        if (!el) return;
+        checkTabsScroll();
+        el.addEventListener('scroll', checkTabsScroll, { passive: true });
+        window.addEventListener('resize', checkTabsScroll);
+        const timer = setTimeout(checkTabsScroll, 120);
+        return () => {
+            el.removeEventListener('scroll', checkTabsScroll);
+            window.removeEventListener('resize', checkTabsScroll);
+            clearTimeout(timer);
+        };
+    }, [checkTabsScroll]);
+
+    const scrollTabs = (direction) => {
+        const el = tabsScrollRef.current;
+        if (!el) return;
+        const scrollAmount = 180;
+        el.scrollBy({
+            left: direction === 'left' ? -scrollAmount : scrollAmount,
+            behavior: 'smooth'
+        });
+    };
+
+    useEffect(() => {
+        const el = tabsScrollRef.current;
+        if (!el) return;
+        const activeBtn = el.querySelector(`[data-tab-id="${selectedCategory}"]`);
+        if (activeBtn) {
+            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }, [selectedCategory]);
 
     // 1. Category Tabs with Icons mapped to municipal communication structure
     const categoryTabs = [
@@ -980,47 +1078,13 @@ const LguFeed = ({
 
 
 
-    // 2. This Month At A Glance Stats Calculation
-    const criticalCount = lguUpdates.filter(u => {
-        const p = (u.priority || '').toLowerCase();
-        return p === 'critical' || p === 'urgent';
-    }).length;
-    const totalCount = lguUpdates.length;
-    const lastUpdated = lguUpdates[0]?.created_at
-        ? formatRelativeTime(lguUpdates[0].created_at)
-        : (loadingAdvisories ? 'Updating…' : advisoriesError ? 'Unavailable' : 'No data');
-
-    // 3. Services & Emergency Contacts
-    const emergencyHotlines = [
-        { id: 'ndrrmc', title: 'NDRRMC Rescue', num: '911', tel: 'tel:911', icon: ShieldCheck },
-        { id: 'pnp', title: 'Caloocan PNP', num: '8892-6166', tel: 'tel:0288926166', icon: ShieldAlert },
-        { id: 'bfp', title: 'BFP Caloocan Fire', num: '8896-5700', tel: 'tel:0288965700', icon: Flame },
-        { id: 'drrmo', title: 'Caloocan DRRMO', num: '8397-6212', tel: 'tel:0283976212', icon: Truck }
-    ];
-
-    const copyOrCall = (e, tel, title) => {
-        if (!navigator.userAgent.match(/Mobi|Android|iPhone/i)) {
-            e.preventDefault();
-            navigator.clipboard?.writeText(tel.replace('tel:', ''));
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: `${title}: ${tel.replace('tel:', '')}`,
-                text: 'Hotline number copied to clipboard!',
-                timer: 2500,
-                showConfirmButton: false
-            });
-        }
-    };
-
     return (
-        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full">
+        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full space-y-6">
             {/* ── Page Header: Title & Purpose ── */}
-            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-                        <Bell className="text-orange-500" size={24} /> City Updates &amp; Advisories
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                        City Updates &amp; Advisories
                     </h2>
                     <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                         Municipal advisories, public utility alerts, and engineering notices across Caloocan.
@@ -1028,96 +1092,145 @@ const LguFeed = ({
                 </div>
             </div>
 
-            {/* ── 2-Column Responsive Layout: Content directly beside sidebar on left, support rail on right ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* ── Category Tabs: Full Width Pill with Responsive Chevrons ── */}
+            <div className="relative flex items-center min-w-0 max-w-full">
+                {/* Left Scroll Chevron Button (only visible when scrollable) */}
+                <button
+                    type="button"
+                    onClick={() => scrollTabs('left')}
+                    disabled={!canScrollLeft}
+                    aria-label="Scroll categories left"
+                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 mr-1 sm:mr-1.5 ${
+                        canScrollLeft
+                            ? 'flex bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 cursor-pointer active:scale-95'
+                            : 'hidden'
+                    }`}
+                >
+                    <ChevronLeft size={16} strokeWidth={2.5} />
+                </button>
 
-                {/* ── PRIMARY COLUMN: City Updates Content (Directly beside the sidebar, lg:col-span-8 xl:col-span-8) ── */}
-                <div className="lg:col-span-8 xl:col-span-8 space-y-4">
-                    {/* Interactive Category Filter Tabs Capsule */}
-                    <div className="w-full overflow-x-auto no-scrollbar scroll-smooth pb-1">
-                        <div className="inline-flex items-center gap-1.5 p-1.5 bg-slate-200/60 dark:bg-slate-900/90 rounded-full border border-slate-200/90 dark:border-slate-800/90 shadow-inner">
-                            {categoryTabs.map(tab => {
-                                const count = tab.id === 'all'
-                                    ? lguUpdates.length
-                                    : lguUpdates.filter(u => {
-                                        const cat = (u.category || '').toLowerCase();
-                                        const dept = (u.department || '').toLowerCase();
-                                        const title = (u.title || '').toLowerCase();
-                                        return tab.matchKeys.some(k => cat.includes(k) || dept.includes(k) || title.includes(k));
-                                    }).length;
+                {/* Scroll Container with Fade Overlays */}
+                <div className="relative min-w-0 flex-1 overflow-hidden">
+                    {/* Left Trailing Edge Fade */}
+                    <div
+                        className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-100 dark:from-slate-950 to-transparent transition-opacity duration-200 ${
+                            canScrollLeft ? 'opacity-100' : 'opacity-0'
+                        }`}
+                    />
 
-                                const isActive = selectedCategory === tab.id;
+                    {/* Scrollable Track */}
+                    <div
+                        ref={tabsScrollRef}
+                        className="inline-flex items-center gap-1.5 p-1.5 bg-slate-200/60 dark:bg-slate-900/90 rounded-full border border-slate-200/90 dark:border-slate-800/90 shadow-inner overflow-x-auto no-scrollbar scroll-smooth w-full"
+                    >
+                        {categoryTabs.map(tab => {
+                            const count = tab.id === 'all'
+                                ? lguUpdates.length
+                                : lguUpdates.filter(u => {
+                                    const cat = (u.category || '').toLowerCase();
+                                    const dept = (u.department || '').toLowerCase();
+                                    const title = (u.title || '').toLowerCase();
+                                    return tab.matchKeys.some(k => cat.includes(k) || dept.includes(k) || title.includes(k));
+                                }).length;
 
-                                return (
-                                    <button
-                                        key={tab.id}
-                                        type="button"
-                                        onClick={() => setSelectedCategory(tab.id)}
-                                        className={`group relative px-3.5 sm:px-4 py-2 min-h-[44px] rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap cursor-pointer select-none ${
-                                            isActive
-                                                ? 'text-orange-600 dark:text-orange-400'
-                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'
-                                        }`}
-                                    >
-                                        {isActive && (
-                                            <motion.span
-                                                layoutId="activeUpdateCategoryPill"
-                                                transition={{ type: "spring", stiffness: 450, damping: 35 }}
-                                                className="absolute inset-0 bg-white dark:bg-slate-800 rounded-full shadow-xs ring-1 ring-slate-200/90 dark:ring-slate-700/80 -z-0"
-                                            />
-                                        )}
-                                        <span className="relative z-10">{tab.label}</span>
-                                        <span className={`relative z-10 px-1.5 py-0.2 rounded-full text-[10.5px] font-mono font-bold ${
-                                            isActive
-                                                ? 'bg-orange-500 text-white'
-                                                : 'text-slate-400 dark:text-slate-500'
-                                        }`}>
-                                            {count}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Updates Feed */}
-                    <div className="space-y-4">
-                        {loadingAdvisories ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
-                                <Loader2 className="animate-spin text-orange-500" size={28} />
-                                <span className="text-xs font-medium">{t('Synchronizing Live Advisories...')}</span>
-                            </div>
-                        ) : advisoriesError ? (
-                            <div role="alert" className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl border border-rose-200 dark:border-rose-900/60 p-6">
-                                <AlertTriangle className="mx-auto mb-3 text-rose-600 dark:text-rose-400" size={36} />
-                                <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">Advisories could not be loaded</p>
-                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">The feed is temporarily unavailable. No advisory totals are being shown.</p>
-                                <button
-                                    type="button"
-                                    onClick={onRetryAdvisories}
-                                    className="mt-4 min-h-11 rounded-xl bg-[#B9380B] px-4 py-2 text-xs font-bold text-white hover:bg-[#9F2F09] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
-                                >
-                                    Try again
-                                </button>
-                            </div>
-                        ) : filteredUpdates.length === 0 ? (
-                            <div className="text-center text-slate-400 py-16 bg-white dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 p-6">
-                                <Bell className="mx-auto mb-3 opacity-20 text-orange-500" size={48} />
-                                <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">No updates in this category</p>
-                                <p className="text-xs text-slate-500 mt-1">Check back later or select "All Updates" to view other notices.</p>
-                            </div>
-                        ) : filteredUpdates.map((update, idx) => {
-                            const isUtility = isUtilityProvider(update.department);
+                            const isActive = selectedCategory === tab.id;
 
                             return (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 15 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    key={update.id || update.advisory_id || idx}
-                                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-sm transition-all"
+                                <button
+                                    key={tab.id}
+                                    data-tab-id={tab.id}
+                                    type="button"
+                                    onClick={() => setSelectedCategory(tab.id)}
+                                    className={`group relative px-3.5 sm:px-4 py-2 min-h-[44px] rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer select-none ${
+                                        isActive
+                                            ? 'text-orange-600 dark:text-orange-400'
+                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'
+                                    }`}
                                 >
+                                    {isActive && (
+                                        <motion.span
+                                            layoutId="activeUpdateCategoryPill"
+                                            transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                                            className="absolute inset-0 bg-white dark:bg-slate-800 rounded-full shadow-xs ring-1 ring-slate-200/90 dark:ring-slate-700/80 -z-0"
+                                        />
+                                    )}
+                                    <span className="relative z-10">{tab.label}</span>
+                                    <span className={`relative z-10 px-1.5 py-0.2 rounded-full text-[10.5px] font-mono font-bold ${
+                                        isActive
+                                            ? 'bg-orange-500 text-white'
+                                            : 'text-slate-400 dark:text-slate-500'
+                                    }`}>
+                                        {count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Right Trailing Edge Fade */}
+                    <div
+                        className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-100 dark:from-slate-950 to-transparent transition-opacity duration-200 ${
+                            canScrollRight ? 'opacity-100' : 'opacity-0'
+                        }`}
+                    />
+                </div>
+
+                {/* Right Scroll Chevron Button (only visible when scrollable) */}
+                <button
+                    type="button"
+                    onClick={() => scrollTabs('right')}
+                    disabled={!canScrollRight}
+                    aria-label="Scroll categories right"
+                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 ml-1 sm:ml-1.5 ${
+                        canScrollRight
+                            ? 'flex bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 cursor-pointer active:scale-95'
+                            : 'hidden'
+                    }`}
+                >
+                    <ChevronRight size={16} strokeWidth={2.5} />
+                </button>
+            </div>
+
+            {/* ── Updates Feed: 2-Column Grid on Desktop (lg:grid-cols-2), 1-Column on Mobile/Tablet ── */}
+            {loadingAdvisories ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
+                    <Loader2 className="animate-spin text-orange-500" size={32} />
+                    <span className="text-xs sm:text-sm font-medium">{t('Synchronizing Live Advisories...')}</span>
+                </div>
+            ) : advisoriesError ? (
+                <div role="alert" className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl border border-rose-200 dark:border-rose-900/60 p-6 max-w-xl mx-auto">
+                    <AlertTriangle className="mx-auto mb-3 text-rose-600 dark:text-rose-400" size={36} />
+                    <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">Advisories could not be loaded</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">The feed is temporarily unavailable. Please try again shortly.</p>
+                    <button
+                        type="button"
+                        onClick={onRetryAdvisories}
+                        className="mt-4 min-h-11 rounded-xl bg-[#B9380B] px-4 py-2 text-xs font-bold text-white hover:bg-[#9F2F09] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 cursor-pointer"
+                    >
+                        Try again
+                    </button>
+                </div>
+            ) : filteredUpdates.length === 0 ? (
+                <div className="text-center text-slate-400 py-20 bg-white dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 p-8 max-w-xl mx-auto">
+                    <Bell className="mx-auto mb-3 opacity-20 text-orange-500" size={48} />
+                    <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">No updates in this category</p>
+                    <p className="text-xs text-slate-500 mt-1">Check back later or select "All Updates" to view other notices.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+                    {filteredUpdates.map((update, idx) => {
+                        const isUtility = isUtilityProvider(update.department);
+
+                        return (
+                            <motion.div
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                key={update.id || update.advisory_id || idx}
+                                className="flex flex-col justify-between h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs hover:shadow-md transition-all"
+                            >
+                                <div className="space-y-3">
                                     {/* Card Header: Source & Timestamp */}
-                                    <div className="flex items-center justify-between gap-2.5 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800/80">
+                                    <div className="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
                                                 isUtility
@@ -1142,151 +1255,53 @@ const LguFeed = ({
                                         <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2 leading-snug">
                                             {update.title}
                                         </h3>
-                                        <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 mb-3 whitespace-pre-line leading-relaxed">
+                                        <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed line-clamp-4">
                                             {update.description}
                                         </p>
-
-                                        {/* Robust Image Display with onError fallback */}
-                                        {update.has_image && update.image_url && (
-                                            <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 mb-3 bg-slate-100 dark:bg-slate-800/50">
-                                                <img
-                                                    src={update.image_url}
-                                                    alt={update.title || "Advisory attachment"}
-                                                    className="w-full max-h-[400px] object-cover"
-                                                    onError={(e) => {
-                                                        e.currentTarget.parentElement.style.display = 'none';
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* Card Footer: Traceable Bulletin Reference & Clear CTA */}
-                                        <div className="mt-3 pt-3 flex flex-wrap items-center justify-between border-t border-slate-100 dark:border-slate-800/80 gap-2">
-                                            <span
-                                                className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/70 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700/60"
-                                                title="Cite this reference code when contacting city dispatch or LGU hotlines"
-                                            >
-                                                {update.advisory_id || update.id ? (
-                                                    <>Bulletin Ref: <strong className="text-slate-700 dark:text-slate-200">{update.advisory_id || update.id}</strong></>
-                                                ) : (
-                                                    <strong className="text-slate-700 dark:text-slate-200">Reference unavailable</strong>
-                                                )}
-                                            </span>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => { setSelectedPost(update); setActiveModal('post-details'); }}
-                                                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:underline cursor-pointer transition-colors min-h-[44px] py-1"
-                                            >
-                                                <span>Read Full Advisory</span>
-                                                <ChevronRight size={15} />
-                                            </button>
-                                        </div>
                                     </div>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                </div>
 
-                {/* ── RIGHT SUPPORT RAIL: Contextual Glanceable Cards (lg:col-span-4 xl:col-span-4) ── */}
-                <aside className="lg:col-span-4 xl:col-span-4 space-y-4 lg:sticky lg:top-20 self-start">
+                                    {/* Robust Image Display with onError fallback */}
+                                    {update.has_image && update.image_url && (
+                                        <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/50">
+                                            <img
+                                                src={update.image_url}
+                                                alt={update.title || "Advisory attachment"}
+                                                className="w-full max-h-[300px] object-cover"
+                                                onError={(e) => {
+                                                    e.currentTarget.parentElement.style.display = 'none';
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
 
-                    {/* 1. This Month At A Glance */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-3 px-1">
-                            This Month At A Glance
-                        </span>
-                        <div className="grid grid-cols-2 gap-2.5 mb-2.5">
-                            <div className="p-3 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200/60 dark:border-red-900/40">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-red-700 dark:text-red-400">Critical</span>
-                                </div>
-                                <div className="text-xl font-bold font-display text-red-700 dark:text-red-300">
-                                    {loadingAdvisories || advisoriesError ? '—' : criticalCount}
-                                </div>
-                                <div className="text-[10.5px] text-red-600/80 dark:text-red-400/70 font-medium">
-                                    Urgent alerts
-                                </div>
-                            </div>
-
-                            <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">Total</span>
-                                </div>
-                                <div className="text-xl font-bold font-display text-blue-700 dark:text-blue-300">
-                                    {loadingAdvisories || advisoriesError ? '—' : totalCount}
-                                </div>
-                                <div className="text-[10.5px] text-blue-600/80 dark:text-blue-400/70 font-medium">
-                                    Advisories logged
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px]">
-                            <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                                <Clock size={12} className="text-emerald-500" />
-                                <span>Feed updated:</span>
-                            </span>
-                            <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">
-                                {lastUpdated}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* 2. Emergency Contacts Mini-Card */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
-                        <div className="flex items-center justify-between mb-3 px-1">
-                            <div className="flex items-center gap-2">
-                                <PhoneCall size={16} className="text-red-500" />
-                                <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                                    Emergency Hotlines
-                                </span>
-                            </div>
-                            <span className="text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-100 dark:bg-red-950/60 px-2 py-0.5 rounded-full font-mono">
-                                24/7
-                            </span>
-                        </div>
-
-                        <div className="space-y-2">
-                            {emergencyHotlines.map(ec => {
-                                const IconComponent = ec.icon;
-                                return (
-                                    <div
-                                        key={ec.id}
-                                        className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2"
+                                {/* Card Footer: Traceable Bulletin Reference & Clear CTA */}
+                                <div className="mt-4 pt-3 flex flex-wrap items-center justify-between border-t border-slate-100 dark:border-slate-800/80 gap-2">
+                                    <span
+                                        className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/70 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700/60"
+                                        title="Cite this reference code when contacting city dispatch or LGU hotlines"
                                     >
-                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                            <div className="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
-                                                <IconComponent size={14} />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="text-[11.5px] font-bold text-slate-800 dark:text-slate-200 truncate">
-                                                    {ec.title}
-                                                </div>
-                                                <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                                                    {ec.num}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <a
-                                            href={ec.tel}
-                                            onClick={(e) => copyOrCall(e, ec.tel, ec.title)}
-                                            className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-mono font-bold shrink-0 shadow-2xs transition-colors flex items-center gap-1"
-                                        >
-                                            <PhoneCall size={10} />
-                                            <span>Call</span>
-                                        </a>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                                        {update.advisory_id || update.id ? (
+                                            <>Bulletin Ref: <strong className="text-slate-700 dark:text-slate-200">{update.advisory_id || update.id}</strong></>
+                                        ) : (
+                                            <strong className="text-slate-700 dark:text-slate-200">Reference unavailable</strong>
+                                        )}
+                                    </span>
 
-                </aside>
-
-            </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setSelectedPost(update); setActiveModal('post-details'); }}
+                                        className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:underline cursor-pointer transition-colors min-h-[44px] py-1"
+                                    >
+                                        <span>Read Full Advisory</span>
+                                        <ChevronRight size={15} />
+                                    </button>
+                                </div>
+                            </motion.div>
+                        );
+                    })}
+                </div>
+            )}
         </motion.div>
     );
 };
@@ -1295,9 +1310,9 @@ const StatusBadge = ({ status }) => {
     const descriptor = getStatusDescriptor(status);
     const StatusIcon = descriptor.icon;
     return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${descriptor.badgeClass} shrink-0`}>
-            <StatusIcon size={12} aria-hidden="true" />
-            {descriptor.label}
+        <span className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider border ${descriptor.badgeClass} shrink-0 whitespace-nowrap`}>
+            <StatusIcon size={11} aria-hidden="true" className="shrink-0" />
+            <span>{descriptor.label}</span>
         </span>
     );
 };
@@ -1331,7 +1346,7 @@ const sanitizeDescription = (text) => {
 };
 
 // ── Mini Pulseline Progress Tracker ───────────────────────────────────────────
-const MiniProgressTracker = ({ status, resolutionDays }) => {
+const MiniProgressTracker = ({ status, resolutionDays, orientation = 'responsive' }) => {
     const isRejected = status === 'rejected';
     const isCancelled = status === 'cancelled';
     const isResolved = status === 'resolved';
@@ -1366,7 +1381,11 @@ const MiniProgressTracker = ({ status, resolutionDays }) => {
     }
 
     return (
-        <div className="w-full bg-slate-50/80 dark:bg-slate-950/50 rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+        <div
+            className="w-full bg-slate-50/80 dark:bg-slate-950/50 rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 dark:border-slate-800/80 shadow-xs"
+            role="region"
+            aria-label={`Report progress: step ${currentStepIndex + 1} of ${REPORT_WORKFLOW_STEPS.length}, currently ${statusDescriptor.label}`}
+        >
             {/* Header Stage Notice */}
             <div className="flex items-center justify-between text-[11px] mb-3 px-1">
                 <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-200">
@@ -1377,71 +1396,169 @@ const MiniProgressTracker = ({ status, resolutionDays }) => {
                         {statusDescriptor.key === 'resolved' && resolutionDays !== null ? ` — ${resolutionDays}d` : ''}
                     </span>
                 </div>
-                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/80 font-bold hidden sm:inline-block">
+                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/80 font-bold inline-block">
                     Step {currentStepIndex + 1} of {REPORT_WORKFLOW_STEPS.length}
                 </span>
             </div>
 
-            {/* Canonical horizontal Pulseline tracker */}
-            <div className="flex items-start w-full px-1 pt-1 pb-1">
-                {REPORT_WORKFLOW_STEPS.map((step, idx) => {
-                    const isCompleted = idx < currentStepIndex || (isResolved && idx <= REPORT_WORKFLOW_STEPS.length - 1);
-                    const isCurrent = idx === currentStepIndex && !isResolved;
-                    return (
-                        <React.Fragment key={step.id}>
-                            <div className="flex flex-col items-center shrink-0">
+            {/* Canonical horizontal Pulseline tracker (Mobile / Stacked View) */}
+            {(orientation === 'horizontal' || orientation === 'responsive') && (
+                <div
+                    className={`items-start w-full px-1 pt-1 pb-1 ${orientation === 'responsive' ? 'flex lg:hidden' : 'flex'}`}
+                    role="list"
+                    aria-label="Workflow progress steps"
+                >
+                    {REPORT_WORKFLOW_STEPS.map((step, idx) => {
+                        const isCompleted = idx < currentStepIndex || (isResolved && idx <= REPORT_WORKFLOW_STEPS.length - 1);
+                        const isCurrent = idx === currentStepIndex && !isResolved;
+                        return (
+                            <React.Fragment key={step.id}>
                                 <div
-                                    className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all aspect-square ${
-                                        isCompleted
-                                            ? 'bg-orange-500 text-white shadow-xs ring-2 ring-orange-500/20'
-                                            : isCurrent
-                                                ? 'bg-white dark:bg-slate-900 border-2 border-orange-500 text-orange-500 ring-4 ring-orange-500/20 shadow-xs'
-                                                : 'bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-transparent'
-                                    }`}
+                                    className="flex flex-col items-center shrink-0"
+                                    role="listitem"
+                                    aria-current={isCurrent ? 'step' : undefined}
                                 >
-                                    {isCompleted ? (
-                                        <Check size={12} strokeWidth={3} />
-                                    ) : isCurrent ? (
-                                        <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                                    ) : (
-                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+                                    <div
+                                        className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all aspect-square ${
+                                            isCompleted
+                                                ? 'bg-orange-500 text-white shadow-xs ring-2 ring-orange-500/20'
+                                                : isCurrent
+                                                    ? 'bg-white dark:bg-slate-900 border-2 border-orange-500 text-orange-500 ring-4 ring-orange-500/20 shadow-xs'
+                                                    : 'bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-transparent'
+                                        }`}
+                                    >
+                                        {isCompleted ? (
+                                            <Check size={12} strokeWidth={3} />
+                                        ) : isCurrent ? (
+                                            <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                                        ) : (
+                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+                                        )}
+                                    </div>
+                                    <span
+                                        className={`text-[9px] sm:text-[11px] mt-1.5 text-center leading-tight truncate max-w-[62px] sm:max-w-none transition-colors ${
+                                            isCompleted
+                                                ? 'text-slate-800 dark:text-slate-200 font-bold'
+                                                : isCurrent
+                                                    ? 'text-orange-600 dark:text-orange-400 font-extrabold'
+                                                    : 'text-slate-400 dark:text-slate-500 font-medium'
+                                        }`}
+                                    >
+                                        {step.label}
+                                    </span>
+                                </div>
+
+                                {/* Connector line segment between steps */}
+                                {idx < REPORT_WORKFLOW_STEPS.length - 1 && (
+                                    <div className="flex-1 mt-[12px] sm:mt-[13px] mx-1 h-[3px] rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-500 rounded-full transition-all duration-500"
+                                            style={{ width: isCompleted ? '100%' : '0%' }}
+                                        />
+                                    </div>
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Vertical Pulseline tracker (Desktop beside photo) */}
+            {(orientation === 'vertical' || orientation === 'responsive') && (
+                <div
+                    className={`flex-col w-full px-1 pt-1 pb-0.5 ${orientation === 'responsive' ? 'hidden lg:flex' : 'flex'}`}
+                    role="list"
+                    aria-label="Workflow progress steps"
+                >
+                    {REPORT_WORKFLOW_STEPS.map((step, idx) => {
+                        const isCompleted = idx < currentStepIndex || (isResolved && idx <= REPORT_WORKFLOW_STEPS.length - 1);
+                        const isCurrent = idx === currentStepIndex && !isResolved;
+                        const isLast = idx === REPORT_WORKFLOW_STEPS.length - 1;
+
+                        return (
+                            <div
+                                key={step.id}
+                                className="flex items-start gap-3 relative"
+                                role="listitem"
+                                aria-current={isCurrent ? 'step' : undefined}
+                            >
+                                <div className="flex flex-col items-center shrink-0">
+                                    <div
+                                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0 ${
+                                            isCompleted
+                                                ? 'bg-orange-500 text-white shadow-xs ring-2 ring-orange-500/20'
+                                                : isCurrent
+                                                    ? 'bg-white dark:bg-slate-900 border-2 border-orange-500 text-orange-500 ring-4 ring-orange-500/20 shadow-xs'
+                                                    : 'bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-transparent'
+                                        }`}
+                                        aria-hidden="true"
+                                    >
+                                        {isCompleted ? (
+                                            <Check size={12} strokeWidth={3} />
+                                        ) : isCurrent ? (
+                                            <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                                        ) : (
+                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+                                        )}
+                                    </div>
+
+                                    {!isLast && (
+                                        <div className="w-[2px] h-6 bg-slate-200 dark:bg-slate-800 my-0.5 rounded-full overflow-hidden">
+                                            <div
+                                                className="w-full bg-gradient-to-b from-orange-500 via-orange-400 to-amber-500 rounded-full transition-all duration-500"
+                                                style={{ height: isCompleted ? '100%' : '0%' }}
+                                            />
+                                        </div>
                                     )}
                                 </div>
-                                <span
-                                    className={`text-[9px] sm:text-[11px] mt-1.5 text-center leading-tight truncate max-w-[62px] sm:max-w-none transition-colors ${
-                                        isCompleted
-                                            ? 'text-slate-800 dark:text-slate-200 font-bold'
-                                            : isCurrent
-                                                ? 'text-orange-600 dark:text-orange-400 font-extrabold'
-                                                : 'text-slate-400 dark:text-slate-500 font-medium'
-                                    }`}
-                                >
-                                    {step.label}
-                                </span>
-                            </div>
 
-                            {/* Connector line segment between steps */}
-                            {idx < REPORT_WORKFLOW_STEPS.length - 1 && (
-                                <div className="flex-1 mt-[12px] sm:mt-[13px] mx-1 h-[3px] rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
-                                    <div
-                                        className="h-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-500 rounded-full transition-all duration-500"
-                                        style={{ width: isCompleted ? '100%' : '0%' }}
-                                    />
+                                <div className={`pt-0.5 flex-1 min-w-0 ${!isLast ? 'pb-2' : ''}`}>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span
+                                            className={`text-xs leading-tight transition-colors ${
+                                                isCompleted
+                                                    ? 'text-slate-800 dark:text-slate-200 font-bold'
+                                                    : isCurrent
+                                                        ? 'text-orange-600 dark:text-orange-400 font-black'
+                                                        : 'text-slate-400 dark:text-slate-500 font-medium'
+                                            }`}
+                                        >
+                                            {step.label}
+                                        </span>
+                                        {isCurrent && (
+                                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 shrink-0">
+                                                Current
+                                            </span>
+                                        )}
+                                        {isCompleted && (
+                                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                                                Done
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
-                        </React.Fragment>
-                    );
-                })}
-            </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 };
 
-const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = false, newestReportId }) => {
-    const [showFullAddr, setShowFullAddr] = useState(false);
-    const [showDetails, setShowDetails] = useState(false);
+const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = false, newestReportId, isExpanded, onToggleExpand }) => {
+    const [localShowDetails, setLocalShowDetails] = useState(false);
+    const showDetails = isExpanded !== undefined ? isExpanded : localShowDetails;
+
+    const handleToggle = () => {
+        if (onToggleExpand) {
+            onToggleExpand();
+        } else {
+            setLocalShowDetails(prev => !prev);
+        }
+    };
+
     const [isDescExpanded, setIsDescExpanded] = useState(false);
-    const [copiedId, setCopiedId] = useState(false);
 
     const resolutionDays = report.status === 'resolved' && report.updated_at && report.created_at
         ? daysBetween(report.created_at, report.updated_at)
@@ -1449,9 +1566,9 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
 
     const rawDescription = report.description || report.notes;
     const cleanDescription = sanitizeDescription(rawDescription);
-    const isLongDescription = cleanDescription && cleanDescription.length > 110;
+    const isLongDescription = cleanDescription && cleanDescription.length > 120;
     const displayDescription = isLongDescription && !isDescExpanded
-        ? `${cleanDescription.substring(0, 110)}...`
+        ? `${cleanDescription.substring(0, 120)}...`
         : cleanDescription;
 
     const isPending = report.status === 'pending' || report.status === 'unverified';
@@ -1461,288 +1578,271 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
     const daysWaiting = daysBetween(report.created_at, new Date().toISOString());
     const isStale = !isLatest && isPending && daysWaiting >= 14;
 
-    const handleCopyTicketId = (e) => {
-        e.stopPropagation();
-        if (report.ticket_id) {
-            navigator.clipboard?.writeText(report.ticket_id);
-            setCopiedId(true);
-            setTimeout(() => setCopiedId(false), 2000);
-        }
-    };
-
     return (
-        <div className={`group bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden flex flex-col transition-all duration-200 ease-out hover:shadow-md hover:-translate-y-px relative ${
-            isLatest
-                ? 'border-slate-300 dark:border-slate-700 shadow-xs'
-                : isStale
-                    ? 'border-slate-300 dark:border-slate-700 shadow-xs'
-                    : 'border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-        }`}>
-
-            <div className="flex flex-col sm:flex-row">
-                {/* ── 1. Thumbnail with Uniform Aspect Ratio & Lightbox Zoom ─────────── */}
-                <div className="relative w-full sm:w-48 md:w-52 aspect-[16/10] sm:aspect-auto sm:self-stretch shrink-0 bg-slate-100 dark:bg-slate-800/90 overflow-hidden group/thumb cursor-pointer">
+        <div
+            className={`group bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden transition-all duration-200 ease-out shadow-xs hover:shadow-md ${
+                showDetails
+                    ? 'ring-2 ring-orange-500/20 border-orange-400 dark:border-orange-500/50'
+                    : isLatest
+                        ? 'border-orange-200/90 dark:border-orange-950/60 hover:border-orange-300 dark:hover:border-orange-800'
+                        : isStale
+                            ? 'border-amber-200/90 dark:border-amber-950/60 hover:border-amber-300 dark:hover:border-amber-800'
+                            : 'border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+            }`}
+        >
+            {/* ── Compact Card (Single Tap Zone: 90-110px height on mobile) ── */}
+            <div
+                role="button"
+                tabIndex={0}
+                onClick={handleToggle}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleToggle();
+                    }
+                }}
+                aria-label={`Report ${report.ticket_id}: ${report.category || 'Civic Issue'}, status ${report.status}. Click to ${showDetails ? 'collapse' : 'view full'} details.`}
+                aria-expanded={showDetails}
+                className="w-full p-3 sm:p-3.5 flex items-center justify-between gap-3 sm:gap-4 cursor-pointer select-none active:scale-[0.99] hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-all outline-none focus-visible:ring-2 focus-visible:ring-orange-500 min-h-[88px] sm:min-h-[96px]"
+            >
+                {/* Left: Square/Rounded Thumbnail (56-64px) */}
+                <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-center shadow-2xs">
                     {report.image_url ? (
-                        <button
-                            type="button"
-                            onClick={() => setZoomedImage(`${API_BASE_URL}${report.image_url}`)}
-                            className="w-full h-full block relative focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer"
-                            aria-label={`View full-size photo for report ${report.ticket_id}`}
-                        >
-                            <img
-                                src={`${API_BASE_URL}${report.image_url}`}
-                                alt={`${report.category || 'Report'} photo`}
-                                loading="lazy"
-                                className="w-full h-full object-cover object-center transition-transform duration-500 ease-out group-hover/thumb:scale-105"
-                            />
-                            {/* Watermark masking gradient at bottom */}
-                            <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 via-black/25 to-transparent pointer-events-none" />
-
-                            {/* Quick Zoom Affordance */}
-                            <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold flex items-center gap-1 opacity-90 group-hover/thumb:opacity-100 transition-opacity">
-                                <Maximize2 size={11} />
-                                <span>Zoom</span>
-                            </div>
-                        </button>
+                        <img
+                            src={`${API_BASE_URL}${report.image_url}`}
+                            alt=""
+                            loading="lazy"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
                     ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 gap-1.5 p-4 min-h-[140px]">
-                            <CameraOff size={26} strokeWidth={1.5} />
-                            <span className="text-[10px] font-semibold uppercase tracking-wider">No photo attached</span>
+                        <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-850">
+                            <CameraOff size={20} strokeWidth={1.75} />
                         </div>
                     )}
                 </div>
 
-                {/* ── 2. Card Body with Tightened Hierarchy ───────────────────────────── */}
-                <div className="flex-1 min-w-0 flex flex-col p-4 sm:p-5 gap-2.5">
-
-                    {/* Row 1: Category + Priority Badges + Status */}
-                    <div className="flex items-start justify-between gap-2.5">
-                        <div className="flex flex-wrap items-center gap-2 min-w-0">
-                            <h3 className="text-[15px] sm:text-base font-bold tracking-tight text-slate-900 dark:text-white leading-snug truncate">
-                                {report.category || report.ai_category || 'Civic Infrastructure Report'}
-                            </h3>
-
-                            {/* Priority Indicators */}
-                            {isLatest && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/70 dark:bg-white/10 backdrop-blur-md text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-white/15 shadow-xs">
-                                    <Sparkles size={11} className="text-slate-600 dark:text-slate-300" />
-                                    <span>Latest Report</span>
-                                </span>
-                            )}
-                            {isStale && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/70 dark:bg-white/10 backdrop-blur-md text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-white/15 shadow-xs">
-                                    <Clock size={11} className="text-slate-600 dark:text-slate-300" />
-                                    <span>Longest Waiting ({daysWaiting}d)</span>
-                                </span>
-                            )}
-                            {(report.is_claimed || report.claimed_by_user_id || report.claimed_at) && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800/60 shadow-xs">
-                                    <Link2 size={11} className="text-orange-500" />
-                                    <span>Claimed Ticket</span>
-                                </span>
-                            )}
-                        </div>
-
-                        <StatusBadge status={report.status} />
+                {/* Middle: Condensed essentials at a glance */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-1 overflow-hidden">
+                    {/* Row 1: Title */}
+                    <div className="min-w-0">
+                        <h4 className="text-[13px] sm:text-[14.5px] font-bold tracking-tight text-slate-900 dark:text-white truncate min-w-0">
+                            {report.category || report.ai_category || 'Civic Infrastructure Report'}
+                        </h4>
                     </div>
 
-                    {/* Row 2: Ticket ID (Click to copy) + Date + Relative Time (Tightly Grouped) */}
-                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                        <button
-                            type="button"
-                            onClick={handleCopyTicketId}
-                            title="Click to copy ticket ID"
-                            className="font-mono text-[11px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-orange-50 dark:hover:bg-orange-950/40 text-slate-800 dark:text-slate-200 hover:text-orange-600 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer select-all"
-                            aria-label={`Copy ticket ID ${report.ticket_id}`}
-                        >
-                            <span>{report.ticket_id}</span>
-                            {copiedId ? (
-                                <Check size={11} className="text-emerald-500" />
-                            ) : (
-                                <Copy size={11} className="text-slate-400 group-hover:text-orange-500" />
-                            )}
-                        </button>
-                        <span className="text-slate-400 dark:text-slate-600">•</span>
-                        <span className="font-mono text-slate-600 dark:text-slate-400">
+                    {/* Row 2: Report ID + Date on strictly ONE line on any mobile screen */}
+                    <div className="flex items-center gap-1.5 text-[10.5px] sm:text-[11px] font-mono text-slate-500 dark:text-slate-400 min-w-0 whitespace-nowrap overflow-hidden">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap shrink-0 tracking-tight">
+                            {report.ticket_id}
+                        </span>
+                        <span className="shrink-0 text-slate-400 dark:text-slate-600">•</span>
+                        <span className="truncate shrink min-w-0">
                             {new Date(report.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
-                        <span className="text-slate-400 dark:text-slate-500 text-[10px]">
-                            ({formatRelativeTime(report.created_at)})
-                        </span>
                     </div>
 
-                    {/* Row 3: Location (Pin + Expand affordance) */}
-                    <div className="flex items-start gap-1.5 text-[12px] text-slate-500 dark:text-slate-400">
-                        <MapPin size={14} className="shrink-0 mt-0.5 text-orange-500" />
-                        <span
-                            className={`${showFullAddr ? '' : 'truncate'} cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 transition-colors font-medium select-text`}
-                            onClick={() => setShowFullAddr(v => !v)}
-                            title={showFullAddr ? 'Click to collapse' : report.location_string || 'Location N/A'}
-                        >
-                            {showFullAddr ? (formatFullAddress(parseAddressString(report.location_string)) || report.location_string || 'Caloocan City') : formatCardAddress(report.location_string)}
-                        </span>
-                    </div>
-
-                    {/* Row 4: Description (Cleaned & Sanitized with Read More) */}
-                    {cleanDescription && (
-                        <div className="text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                            <span>{displayDescription}</span>
-                            {isLongDescription && (
-                                <button
-                                    type="button"
-                                    onClick={() => setIsDescExpanded(!isDescExpanded)}
-                                    className="ml-1 text-orange-600 dark:text-orange-400 font-semibold hover:underline text-[12px] inline cursor-pointer"
-                                >
-                                    {isDescExpanded ? 'Show less' : 'Read more'}
-                                </button>
-                            )}
+                    {/* Row 3: Micro Location preview */}
+                    {report.location_string && (
+                        <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] text-slate-500 dark:text-slate-400 min-w-0 truncate">
+                            <MapPin size={11} className="text-orange-500 shrink-0" />
+                            <span className="truncate min-w-0">
+                                {formatCardAddress(report.location_string)}
+                            </span>
                         </div>
                     )}
+                </div>
 
-                    {/* Row 5: Mini Pulseline Step Tracker */}
-                    <MiniProgressTracker
-                        status={report.status}
-                        resolutionDays={resolutionDays}
+                {/* Right: Expand affordance */}
+                <div className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 dark:text-slate-500 group-hover:text-orange-500 group-hover:bg-orange-50 dark:group-hover:bg-orange-950/30 transition-all">
+                    <ChevronDown
+                        size={17}
+                        strokeWidth={2.5}
+                        className={`transform transition-transform duration-200 ${showDetails ? 'rotate-180 text-orange-500' : ''}`}
                     />
-
-                    {/* ── Row 6: Footer with Actions & Timeline Summary ──────────────── */}
-                    <div className="mt-1 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                            <Clock size={12} className="shrink-0" />
-                            {isResolved && resolutionDays !== null ? (
-                                <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
-                                    Resolved in {resolutionDays} {resolutionDays === 1 ? 'day' : 'days'}
-                                </span>
-                            ) : (
-                                <span>
-                                    {isPending ? 'Queued for LGU triage' : 'Under active field dispatch'}
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-                            {/* Retract Action (Cautionary Outline, Secondary Weight) */}
-                            {isPending && (
-                                <button
-                                    type="button"
-                                    onClick={() => handleCancelReport(report)}
-                                    aria-label={`Retract report ${report.ticket_id}`}
-                                    className="text-[12px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300
-                                               border border-rose-200 dark:border-rose-900/70 hover:border-rose-400 dark:hover:border-rose-700
-                                               bg-transparent hover:bg-rose-50/80 dark:hover:bg-rose-950/40
-                                               px-3.5 py-2 min-h-[44px] rounded-xl transition-all duration-150 flex items-center gap-1.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
-                                >
-                                    <RotateCcw size={13} strokeWidth={2.5} />
-                                    <span>Retract</span>
-                                </button>
-                            )}
-
-                            {/* View Proof Action (if resolved) */}
-                            {isResolved && report.resolution_image_url && (
-                                <button
-                                    type="button"
-                                    onClick={() => setZoomedImage(`${API_BASE_URL}${report.resolution_image_url}`)}
-                                    aria-label={`View photo proof for report ${report.ticket_id}`}
-                                    className="text-[12px] font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-white
-                                               border border-emerald-300 dark:border-emerald-600/40
-                                               bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20
-                                               px-3.5 py-2 min-h-[44px] rounded-xl transition-all duration-150 flex items-center gap-1.5 cursor-pointer"
-                                >
-                                    <ImageIcon size={14} />
-                                    <span>View Proof</span>
-                                </button>
-                            )}
-
-                            {/* View Details Primary Action */}
-                            <button
-                                type="button"
-                                onClick={() => setShowDetails(!showDetails)}
-                                aria-label={`${showDetails ? 'Hide' : 'View'} details for report ${report.ticket_id}`}
-                                className={`text-[12px] font-bold px-3.5 py-2 min-h-[44px] rounded-xl transition-all duration-150 flex items-center gap-1.5 cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
-                                    showDetails
-                                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
-                                        : 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/20 hover:shadow-md'
-                                }`}
-                            >
-                                <Eye size={14} strokeWidth={2.5} />
-                                <span>{showDetails ? 'Hide Details' : 'View Details'}</span>
-                                <ChevronDown size={14} className={`transform transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`} />
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
 
-            {/* ── Expandable Details Drawer ─────────────────────────────────── */}
+            {/* ── Dedicated Expanded Details View (Photo, All Badges, Full Location, Activity, Actions) ── */}
             <AnimatePresence>
                 {showDetails && (
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/60 p-4 sm:p-5 overflow-hidden"
+                        transition={{ duration: 0.25, ease: 'easeOut' }}
+                        className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 p-4 sm:p-5 overflow-hidden space-y-4"
                     >
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-[12px]">
-                            {/* Complete Address */}
-                            <div className="space-y-1 sm:col-span-2">
-                                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    Full Recorded Address
+                        {/* Stale Report Signal (if pending >= 14 days) */}
+                        {isStale && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 shadow-2xs">
+                                    <Clock size={11} className="text-amber-500" />
+                                    <span>Pending ({daysWaiting}d)</span>
                                 </span>
-                                <p className="text-slate-800 dark:text-slate-200 font-medium leading-relaxed select-text cursor-text">
-                                    {formatFullAddress(parseAddressString(report.location_string)) || report.location_string || 'N/A'}
-                                </p>
                             </div>
+                        )}
 
-                            {/* GPS Coordinates */}
-                            <div className="space-y-1">
-                                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    GPS Coordinates
-                                </span>
-                                <p className="font-mono text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-2">
-                                    <span>{report.lat && report.lng ? `${parseFloat(report.lat).toFixed(5)}, ${parseFloat(report.lng).toFixed(5)}` : 'N/A'}</span>
-                                    {report.lat && report.lng && (
+                        {/* Main Content Area: Responsive Stacked (<lg) vs 2-Column (>=lg) */}
+                        {report.image_url ? (
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 lg:gap-5 items-start">
+                                {/* LEFT COLUMN: Evidence Photo (+ Description if present) */}
+                                <div className="lg:col-span-7 flex flex-col gap-3">
+                                    <div className="relative rounded-xl overflow-hidden bg-black/10 dark:bg-black/40 border border-slate-200/80 dark:border-slate-800 aspect-[16/9] max-h-64 sm:max-h-72 lg:max-h-none">
+                                        <img
+                                            src={`${API_BASE_URL}${report.image_url}`}
+                                            alt={`${report.category} photo proof`}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
                                         <button
                                             type="button"
-                                            onClick={() => navigator.clipboard?.writeText(`${report.lat}, ${report.lng}`)}
-                                            title="Copy coordinates"
-                                            className="text-slate-400 hover:text-orange-500 p-0.5"
+                                            onClick={() => setZoomedImage(`${API_BASE_URL}${report.image_url}`)}
+                                            className="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-lg bg-black/70 hover:bg-black/90 backdrop-blur-xs text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                                         >
-                                            <Copy size={11} />
+                                            <Maximize2 size={12} />
+                                            <span>Full Photo</span>
                                         </button>
+                                    </div>
+
+                                    {/* Description (if present) sits under the photo in the left column on desktop */}
+                                    {cleanDescription && (
+                                        <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                                            <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                                                Incident Description
+                                            </p>
+                                            <span>{displayDescription}</span>
+                                            {isLongDescription && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsDescExpanded(!isDescExpanded)}
+                                                    className="ml-1.5 text-orange-600 dark:text-orange-400 font-semibold hover:underline inline cursor-pointer"
+                                                >
+                                                    {isDescExpanded ? 'Show less' : 'Read more'}
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
-                                </p>
-                            </div>
+                                </div>
 
-                            {/* Category Classification */}
-                            <div className="space-y-1">
-                                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    Assigned Department
-                                </span>
-                                <p className="text-slate-800 dark:text-slate-200 font-semibold">
-                                    {report.category || 'City Engineering / DPS'}
-                                </p>
-                            </div>
+                                {/* RIGHT COLUMN: Recorded Location + Progress Tracker */}
+                                <div className="lg:col-span-5 flex flex-col gap-3">
+                                    {/* Full Recorded Address & GPS */}
+                                    <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
+                                        <div>
+                                            <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
+                                                Recorded Location
+                                            </p>
+                                            <p className="text-slate-800 dark:text-slate-200 font-medium select-text cursor-text">
+                                                {formatFullAddress(parseAddressString(report.location_string)) || report.location_string || 'Caloocan City'}
+                                            </p>
+                                        </div>
+                                        {report.lat && report.lng && (
+                                            <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 font-mono text-[11px] text-slate-500">
+                                                <span>Coordinates: {parseFloat(report.lat).toFixed(5)}, {parseFloat(report.lng).toFixed(5)}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navigator.clipboard?.writeText(`${report.lat}, ${report.lng}`)}
+                                                    className="text-orange-600 dark:text-orange-400 font-bold hover:underline cursor-pointer"
+                                                >
+                                                    Copy GPS
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
 
-                            {/* Submission Timestamp */}
-                            <div className="space-y-1">
-                                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    Submitted At
-                                </span>
-                                <p className="font-mono text-slate-700 dark:text-slate-300">
-                                    {new Date(report.created_at).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}
-                                </p>
+                                    {/* Progress Step Tracker (Horizontal on mobile/tablet, Vertical beside photo on desktop) */}
+                                    <MiniProgressTracker
+                                        status={report.status}
+                                        resolutionDays={resolutionDays}
+                                        orientation="responsive"
+                                    />
+                                </div>
                             </div>
+                        ) : (
+                            /* Fallback when report has no photo: Single-column clean layout */
+                            <div className="flex flex-col gap-3">
+                                {cleanDescription && (
+                                    <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                                        <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                                            Incident Description
+                                        </p>
+                                        <span>{displayDescription}</span>
+                                        {isLongDescription && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsDescExpanded(!isDescExpanded)}
+                                                className="ml-1.5 text-orange-600 dark:text-orange-400 font-semibold hover:underline inline cursor-pointer"
+                                            >
+                                                {isDescExpanded ? 'Show less' : 'Read more'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                                <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
+                                    <div>
+                                        <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
+                                            Recorded Location
+                                        </p>
+                                        <p className="text-slate-800 dark:text-slate-200 font-medium select-text cursor-text">
+                                            {formatFullAddress(parseAddressString(report.location_string)) || report.location_string || 'Caloocan City'}
+                                        </p>
+                                    </div>
+                                    {report.lat && report.lng && (
+                                        <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 font-mono text-[11px] text-slate-500">
+                                            <span>Coordinates: {parseFloat(report.lat).toFixed(5)}, {parseFloat(report.lng).toFixed(5)}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => navigator.clipboard?.writeText(`${report.lat}, ${report.lng}`)}
+                                                className="text-orange-600 dark:text-orange-400 font-bold hover:underline cursor-pointer"
+                                            >
+                                                Copy GPS
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                <MiniProgressTracker
+                                    status={report.status}
+                                    resolutionDays={resolutionDays}
+                                    orientation="horizontal"
+                                />
+                            </div>
+                        )}
 
-                            {/* Last Status Update */}
-                            <div className="space-y-1">
-                                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    Last Status Update
-                                </span>
-                                <p className="font-mono text-slate-700 dark:text-slate-300">
-                                    {report.updated_at ? new Date(report.updated_at).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
-                                </p>
-                            </div>
+                        {/* Action Buttons in Detail View */}
+                        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                            {/* Retract button if pending */}
+                            {isPending && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleCancelReport(report)}
+                                    className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/30 px-3.5 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer min-h-[44px]"
+                                >
+                                    <RotateCcw size={13} strokeWidth={2.5} />
+                                    <span>Retract Report</span>
+                                </button>
+                            )}
+
+                            {/* View Proof if resolved */}
+                            {isResolved && report.resolution_image_url && (
+                                <button
+                                    type="button"
+                                    onClick={() => setZoomedImage(`${API_BASE_URL}${report.resolution_image_url}`)}
+                                    className="text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50 bg-emerald-50 dark:bg-emerald-950/40 px-3.5 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer min-h-[44px]"
+                                >
+                                    <ImageIcon size={14} />
+                                    <span>View Repair Proof</span>
+                                </button>
+                            )}
+
+                            {/* Collapse button */}
+                            <button
+                                type="button"
+                                onClick={() => setShowDetails(false)}
+                                className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 ml-auto py-2 px-3 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors cursor-pointer min-h-[44px] flex items-center gap-1"
+                            >
+                                <span>Collapse</span>
+                                <ChevronDown size={14} className="rotate-180" />
+                            </button>
                         </div>
                     </motion.div>
                 )}
@@ -1751,26 +1851,19 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
     );
 };
 
-// ── Skeleton Loader Card for High Perceived Performance ─────────────────────────
+// ── Skeleton Loader Card for High Perceived Performance (Matching compact height) ──
 const ReportCardSkeleton = () => (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col sm:flex-row animate-pulse">
-        <div className="w-full sm:w-52 h-44 sm:h-auto aspect-[16/10] sm:aspect-auto bg-slate-200 dark:bg-slate-800 shrink-0" />
-        <div className="flex-1 p-4 sm:p-5 flex flex-col gap-3">
-            <div className="flex justify-between items-center gap-4">
-                <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-1/3" />
+    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3 sm:p-3.5 flex items-center gap-3 sm:gap-4 animate-pulse min-h-[88px] sm:min-h-[96px]">
+        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
+        <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex justify-between items-center gap-3">
+                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
                 <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-20" />
             </div>
-            <div className="flex gap-2">
-                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-24" />
-                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-20" />
-            </div>
-            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
-            <div className="h-14 bg-slate-100 dark:bg-slate-800/60 rounded-xl w-full" />
-            <div className="flex justify-between items-center pt-2 mt-auto">
-                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-32" />
-                <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-xl w-28" />
-            </div>
+            <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
+            <div className="h-3 bg-slate-100 dark:bg-slate-850 rounded w-2/3" />
         </div>
+        <div className="w-6 h-6 rounded-md bg-slate-200 dark:bg-slate-800 shrink-0" />
     </div>
 );
 
@@ -1778,6 +1871,12 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
     const [currentPage, setCurrentPage] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
     const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+    const [expandedReportId, setExpandedReportId] = useState(null);
+
+    // Auto-collapse expanded report card when switching status tabs, searching, or paging
+    useEffect(() => {
+        setExpandedReportId(null);
+    }, [reportStatusFilter, searchQuery, currentPage]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -1787,7 +1886,58 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const itemsPerPage = isMobile ? 2 : 4;
+    const itemsPerPage = isMobile ? 5 : 6;
+
+    const tabsScrollRef = useRef(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    const checkTabsScroll = useCallback(() => {
+        const el = tabsScrollRef.current;
+        if (!el) return;
+        const { scrollLeft, scrollWidth, clientWidth } = el;
+        setCanScrollLeft(prev => {
+            const nextVal = scrollLeft > 6;
+            return prev !== nextVal ? nextVal : prev;
+        });
+        setCanScrollRight(prev => {
+            const nextVal = scrollLeft < scrollWidth - clientWidth - 6;
+            return prev !== nextVal ? nextVal : prev;
+        });
+    }, []);
+
+    useEffect(() => {
+        const el = tabsScrollRef.current;
+        if (!el) return;
+        checkTabsScroll();
+        el.addEventListener('scroll', checkTabsScroll, { passive: true });
+        window.addEventListener('resize', checkTabsScroll);
+        const timer = setTimeout(checkTabsScroll, 120);
+        return () => {
+            el.removeEventListener('scroll', checkTabsScroll);
+            window.removeEventListener('resize', checkTabsScroll);
+            clearTimeout(timer);
+        };
+    }, [checkTabsScroll]);
+
+    const scrollTabs = (direction) => {
+        const el = tabsScrollRef.current;
+        if (!el) return;
+        const scrollAmount = 180;
+        el.scrollBy({
+            left: direction === 'left' ? -scrollAmount : scrollAmount,
+            behavior: 'smooth'
+        });
+    };
+
+    useEffect(() => {
+        const el = tabsScrollRef.current;
+        if (!el) return;
+        const activeBtn = el.querySelector(`[data-tab-id="${reportStatusFilter}"]`);
+        if (activeBtn) {
+            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }, [reportStatusFilter]);
 
     const filterOptions = [
         {
@@ -1876,7 +2026,7 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
     });
 
     useEffect(() => {
-        setCurrentPage(1);
+        setCurrentPage(prev => (prev === 1 ? prev : 1));
     }, [reportStatusFilter, searchQuery, isMobile]);
 
     const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
@@ -1939,102 +2089,30 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full bg-slate-50/60 dark:bg-slate-950 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 p-5 sm:p-7 md:p-8 transition-colors shadow-xs overflow-hidden"
+            className="w-full space-y-6"
         >
-            {/* Header: Title + Submit Action Button */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <div>
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        {t('dashboard.reports.history', { defaultValue: 'Report History' })}
-                    </h2>
-                    <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        {t('dashboard.reports.historyDesc', { defaultValue: 'Track the status and progress of all your submitted infrastructure issues.' })}
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={() => handleSetModal('file-report')}
-                    className="bg-orange-500 hover:bg-orange-600 active:scale-[0.97] text-white px-4 py-2.5 rounded-xl font-bold text-[13px] transition-all duration-150 flex items-center justify-center gap-2 shrink-0 shadow-md shadow-orange-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer min-h-[44px] w-full sm:w-auto"
-                >
-                    <Plus size={16} strokeWidth={2.5} />
-                    <span>{t('dashboard.quickReport.submitBtn', { defaultValue: 'Submit a Report' })}</span>
-                </button>
+            {/* Header: Title */}
+            <div>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    {t('dashboard.reports.history', { defaultValue: 'Report History' })}
+                </h2>
+                <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {t('dashboard.reports.historyDesc', { defaultValue: 'Track the status and progress of all your submitted infrastructure issues.' })}
+                </p>
             </div>
 
-            {/* Filter Row: Horizontally Scrollable Segmented Capsule + Matching Search Input */}
-            <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 sm:gap-4 mb-6 w-full min-w-0">
-                {/* Modern Segmented Control Capsule */}
-                <div className="inline-flex items-center gap-1 p-1.5 bg-slate-200/60 dark:bg-slate-900/90 rounded-full border border-slate-200/90 dark:border-slate-800/90 shadow-inner overflow-x-auto no-scrollbar scroll-smooth min-w-0 max-w-full w-fit">
-                    {filterOptions.map(opt => {
-                        const IconComponent = opt.icon;
-                        const count = opt.id === 'all'
-                            ? userReports.length
-                            : userReports.filter(r => {
-                                if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress'].includes(r.status);
-                                if (opt.id === 'pending') return ['pending', 'unverified'].includes(r.status);
-                                return r.status === opt.id;
-                            }).length;
-
-                        const isActive = reportStatusFilter === opt.id;
-
-                        return (
-                            <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => setReportStatusFilter(opt.id)}
-                                className={`group relative px-3.5 sm:px-4 py-2 min-h-[44px] rounded-full text-[12px] font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer select-none ${
-                                    isActive
-                                        ? `${opt.activeText}`
-                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'
-                                }`}
-                            >
-                                {/* Animated Spring Pill Sliding Indicator */}
-                                {isActive && (
-                                    <motion.span
-                                        layoutId="activeReportFilterPill"
-                                        transition={{ type: "spring", stiffness: 450, damping: 35 }}
-                                        className="absolute inset-0 bg-white dark:bg-slate-800 rounded-full shadow-xs ring-1 ring-slate-200/90 dark:ring-slate-700/80 -z-0"
-                                    />
-                                )}
-
-                                {/* Icon & Label */}
-                                <span className="relative z-10 flex items-center gap-1.5">
-                                    <IconComponent
-                                        size={14}
-                                        className={`transition-colors shrink-0 ${
-                                            isActive ? opt.iconColor : 'opacity-70 group-hover:opacity-100'
-                                        }`}
-                                        strokeWidth={isActive ? 2.3 : 2}
-                                    />
-                                    <span>{opt.label}</span>
-                                </span>
-
-                                {/* Micro Count Pill */}
-                                <span
-                                    className={`relative z-10 px-2 py-0.5 min-w-[20px] text-center rounded-full text-[10.5px] font-mono font-bold transition-all duration-200 ${
-                                        isActive
-                                            ? `${opt.activeBadge} shadow-2xs`
-                                            : count === 0
-                                                ? 'text-slate-400/80 dark:text-slate-600 bg-transparent px-1'
-                                                : `${opt.idleBadge}`
-                                    }`}
-                                >
-                                    {count}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* Cohesive Matching In-Page Search Filter */}
-                <div className="relative w-full sm:w-64 md:w-72 lg:w-80 shrink-0 self-end sm:self-auto">
+            {/* Controls: Search Input on Top, Category Reports Tabs on Bottom */}
+            <div className="flex flex-col gap-3 sm:gap-3.5 w-full min-w-0">
+                {/* Cohesive Matching In-Page Search Filter (Top) */}
+                <div className="relative w-full">
                     <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search by ID, category, street..."
-                        className="w-full pl-9.5 pr-8 py-2.5 text-base sm:text-xs min-h-[44px] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 rounded-full text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all shadow-2xs"
+                        className="w-full pl-9.5 pr-8 py-2.5 text-base sm:text-xs min-h-[44px] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 rounded-full text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-700/50 transition-all shadow-2xs"
+                        style={{ outline: 'none', boxShadow: 'none' }}
                     />
                     {searchQuery && (
                         <button
@@ -2046,6 +2124,109 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
                             <X size={14} />
                         </button>
                     )}
+                </div>
+
+                {/* Modern Segmented Control Capsule with Chevrons and Edge Fade Affordance (Bottom) */}
+                <div className="relative flex items-center min-w-0 max-w-full w-full">
+                    {/* Left Scroll Chevron Button (only visible when scrollable) */}
+                    <button
+                        type="button"
+                        onClick={() => scrollTabs('left')}
+                        disabled={!canScrollLeft}
+                        aria-label="Scroll tabs left"
+                        className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 mr-1 sm:mr-1.5 ${
+                            canScrollLeft
+                                ? 'flex bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 cursor-pointer active:scale-95'
+                                : 'hidden'
+                        }`}
+                    >
+                        <ChevronLeft size={16} strokeWidth={2.5} />
+                    </button>
+
+                    {/* Scroll Container with Fade Overlays */}
+                    <div className="relative min-w-0 flex-1 overflow-hidden">
+                        {/* Left Trailing Edge Fade */}
+                        <div
+                            className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-100 dark:from-slate-950 to-transparent transition-opacity duration-200 ${
+                                canScrollLeft ? 'opacity-100' : 'opacity-0'
+                            }`}
+                        />
+
+                        {/* Scrollable Track */}
+                        <div
+                            ref={tabsScrollRef}
+                            className="inline-flex items-center gap-1.5 p-1.5 bg-slate-200/60 dark:bg-slate-900/90 rounded-full border border-slate-200/90 dark:border-slate-800/90 shadow-inner overflow-x-auto no-scrollbar scroll-smooth w-full"
+                        >
+                            {filterOptions.map(opt => {
+                                const count = opt.id === 'all'
+                                    ? userReports.length
+                                    : userReports.filter(r => {
+                                        if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress'].includes(r.status);
+                                        if (opt.id === 'pending') return ['pending', 'unverified'].includes(r.status);
+                                        return r.status === opt.id;
+                                    }).length;
+
+                                const isActive = reportStatusFilter === opt.id;
+
+                                return (
+                                    <button
+                                        key={opt.id}
+                                        data-tab-id={opt.id}
+                                        type="button"
+                                        onClick={() => setReportStatusFilter(opt.id)}
+                                        className={`group relative px-3.5 sm:px-4 py-2 min-h-[44px] rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer select-none ${
+                                            isActive
+                                                ? 'text-orange-600 dark:text-orange-400'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'
+                                        }`}
+                                    >
+                                        {/* Animated Spring Pill Sliding Indicator */}
+                                        {isActive && (
+                                            <motion.span
+                                                layoutId="activeReportFilterPill"
+                                                transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                                                className="absolute inset-0 bg-white dark:bg-slate-800 rounded-full shadow-xs ring-1 ring-slate-200/90 dark:ring-slate-700/80 -z-0"
+                                            />
+                                        )}
+
+                                        {/* Label */}
+                                        <span className="relative z-10">{opt.label}</span>
+
+                                        {/* Micro Count Pill */}
+                                        <span className={`relative z-10 px-1.5 py-0.2 rounded-full text-[10.5px] font-mono font-bold ${
+                                            isActive
+                                                ? 'bg-orange-500 text-white'
+                                                : 'text-slate-400 dark:text-slate-500'
+                                        }`}>
+                                            {count}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Right Trailing Edge Fade */}
+                        <div
+                            className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-100 dark:from-slate-950 to-transparent transition-opacity duration-200 ${
+                                canScrollRight ? 'opacity-100' : 'opacity-0'
+                            }`}
+                        />
+                    </div>
+
+                    {/* Right Scroll Chevron Button (only visible when scrollable) */}
+                    <button
+                        type="button"
+                        onClick={() => scrollTabs('right')}
+                        disabled={!canScrollRight}
+                        aria-label="Scroll tabs right"
+                        className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 ml-1 sm:ml-1.5 ${
+                            canScrollRight
+                                ? 'flex bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 cursor-pointer active:scale-95'
+                                : 'hidden'
+                        }`}
+                    >
+                        <ChevronRight size={16} strokeWidth={2.5} />
+                    </button>
                 </div>
             </div>
 
@@ -2099,6 +2280,8 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
                             handleCancelReport={handleCancelReport}
                             isLatest={report.id === newestReportId}
                             newestReportId={newestReportId}
+                            isExpanded={expandedReportId === report.id}
+                            onToggleExpand={() => setExpandedReportId(prev => prev === report.id ? null : report.id)}
                         />
                     ))
                 )}
@@ -2154,16 +2337,116 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
     );
 };
 
-const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, containerVariants, userReports = [], showToast, handleLogout, t }) => {
+const ProfileView = ({
+    user,
+    setUser,
+    handleUpdateProfile,
+    updatingProfile,
+    containerVariants,
+    userReports = [],
+    showToast,
+    handleLogout,
+    handleSetModal,
+    t,
+    i18n: propI18n,
+    subView: propSubView,
+    setSubView: propSetSubView
+}) => {
+    const { theme, changeTheme } = useTheme();
+    const translationHook = useTranslation();
+    const activeI18n = propI18n || translationHook.i18n;
+    const isFilipino = Boolean(activeI18n?.language?.startsWith('tl') || activeI18n?.language?.startsWith('fil'));
+
+    const handleSwitchLanguage = (lang) => {
+        if (activeI18n?.changeLanguage) {
+            activeI18n.changeLanguage(lang);
+            if (showToast) {
+                showToast(lang === 'tl' ? 'Pinalitan ang wika sa Filipino' : 'Language switched to English');
+            }
+        }
+    };
+
+    const [internalSubView, setInternalSubView] = useState('settings');
+    const activeSubView = propSubView !== undefined ? propSubView : internalSubView;
+    const changeSubView = propSetSubView || setInternalSubView;
     const [editingField, setEditingField] = useState(null); // 'email' | 'phone' | null
     const [tempValues, setTempValues] = useState({ email: user.email || '', phone: user.phone || '' });
     const [activeTooltip, setActiveTooltip] = useState(null); // 'verified' | 'name' | 'barangay' | 'address' | null
     const [cropModalData, setCropModalData] = useState(null); // { imageSrc, naturalWidth, naturalHeight, revokeUrl }
     const fileInputRef = useRef(null);
 
+    // Settings States & Dialogs
+    const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+        const saved = localStorage.getItem('pulso_notifications_enabled');
+        return saved !== null ? saved === 'true' : true;
+    });
+    const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+    const [isRateModalOpen, setIsRateModalOpen] = useState(false);
+    const [ratingScore, setRatingScore] = useState(5);
+    const [ratingSubmitted, setRatingSubmitted] = useState(false);
+    const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+
+    // Synchronize dark mode with PULSO theme system
+    const isDarkMode = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+
+    const handleToggleDarkMode = () => {
+        const nextTheme = isDarkMode ? 'light' : 'dark';
+        changeTheme(nextTheme);
+        if (showToast) {
+            showToast(nextTheme === 'dark' ? 'Dark mode enabled' : 'Light mode enabled');
+        }
+    };
+
+    const handleToggleNotifications = () => {
+        const nextState = !notificationsEnabled;
+        setNotificationsEnabled(nextState);
+        localStorage.setItem('pulso_notifications_enabled', String(nextState));
+        if (showToast) {
+            showToast(nextState ? 'Notifications enabled' : 'Notifications muted');
+        }
+    };
+
+    const handleShareApp = async () => {
+        const shareData = {
+            title: 'PULSO - Caloocan City Engineering Dept',
+            text: 'Report civic issues, track public infrastructure works, and get live alerts with PULSO.',
+            url: window.location.origin
+        };
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    navigator.clipboard?.writeText(window.location.origin);
+                    if (showToast) showToast('PULSO link copied to clipboard!');
+                }
+            }
+        } else {
+            navigator.clipboard?.writeText(window.location.origin);
+            if (showToast) showToast('PULSO link copied to clipboard!');
+        }
+    };
+
+    const handleOpenPrivacy = () => {
+        if (handleSetModal) {
+            handleSetModal('privacy');
+        }
+    };
+
+    const handleOpenTerms = () => {
+        if (handleSetModal) {
+            handleSetModal('terms');
+        }
+    };
+
     // Sync tempValues whenever user prop updates
     useEffect(() => {
-        setTempValues({ email: user.email || '', phone: user.phone || '' });
+        setTempValues(prev => {
+            const nextEmail = user.email || '';
+            const nextPhone = user.phone || '';
+            if (prev.email === nextEmail && prev.phone === nextPhone) return prev;
+            return { email: nextEmail, phone: nextPhone };
+        });
     }, [user.email, user.phone]);
 
     const handleStartEdit = (field) => {
@@ -2256,320 +2539,682 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-3xl p-6 sm:p-10 relative overflow-hidden shadow-xl dark:shadow-2xl transition-colors"
+            className="w-full relative"
         >
-            {/* Subtle Ambient Glow */}
-            <div className="absolute top-0 right-0 w-80 h-80 bg-orange-500/5 blur-3xl rounded-full -mr-24 -mt-24 pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 blur-3xl rounded-full -ml-20 -mb-20 pointer-events-none" />
+            <AnimatePresence mode="wait">
+                {activeSubView === 'settings' ? (
+                    <motion.div
+                        key="settings"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.15 }}
+                        className="w-full max-w-xl mx-auto space-y-5"
+                    >
+                        {/* Page Header */}
+                        <div className="flex items-center justify-between px-1">
+                            <div>
+                                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    Settings
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Manage preferences, security, and account settings
+                                </p>
+                            </div>
+                        </div>
 
-            <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 relative z-10">
+                        {/* Compact Profile Summary Row (Entry to Profile Details) */}
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => changeSubView('profile-details')}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    changeSubView('profile-details');
+                                }
+                            }}
+                            aria-label={`View full profile for ${user.fullName}`}
+                            className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 hover:border-orange-500/40 dark:hover:border-orange-500/40 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-all cursor-pointer select-none group outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+                        >
+                            <div className="flex items-center gap-3.5 min-w-0">
+                                {/* Small Avatar Thumbnail */}
+                                <div className={`w-12 h-12 rounded-full font-black flex items-center justify-center text-white text-base shadow-sm border border-slate-200 dark:border-slate-700/80 shrink-0 overflow-hidden ${
+                                    user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-800' : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
+                                }`}>
+                                    {user.avatarPhoto ? (
+                                        <img src={user.avatarPhoto} alt={user.fullName} className="w-full h-full object-cover" />
+                                    ) : (
+                                        user.avatar
+                                    )}
+                                </div>
 
-                {/* ── Left Column: Identity & Civic Stats ──────────────── */}
-                <div className="flex flex-col items-center gap-6 shrink-0 w-full lg:w-72">
+                                <div className="min-w-0 text-left">
+                                    <div className="flex items-center gap-1.5">
+                                        <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight truncate">
+                                            {user.fullName}
+                                        </h3>
+                                        <ShieldCheck size={14} className="text-emerald-500 shrink-0" />
+                                    </div>
+                                    <div className="text-[12px] font-medium text-orange-600 dark:text-orange-400 group-hover:text-orange-500 flex items-center gap-1 transition-colors mt-0.5">
+                                        <span>View Profile Details</span>
+                                        <span aria-hidden="true" className="transition-transform duration-150 group-hover:translate-x-0.5">&rarr;</span>
+                                    </div>
+                                </div>
+                            </div>
 
-                    {/* Avatar with Camera Upload Overlay & Touch Badge */}
-                    <div className="relative group">
-                        <div className={`w-36 h-36 rounded-full font-black flex items-center justify-center text-white text-5xl shadow-md border-2 border-slate-200 dark:border-slate-800 relative overflow-hidden transition-transform duration-200 group-hover:scale-[1.02] ${
-                            user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-900' : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
-                        }`}>
-                            {user.avatarPhoto ? (
-                                <img src={user.avatarPhoto} alt={user.fullName} className="w-full h-full object-cover" />
-                            ) : (
-                                user.avatar
-                            )}
+                            <ChevronRight size={18} className="text-slate-400 group-hover:text-orange-500 shrink-0 transition-colors" />
+                        </div>
 
-                            {/* Hover Upload Overlay */}
+                        {/* Sectioned Settings List (GENERAL / SECURE / ACCOUNT) */}
+                        <div className="w-full space-y-5">
+                            {/* GENERAL SECTION */}
+                            <div className="w-full">
+                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
+                                    General
+                                </h5>
+                                <div className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-200/70 dark:divide-slate-800/70 shadow-xs">
+                                    {/* Language / Translation Toggle [ EN | FIL ] */}
+                                    <div
+                                        className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors select-none"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <Globe size={18} className="text-orange-500 shrink-0" />
+                                            <div className="min-w-0">
+                                                <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate block">
+                                                    Language / Wika
+                                                </span>
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 block -mt-0.5">
+                                                    {isFilipino ? 'Filipino (Tagalog)' : 'English (US)'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Segmented Pill [ EN | FIL ] */}
+                                        <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 rounded-full p-0.5 border border-slate-300/70 dark:border-slate-700/80 shadow-2xs shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSwitchLanguage('en')}
+                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                                    !isFilipino
+                                                        ? 'bg-orange-500 text-white shadow-xs'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                                }`}
+                                                aria-pressed={!isFilipino}
+                                                aria-label="Switch language to English"
+                                            >
+                                                EN
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSwitchLanguage('tl')}
+                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                                    isFilipino
+                                                        ? 'bg-orange-500 text-white shadow-xs'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                                }`}
+                                                aria-pressed={isFilipino}
+                                                aria-label="Palitan ang wika sa Filipino"
+                                            >
+                                                FIL
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Notifications Toggle */}
+                                    <div
+                                        role="switch"
+                                        aria-checked={notificationsEnabled}
+                                        aria-label={`Notifications, currently ${notificationsEnabled ? 'on' : 'off'}`}
+                                        tabIndex={0}
+                                        onClick={handleToggleNotifications}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleToggleNotifications();
+                                            }
+                                        }}
+                                        className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <Bell size={18} className="text-orange-500 shrink-0" />
+                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
+                                                Notifications
+                                            </span>
+                                        </div>
+                                        <div
+                                            className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
+                                                notificationsEnabled ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
+                                                    notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
+                                                }`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Dark Mode Toggle */}
+                                    <div
+                                        role="switch"
+                                        aria-checked={isDarkMode}
+                                        aria-label={`Dark Mode, currently ${isDarkMode ? 'on' : 'off'}`}
+                                        tabIndex={0}
+                                        onClick={handleToggleDarkMode}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleToggleDarkMode();
+                                            }
+                                        }}
+                                        className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <Moon size={18} className="text-orange-500 shrink-0" />
+                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
+                                                Dark Mode
+                                            </span>
+                                        </div>
+                                        <div
+                                            className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
+                                                isDarkMode ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
+                                                    isDarkMode ? 'translate-x-5' : 'translate-x-0'
+                                                }`}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECURE SECTION */}
+                            <div className="w-full">
+                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
+                                    Secure
+                                </h5>
+                                <div className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-200/70 dark:divide-slate-800/70 shadow-xs">
+                                    {/* Rate App */}
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => setIsRateModalOpen(true)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                setIsRateModalOpen(true);
+                                            }
+                                        }}
+                                        aria-label="Rate App"
+                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <Star size={18} className="text-orange-500 shrink-0" />
+                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
+                                                Rate App
+                                            </span>
+                                        </div>
+                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                    </div>
+
+                                    {/* Share App */}
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={handleShareApp}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleShareApp();
+                                            }
+                                        }}
+                                        aria-label="Share App"
+                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <Share2 size={18} className="text-orange-500 shrink-0" />
+                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
+                                                Share App
+                                            </span>
+                                        </div>
+                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                    </div>
+
+                                    {/* Privacy Policy */}
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={handleOpenPrivacy}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleOpenPrivacy();
+                                            }
+                                        }}
+                                        aria-label="Privacy Policy"
+                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <Shield size={18} className="text-orange-500 shrink-0" />
+                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
+                                                Privacy Policy
+                                            </span>
+                                        </div>
+                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                    </div>
+
+                                    {/* Terms & Conditions */}
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={handleOpenTerms}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleOpenTerms();
+                                            }
+                                        }}
+                                        aria-label="Terms and Conditions"
+                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <FileText size={18} className="text-orange-500 shrink-0" />
+                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
+                                                Terms &amp; Conditions
+                                            </span>
+                                        </div>
+                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                    </div>
+
+                                    {/* Contact */}
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => setIsContactModalOpen(true)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                setIsContactModalOpen(true);
+                                            }
+                                        }}
+                                        aria-label="Contact and Support"
+                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <PhoneCall size={18} className="text-orange-500 shrink-0" />
+                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
+                                                Contact
+                                            </span>
+                                        </div>
+                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ACCOUNT SECTION */}
+                            <div className="w-full">
+                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
+                                    Account
+                                </h5>
+                                <div className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-200/70 dark:divide-slate-800/70 shadow-xs">
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => setIsLogoutConfirmOpen(true)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                setIsLogoutConfirmOpen(true);
+                                            }
+                                        }}
+                                        aria-label="Logout, end session"
+                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-red-600 dark:text-red-400 hover:bg-red-50/70 dark:hover:bg-red-950/30 transition-colors cursor-pointer select-none outline-none focus-visible:bg-red-50 dark:focus-visible:bg-red-950/40"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <LogOut size={18} className="text-red-500 shrink-0" />
+                                            <span className="text-[13.5px] font-semibold text-red-600 dark:text-red-400 truncate">
+                                                {t('dashboard.sidebar.signOut', { defaultValue: 'Log Out' })}
+                                            </span>
+                                        </div>
+                                        <ChevronRight size={16} className="text-red-400/80 dark:text-red-500/80 shrink-0" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        key="profile-details"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.15 }}
+                        className="w-full space-y-4"
+                    >
+                        {/* Navigation: Back to Settings button */}
+                        <div className="flex items-center justify-between">
                             <button
                                 type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="absolute inset-0 rounded-full bg-slate-950/75 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-white"
-                                title="Change Profile Photo"
+                                onClick={() => changeSubView('settings')}
+                                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200/90 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[38px] outline-none focus-visible:ring-2 focus-visible:ring-orange-500 shadow-xs"
+                                aria-label="Back to Settings"
                             >
-                                <Camera size={22} className="text-orange-400" />
-                                <span className="text-[11px] font-semibold tracking-wide">Change Photo</span>
+                                <ChevronLeft size={16} className="shrink-0" />
+                                <span>Back to Settings</span>
                             </button>
                         </div>
 
-                        {/* Always-visible Camera Upload Badge (for clarity & mobile/touch) */}
-                        <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-orange-600 hover:bg-orange-500 text-white shadow-lg border-2 border-white dark:border-slate-900 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer z-10"
-                            title="Upload Profile Photo"
-                            aria-label="Upload Profile Photo"
-                        >
-                            <Camera size={16} />
-                        </button>
+                        {/* Full Profile Card */}
+                        <div className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-3xl p-6 sm:p-10 relative overflow-hidden shadow-xl dark:shadow-2xl transition-colors">
+                            {/* Subtle Ambient Glow */}
+                            <div className="absolute top-0 right-0 w-80 h-80 bg-orange-500/5 blur-3xl rounded-full -mr-24 -mt-24 pointer-events-none" />
+                            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 blur-3xl rounded-full -ml-20 -mb-20 pointer-events-none" />
 
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleAvatarChange}
-                            accept="image/*"
-                            className="hidden"
-                        />
-                    </div>
+                            <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 relative z-10">
+                                {/* Left Column: Avatar & Civic Stats Only (NO settings or toggles) */}
+                                <div className="flex flex-col items-center gap-6 shrink-0 w-full lg:w-80">
+                                    {/* Avatar with Camera Upload Overlay & Touch Badge */}
+                                    <div className="relative group">
+                                        <div className={`w-36 h-36 rounded-full font-black flex items-center justify-center text-white text-5xl shadow-md border-2 border-slate-200 dark:border-slate-800 relative overflow-hidden transition-transform duration-200 group-hover:scale-[1.02] ${
+                                            user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-900' : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
+                                        }`}>
+                                            {user.avatarPhoto ? (
+                                                <img src={user.avatarPhoto} alt={user.fullName} className="w-full h-full object-cover" />
+                                            ) : (
+                                                user.avatar
+                                            )}
 
-                    {/* Verified Resident Trust Badge */}
-                    <div className="text-center space-y-2 w-full flex flex-col items-center">
-                        <div
-                            className="relative inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-full border border-emerald-200 dark:border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)] cursor-pointer select-none group transition-colors"
-                            onClick={() => setActiveTooltip(activeTooltip === 'verified' ? null : 'verified')}
-                            onMouseEnter={() => setActiveTooltip('verified')}
-                            onMouseLeave={() => setActiveTooltip(null)}
-                        >
-                            <ShieldCheck size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                                {t('dashboard.profile.verified', { defaultValue: 'Verified Resident' })}
-                            </span>
-                            <Info size={12} className="text-emerald-500/70 dark:text-emerald-400/60 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
+                                            {/* Hover Upload Overlay */}
+                                            <button
+                                                type="button"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="absolute inset-0 rounded-full bg-slate-950/75 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-white"
+                                                title="Change Profile Photo"
+                                            >
+                                                <Camera size={22} className="text-orange-400" />
+                                                <span className="text-[11px] font-semibold tracking-wide">Change Photo</span>
+                                            </button>
+                                        </div>
 
-                            {/* Tooltip */}
-                            <AnimatePresence>
-                                {activeTooltip === 'verified' && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 6 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 6 }}
-                                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl text-left z-30 pointer-events-none"
-                                    >
-                                        <p className="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
-                                            ✓ Official Resident of Caloocan City. Verified against Barangay Registry records.
+                                        {/* Always-visible Camera Upload Badge (for clarity & mobile/touch) */}
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-orange-600 hover:bg-orange-500 text-white shadow-lg border-2 border-white dark:border-slate-900 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer z-10"
+                                            title="Upload Profile Photo"
+                                            aria-label="Upload Profile Photo"
+                                        >
+                                            <Camera size={16} />
+                                        </button>
+
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            onChange={handleAvatarChange}
+                                            accept="image/*"
+                                            className="hidden"
+                                        />
+                                    </div>
+
+                                    {/* Verified Resident Trust Badge */}
+                                    <div className="text-center space-y-2 w-full flex flex-col items-center">
+                                        <div
+                                            className="relative inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-full border border-emerald-200 dark:border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)] cursor-pointer select-none group transition-colors"
+                                            onClick={() => setActiveTooltip(activeTooltip === 'verified' ? null : 'verified')}
+                                            onMouseEnter={() => setActiveTooltip('verified')}
+                                            onMouseLeave={() => setActiveTooltip(null)}
+                                        >
+                                            <ShieldCheck size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                                {t('dashboard.profile.verified', { defaultValue: 'Verified Resident' })}
+                                            </span>
+                                            <Info size={12} className="text-emerald-500/70 dark:text-emerald-400/60 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
+
+                                            <AnimatePresence>
+                                                {activeTooltip === 'verified' && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: 6 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, y: 6 }}
+                                                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl text-left z-30 pointer-events-none"
+                                                    >
+                                                        <p className="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                                                            ✓ Official Resident of Caloocan City. Verified against Barangay Registry records.
+                                                        </p>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+
+                                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight">{user.fullName}</h3>
+                                        <p className="text-[12px] font-mono text-slate-500 dark:text-slate-400">
+                                            {t('dashboard.profile.memberSince', { defaultValue: 'Joined' })} {user.memberSince}
                                         </p>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
+                                    </div>
 
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight">{user.fullName}</h3>
-                        <p className="text-[12px] font-mono text-slate-500 dark:text-slate-400">
-                            {t('dashboard.profile.memberSince', { defaultValue: 'Joined' })} {user.memberSince}
-                        </p>
-                    </div>
+                                    {/* Civic Impact Stats Box */}
+                                    <div className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm transition-colors">
+                                        <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Civic Activity</span>
+                                            <span className="text-[10px] font-mono font-semibold text-slate-400">Registered Resident</span>
+                                        </div>
 
-                    {/* Civic Impact Stats Box */}
-                    <div className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm transition-colors">
-                        <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Civic Activity</span>
-                            <span className="text-[10px] font-mono font-semibold text-slate-400">Registered Resident</span>
-                        </div>
+                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                            <div className="bg-white dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-xs">
+                                                <div className="font-mono text-base font-bold text-slate-900 dark:text-white">{totalReports}</div>
+                                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-tight">Reports Filed</div>
+                                            </div>
+                                            <div className="bg-white dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-xs">
+                                                <div className="font-mono text-base font-bold text-emerald-600 dark:text-emerald-400">{resolvedReports}</div>
+                                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-tight">Resolved</div>
+                                            </div>
+                                        </div>
 
-                        <div className="grid grid-cols-2 gap-2 pt-1">
-                            <div className="bg-white dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-xs">
-                                <div className="font-mono text-base font-bold text-slate-900 dark:text-white">{totalReports}</div>
-                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-tight">Reports Filed</div>
-                            </div>
-                            <div className="bg-white dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-xs">
-                                <div className="font-mono text-base font-bold text-emerald-600 dark:text-emerald-400">{resolvedReports}</div>
-                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-tight">Resolved</div>
-                            </div>
-                        </div>
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1.5 pt-1 text-center font-medium">
+                                            <MapPin size={12} className="text-orange-500 shrink-0" />
+                                            <span className="truncate">{user.barangay || 'Caloocan City'}</span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1.5 pt-1 text-center font-medium">
-                            <MapPin size={12} className="text-orange-500 shrink-0" />
-                            <span className="truncate">{user.barangay || 'Caloocan City'}</span>
-                        </div>
-                    </div>
+                                {/* Right Column: Form Sections ──────────────────────── */}
+                                <div className="flex-1 space-y-8 min-w-0">
 
-                    {/* Sign Out Button for Mobile / Desktop Profile View */}
-                    {handleLogout && (
-                        <button
-                            type="button"
-                            onClick={handleLogout}
-                            className="w-full min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/80 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 font-bold text-xs uppercase tracking-wider transition-all shadow-2xs cursor-pointer active:scale-95"
-                        >
-                            <LogOut size={15} />
-                            <span>{t('dashboard.sidebar.signOut', { defaultValue: 'Sign Out' })}</span>
-                        </button>
-                    )}
-                </div>
+                                    {/* ── Section 1: PERSONAL INFORMATION (Consolidated Locked Block) ── */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-[12px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                                                <User size={14} className="text-orange-500" />
+                                                PERSONAL INFORMATION
+                                            </h4>
+                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-0.5 rounded-md">
+                                                <Lock size={11} className="text-slate-400" />
+                                                Verified Record
+                                            </span>
+                                        </div>
 
-                {/* ── Right Column: Form Sections ──────────────────────── */}
-                <div className="flex-1 space-y-8 min-w-0">
+                                        {/* Unified Card grouping Official Name, Barangay, and Residential Address */}
+                                        <div className="bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-5">
+                                            {/* Registered Name & Barangay Side-by-Side */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {/* Official Name */}
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                                        {t('dashboard.profile.regName', { defaultValue: 'Official Name' })}
+                                                    </label>
+                                                    <div
+                                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-[14px] font-semibold text-slate-900 dark:text-white flex items-center justify-between group cursor-help"
+                                                        title="Verified by barangay — contact your barangay office to update"
+                                                    >
+                                                        <span className="truncate">{user.fullName}</span>
+                                                        <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-2" />
+                                                    </div>
+                                                </div>
 
-                    {/* Section 1: Account Identity (Locked) */}
-                    <div>
-                        <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-[12px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                                <User size={14} className="text-orange-500" />
-                                {t('dashboard.profile.personalInfo', { defaultValue: 'Account Identity' })}
-                            </h4>
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-0.5 rounded-md">
-                                <Lock size={11} className="text-slate-400" />
-                                Verified Record
-                            </span>
-                        </div>
+                                                {/* Barangay */}
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                                        {t('dashboard.profile.barangay', { defaultValue: 'Registered Barangay' })}
+                                                    </label>
+                                                    <div
+                                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-[14px] font-semibold text-slate-900 dark:text-white flex items-center justify-between group cursor-help"
+                                                        title="Verified by barangay — contact your barangay office to update"
+                                                    >
+                                                        <span className="truncate">{user.barangay}</span>
+                                                        <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-2" />
+                                                    </div>
+                                                </div>
+                                            </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {/* Official Name */}
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                    {t('dashboard.profile.regName', { defaultValue: 'Official Name' })}
-                                </label>
-                                <div
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-[14px] font-semibold text-slate-900 dark:text-white flex items-center justify-between group cursor-help relative"
-                                    title="Verified by barangay — contact your barangay office to update"
-                                >
-                                    <span className="truncate">{user.fullName}</span>
-                                    <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-2" />
+                                            {/* Residential Address (grouped directly under Personal Information) */}
+                                            <div className="space-y-1.5 pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                                        <MapPin size={12} className="text-orange-500 shrink-0" />
+                                                        {t('dashboard.profile.resAddress', { defaultValue: 'Residential Address' })}
+                                                    </label>
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 px-2 py-0.5 rounded-md">
+                                                        <Lock size={10} className="text-slate-400" />
+                                                        Official Record
+                                                    </span>
+                                                </div>
+
+                                                <div
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-[14px] font-semibold text-slate-800 dark:text-slate-200 flex items-start justify-between gap-3 min-h-[56px] leading-relaxed cursor-help"
+                                                    title="Verified by barangay — contact your barangay office to update"
+                                                >
+                                                    <span className="flex-1">{formatAddress(user.address) || "No complete address recorded. Please contact LGU for verification."}</span>
+                                                    <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 mt-1" />
+                                                </div>
+
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
+                                                    <Info size={12} className="shrink-0 text-slate-400" />
+                                                    Official residential record registered with Caloocan City. Contact your barangay office to request an update.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* ── Section 2: CONTACT INFORMATION (Citizen Editable) ── */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-[12px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                                                <Mail size={14} className="text-orange-500" />
+                                                CONTACT INFORMATION
+                                            </h4>
+                                            <span className="text-[11px] font-semibold text-orange-600 dark:text-orange-400/90 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 px-2.5 py-0.5 rounded-md">
+                                                Citizen Editable
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {/* Email Field */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                                    {t('dashboard.profile.secureEmail', { defaultValue: 'Email Address' })}
+                                                </label>
+
+                                                {editingField === 'email' ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="email"
+                                                            value={tempValues.email}
+                                                            onChange={(e) => setTempValues({ ...tempValues, email: e.target.value })}
+                                                            autoFocus
+                                                            className="flex-1 bg-white dark:bg-slate-900 border border-orange-500 rounded-xl px-4 py-2.5 text-base sm:text-sm min-h-[44px] font-medium text-slate-900 dark:text-white outline-none ring-2 ring-orange-500/20"
+                                                            placeholder="Enter your email"
+                                                        />
+                                                        <button
+                                                            onClick={() => handleSaveField('email')}
+                                                            disabled={updatingProfile}
+                                                            className="px-3.5 py-2.5 min-h-[44px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 shrink-0 cursor-pointer"
+                                                            title="Save Changes"
+                                                        >
+                                                            {updatingProfile ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} strokeWidth={3} />}
+                                                            <span>Save</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={handleCancelEdit}
+                                                            disabled={updatingProfile}
+                                                            className="px-3 py-2.5 min-h-[44px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer"
+                                                            title="Cancel"
+                                                        >
+                                                            <X size={15} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between shadow-xs">
+                                                        <span className="text-[14px] font-semibold text-slate-900 dark:text-white truncate">{user.email || 'No email provided'}</span>
+                                                        <button
+                                                            onClick={() => handleStartEdit('email')}
+                                                            className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-lg text-[12px] font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-orange-400 dark:hover:ring-orange-500/50 transition-all ml-2 shrink-0 shadow-xs cursor-pointer"
+                                                        >
+                                                            <Edit3 size={13} />
+                                                            <span>Edit</span>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Mobile Number Field */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                                    {t('dashboard.profile.mobileNumber', { defaultValue: 'Mobile Number' })}
+                                                </label>
+
+                                                {editingField === 'phone' ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="tel"
+                                                            value={tempValues.phone}
+                                                            onChange={(e) => setTempValues({ ...tempValues, phone: e.target.value })}
+                                                            autoFocus
+                                                            className="flex-1 bg-white dark:bg-slate-900 border border-orange-500 rounded-xl px-4 py-2.5 font-mono text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none ring-2 ring-orange-500/20"
+                                                            placeholder="e.g. 09171234567"
+                                                        />
+                                                        <button
+                                                            onClick={() => handleSaveField('phone')}
+                                                            disabled={updatingProfile}
+                                                            className="px-3.5 py-2.5 min-h-[44px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 shrink-0 cursor-pointer"
+                                                            title="Save Changes"
+                                                        >
+                                                            {updatingProfile ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} strokeWidth={3} />}
+                                                            <span>Save</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={handleCancelEdit}
+                                                            disabled={updatingProfile}
+                                                            className="px-3 py-2.5 min-h-[44px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer"
+                                                            title="Cancel"
+                                                        >
+                                                            <X size={15} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between shadow-xs">
+                                                        <span className="font-mono text-[14px] font-semibold text-slate-900 dark:text-white tracking-wide truncate">{user.phone || 'No phone recorded'}</span>
+                                                        <button
+                                                            onClick={() => handleStartEdit('phone')}
+                                                            className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-lg text-[12px] font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-orange-400 dark:hover:ring-orange-500/50 transition-all ml-2 shrink-0 shadow-xs cursor-pointer"
+                                                        >
+                                                            <Edit3 size={13} />
+                                                            <span>Edit</span>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
                                 </div>
                             </div>
-
-                            {/* Barangay */}
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                    {t('dashboard.profile.barangay', { defaultValue: 'Registered Barangay' })}
-                                </label>
-                                <div
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-[14px] font-semibold text-slate-900 dark:text-white flex items-center justify-between group cursor-help"
-                                    title="Verified by barangay — contact your barangay office to update"
-                                >
-                                    <span className="truncate">{user.barangay}</span>
-                                    <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-2" />
-                                </div>
-                            </div>
                         </div>
-                    </div>
-
-                    {/* Section 2: Residential Address (Locked) */}
-                    <div>
-                        <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-[12px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                                <MapPin size={14} className="text-orange-500" />
-                                {t('dashboard.profile.resAddress', { defaultValue: 'Residential Address' })}
-                            </h4>
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-0.5 rounded-md">
-                                <Lock size={11} className="text-slate-400" />
-                                Official Record
-                            </span>
-                        </div>
-
-                        <div
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-[14px] font-semibold text-slate-800 dark:text-slate-200 flex items-start justify-between gap-3 min-h-[56px] leading-relaxed cursor-help"
-                            title="Verified by barangay — contact your barangay office to update"
-                        >
-                            <span className="flex-1">{formatAddress(user.address) || "No complete address recorded. Please contact LGU for verification."}</span>
-                            <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 mt-1" />
-                        </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
-                            <Info size={12} className="shrink-0 text-slate-400" />
-                            Official residential record registered with Caloocan City.
-                        </p>
-                    </div>
-
-                    {/* Section 3: Contact Information (Editable) */}
-                    <div>
-                        <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-[12px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                                <Mail size={14} className="text-orange-500" />
-                                Contact Information
-                            </h4>
-                            <span className="text-[11px] font-semibold text-orange-600 dark:text-orange-400/90 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 px-2.5 py-0.5 rounded-md">
-                                Citizen Editable
-                            </span>
-                        </div>
-
-                        <div className="space-y-4">
-                            {/* Email Field */}
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    {t('dashboard.profile.secureEmail', { defaultValue: 'Email Address' })}
-                                </label>
-
-                                {editingField === 'email' ? (
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="email"
-                                            value={tempValues.email}
-                                            onChange={(e) => setTempValues({ ...tempValues, email: e.target.value })}
-                                            autoFocus
-                                            className="flex-1 bg-white dark:bg-slate-900 border border-orange-500 rounded-xl px-4 py-2.5 text-base sm:text-sm min-h-[44px] font-medium text-slate-900 dark:text-white outline-none ring-2 ring-orange-500/20"
-                                            placeholder="Enter your email"
-                                        />
-                                        <button
-                                            onClick={() => handleSaveField('email')}
-                                            disabled={updatingProfile}
-                                            className="px-3.5 py-2.5 min-h-[44px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 shrink-0 cursor-pointer"
-                                            title="Save Changes"
-                                        >
-                                            {updatingProfile ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} strokeWidth={3} />}
-                                            <span>Save</span>
-                                        </button>
-                                        <button
-                                            onClick={handleCancelEdit}
-                                            disabled={updatingProfile}
-                                            className="px-3 py-2.5 min-h-[44px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer"
-                                            title="Cancel"
-                                        >
-                                            <X size={15} />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between shadow-xs">
-                                        <span className="text-[14px] font-semibold text-slate-900 dark:text-white truncate">{user.email || 'No email provided'}</span>
-                                        <button
-                                            onClick={() => handleStartEdit('email')}
-                                            className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-lg text-[12px] font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-orange-400 dark:hover:ring-orange-500/50 transition-all ml-2 shrink-0 shadow-xs cursor-pointer"
-                                        >
-                                            <Edit3 size={13} />
-                                            <span>Edit</span>
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Mobile Number Field */}
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    {t('dashboard.profile.mobileNumber', { defaultValue: 'Mobile Number' })}
-                                </label>
-
-                                {editingField === 'phone' ? (
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="tel"
-                                            value={tempValues.phone}
-                                            onChange={(e) => setTempValues({ ...tempValues, phone: e.target.value })}
-                                            autoFocus
-                                            className="flex-1 bg-white dark:bg-slate-900 border border-orange-500 rounded-xl px-4 py-2.5 font-mono text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none ring-2 ring-orange-500/20"
-                                            placeholder="e.g. 09171234567"
-                                        />
-                                        <button
-                                            onClick={() => handleSaveField('phone')}
-                                            disabled={updatingProfile}
-                                            className="px-3.5 py-2.5 min-h-[44px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 shrink-0 cursor-pointer"
-                                            title="Save Changes"
-                                        >
-                                            {updatingProfile ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} strokeWidth={3} />}
-                                            <span>Save</span>
-                                        </button>
-                                        <button
-                                            onClick={handleCancelEdit}
-                                            disabled={updatingProfile}
-                                            className="px-3 py-2.5 min-h-[44px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer"
-                                            title="Cancel"
-                                        >
-                                            <X size={15} />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between shadow-xs">
-                                        <span className="font-mono text-[14px] font-semibold text-slate-900 dark:text-white tracking-wide truncate">{user.phone || 'No phone recorded'}</span>
-                                        <button
-                                            onClick={() => handleStartEdit('phone')}
-                                            className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-lg text-[12px] font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-orange-400 dark:hover:ring-orange-500/50 transition-all ml-2 shrink-0 shadow-xs cursor-pointer"
-                                        >
-                                            <Edit3 size={13} />
-                                            <span>Edit</span>
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Civic Aperture Rotate & Crop Modal for Profile Photo */}
             {cropModalData && (
@@ -2583,11 +3228,203 @@ const ProfileView = ({ user, setUser, handleUpdateProfile, updatingProfile, cont
                     t={t}
                 />
             )}
+
+            {/* Logout Confirmation Dialog */}
+            <AnimatePresence>
+                {isLogoutConfirmOpen && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+                        onClick={() => setIsLogoutConfirmOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            role="alertdialog"
+                            aria-modal="true"
+                            aria-labelledby="logout-title"
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4"
+                        >
+                            <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 flex items-center justify-center text-red-600 dark:text-red-400 mx-auto">
+                                <LogOut size={22} />
+                            </div>
+                            <div className="text-center space-y-1">
+                                <h3 id="logout-title" className="text-base font-bold text-slate-900 dark:text-white">
+                                    Are you sure you want to log out?
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    You will need to sign in again to file new reports and track your civic tickets.
+                                </p>
+                            </div>
+                            <div className="flex gap-2.5 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsLogoutConfirmOpen(false)}
+                                    className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[44px]"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsLogoutConfirmOpen(false);
+                                        if (handleLogout) handleLogout();
+                                    }}
+                                    className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer shadow-sm shadow-red-500/20 min-h-[44px]"
+                                >
+                                    Log Out
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Rate App Interactive Feedback Modal */}
+            <AnimatePresence>
+                {isRateModalOpen && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+                        onClick={() => { setIsRateModalOpen(false); setRatingSubmitted(false); }}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            role="dialog"
+                            aria-modal="true"
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 relative"
+                        >
+                            <button
+                                type="button"
+                                onClick={() => { setIsRateModalOpen(false); setRatingSubmitted(false); }}
+                                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg cursor-pointer"
+                                aria-label="Close"
+                            >
+                                <X size={18} />
+                            </button>
+                            {!ratingSubmitted ? (
+                                <>
+                                    <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-950/50 border border-orange-200 dark:border-orange-900/60 flex items-center justify-center text-orange-500 mx-auto">
+                                        <Star size={24} className="fill-orange-500 text-orange-500" />
+                                    </div>
+                                    <div className="text-center space-y-1">
+                                        <h3 className="text-base font-bold text-slate-900 dark:text-white">Rate PULSO Experience</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            How easy was it to file reports and track public repairs in Caloocan?
+                                        </p>
+                                    </div>
+                                    <div className="flex justify-center gap-2 py-2">
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                            <button
+                                                key={star}
+                                                type="button"
+                                                onClick={() => setRatingScore(star)}
+                                                className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                                                aria-label={`${star} star${star > 1 ? 's' : ''}`}
+                                            >
+                                                <Star
+                                                    size={28}
+                                                    className={`${star <= ratingScore ? 'fill-orange-500 text-orange-500' : 'text-slate-300 dark:text-slate-700'}`}
+                                                />
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setRatingSubmitted(true);
+                                            if (showToast) showToast('Thank you for rating PULSO!');
+                                        }}
+                                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 transition-colors cursor-pointer shadow-sm shadow-orange-500/20 min-h-[44px]"
+                                    >
+                                        Submit Feedback
+                                    </button>
+                                </>
+                            ) : (
+                                <div className="text-center py-4 space-y-2">
+                                    <CheckCircle2 size={36} className="text-emerald-500 mx-auto" />
+                                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Feedback Received!</h4>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Thank you! Your feedback directly helps us improve municipal engineering services in Caloocan.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsRateModalOpen(false); setRatingSubmitted(false); }}
+                                        className="mt-2 py-2 px-5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer min-h-[44px]"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Contact & Support Modal */}
+            <AnimatePresence>
+                {isContactModalOpen && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+                        onClick={() => setIsContactModalOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            role="dialog"
+                            aria-modal="true"
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 relative"
+                        >
+                            <button
+                                type="button"
+                                onClick={() => setIsContactModalOpen(false)}
+                                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg cursor-pointer"
+                                aria-label="Close"
+                            >
+                                <X size={18} />
+                            </button>
+                            <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-950/50 border border-orange-200 dark:border-orange-900/60 flex items-center justify-center text-orange-500 mx-auto">
+                                <PhoneCall size={22} />
+                            </div>
+                            <div className="text-center space-y-1">
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">Contact &amp; Assistance</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Caloocan City Engineering Department &amp; Emergency Hotlines
+                                </p>
+                            </div>
+                            <div className="space-y-2 pt-1 text-left">
+                                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">City Engineering Office</div>
+                                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">888-1234 / 8397-6212</div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400">engineering@caloocancity.gov.ph</div>
+                                </div>
+                                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Emergency Hotlines (24/7)</div>
+                                    <div className="text-xs font-semibold text-orange-600 dark:text-orange-400">911 (Rescue, Police &amp; Fire)</div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400">Caloocan DRRMO: 8397-6212</div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsContactModalOpen(false)}
+                                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[44px]"
+                            >
+                                Close
+                            </button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };
 
-const SettingsView = ({ user, handleLogout, containerVariants, token, showToast, t }) => {
+const SettingsView = ({ user, handleLogout, containerVariants, token, showToast, t, onClearAIChatHistory }) => {
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
     const [changing, setChanging] = useState(false);
     const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
@@ -3119,7 +3956,43 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                         <span>SSL / TLS Encrypted</span>
                     </div>
                 </div>
+            </div>
 
+            {/* ── PULSEAI Chat History & Privacy Card ── */}
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between gap-5">
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-2 rounded-xl bg-orange-50 dark:bg-orange-500/15 text-[#ea580c] dark:text-orange-400">
+                                <Brain size={18} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-slate-900 dark:text-white">PULSEAI Chat History & Privacy</h4>
+                                <p className="text-[11px] text-slate-500 font-mono">Persistent Assistant Memory · RA 10173</p>
+                            </div>
+                        </div>
+                        <span className="text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full uppercase border bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30">
+                            Encrypted
+                        </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                        Your conversations with PULSEAI are securely saved to your resident profile so you can resume questions on any device. Under the Philippine Data Privacy Act (RA 10173), you maintain the right to erase your conversational data at any time.
+                    </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <span className="text-[11px] text-slate-400">
+                        Permanently erases all past questions, answers, and assistant session history.
+                    </span>
+                    <button
+                        type="button"
+                        onClick={onClearAIChatHistory}
+                        className="py-2.5 px-4 min-h-[40px] rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/30 text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-300 dark:border-slate-700 hover:border-rose-300 dark:hover:border-rose-800 shrink-0"
+                    >
+                        <Trash2 size={14} />
+                        <span>Clear All PULSEAI History</span>
+                    </button>
+                </div>
             </div>
 
             {/* ── Gmail 2FA Activation & OTP Verification Modal ── */}
@@ -3317,6 +4190,16 @@ const CATEGORY_META = {
             'Covered courts, parks, and other city-owned public spaces',
         ],
     },
+    'Others': {
+        color: 'purple',
+        icon: <HelpCircle size={24} strokeWidth={1.5} />,
+        scope: [
+            'General civic infrastructure concerns not covered by defined categories',
+            'Uncategorized city engineering maintenance requests',
+            'Cross-departmental issues requiring dispatcher manual review',
+            'Note: Detailed description in Additional Notes is required for routing',
+        ],
+    },
 };
 
 const COLOR_MAP = {
@@ -3325,6 +4208,7 @@ const COLOR_MAP = {
     yellow: { ring: 'ring-yellow-500', bg: 'bg-yellow-500/10 dark:bg-yellow-500/15', dot: 'bg-yellow-500', text: 'text-yellow-600 dark:text-yellow-400', border: 'border-yellow-400', badge: 'bg-yellow-500' },
     red: { ring: 'ring-red-500', bg: 'bg-red-500/10 dark:bg-red-500/15', dot: 'bg-red-500', text: 'text-red-600 dark:text-red-400', border: 'border-red-400', badge: 'bg-red-500' },
     green: { ring: 'ring-green-500', bg: 'bg-green-500/10 dark:bg-green-500/15', dot: 'bg-green-500', text: 'text-green-600 dark:text-green-400', border: 'border-green-400', badge: 'bg-green-500' },
+    purple: { ring: 'ring-purple-500', bg: 'bg-purple-500/10 dark:bg-purple-500/15', dot: 'bg-purple-500', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-400', badge: 'bg-purple-500' },
 };
 
 const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disabledReason = '' }) => {
@@ -3524,7 +4408,7 @@ const ResidentModals = ({
     isSubmitConfirmOpen, setIsSubmitConfirmOpen, actuallySubmitReport,
     setZoomedImage,
     photoPinIcons, getCachedIcon, theme, borderData,
-    isLocating, requestDeviceLocation,
+    isLocating, locatingStep, requestDeviceLocation,
     locationPermissionDenied, photoMetadata, setPhotoMetadata,
     showHeatmap, setShowHeatmap,
     mapLayerType, setMapLayerType,
@@ -3535,6 +4419,51 @@ const ResidentModals = ({
 }) => {
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
+    const [isSvFullscreen, setIsSvFullscreen] = useState(false);
+    const [currentMapZoom, setCurrentMapZoom] = useState(11);
+    const [activeSector, setActiveSector] = useState('all');
+
+    // Auto-reset fullscreen when Street View closes
+    useEffect(() => {
+        if (!svLocation) {
+            setIsSvFullscreen(false);
+        }
+    }, [svLocation]);
+
+    // Memoized District & Barangay Boundary Polygon Options matching Government Dispatcher GIS Map
+    const northPolygonOptions = React.useMemo(() => ({
+        strokeColor: '#f97316',
+        strokeOpacity: activeSector === 'south' ? 0.35 : 1.0,
+        strokeWeight: activeSector === 'north' ? 2.5 : 2.2,
+        fillColor: '#f97316',
+        fillOpacity: activeSector === 'south' ? 0.02 : (theme === 'dark' ? 0.10 : 0.06),
+        clickable: false,
+        zIndex: activeSector === 'north' ? 3 : 2,
+    }), [theme, activeSector]);
+
+    const southPolygonOptions = React.useMemo(() => ({
+        strokeColor: '#ff6b00',
+        strokeOpacity: activeSector === 'north' ? 0.35 : 1.0,
+        strokeWeight: activeSector === 'south' ? 2.5 : 2.2,
+        fillColor: '#ff6b00',
+        fillOpacity: activeSector === 'north' ? 0.02 : (theme === 'dark' ? 0.08 : 0.05),
+        clickable: false,
+        zIndex: activeSector === 'south' ? 3 : 1,
+    }), [theme, activeSector]);
+
+    // Pre-indexed memoized barangay polygons (only instantiated once from GeoJSON)
+    const memoizedBarangayPolygons = React.useMemo(() => {
+        if (!borderData?.features || borderData.features.length === 0) return [];
+        return borderData.features.map((feature, i) => {
+            const isNorth = (feature.properties?.sector || '') === 'North';
+            const paths = feature.geometry?.type === 'MultiPolygon'
+                ? feature.geometry.coordinates.map(poly => poly[0].map(c => ({ lng: c[0], lat: c[1] })))
+                : [feature.geometry?.coordinates?.[0]?.map(c => ({ lng: c[0], lat: c[1] })) || []];
+            return { id: `brgy-${i}`, isNorth, paths };
+        });
+    }, [borderData]);
+
+
 
     // Default Map View: Frame full Caloocan bounds (North + South) when opening maps
     useEffect(() => {
@@ -3554,6 +4483,42 @@ const ResidentModals = ({
             setIsListening(false);
         }
     }, [activeModal, isListening]);
+
+    // Map Categories Horizontal Scroll State & Controls
+    const mapCategoryScrollRef = useRef(null);
+    const [canScrollMapCatLeft, setCanScrollMapCatLeft] = useState(false);
+    const [canScrollMapCatRight, setCanScrollMapCatRight] = useState(true);
+
+    const updateMapCatScroll = useCallback(() => {
+        const el = mapCategoryScrollRef.current;
+        if (!el) return;
+        const { scrollLeft, scrollWidth, clientWidth } = el;
+        setCanScrollMapCatLeft(scrollLeft > 2);
+        setCanScrollMapCatRight(scrollLeft < scrollWidth - clientWidth - 2);
+    }, []);
+
+    const scrollMapCategories = (direction) => {
+        const el = mapCategoryScrollRef.current;
+        if (!el) return;
+        const scrollAmount = 140;
+        el.scrollBy({
+            left: direction === 'left' ? -scrollAmount : scrollAmount,
+            behavior: 'smooth'
+        });
+        setTimeout(updateMapCatScroll, 300);
+    };
+
+    useEffect(() => {
+        if (activeModal === 'map') {
+            updateMapCatScroll();
+            const timer = setTimeout(updateMapCatScroll, 120);
+            window.addEventListener('resize', updateMapCatScroll);
+            return () => {
+                clearTimeout(timer);
+                window.removeEventListener('resize', updateMapCatScroll);
+            };
+        }
+    }, [activeModal, updateMapCatScroll]);
 
     const toggleVoiceToText = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -3628,6 +4593,20 @@ const ResidentModals = ({
 
     const notesLength = reportNotes.length;
     const isCategorySelected = reportCategory.length > 0;
+    const isOthersSelected = reportCategory.includes('Others');
+    const isNotesValidForOthers = !isOthersSelected || reportNotes.trim().length >= 10;
+
+    const getLocatingStatusText = () => {
+        if (geocodingAddress) return "Pinpointing street & landmark...";
+        if (locatingStep === 0) return "Getting your exact location...";
+        if (locatingStep === 1) return "Refining GPS accuracy radius...";
+        return "Almost there, finalizing coordinates...";
+    };
+
+    const isLocationLoading = (isLocating || geocodingAddress || (!reportLocation && !locationPermissionDenied)) && !locationPermissionDenied;
+    const isLocationResolved = !isLocating && !geocodingAddress && Boolean(reportLocation?.lat && locationAddress);
+    const isLocationFailed = !isLocationLoading && (!reportLocation || locationPermissionDenied);
+    const isLocationReady = Boolean(reportLocation?.lat && reportLocation?.lng && !isLocating && !geocodingAddress);
 
     return (
         <AnimatePresence>
@@ -3645,7 +4624,10 @@ const ResidentModals = ({
                     exit={{ scale: 0.96, opacity: 0 }}
                     className={`pointer-events-auto transition-colors w-full ${
                         activeModal === 'map'
-                            ? 'max-w-7xl h-[88dvh] sm:h-[90vh] flex flex-col my-auto bg-white dark:bg-slate-900 backdrop-blur-xl rounded-2xl sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden'
+                            ? (isSvFullscreen
+                                ? 'fixed inset-0 z-[100] w-screen h-[100dvh] flex flex-col bg-slate-950 rounded-none border-0 shadow-none'
+                                : 'max-w-7xl h-[88dvh] sm:h-[90vh] flex flex-col my-auto bg-white dark:bg-slate-900 backdrop-blur-xl rounded-2xl sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden'
+                              )
                             : activeModal === 'file-report'
                                 ? 'bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 max-w-4xl max-h-[94dvh] sm:max-h-[92vh] my-auto'
                                 : 'max-w-xl flex flex-col my-auto bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90dvh]'
@@ -3694,45 +4676,87 @@ const ResidentModals = ({
 
                                 {/* Location Banner with Automated Multi-Sample Accuracy */}
                                 <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl transition-all shadow-xs">
-                                    {locationPermissionDenied && (
-                                        <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-xl flex items-center justify-between gap-3 text-rose-700 dark:text-rose-300 text-xs font-semibold mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
-                                                <span>Location permission is required for verified civic reporting. Please enable GPS in your device/browser settings.</span>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => requestDeviceLocation(true)}
-                                                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold shrink-0 cursor-pointer transition-colors"
-                                            >
-                                                Retry GPS
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                                            <div className="w-10 h-10 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                                                <MapPin size={20} />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                {geocodingAddress ? (
-                                                    <div className="animate-pulse space-y-1">
-                                                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3" />
-                                                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
+                                    {isLocationLoading ? (
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[64px]">
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                <div className="w-10 h-10 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center shrink-0">
+                                                    <Loader2 size={20} className="animate-spin text-orange-500" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+                                                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                                                            {getLocatingStatusText()}
+                                                        </p>
                                                     </div>
-                                                ) : (
+                                                    <div className="flex items-center gap-2 mt-2 animate-pulse">
+                                                        <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full w-48" />
+                                                        <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full w-24" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center flex-wrap gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setActiveModal('map'); setIsSelectingLocation(true); }}
+                                                    className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                                    title="Pinpoint manually on map"
+                                                >
+                                                    <MapPin size={14} />
+                                                    <span>Pinpoint on Map</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : isLocationFailed ? (
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[64px]">
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                <div className="w-10 h-10 bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center shrink-0">
+                                                    <AlertTriangle size={20} />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                                                        Unable to acquire GPS location
+                                                    </p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Location permission was denied or signal is unavailable. Please retry or pinpoint manually on the map.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center flex-wrap gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => requestDeviceLocation(true)}
+                                                    className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                                    title="Retry GPS location acquisition"
+                                                >
+                                                    <RotateCcw size={14} />
+                                                    <span>Retry GPS</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setActiveModal('map'); setIsSelectingLocation(true); }}
+                                                    className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                                    title="Pinpoint manually on map"
+                                                >
+                                                    <MapPin size={14} />
+                                                    <span>Pinpoint on Map</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[64px]">
+                                            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                                                <div className="w-10 h-10 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                                                    <MapPin size={20} />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
                                                     <div>
                                                         <div className="flex items-start justify-between gap-1.5">
                                                             <p
                                                                 className="text-sm font-bold text-slate-900 dark:text-white leading-snug break-words select-text cursor-text flex-1"
                                                                 title={locationAddress}
                                                             >
-                                                                {locationAddress && !locationAddress.startsWith('Lat:')
-                                                                    ? locationAddress
-                                                                    : (reportLocation
-                                                                        ? `Coordinates: ${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)} (Address unresolved)`
-                                                                        : "Caloocan City Location")}
+                                                                {locationAddress}
                                                             </p>
                                                             <button
                                                                 type="button"
@@ -3757,20 +4781,12 @@ const ResidentModals = ({
                                                                 </span>
                                                             )}
                                                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 select-all" title="GPS Coordinates">
-                                                                {reportLocation ? `${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)}` : 'Caloocan North Center'}
+                                                                {reportLocation ? `${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)}` : ''}
                                                             </span>
 
                                                             {/* Honest Tiered Accuracy Confidence Indicator */}
                                                             {(() => {
                                                                 const acc = reportLocation?.accuracy;
-                                                                if (isLocating) {
-                                                                    return (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-500/40">
-                                                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                                                                            <span>Acquiring GPS...</span>
-                                                                        </span>
-                                                                    );
-                                                                }
                                                                 if (typeof acc === 'number' && acc > 0 && acc <= 20) {
                                                                     return (
                                                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 shadow-2xs">
@@ -3796,22 +4812,22 @@ const ResidentModals = ({
                                                             })()}
                                                         </div>
                                                     </div>
-                                                )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center flex-wrap gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setActiveModal('map'); setIsSelectingLocation(true); }}
+                                                    className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-orange-600/20"
+                                                    title="Open interactive map to pinpoint location on map"
+                                                >
+                                                    <MapPin size={14} />
+                                                    <span>Pinpoint on Map</span>
+                                                </button>
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center flex-wrap gap-2 shrink-0">
-                                            <button
-                                                type="button"
-                                                onClick={() => { setActiveModal('map'); setIsSelectingLocation(true); }}
-                                                className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-orange-600/20"
-                                                title="Open interactive map to pinpoint location on map"
-                                            >
-                                                <MapPin size={14} />
-                                                <span>Pinpoint on Map</span>
-                                            </button>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
 
                                 {/* Main Two-Column Layout */}
@@ -3990,6 +5006,8 @@ const ResidentModals = ({
                                                         mapped.push('Public Safety & Regulatory');
                                                     } else if (aiCat.includes('facilit') || aiCat.includes('park') || aiCat.includes('hall') || aiCat.includes('court') || aiCat.includes('school') || aiCat.includes('gym')) {
                                                         mapped.push('Public Facilities');
+                                                    } else if (aiCat.includes('other') || aiCat.includes('unknown') || aiCat.includes('unclear') || aiCat.includes('misc')) {
+                                                        mapped.push('Others');
                                                     }
                                                     if (mapped.length > 0) {
                                                         setReportCategory(mapped);
@@ -4091,15 +5109,22 @@ const ResidentModals = ({
                                                 <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                                                     <MessageSquareText size={14} />
                                                     <span>Additional Notes</span>
+                                                    {isOthersSelected && (
+                                                        <span className="text-orange-600 dark:text-orange-400 font-extrabold text-[11px] normal-case tracking-normal">
+                                                            (Required for Others)
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <span className={`text-[11px] font-mono ${
                                                     notesLength >= 500
                                                         ? 'text-rose-600 font-extrabold animate-pulse'
                                                         : notesLength >= 400
                                                             ? 'text-amber-600 font-bold'
-                                                            : 'text-slate-500 dark:text-slate-400 font-semibold'
+                                                            : isOthersSelected && notesLength < 10
+                                                                ? 'text-orange-600 dark:text-orange-400 font-bold'
+                                                                : 'text-slate-500 dark:text-slate-400 font-semibold'
                                                 }`}>
-                                                    {notesLength}/500
+                                                    {notesLength}/500 {isOthersSelected && notesLength < 10 ? '(min 10)' : ''}
                                                 </span>
                                             </div>
 
@@ -4114,11 +5139,15 @@ const ResidentModals = ({
                                                     placeholder={
                                                         isListening
                                                             ? "🎙️ Listening... Speak clearly into your microphone..."
-                                                            : (reportCategory.length > 0 ? `Describe specific damage or landmark details for ${reportCategory[0]}...` : "Provide helpful context, landmark details, or specific damage...")
+                                                            : isOthersSelected
+                                                                ? "Please describe the issue so we can route it to the right team (minimum 10 characters)..."
+                                                                : (reportCategory.length > 0 ? `Describe specific damage or landmark details for ${reportCategory[0]}...` : "Provide helpful context, landmark details, or specific damage...")
                                                     }
                                                     maxLength={500}
                                                     value={reportNotes}
                                                     onChange={e => setReportNotes(e.target.value)}
+                                                    aria-required={isOthersSelected}
+                                                    aria-invalid={isOthersSelected && notesLength < 10}
                                                 />
 
                                                 {/* Voice-to-Text Button */}
@@ -4139,6 +5168,12 @@ const ResidentModals = ({
                                                     )}
                                                 </button>
                                             </div>
+                                            {isOthersSelected && notesLength < 10 && (
+                                                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-1.5 px-1" role="alert">
+                                                    <AlertTriangle size={12} className="shrink-0 text-amber-500" />
+                                                    <span>Please describe the issue in at least 10 characters so dispatchers can route it properly ({Math.max(0, 10 - notesLength)} more needed).</span>
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -4153,10 +5188,34 @@ const ResidentModals = ({
                                             <AlertTriangle size={14} className="shrink-0 text-rose-500" />
                                             <span>Please take or upload a photo showing the actual problem</span>
                                         </span>
+                                    ) : !selectedImage ? (
+                                        <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5">
+                                            <AlertTriangle size={14} className="shrink-0 text-amber-500" />
+                                            <span>Capture photo evidence to continue</span>
+                                        </span>
+                                    ) : !isLocationReady ? (
+                                        <span className="text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
+                                            {isLocationLoading ? (
+                                                <>
+                                                    <Loader2 size={14} className="shrink-0 animate-spin" />
+                                                    <span>Acquiring exact location for field dispatch...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <AlertTriangle size={14} className="shrink-0 text-amber-500" />
+                                                    <span>Location required • Retry GPS or pinpoint on map</span>
+                                                </>
+                                            )}
+                                        </span>
                                     ) : !isCategorySelected ? (
                                         <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5">
                                             <AlertTriangle size={14} className="shrink-0 text-amber-500" />
                                             <span>Select at least 1 issue category to continue</span>
+                                        </span>
+                                    ) : !isNotesValidForOthers ? (
+                                        <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5" role="alert">
+                                            <AlertTriangle size={14} className="shrink-0 text-amber-500" />
+                                            <span>Describe the issue in Additional Notes (10+ chars)</span>
                                         </span>
                                     ) : (
                                         <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
@@ -4184,7 +5243,7 @@ const ResidentModals = ({
                                     <button
                                         type="button"
                                         onClick={handleFileReport}
-                                        disabled={submittingReport || !isCategorySelected || Boolean(aiFeedback?.is_inappropriate) || !selectedImage}
+                                        disabled={submittingReport || !isCategorySelected || Boolean(aiFeedback?.is_inappropriate) || !selectedImage || !isLocationReady || !isNotesValidForOthers}
                                         className="w-full sm:w-auto px-6 py-2.5 min-h-[44px] rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer"
                                     >
                                         {submittingReport ? (
@@ -4196,6 +5255,17 @@ const ResidentModals = ({
                                             <span>Invalid Photo • Retake to Continue</span>
                                         ) : !selectedImage ? (
                                             <span>Capture Photo to Continue</span>
+                                        ) : isLocationLoading ? (
+                                            <>
+                                                <Loader2 size={15} className="animate-spin" />
+                                                <span>Acquiring Location...</span>
+                                            </>
+                                        ) : !isLocationReady ? (
+                                            <span>Set Location to Continue</span>
+                                        ) : !isCategorySelected ? (
+                                            <span>Select Category to Continue</span>
+                                        ) : !isNotesValidForOthers ? (
+                                            <span>Describe Issue to Continue</span>
                                         ) : (
                                             <span>Submit Report</span>
                                         )}
@@ -4206,131 +5276,201 @@ const ResidentModals = ({
                     )}
 
                     {activeModal === 'map' && (
-                        <div className="flex flex-col h-full bg-white dark:bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800">
-                            {/* Modal Header */}
-                            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap justify-between items-center gap-3 shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">Nearby Hazards & Infrastructure</h2>
-                                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
-                                            {processedHazards.length} Live
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Interactive Caloocan GIS map · Field inspections and citizen reports</p>
+                        <div className="flex flex-col h-full bg-white dark:bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800">
+                            {/* Modal Header — collapses into a sleek compact bar when Street View is active */}
+                            <div className={`border-b border-slate-100 dark:border-slate-800 flex justify-between items-center gap-3 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 transition-all duration-200 ${
+                                svLocation ? 'px-3 sm:px-4 py-2 sm:py-2.5' : 'p-4 sm:p-5'
+                            }`}>
+                                <div className="min-w-0 pr-2">
+                                    <h2 className={`font-black text-slate-900 dark:text-white leading-tight ${
+                                        svLocation ? 'text-sm sm:text-base flex items-center gap-2' : 'text-lg sm:text-2xl'
+                                    }`}>
+                                        {svLocation ? (
+                                            <>
+                                                <Eye size={16} className="text-orange-500 shrink-0" />
+                                                <span className="truncate">Street View Inspection</span>
+                                            </>
+                                        ) : (
+                                            'Nearby Hazards & Infrastructure'
+                                        )}
+                                    </h2>
+                                    {!svLocation && (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                                            Interactive Caloocan GIS map · Field inspections and citizen reports
+                                        </p>
+                                    )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 shrink-0">
                                     <button 
                                         onClick={() => { 
                                             setActiveModal(isSelectingLocation ? 'file-report' : null); 
                                             setIsSelectingLocation(false); 
+                                            if (svLocation) handleStreetViewClick(null);
                                         }} 
-                                        className="p-2 border border-slate-200 dark:border-slate-700 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
+                                        className="p-1.5 sm:p-2 border border-slate-200 dark:border-slate-700 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer shrink-0"
                                         aria-label="Close map"
                                     >
-                                        <X size={20} />
+                                        <X size={18} />
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Floating Top Controls Toolbar */}
-                            <div className="relative z-10 px-4 py-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-                                <div className="flex items-center flex-wrap gap-2">
-                                    {/* Map Type: Roadmap vs Satellite */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setMapLayerType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
-                                        className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                                    >
-                                        <Layers size={14} className="text-blue-500" />
-                                        <span>{mapLayerType === 'roadmap' ? 'Satellite View' : 'Civic View'}</span>
-                                    </button>
+                            {/* Floating Top Controls Toolbar & Category Chips Bar — Collapsed when Street View is open */}
+                            {!svLocation && (
+                                <>
+                                    {/* Floating Top Controls Toolbar */}
+                                    <div className="relative z-10 px-4 py-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                        <div className="flex items-center flex-wrap gap-2">
+                                            {/* Map Type: Roadmap vs Satellite */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setMapLayerType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
+                                                className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                            >
+                                                <Layers size={14} className="text-blue-500" />
+                                                <span>{mapLayerType === 'roadmap' ? 'Satellite View' : 'Civic View'}</span>
+                                            </button>
 
-                                    {/* My Location GPS */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            requestDeviceLocation(true);
-                                            if (map && reportLocation?.lat) {
-                                                map.panTo({ lat: reportLocation.lat, lng: reportLocation.lng });
-                                                map.setZoom(15);
-                                            }
-                                        }}
-                                        className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                                    >
-                                        <Crosshair size={14} className={isLocating ? 'animate-spin text-orange-500' : 'text-emerald-500'} />
-                                        <span>{isLocating ? 'Locating...' : 'My Location'}</span>
-                                    </button>
-                                </div>
+                                            {/* My Location GPS */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    requestDeviceLocation(true);
+                                                    if (map && reportLocation?.lat) {
+                                                        map.panTo({ lat: reportLocation.lat, lng: reportLocation.lng });
+                                                        map.setZoom(15);
+                                                    }
+                                                }}
+                                                className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                            >
+                                                <Crosshair size={14} className={isLocating ? 'animate-spin text-orange-500' : 'text-emerald-500'} />
+                                                <span>{isLocating ? 'Locating...' : 'My Location'}</span>
+                                            </button>
+                                        </div>
 
-                                {/* Sector Jump Buttons */}
-                                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                    <span className="text-[10px] uppercase font-black px-2 text-slate-600 dark:text-slate-300">Sector:</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (map && window.google && window.google.maps) {
-                                                const bounds = new window.google.maps.LatLngBounds(
-                                                    new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
-                                                    new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
-                                                );
-                                                map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-                                            }
-                                        }}
-                                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all cursor-pointer"
-                                    >
-                                        All Caloocan
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (map) {
-                                                map.panTo({ lat: 14.7566, lng: 121.0450 });
-                                                map.setZoom(13);
-                                            }
-                                        }}
-                                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all cursor-pointer"
-                                    >
-                                        North Caloocan
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (map) {
-                                                map.panTo({ lat: 14.6500, lng: 120.9850 });
-                                                map.setZoom(13);
-                                            }
-                                        }}
-                                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all cursor-pointer"
-                                    >
-                                        South Caloocan
-                                    </button>
-                                </div>
-                            </div>
+                                        {/* Sector Jump Buttons */}
+                                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                                            <span className="text-[10px] uppercase font-black px-2 text-slate-600 dark:text-slate-300">Sector:</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveSector('all');
+                                                    if (map && window.google && window.google.maps) {
+                                                        const bounds = new window.google.maps.LatLngBounds(
+                                                            new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
+                                                            new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
+                                                        );
+                                                        map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+                                                    }
+                                                }}
+                                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                                                    activeSector === 'all'
+                                                        ? 'bg-[#ff6b00] text-white shadow-xs font-black'
+                                                        : 'text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] hover:bg-white/60 dark:hover:bg-slate-700/60'
+                                                }`}
+                                            >
+                                                All Caloocan
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveSector('north');
+                                                    if (map) {
+                                                        map.panTo(NORTH_CALOOCAN_CENTROID || { lat: 14.7566, lng: 121.0450 });
+                                                        map.setZoom(12);
+                                                    }
+                                                }}
+                                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                                                    activeSector === 'north'
+                                                        ? 'bg-[#ff6b00] text-white shadow-xs font-black'
+                                                        : 'text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] hover:bg-white/60 dark:hover:bg-slate-700/60'
+                                                }`}
+                                            >
+                                                North Caloocan
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveSector('south');
+                                                    if (map) {
+                                                        map.panTo(SOUTH_CALOOCAN_CENTROID || { lat: 14.6500, lng: 120.9850 });
+                                                        map.setZoom(12);
+                                                    }
+                                                }}
+                                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                                                    activeSector === 'south'
+                                                        ? 'bg-[#ff6b00] text-white shadow-xs font-black'
+                                                        : 'text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] hover:bg-white/60 dark:hover:bg-slate-700/60'
+                                                }`}
+                                            >
+                                                South Caloocan
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            {/* Category Filter Chips Bar */}
-                            <div className="relative z-10 px-4 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-1.5 overflow-x-auto custom-scrollbar text-[11px] font-bold">
-                                {[
-                                    { id: 'all', label: 'All Incidents' },
-                                    { id: 'roads', label: 'Roads & Potholes' },
-                                    { id: 'drainage', label: 'Drainage & Floods' },
-                                    { id: 'lighting', label: 'Power & Streetlights' },
-                                    { id: 'safety', label: 'Public Safety' },
-                                    { id: 'facilities', label: 'Public Facilities' }
-                                ].map(cat => (
-                                    <button
-                                        key={cat.id}
-                                        type="button"
-                                        onClick={() => setMapCategoryFilter(cat.id)}
-                                        className={`px-3 py-1 rounded-full whitespace-nowrap transition-all cursor-pointer ${
-                                            mapCategoryFilter === cat.id
-                                                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                                                : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-orange-500/40'
-                                        }`}
-                                    >
-                                        {cat.label}
-                                    </button>
-                                ))}
-                            </div>
+                                    {/* Category Filter Chips Bar with Left & Right Chevrons */}
+                                    <div className="relative z-10 px-2 sm:px-3 py-1.5 sm:py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-1 sm:gap-1.5 text-[11px] font-bold">
+                                        {/* Left Chevron Button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => scrollMapCategories('left')}
+                                            disabled={!canScrollMapCatLeft}
+                                            aria-label="Scroll categories left"
+                                            className={`shrink-0 w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all duration-150 z-10 ${
+                                                canScrollMapCatLeft
+                                                    ? 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-2xs border border-slate-200 dark:border-slate-700 hover:bg-[#f05a00] hover:text-white dark:hover:bg-[#f05a00] cursor-pointer active:scale-95'
+                                                    : 'text-slate-300 dark:text-slate-700 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
+                                            }`}
+                                        >
+                                            <ChevronLeft size={13} strokeWidth={2.5} />
+                                        </button>
+
+                                        {/* Scrollable Categories Container */}
+                                        <div
+                                            ref={mapCategoryScrollRef}
+                                            onScroll={updateMapCatScroll}
+                                            className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5"
+                                        >
+                                            {[
+                                                { id: 'all', label: 'All Incidents' },
+                                                { id: 'roads', label: 'Roads & Potholes' },
+                                                { id: 'drainage', label: 'Drainage & Floods' },
+                                                { id: 'lighting', label: 'Power & Streetlights' },
+                                                { id: 'safety', label: 'Public Safety' },
+                                                { id: 'facilities', label: 'Public Facilities' }
+                                            ].map(cat => (
+                                                <button
+                                                    key={cat.id}
+                                                    type="button"
+                                                    onClick={() => setMapCategoryFilter(cat.id)}
+                                                    className={`px-3 py-1 rounded-full whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                                                        mapCategoryFilter === cat.id
+                                                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                                                            : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-orange-500/40'
+                                                    }`}
+                                                >
+                                                    {cat.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Right Chevron Button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => scrollMapCategories('right')}
+                                            disabled={!canScrollMapCatRight}
+                                            aria-label="Scroll categories right"
+                                            className={`shrink-0 w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all duration-150 z-10 ${
+                                                canScrollMapCatRight
+                                                    ? 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-2xs border border-slate-200 dark:border-slate-700 hover:bg-[#f05a00] hover:text-white dark:hover:bg-[#f05a00] cursor-pointer active:scale-95'
+                                                    : 'text-slate-300 dark:text-slate-700 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
+                                            }`}
+                                        >
+                                            <ChevronRight size={13} strokeWidth={2.5} />
+                                        </button>
+                                    </div>
+                                </>
+                            )}
 
                             <div className="flex-1 relative">
                                 {isLoaded && (
@@ -4339,7 +5479,18 @@ const ResidentModals = ({
                                         center={CALOOCAN_CENTER}
                                         zoom={11}
                                         mapTypeId={mapLayerType}
-                                        options={mapOptions}
+                                        options={{
+                                            ...mapOptions,
+                                            styles: mapLayerType === 'hybrid'
+                                                ? []
+                                                : (theme === 'dark' ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE)
+                                        }}
+                                        onZoomChanged={() => {
+                                            if (map) {
+                                                const z = map.getZoom();
+                                                if (typeof z === 'number') setCurrentMapZoom(z);
+                                            }
+                                        }}
                                         onLoad={m => {
                                             setMap(m);
                                             if (window.google && window.google.maps) {
@@ -4381,61 +5532,30 @@ const ResidentModals = ({
 
                                         {/* ═══════════════════════════════════════════════════════════════════
                                             AUTHORITATIVE BARANGAY JURISDICTION BOUNDARIES (ALL 188 BARANGAYS)
+                                            MATCHING GOVERNMENT DISPATCHER GIS MAP EXACTLY
                                         ══════════════════════════════════════════════════════════════════════ */}
-                                        {borderData?.features?.map((feature, i) => {
-                                            const props = feature.properties || {};
-                                            const sector = props.sector || 'Caloocan';
-                                            const isNorth = sector === 'North';
-
-                                            const polygonOptions = {
-                                                strokeColor: isNorth ? '#f97316' : '#ff6b00',
-                                                strokeOpacity: 1.0,
-                                                strokeWeight: 2.2,
-                                                fillColor: isNorth ? '#f97316' : '#ff6b00',
-                                                fillOpacity: isNorth
-                                                    ? (theme === 'dark' ? 0.10 : 0.06)
-                                                    : (theme === 'dark' ? 0.08 : 0.05),
-                                                clickable: false,
-                                                zIndex: isNorth ? 2 : 1,
-                                            };
-
-                                            const paths = feature.geometry.type === 'MultiPolygon'
-                                                ? feature.geometry.coordinates.map(poly => poly[0].map(c => ({ lng: c[0], lat: c[1] })))
-                                                : [feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))];
-
-                                            return paths.map((path, pi) => (
-                                                <PolygonF
-                                                    key={`resident-brgy-border-${i}-${pi}`}
-                                                    paths={path}
-                                                    options={polygonOptions}
-                                                />
-                                            ));
-                                        })}
-
-                                        {/* Fallback boundary outlines if borderData has no features */}
-                                        {(!borderData?.features || borderData.features.length === 0) && (
+                                        {memoizedBarangayPolygons && memoizedBarangayPolygons.length > 0 ? (
+                                            memoizedBarangayPolygons.map((b) => (
+                                                b.paths.map((p, pi) => (
+                                                    <PolygonF
+                                                        key={`resident-brgy-${b.id}-${pi}`}
+                                                        paths={p}
+                                                        options={b.isNorth ? northPolygonOptions : southPolygonOptions}
+                                                    />
+                                                ))
+                                            ))
+                                        ) : (
+                                            /* Fallback boundary outlines if borderData has no features */
                                             <>
                                                 <PolygonF
+                                                    key="resident-district-border-north"
                                                     paths={NORTH_CALOOCAN_PATH}
-                                                    options={{
-                                                        fillColor: "#ff6b00",
-                                                        fillOpacity: theme === 'dark' ? 0.10 : 0.06,
-                                                        strokeColor: "#ff6b00",
-                                                        strokeOpacity: 0.85,
-                                                        strokeWeight: 2.5,
-                                                        clickable: false,
-                                                    }}
+                                                    options={northPolygonOptions}
                                                 />
                                                 <PolygonF
+                                                    key="resident-district-border-south"
                                                     paths={SOUTH_CALOOCAN_PATH}
-                                                    options={{
-                                                        fillColor: "#ff6b00",
-                                                        fillOpacity: theme === 'dark' ? 0.08 : 0.05,
-                                                        strokeColor: "#ff6b00",
-                                                        strokeOpacity: 0.85,
-                                                        strokeWeight: 2.5,
-                                                        clickable: false,
-                                                    }}
+                                                    options={southPolygonOptions}
                                                 />
                                             </>
                                         )}
@@ -4551,87 +5671,127 @@ const ResidentModals = ({
                                         />
 
                                         {/* Animated Wave Sonar Overlay for User Location */}
-                                        <OverlayViewF
-                                            position={reportLocation}
-                                            mapPaneName="overlayMouseTarget"
-                                            getPixelPositionOffset={() => ({ x: -24, y: -24 })}
-                                        >
-                                            <div className="relative flex items-center justify-center w-12 h-12 pointer-events-none">
-                                                {/* Wave Ring 1 */}
-                                                <div className="absolute inset-0 rounded-full bg-blue-500/25 animate-wave-ring" style={{ animationDelay: '0s' }} />
-                                                {/* Wave Ring 2 */}
-                                                <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-wave-ring" style={{ animationDelay: '0.6s' }} />
-                                                {/* Wave Ring 3 */}
-                                                <div className="absolute inset-0 rounded-full bg-blue-500/15 animate-wave-ring" style={{ animationDelay: '1.2s' }} />
-                                                {/* Center Dot */}
-                                                <div className="relative z-10 w-5 h-5 bg-blue-500 rounded-full border-[3px] border-white shadow-lg shadow-blue-500/50" />
-                                            </div>
-                                        </OverlayViewF>
+                                        {reportLocation?.lat && (
+                                            <OverlayViewF
+                                                position={reportLocation}
+                                                mapPaneName="overlayMouseTarget"
+                                                getPixelPositionOffset={() => ({ x: -24, y: -24 })}
+                                            >
+                                                <div className="relative flex items-center justify-center w-12 h-12 pointer-events-none">
+                                                    {/* Wave Ring 1 */}
+                                                    <div className="absolute inset-0 rounded-full bg-blue-500/25 animate-wave-ring" style={{ animationDelay: '0s' }} />
+                                                    {/* Wave Ring 2 */}
+                                                    <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-wave-ring" style={{ animationDelay: '0.6s' }} />
+                                                    {/* Wave Ring 3 */}
+                                                    <div className="absolute inset-0 rounded-full bg-blue-500/15 animate-wave-ring" style={{ animationDelay: '1.2s' }} />
+                                                    {/* Center Dot */}
+                                                    <div className="relative z-10 w-5 h-5 bg-blue-500 rounded-full border-[3px] border-white shadow-lg shadow-blue-500/50" />
+                                                </div>
+                                            </OverlayViewF>
+                                        )}
 
-                                        {/* Government-Grade Pin Markers (with photo-pin thumbnails and crisp SVG fallback) */}
-                                        {mapFilteredHazards.map(h => {
-                                            const isSelected = selectedHazard?.id === h.id;
-                                            const cacheKey = `${h.id}-${isSelected ? 'sel' : 'norm'}`;
-                                            const customIconUrl = photoPinIcons ? photoPinIcons[cacheKey] : null;
+                                        {/* Active Selected Incident Marker (Rendered outside clusterer with top priority) */}
+                                        {selectedHazard && (
+                                            <MarkerF
+                                                key={`hazard-selected-${selectedHazard.id}`}
+                                                position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }}
+                                                zIndex={1000}
+                                                title={`${selectedHazard.title} (${(selectedHazard.status || 'PENDING').toUpperCase()})`}
+                                                onClick={() => setSelectedHazard(selectedHazard)}
+                                                options={{
+                                                    optimized: false,
+                                                    clickable: true
+                                                }}
+                                                icon={(() => {
+                                                    const cacheKey = `${selectedHazard.id}-sel`;
+                                                    const customIconUrl = photoPinIcons ? photoPinIcons[cacheKey] : null;
+                                                    const size = 46;
+                                                    const pointerH = 8;
+                                                    const totalW = size + 6;
+                                                    const totalH = size + pointerH + 2;
+                                                    return customIconUrl && getCachedIcon
+                                                        ? getCachedIcon(customIconUrl, totalW, totalH, totalW / 2, totalH)
+                                                        : (getCachedIcon
+                                                            ? getCachedIcon(
+                                                                getMarkerSVG(selectedHazard.category, selectedHazard.status, true),
+                                                                44,
+                                                                50,
+                                                                22,
+                                                                50
+                                                            )
+                                                            : {
+                                                                url: getMarkerSVG(selectedHazard.category, selectedHazard.status, true),
+                                                                scaledSize: new window.google.maps.Size(44, 50),
+                                                                anchor: new window.google.maps.Point(22, 50)
+                                                            }
+                                                        );
+                                                })()}
+                                            />
+                                        )}
 
-                                            const size = isSelected ? 46 : 36;
-                                            const pointerH = isSelected ? 8 : 7;
-                                            const totalW = size + 6;
-                                            const totalH = size + pointerH + 2;
+                                        {/* Incident Markers: Direct Report Photo-Pins (No numeric clustering) */}
+                                        {mapFilteredHazards
+                                            .filter(h => h.id !== selectedHazard?.id)
+                                            .map(h => {
+                                                const cacheKey = `${h.id}-norm`;
+                                                const customIconUrl = photoPinIcons ? photoPinIcons[cacheKey] : null;
+                                                const size = 36;
+                                                const pointerH = 7;
+                                                const totalW = size + 6;
+                                                const totalH = size + pointerH + 2;
 
-                                            const iconConfig = customIconUrl && getCachedIcon
-                                                ? getCachedIcon(customIconUrl, totalW, totalH, totalW / 2, totalH)
-                                                : (getCachedIcon
-                                                    ? getCachedIcon(
-                                                        getMarkerSVG(h.category, h.status, isSelected),
-                                                        isSelected ? 44 : 36,
-                                                        isSelected ? 50 : 42,
-                                                        isSelected ? 22 : 18,
-                                                        isSelected ? 50 : 42
-                                                    )
-                                                    : {
-                                                        url: getMarkerSVG(h.category, h.status, isSelected),
-                                                        scaledSize: new window.google.maps.Size(isSelected ? 44 : 36, isSelected ? 50 : 42),
-                                                        anchor: new window.google.maps.Point(isSelected ? 22 : 18, isSelected ? 50 : 42)
-                                                    }
+                                                const iconConfig = customIconUrl && getCachedIcon
+                                                    ? getCachedIcon(customIconUrl, totalW, totalH, totalW / 2, totalH)
+                                                    : (getCachedIcon
+                                                        ? getCachedIcon(
+                                                            getMarkerSVG(h.category, h.status, false),
+                                                            36,
+                                                            42,
+                                                            18,
+                                                            42
+                                                        )
+                                                        : {
+                                                            url: getMarkerSVG(h.category, h.status, false),
+                                                            scaledSize: new window.google.maps.Size(36, 42),
+                                                            anchor: new window.google.maps.Point(18, 42)
+                                                        }
+                                                    );
+
+                                                return (
+                                                    <MarkerF
+                                                        key={`hazard-${h.id}`}
+                                                        position={{ lat: h.lat, lng: h.lng }}
+                                                        zIndex={150}
+                                                        title={`${h.title} (${(h.status || 'PENDING').toUpperCase()})`}
+                                                        onClick={() => setSelectedHazard(h)}
+                                                        options={{
+                                                            optimized: true,
+                                                            clickable: true
+                                                        }}
+                                                        icon={iconConfig}
+                                                    />
                                                 );
+                                            })
+                                        }
 
-                                            return (
-                                                <MarkerF
-                                                    key={`hazard-${h.id}`}
-                                                    position={{ lat: h.lat, lng: h.lng }}
-                                                    zIndex={isSelected ? 500 : 150}
-                                                    title={`${h.title} (${(h.status || 'PENDING').toUpperCase()})`}
-                                                    onClick={() => setSelectedHazard(h)}
-                                                    options={{
-                                                        optimized: true,
-                                                        clickable: true
-                                                    }}
-                                                    icon={iconConfig}
-                                                />
-                                            );
-                                        })}
-
-                                        {/* STREET VIEW PIN OVERLAY: 3D Pins for exploration */}
-                                        {svLocation && panorama && processedHazards.map(h => (
-                                            (h.lat && h.lng) && (
-                                                <MarkerF
-                                                    key={`sv-pin-${h.id}`}
-                                                    map={panorama}
-                                                    position={{ lat: h.lat, lng: h.lng }}
-                                                    onClick={() => setSelectedHazard(h)}
-                                                    options={{
-                                                        optimized: false,
-                                                        clickable: true
-                                                    }}
-                                                    icon={window.google && window.google.maps ? {
-                                                        url: getMarkerSVG(h.category, h.status, selectedHazard?.id === h.id),
-                                                        scaledSize: new window.google.maps.Size(46, 52),
-                                                        anchor: new window.google.maps.Point(23, 52)
-                                                    } : undefined}
-                                                />
-                                            )
-                                        ))}
+                                        {/* STREET VIEW PIN OVERLAY: 3D Pin for the inspected incident (Lightweight, single-pin) */}
+                                        {svLocation && panorama && selectedHazard && selectedHazard.lat && selectedHazard.lng && (
+                                            <MarkerF
+                                                key={`sv-pin-${selectedHazard.id}`}
+                                                map={panorama}
+                                                position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }}
+                                                onClick={() => setSelectedHazard(selectedHazard)}
+                                                options={{
+                                                    optimized: false,
+                                                    clickable: true
+                                                }}
+                                                icon={window.google && window.google.maps ? {
+                                                    url: getMarkerSVG(selectedHazard.category, selectedHazard.status, true),
+                                                    scaledSize: new window.google.maps.Size(46, 52),
+                                                    anchor: new window.google.maps.Point(23, 52)
+                                                } : undefined}
+                                            />
+                                        )}
 
                                         {/* Sleek Government-Grade InfoWindow */}
                                         {(() => {
@@ -4802,18 +5962,70 @@ const ResidentModals = ({
                                                 <StreetViewPanorama
                                                     position={svLocation}
                                                     visible={true}
-                                                    options={{ enableCloseButton: false }}
+                                                    options={{
+                                                        enableCloseButton: false,
+                                                        fullscreenControl: false,
+                                                        zoomControl: false,
+                                                        motionTracking: false,
+                                                        motionTrackingControl: false,
+                                                        linksControl: true,
+                                                        panControl: false,
+                                                        addressControl: false
+                                                    }}
                                                     onLoad={(pano) => setPanorama(pano)}
                                                 />
-                                                {/* Floating Back Button */}
-                                                <div className="absolute top-4 left-4 z-10">
+                                                {/* Top Controls Overlay on Street View */}
+                                                <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-40 flex items-center justify-between pointer-events-none gap-2">
+                                                    {/* Prominent Back to Map Button (44px min touch target, non-overlapping) */}
                                                     <button
+                                                        type="button"
                                                         onClick={() => handleStreetViewClick(null)}
-                                                        className="flex items-center gap-2 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-[13px] font-bold px-4 py-2.5 rounded-full shadow-xl border border-slate-200 dark:border-slate-700 hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all"
+                                                        aria-label="Back to Map"
+                                                        className="pointer-events-auto h-11 min-h-[44px] px-4 rounded-full bg-slate-900/90 hover:bg-orange-600 text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-2 text-xs sm:text-sm font-bold shrink-0"
                                                     >
-                                                        <ArrowRight size={14} className="rotate-180" /> Back to Map
+                                                        <ChevronLeft size={18} strokeWidth={2.5} />
+                                                        <span>Back to Map</span>
+                                                    </button>
+
+                                                    {/* Center: Persistent Incident Context Label */}
+                                                    {selectedHazard && (
+                                                        <div className="pointer-events-auto hidden xs:flex items-center gap-2 bg-slate-950/90 text-white border border-slate-700/70 shadow-2xl rounded-full px-3.5 py-2 text-xs font-semibold backdrop-blur-md max-w-[50%] sm:max-w-[60%] truncate">
+                                                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0 animate-pulse" />
+                                                            <span className="text-slate-400 font-medium shrink-0">Viewing:</span>
+                                                            <span className="font-bold text-white truncate">{selectedHazard.title || 'Reported Location'}</span>
+                                                            {(selectedHazard.dynamicDistance || selectedHazard.distance) && (
+                                                                <span className="text-slate-400 shrink-0 hidden md:inline">
+                                                                    · {selectedHazard.dynamicDistance || selectedHazard.distance} away
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Right: Fullscreen Toggle Button (Repositioned away from Back button) */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsSvFullscreen(prev => !prev)}
+                                                        aria-label={isSvFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                                                        title={isSvFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                                                        className="pointer-events-auto w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-slate-900/90 hover:bg-orange-600 text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                                                    >
+                                                        {isSvFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                                                     </button>
                                                 </div>
+
+                                                {/* Mobile Extra Context Pill (anchored bottom-center above Street View controls) */}
+                                                {selectedHazard && (
+                                                    <div className="xs:hidden absolute bottom-12 left-3 right-3 z-40 pointer-events-none flex justify-center">
+                                                        <div className="pointer-events-auto bg-slate-950/90 text-white border border-slate-700/70 shadow-2xl rounded-full px-3.5 py-1.5 text-[11px] font-semibold backdrop-blur-md flex items-center gap-1.5 max-w-full truncate">
+                                                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0 animate-pulse" />
+                                                            <span className="text-slate-400">Viewing:</span>
+                                                            <span className="font-bold text-white truncate">{selectedHazard.title || 'Reported Location'}</span>
+                                                            {(selectedHazard.dynamicDistance || selectedHazard.distance) && (
+                                                                <span className="text-slate-400 shrink-0">· {selectedHazard.dynamicDistance || selectedHazard.distance} away</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                     </GoogleMap>
@@ -5208,6 +6420,7 @@ const TopNavigation = ({
     });
 
     const searchRef = useRef(null);
+    const searchInputRef = useRef(null);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const userMenuTimeoutRef = useRef(null);
     const userMenuRef = useRef(null);
@@ -5449,9 +6662,7 @@ const TopNavigation = ({
                                                 <div className="text-[11px] text-slate-500 truncate">{r.location_string || 'No location specified'}</div>
                                             </div>
                                         </div>
-                                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
-                                            {r.status}
-                                        </span>
+                                        <ArrowRight size={14} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all shrink-0" />
                                     </button>
                                 ))}
                             </div>
@@ -5549,8 +6760,8 @@ const TopNavigation = ({
         <header className="shrink-0 sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800 transition-colors">
             <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-1 sm:gap-2">
 
-                {/* Left Area: Logo & Search */}
-                <div className="flex items-center gap-1 sm:gap-4 shrink-0 relative" ref={searchRef}>
+                {/* Left Area: Municipal Branding */}
+                <div className="flex items-center shrink-0">
                     <a
                         href="/dashboard"
                         className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl shrink-0 cursor-pointer"
@@ -5559,27 +6770,52 @@ const TopNavigation = ({
                     >
                         <Branding size="h-7 w-7 xs:h-8 xs:w-8 sm:h-10 sm:w-10" showText={true} />
                     </a>
+                </div>
 
-                    {/* Desktop Search Bar */}
-                    <div className="hidden md:flex bg-slate-100 dark:bg-slate-800 rounded-full items-center px-3.5 py-1.5 sm:py-2 border border-transparent focus-within:border-orange-500 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all w-full max-w-[240px] lg:max-w-[320px] relative shadow-xs">
-                        <Search size={15} className="text-slate-400 shrink-0" />
+                {/* Search Bar (Centered on Mobile, Left-aligned on Desktop) */}
+                <div className="flex-1 flex justify-center md:justify-start items-center min-w-0 px-1 sm:px-3 md:pl-6 lg:pl-8" ref={searchRef}>
+                    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-full items-center px-2.5 xs:px-3 sm:px-3.5 py-1.5 sm:py-2 border border-transparent focus-within:border-slate-300 dark:focus-within:border-slate-600 focus-within:ring-2 focus-within:ring-slate-200 dark:focus-within:ring-slate-700/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all w-full max-w-[170px] xs:max-w-[210px] sm:max-w-[320px] md:max-w-[390px] lg:max-w-[460px] relative shadow-xs">
+                        {isSearchOpen ? (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsSearchOpen(false);
+                                    if (searchInputRef.current) {
+                                        searchInputRef.current.blur();
+                                    }
+                                }}
+                                className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors p-0.5 -ml-1 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-700 cursor-pointer shrink-0 flex items-center justify-center active:scale-95"
+                                title="Close search"
+                                aria-label="Close search"
+                            >
+                                <ChevronLeft size={16} strokeWidth={2.5} className="sm:w-[17px] sm:h-[17px]" />
+                            </button>
+                        ) : (
+                            <Search size={14} className="text-slate-400 shrink-0 sm:w-[15px] sm:h-[15px]" />
+                        )}
                         <input
+                            ref={searchInputRef}
                             type="text"
                             value={searchQuery}
                             onChange={(e) => { setSearchQuery(e.target.value); setIsSearchOpen(true); }}
                             onFocus={() => setIsSearchOpen(true)}
                             onKeyDown={(e) => {
-                                if (e.key === 'Escape') setIsSearchOpen(false);
+                                if (e.key === 'Escape') {
+                                    setIsSearchOpen(false);
+                                    searchInputRef.current?.blur();
+                                }
                             }}
                             placeholder={t('dashboard.topNav.searchPlaceholder', { defaultValue: 'Search PULSO...' })}
-                            className="bg-transparent border-none outline-none text-xs sm:text-sm ml-2 w-full text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-medium"
+                            className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-[10.5px] xs:text-[11px] sm:text-xs md:text-sm ml-1.5 sm:ml-2 w-full text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-medium whitespace-nowrap"
+                            style={{ outline: 'none', boxShadow: 'none' }}
                         />
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 shrink-0"
                             >
-                                <X size={14} />
+                                <X size={13} />
                             </button>
                         )}
 
@@ -5591,73 +6827,17 @@ const TopNavigation = ({
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: 8, scale: 0.98 }}
                                     transition={{ duration: 0.15 }}
-                                    className="absolute top-12 left-0 w-[340px] lg:w-[440px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 text-slate-900 dark:text-white overflow-hidden ring-1 ring-black/5"
+                                    className="fixed inset-x-2.5 top-15 sm:absolute sm:top-12 sm:left-1/2 sm:-translate-x-1/2 md:left-0 md:translate-x-0 sm:inset-x-auto w-auto sm:w-[380px] lg:w-[460px] max-h-[75vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 text-slate-900 dark:text-white ring-1 ring-black/5"
                                 >
                                     {renderSearchDropdown()}
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
-
-                    {/* Mobile Search Trigger Icon */}
-                    <button
-                        onClick={() => setIsMobileSearchOpen(true)}
-                        className="md:hidden w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0"
-                        title="Search"
-                        aria-label="Open Search"
-                    >
-                        <Search size={14} className="sm:w-4 sm:h-4" />
-                    </button>
                 </div>
 
-                {/* Center Header Space (Navigation is persistently handled in Left Rail on Desktop and Bottom Bar on Mobile) */}
-                <div className="flex-1" />
-
-                {/* Right Area: Language Toggle, Profile, Theme, Notifications */}
+                {/* Right Area: Notifications */}
                 <div className="flex items-center justify-end gap-1 xs:gap-1.5 sm:gap-2.5 shrink-0">
-
-                    {/* Language Toggle Pill [ EN | FIL ] */}
-                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-full p-0.5 border border-slate-200 dark:border-slate-700/60 shadow-2xs shrink-0">
-                        <button
-                            type="button"
-                            onClick={() => i18n?.changeLanguage('en')}
-                            className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-extrabold transition-all cursor-pointer ${
-                                !i18n?.language?.startsWith('tl') && !i18n?.language?.startsWith('fil')
-                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                            }`}
-                        >
-                            EN
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => i18n?.changeLanguage('tl')}
-                            className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-extrabold transition-all cursor-pointer ${
-                                i18n?.language?.startsWith('tl') || i18n?.language?.startsWith('fil')
-                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                            }`}
-                        >
-                            FIL
-                        </button>
-                    </div>
-
-                    {/* Theme Toggle menu item */}
-                    <div className="hidden lg:flex bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700/50">
-                        <button onClick={() => changeTheme('light')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-xs text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="Light"><Sun size={14} /></button>
-                        <button onClick={() => changeTheme('system')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-xs text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="System"><Monitor size={14} /></button>
-                        <button onClick={() => changeTheme('dark')} className={`p-1.5 rounded-full transition-all flex justify-center ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-xs text-orange-500' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`} title="Dark"><Moon size={14} /></button>
-                    </div>
-
-                    {/* Mobile Quick Theme Switcher */}
-                    <button
-                        onClick={() => changeTheme(theme === 'dark' ? 'light' : 'dark')}
-                        className="lg:hidden w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none shrink-0"
-                        title={`Toggle ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
-                    >
-                        {theme === 'dark' ? <Sun size={14} className="sm:w-4 sm:h-4 text-orange-400" /> : <Moon size={14} className="sm:w-4 sm:h-4" />}
-                    </button>
-
                     <div className="relative shrink-0">
                         <button
                             className="relative w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none shrink-0"
@@ -5853,14 +7033,23 @@ const TopNavigation = ({
                                 {/* Search Header Bar */}
                                 <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-b border-slate-100 dark:border-slate-800 shrink-0">
                                     <div className="flex-1 flex items-center bg-slate-100 dark:bg-slate-800 rounded-2xl px-3.5 py-2.5">
-                                        <Search size={16} className="text-slate-400 mr-2 shrink-0" />
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsMobileSearchOpen(false)}
+                                            className="text-slate-400 hover:text-slate-700 dark:hover:text-white mr-2 shrink-0 p-0.5 -ml-1 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-700 cursor-pointer flex items-center justify-center active:scale-95"
+                                            title="Close search"
+                                            aria-label="Close search"
+                                        >
+                                            <ChevronLeft size={18} strokeWidth={2.5} />
+                                        </button>
                                         <input
                                             type="text"
                                             autoFocus
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             placeholder={t('dashboard.topNav.searchPlaceholder', { defaultValue: 'Search PULSO...' })}
-                                            className="bg-transparent border-none outline-none text-sm w-full text-slate-900 dark:text-white placeholder-slate-400 font-medium"
+                                            className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-sm w-full text-slate-900 dark:text-white placeholder-slate-400 font-medium"
+                                            style={{ outline: 'none', boxShadow: 'none' }}
                                         />
                                         {searchQuery && (
                                             <button
@@ -5925,12 +7114,14 @@ export default function ResidentDashboard() {
     // (Handles X button, Cancel button, and Backdrop clicks)
     useEffect(() => {
         if (!activeModal) {
-            setReportCategory([]);
-            setAiFeedback(null);
-            setSelectedImage(null);
-            setReportNotes('');
-            setGeocodingAddress(false);
-            geocodeRequest.current += 1;
+            setReportCategory(prev => (Array.isArray(prev) && prev.length === 0 ? prev : []));
+            setAiFeedback(prev => (prev === null ? prev : null));
+            setSelectedImage(prev => (prev === null ? prev : null));
+            setReportNotes(prev => (prev === '' ? prev : ''));
+            setGeocodingAddress(prev => (prev === false ? prev : false));
+            if (geocodeRequest?.current !== undefined) {
+                geocodeRequest.current += 1;
+            }
         }
     }, [activeModal]);
 
@@ -5958,14 +7149,7 @@ export default function ResidentDashboard() {
 
     const { isLoaded, loadError } = useJsApiLoader(loaderOptions);
 
-    const [pulseRadius, setPulseRadius] = useState(0);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setPulseRadius(prev => (prev + 1) % 40); // Pulse scale from 0 to 40
-        }, 40);
-        return () => clearInterval(interval);
-    }, []);
+    const [pulseRadius] = useState(0);
 
     const checkJurisdiction = (location) => {
         if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return true;
@@ -5980,7 +7164,7 @@ export default function ResidentDashboard() {
     const mapOptions = React.useMemo(() => ({
         styles: theme === 'dark' ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE,
         disableDefaultUI: true,
-        zoomControl: true,
+        zoomControl: false,
         gestureHandling: 'greedy',
     }), [theme]);
 
@@ -6046,9 +7230,13 @@ export default function ResidentDashboard() {
     }, [panorama]);
 
     const mainScrollRef = useRef(null);
+    const [accountSubView, setAccountSubView] = useState('settings'); // 'settings' | 'profile-details'
 
     const handleSetTab = (tab) => {
         console.log(`PULSO: Switching tab: ${activeTab} -> ${tab}`);
+        if (tab === 'profile') {
+            setAccountSubView('settings');
+        }
         setActiveTab(tab);
         if (mainScrollRef.current) {
             mainScrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
@@ -6073,7 +7261,7 @@ export default function ResidentDashboard() {
     const [toast, setToast] = useState({ message: '', type: 'success' });
     const [isIDCameraOpen, setIsIDCameraOpen] = useState(false);
 
-    const showToast = (message, type = 'success') => {
+    const showToast = useCallback((message, type = 'success') => {
         // Robust check to prevent rendering objects as React children which crashes the UI
         const finalMsg = typeof message === 'string' ? message : (
             Array.isArray(message) && message[0]?.msg
@@ -6082,12 +7270,75 @@ export default function ResidentDashboard() {
         );
         setToast({ message: finalMsg, type });
         setTimeout(() => setToast({ message: '', type: 'success' }), 3000);
-    };
+    }, []);
 
     const [lguUpdates, setLguUpdates] = useState([]);
     const [loadingAdvisories, setLoadingAdvisories] = useState(true);
     const [advisoriesError, setAdvisoriesError] = useState(null);
     const [advisoriesReloadKey, setAdvisoriesReloadKey] = useState(0);
+
+    // Real User Data State (hoisted to precede loadData dependencies)
+    const [user, setUser] = useState(() => {
+        const savedAvatar = typeof localStorage !== 'undefined' ? (localStorage.getItem('pulso_avatar_current') || null) : null;
+        return {
+            name: 'Resident',
+            fullName: 'Loading...',
+            barangay: 'Loading...',
+            email: '',
+            phone: '',
+            memberSince: 'Loading...',
+            trustScore: 100,
+            avatar: 'R',
+            avatarPhoto: savedAvatar
+        };
+    });
+    const [updatingProfile, setUpdatingProfile] = useState(false);
+
+    const fetchUser = useCallback(async (userId) => {
+        if (!userId) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const savedAvatar = (typeof localStorage !== 'undefined')
+                    ? (localStorage.getItem(`pulso_avatar_${data.email || 'current'}`) || localStorage.getItem('pulso_avatar_current') || null)
+                    : null;
+                const nextUser = {
+                    name: data.full_name ? data.full_name.split(' ')[0] : 'Resident',
+                    fullName: data.full_name || '',
+                    address: formatAddress(data.address || ''),
+                    barangay: data.barangay || '',
+                    email: data.email || '',
+                    phone: data.phone_number || '',
+                    memberSince: new Date(data.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+                    trustScore: data.trust_score || 100,
+                    avatar: data.full_name ? data.full_name.charAt(0).toUpperCase() : 'R',
+                    avatarPhoto: savedAvatar
+                };
+                setUser(prev => {
+                    if (
+                        prev.name === nextUser.name &&
+                        prev.fullName === nextUser.fullName &&
+                        prev.address === nextUser.address &&
+                        prev.barangay === nextUser.barangay &&
+                        prev.email === nextUser.email &&
+                        prev.phone === nextUser.phone &&
+                        prev.memberSince === nextUser.memberSince &&
+                        prev.trustScore === nextUser.trustScore &&
+                        prev.avatar === nextUser.avatar &&
+                        prev.avatarPhoto === nextUser.avatarPhoto
+                    ) {
+                        return prev;
+                    }
+                    return nextUser;
+                });
+            }
+        } catch (error) {
+            console.error("PULSO: Error fetching user data:", error);
+        }
+    }, [token]);
 
     // New State for User Reports
     const [userReports, setUserReports] = useState([]);
@@ -6106,62 +7357,109 @@ export default function ResidentDashboard() {
     };
 
     const getIconForCategory = (category) => {
-        switch (category) {
-            case 'Public Works': return <HardHat size={18} className="text-orange-500" />;
-            case 'Utilities': return <Droplets size={18} className="text-blue-500" />;
-            case 'Advisory': return <ShieldAlert size={18} className="text-red-500" />;
-            default: return <ShieldCheck size={18} className="text-slate-500" />;
-        }
+        const cat = (category || '').toLowerCase();
+        if (cat.includes('public works') || cat.includes('road') || cat.includes('bridge')) return <HardHat size={18} className="text-orange-500" />;
+        if (cat.includes('utilit') || cat.includes('water') || cat.includes('drain')) return <Droplets size={18} className="text-blue-500" />;
+        if (cat.includes('advisory') || cat.includes('safety') || cat.includes('hazard')) return <ShieldAlert size={18} className="text-red-500" />;
+        if (cat.includes('other')) return <HelpCircle size={18} className="text-purple-500" />;
+        return <ShieldCheck size={18} className="text-slate-500" />;
     };
 
-    const fetchUserReports = async (userId) => {
+    const fetchUserReports = useCallback(async (userId) => {
+        if (!userId) return;
         try {
             const response = await fetch(`${API_BASE_URL}/api/reports/user/${userId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
                 const data = await response.json();
-                setUserReports(data);
+                setUserReports(prev => {
+                    if (Array.isArray(prev) && Array.isArray(data) && prev.length === data.length) {
+                        const unchanged = prev.every((p, i) => p.id === data[i]?.id && p.status === data[i]?.status && p.updated_at === data[i]?.updated_at);
+                        if (unchanged) return prev;
+                    }
+                    return Array.isArray(data) ? data : [];
+                });
             }
         } catch (error) {
             console.error("PULSO: Error fetching reports:", error);
         } finally {
             setLoadingReports(false);
         }
-    };
+    }, [token]);
 
     const [publicReports, setPublicReports] = useState([]);
     const [loadingPublicReports, setLoadingPublicReports] = useState(true);
 
-    const fetchPublicReports = async () => {
+    const fetchPublicReports = useCallback(async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/reports/public?limit=100`);
             if (response.ok) {
                 const data = await response.json();
-                setPublicReports(Array.isArray(data) ? data : []);
+                const list = Array.isArray(data) ? data : [];
+                setPublicReports(prev => {
+                    if (Array.isArray(prev) && prev.length === list.length) {
+                        const unchanged = prev.every((p, i) => p.id === list[i]?.id && p.status === list[i]?.status && p.updated_at === list[i]?.updated_at);
+                        if (unchanged) return prev;
+                    }
+                    return list;
+                });
             }
         } catch (error) {
             console.error("PULSO: Error fetching public reports:", error);
         } finally {
             setLoadingPublicReports(false);
         }
-    };
+    }, []);
 
     const [notifications, setNotifications] = useState([]);
 
-    const fetchNotifications = async (userId) => {
+    const fetchNotifications = useCallback(async (userId) => {
+        if (!userId) return;
         try {
             const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
                 const data = await response.json();
-                setNotifications(data);
+                setNotifications(prev => {
+                    if (Array.isArray(prev) && Array.isArray(data) && prev.length === data.length) {
+                        const unchanged = prev.every((p, i) => p.id === data[i]?.id && p.is_read === data[i]?.is_read);
+                        if (unchanged) return prev;
+                    }
+                    return Array.isArray(data) ? data : [];
+                });
             }
         } catch (error) {
             console.error("PULSO: Error fetching notifications:", error);
         }
-    };
+    }, [token]);
+
+    const fetchAdvisories = useCallback(async () => {
+        setLoadingAdvisories(prev => (prev ? prev : true));
+        setAdvisoriesError(null);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/advisories`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error(`Advisory request failed (${response.status})`);
+            const data = await response.json();
+            if (!Array.isArray(data)) throw new Error('Advisory response was not a list');
+            setLguUpdates(prev => {
+                if (Array.isArray(prev) && prev.length === data.length) {
+                    const unchanged = prev.every((p, i) => p.id === data[i]?.id && p.updated_at === data[i]?.updated_at);
+                    if (unchanged) return prev;
+                }
+                return data;
+            });
+        } catch (error) {
+            console.error("PULSO: Error fetching advisories:", error);
+            setLguUpdates([]);
+            setAdvisoriesError('Advisories are temporarily unavailable.');
+        } finally {
+            setLoadingAdvisories(false);
+        }
+    }, [token]);
 
     const handleMarkAllRead = async () => {
         if (!currentUser) return;
@@ -6214,60 +7512,52 @@ export default function ResidentDashboard() {
         setShowNotifications(false);
     };
 
+    const isFetchingDataRef = useRef(false);
     useEffect(() => {
-        console.log("PULSO: ResidentDashboard useEffect triggered. currentUser:", currentUser?.id);
-        const fetchAdvisories = async () => {
-            setLoadingAdvisories(true);
-            setAdvisoriesError(null);
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/advisories`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!response.ok) throw new Error(`Advisory request failed (${response.status})`);
-                const data = await response.json();
-                if (!Array.isArray(data)) throw new Error('Advisory response was not a list');
-                setLguUpdates(data);
-            } catch (error) {
-                console.error("PULSO: Error fetching advisories:", error);
-                setLguUpdates([]);
-                setAdvisoriesError('Advisories are temporarily unavailable.');
-            } finally {
-                setLoadingAdvisories(false);
-            }
-        };
+        const userId = currentUser?.id;
+        let isMounted = true;
+
         const loadData = async () => {
-            fetchPublicReports();
-            if (currentUser) {
-                try {
-                    await fetchUser(currentUser.id);
-                    await fetchAdvisories();
-                    await fetchUserReports(currentUser.id);
-                    await fetchNotifications(currentUser.id);
-                } catch (e) {
-                    console.error("PULSO: Error in loadData sequence:", e);
+            if (isFetchingDataRef.current) return;
+            isFetchingDataRef.current = true;
+            try {
+                const tasks = [fetchPublicReports()];
+                if (userId) {
+                    tasks.push(
+                        fetchUser(userId),
+                        fetchAdvisories(),
+                        fetchUserReports(userId),
+                        fetchNotifications(userId)
+                    );
+                }
+                await Promise.allSettled(tasks);
+            } catch (e) {
+                console.error("PULSO: Error in loadData sequence:", e);
+            } finally {
+                if (isMounted) {
+                    isFetchingDataRef.current = false;
                 }
             }
         };
+
         loadData();
         // Auto-refresh user data and reports every 30s to keep status badges sync'd
         const interval = setInterval(loadData, 30000);
-        return () => clearInterval(interval);
-    }, [currentUser, advisoriesReloadKey]);
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
+    }, [currentUser?.id, token, advisoriesReloadKey, fetchPublicReports, fetchUser, fetchAdvisories, fetchUserReports, fetchNotifications]);
 
     const [reportNotes, setReportNotes] = useState('');
     const [reportCategory, setReportCategory] = useState([]);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [aiFeedback, setAiFeedback] = useState(null);
     const [submittingReport, setSubmittingReport] = useState(false);
-    const [reportLocation, setReportLocation] = useState({
-        lat: 14.751952,
-        lng: 121.026277,
-        confirmed: true,
-        source: 'pinpoint',
-        isExact: true,
-        accuracy: 12
-    }); // Default: Celina Homes 3, Barangay 171, Caloocan
-    const [isLocating, setIsLocating] = useState(false);
+    const [reportLocation, setReportLocation] = useState(null);
+    const [isLocating, setIsLocating] = useState(true);
+    const [locatingStep, setLocatingStep] = useState(0);
+    const locatingStepTimers = useRef([]);
     const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
     const [photoMetadata, setPhotoMetadata] = useState(null);
     const [showHeatmap, setShowHeatmap] = useState(true);
@@ -6297,6 +7587,7 @@ export default function ResidentDashboard() {
         if (cat.includes('lighting') || cat.includes('street') || cat.includes('electric')) return '#eab308';
         if (cat.includes('safety') || cat.includes('regulatory') || cat.includes('emergency')) return '#ef4444';
         if (cat.includes('facilit') || cat.includes('build') || cat.includes('park')) return '#22c55e';
+        if (cat.includes('other')) return '#8b5cf6';
         return '#94a3b8';
     };
 
@@ -6315,6 +7606,8 @@ export default function ResidentDashboard() {
         // Overwrite color for Public Facilities
         if (isPublicFacility) {
             color = isSelected ? '#16a34a' : '#22c55e';
+        } else if (cat.includes('other')) {
+            color = isSelected ? '#7c3aed' : '#8b5cf6';
         }
 
         let svgIcon = '';
@@ -6332,6 +7625,9 @@ export default function ResidentDashboard() {
         } else if (isPublicFacility) {
             // Building/Facility icon
             svgIcon = `<path d="M4 22V4c0-1.1.9-2 2-2h12a2 2 0 0 1 2 2v18H4zm4-4h2v-2H8v2zm0-4h2v-2H8v2zm0-4h2V8H8v2zm4 8h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2V8h-2v2zm4 8h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2V8h-2v2z" fill="white"/>`;
+        } else if (cat.includes('other')) {
+            // Question mark icon
+            svgIcon = `<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-2h2zm1.07-7.75l-.9.92C12.45 10.9 12 11.5 12 13h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41a2 2 0 1 0-4 0H7a4 4 0 1 1 8 0c0 .88-.36 1.68-.93 2.25z" fill="white"/>`;
         } else {
             // Alert triangle
             svgIcon = `<path d="M12 2L1 21h22L12 2zm0 3.5l7 13.5H5l7-13.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z" fill="white"/>`;
@@ -6377,7 +7673,7 @@ export default function ResidentDashboard() {
         const seen = new Set();
         const uniqueReports = [];
         for (const r of combined) {
-            const idKey = r.id ? String(r.id) : (r.ticket_id || Math.random());
+            const idKey = r.id != null ? String(r.id) : (r.ticket_id ? String(r.ticket_id) : (r.tracking_token || `${r.location_lat || r.lat}_${r.location_lng || r.lng}_${r.created_at || ''}`));
             if (!seen.has(idKey)) {
                 seen.add(idKey);
                 uniqueReports.push(r);
@@ -6460,7 +7756,16 @@ export default function ResidentDashboard() {
 
         const flushBatch = () => {
             if (Object.keys(pendingBatch).length > 0) {
-                setPhotoPinIcons(prev => ({ ...prev, ...pendingBatch }));
+                setPhotoPinIcons(prev => {
+                    let hasNew = false;
+                    for (const k in pendingBatch) {
+                        if (!prev[k]) {
+                            hasNew = true;
+                            break;
+                        }
+                    }
+                    return hasNew ? { ...prev, ...pendingBatch } : prev;
+                });
             }
         };
 
@@ -6592,13 +7897,28 @@ export default function ResidentDashboard() {
     }, [processedHazards]);
 
 
+    const clearLocatingTimers = () => {
+        if (locatingStepTimers.current) {
+            locatingStepTimers.current.forEach(t => clearTimeout(t));
+            locatingStepTimers.current = [];
+        }
+    };
+
     const requestDeviceLocation = (force = false) => {
+        clearLocatingTimers();
         if (!navigator.geolocation) {
-            if (!locationAddress) reverseGeocode(14.751952, 121.026277);
+            setIsLocating(false);
+            setLocationPermissionDenied(true);
             return;
         }
         setIsLocating(true);
         setLocationPermissionDenied(false);
+        setLocatingStep(0);
+
+        // Progressive status timers: 0 -> 1 -> 2
+        const t1 = setTimeout(() => setLocatingStep(1), 1400);
+        const t2 = setTimeout(() => setLocatingStep(2), 2800);
+        locatingStepTimers.current = [t1, t2];
 
         let bestAcc = Infinity;
         let bestCoords = null;
@@ -6606,6 +7926,7 @@ export default function ResidentDashboard() {
         let settledTimer = null;
 
         const finalize = (coords) => {
+            clearLocatingTimers();
             const finalCoords = coords || bestCoords;
             if (finalCoords) {
                 let finalLat = finalCoords.latitude;
@@ -6628,6 +7949,8 @@ export default function ResidentDashboard() {
                 };
                 setReportLocation(loc);
                 reverseGeocode(loc.lat, loc.lng);
+            } else {
+                setLocationPermissionDenied(true);
             }
             setIsLocating(false);
         };
@@ -6667,6 +7990,7 @@ export default function ResidentDashboard() {
                     console.warn("High-accuracy watch fallback:", err);
                     if (err.code === 1) { // PERMISSION_DENIED
                         stopWatching();
+                        clearLocatingTimers();
                         setIsLocating(false);
                         setLocationPermissionDenied(true);
                         return;
@@ -6676,13 +8000,10 @@ export default function ResidentDashboard() {
                         pos => finalize(pos.coords),
                         fallbackErr => {
                             console.warn("Geolocation fallback failed:", fallbackErr);
+                            clearLocatingTimers();
                             setIsLocating(false);
-                            if (fallbackErr.code === 1) {
-                                setLocationPermissionDenied(true);
-                            } else {
-                                if (force) showToast('Could not retrieve live GPS. Defaulted to Caloocan North.', 'info');
-                                if (!locationAddress) reverseGeocode(14.751952, 121.026277);
-                            }
+                            setLocationPermissionDenied(true);
+                            if (force) showToast('Could not retrieve live GPS. Please pinpoint your location on the map.', 'info');
                         },
                         { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
                     );
@@ -6698,12 +8019,15 @@ export default function ResidentDashboard() {
     // Auto-request device location once on mount
     useEffect(() => {
         requestDeviceLocation(false);
+        return () => clearLocatingTimers();
     }, []);
 
     // Automatically sample fresh high-accuracy location whenever Quick Report modal is opened
     useEffect(() => {
         if (activeModal === 'file-report') {
-            requestDeviceLocation(false);
+            if (!reportLocation || !locationAddress) {
+                requestDeviceLocation(false);
+            }
         }
     }, [activeModal]);
 
@@ -6831,20 +8155,9 @@ export default function ResidentDashboard() {
 
 
     // Reverse-geocoded address for the report location picker
-    const [structuredAddress, setStructuredAddress] = useState({
-        subdivision: 'Celina Homes 3',
-        plusCode: 'Q22G+QGP',
-        streetAddress: 'Blk 4 Lot 16 Silver',
-        houseNumber: '',
-        blockLot: 'Blk 4 Lot 16',
-        street: 'Silver',
-        barangay: 'Barangay 171',
-        city: 'Caloocan',
-        postalCode: '1421',
-        region: 'Metro Manila'
-    });
-    const [locationAddress, setLocationAddress] = useState('Celina Homes 3, Q22G+QGP, Blk 4 Lot 16 Silver, Barangay 171, Caloocan, 1421 Metro Manila');
-    const [plusCode, setPlusCode] = useState('Q22G+QGP');
+    const [structuredAddress, setStructuredAddress] = useState(null);
+    const [locationAddress, setLocationAddress] = useState('');
+    const [plusCode, setPlusCode] = useState('');
     const [geocodingAddress, setGeocodingAddress] = useState(false);
     const geocodeRequest = useRef(0);
 
@@ -6989,12 +8302,16 @@ export default function ResidentDashboard() {
     };
 
     const handleFileReport = () => {
-        if (!reportLocation || isNaN(reportLocation.lat) || isNaN(reportLocation.lng)) {
-            showToast('Please select a valid incident location inside Caloocan City.', 'error');
+        if (isLocating || geocodingAddress || !reportLocation || isNaN(reportLocation.lat) || isNaN(reportLocation.lng)) {
+            showToast('Please wait for location to finish acquiring or pinpoint manually on the map.', 'warning');
             return;
         }
         if (reportCategory.length === 0) {
             showToast('Please select at least one issue category.', 'error');
+            return;
+        }
+        if (reportCategory.includes('Others') && (!reportNotes || reportNotes.trim().length < 10)) {
+            showToast('Please describe the issue in Additional Notes (minimum 10 characters) when "Others" is selected.', 'warning');
             return;
         }
         if (!selectedImage) {
@@ -7099,50 +8416,6 @@ export default function ResidentDashboard() {
     };
 
 
-    // Real User Data State
-    const [user, setUser] = useState(() => {
-        const savedAvatar = typeof localStorage !== 'undefined' ? (localStorage.getItem('pulso_avatar_current') || null) : null;
-        return {
-            name: 'Resident',
-            fullName: 'Loading...',
-            barangay: 'Loading...',
-            email: '',
-            phone: '',
-            memberSince: 'Loading...',
-            trustScore: 100,
-            avatar: 'R',
-            avatarPhoto: savedAvatar
-        };
-    });
-    const [updatingProfile, setUpdatingProfile] = useState(false);
-
-    const fetchUser = async (userId) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                const savedAvatar = (typeof localStorage !== 'undefined')
-                    ? (localStorage.getItem(`pulso_avatar_${data.email || 'current'}`) || localStorage.getItem('pulso_avatar_current') || null)
-                    : null;
-                setUser({
-                    name: data.full_name ? data.full_name.split(' ')[0] : 'Resident',
-                    fullName: data.full_name || '',
-                    address: formatAddress(data.address || ''),
-                    barangay: data.barangay || '',
-                    email: data.email || '',
-                    phone: data.phone_number || '', // Mapped to phone_number
-                    memberSince: new Date(data.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-                    trustScore: data.trust_score || 100,
-                    avatar: data.full_name ? data.full_name.charAt(0).toUpperCase() : 'R',
-                    avatarPhoto: savedAvatar
-                });
-            }
-        } catch (error) {
-            console.error("PULSO: Error fetching user data:", error);
-        }
-    };
 
     const handleUpdateProfile = async (field, value) => {
         setUpdatingProfile(true);
@@ -7174,39 +8447,332 @@ export default function ResidentDashboard() {
         }
     };
 
-    // ── Resident AI Assistant State ───────────────────────────────────────────
+    // ── Resident AI Assistant State & Persistent History ──────────────────────
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
     const [isAIMaximized, setIsAIMaximized] = useState(false);
     const [isAILoading, setIsAILoading] = useState(false);
     const [aiQuery, setAiQuery] = useState('');
+    const [aiConversations, setAiConversations] = useState([]);
+    const [activeConversationId, setActiveConversationId] = useState(() => {
+        const uid = currentUser?.id || user?.id;
+        const stored = uid ? localStorage.getItem(`pulso_pulseai_active_conv_${uid}`) : null;
+        return stored ? parseInt(stored, 10) : null;
+    });
+    const [isAIHistoryOpen, setIsAIHistoryOpen] = useState(false);
+    const [loadingAIConversations, setLoadingAIConversations] = useState(false);
+    const [deletingConversationId, setDeletingConversationId] = useState(null);
+
+    const getInitialAIMessage = useCallback(() => ({
+        role: 'assistant',
+        text: `Hello ${currentUser?.full_name?.split(' ')[0] || user?.name?.split(' ')[0] || 'there'}. I am **PULSEAI**, the official 24/7 assistant for Caloocan City's infrastructure and public services.\n\nHow can I help you today? You can ask about **how to file a report**, check your **report status**, inquire about **city emergency hotlines**, or view **active engineering advisories**.`
+    }), [currentUser?.full_name, user?.name]);
+
     const [aiMessages, setAiMessages] = useState([
-        { role: 'assistant', text: `Hi ${currentUser?.full_name?.split(' ')[0] || 'there'}! I am PULSEAI, your 24/7 community helper. Ask me about filing reports, nearby hazards, city services, or anything about Caloocan City!` }
+        {
+            role: 'assistant',
+            text: `Hello ${currentUser?.full_name?.split(' ')[0] || user?.name?.split(' ')[0] || 'there'}. I am **PULSEAI**, the official 24/7 assistant for Caloocan City's infrastructure and public services.\n\nHow can I help you today? You can ask about **how to file a report**, check your **report status**, inquire about **city emergency hotlines**, or view **active engineering advisories**.`
+        }
     ]);
     const aiChatEndRef = React.useRef(null);
+    const hasFetchedConversationsOnOpen = React.useRef(false);
+    const aiSuggestionsScrollRef = React.useRef(null);
+    const [canScrollAiLeft, setCanScrollAiLeft] = useState(false);
+    const [canScrollAiRight, setCanScrollAiRight] = useState(true);
 
-    const handleResidentAIChat = async (e) => {
-        e.preventDefault();
-        if (!aiQuery.trim() || isAILoading) return;
+    const updateAiSuggestionsScroll = useCallback(() => {
+        const el = aiSuggestionsScrollRef.current;
+        if (!el) return;
+        const { scrollLeft, scrollWidth, clientWidth } = el;
+        setCanScrollAiLeft(scrollLeft > 2);
+        setCanScrollAiRight(scrollLeft < scrollWidth - clientWidth - 2);
+    }, []);
 
-        const userMsg = { role: 'user', text: aiQuery };
+    const scrollAiSuggestions = (direction) => {
+        const el = aiSuggestionsScrollRef.current;
+        if (!el) return;
+        const scrollAmount = 140;
+        el.scrollBy({
+            left: direction === 'left' ? -scrollAmount : scrollAmount,
+            behavior: 'smooth'
+        });
+        setTimeout(updateAiSuggestionsScroll, 300);
+    };
+
+    useEffect(() => {
+        if (isAIChatOpen && aiMessages.length === 1) {
+            updateAiSuggestionsScroll();
+            const timer = setTimeout(updateAiSuggestionsScroll, 120);
+            window.addEventListener('resize', updateAiSuggestionsScroll);
+            return () => {
+                clearTimeout(timer);
+                window.removeEventListener('resize', updateAiSuggestionsScroll);
+            };
+        }
+    }, [isAIChatOpen, aiMessages.length, updateAiSuggestionsScroll]);
+
+    const formatRelativeTime = (dateStr) => {
+        if (!dateStr) return '';
+        try {
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return '';
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            const diffHours = Math.floor(diffMins / 60);
+            if (diffHours < 24) return `${diffHours}h ago`;
+            const diffDays = Math.floor(diffHours / 24);
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays < 7) return `${diffDays}d ago`;
+            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        } catch {
+            return '';
+        }
+    };
+
+    const fetchAIConversations = useCallback(async (silent = false) => {
+        const uid = currentUser?.id || user?.id;
+        if (!token || !uid) {
+            setLoadingAIConversations(false);
+            return;
+        }
+        if (!silent) setLoadingAIConversations(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/pulseai/conversations`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAiConversations(data.conversations || []);
+            }
+        } catch (err) {
+            console.error("Failed to load PULSEAI conversations:", err);
+        } finally {
+            if (!silent) setLoadingAIConversations(false);
+        }
+    }, [token, currentUser?.id, user?.id]);
+
+    const loadConversationMessages = useCallback(async (convId) => {
+        if (!convId || !token) return;
+        setIsAILoading(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/pulseai/conversations/${convId}/messages`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.messages && data.messages.length > 0) {
+                    setAiMessages(data.messages.map(m => ({
+                        role: m.role,
+                        text: m.content,
+                        created_at: m.created_at,
+                        tool_name: m.tool_name
+                    })));
+                } else {
+                    setAiMessages([getInitialAIMessage()]);
+                }
+                setActiveConversationId(convId);
+                const uid = currentUser?.id || user?.id;
+                if (uid) {
+                    localStorage.setItem(`pulso_pulseai_active_conv_${uid}`, convId.toString());
+                }
+                setIsAIHistoryOpen(false);
+            }
+        } catch (err) {
+            console.error("Failed to load conversation messages:", err);
+            showToast("Could not load past conversation", 'error');
+        } finally {
+            setIsAILoading(false);
+            setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        }
+    }, [token, currentUser?.id, user?.id, getInitialAIMessage, showToast]);
+
+    const handleStartNewChat = () => {
+        setActiveConversationId(null);
+        const uid = currentUser?.id || user?.id;
+        if (uid) {
+            localStorage.removeItem(`pulso_pulseai_active_conv_${uid}`);
+        }
+        setAiMessages([getInitialAIMessage()]);
+        setIsAIHistoryOpen(false);
+    };
+
+    const handleDeleteConversation = async (convId, e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (!convId || !token) return;
+
+        const result = await Swal.fire({
+            title: 'Delete Conversation?',
+            text: 'This chat thread will be permanently deleted from your account per RA 10173 Right to Erasure.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ea580c',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Yes, delete',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            setDeletingConversationId(convId);
+            const res = await fetch(`${API_BASE_URL}/api/pulseai/conversations/${convId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                showToast("Conversation deleted");
+                setAiConversations(prev => prev.filter(c => c.id !== convId));
+                if (activeConversationId === convId) {
+                    handleStartNewChat();
+                }
+            } else {
+                showToast("Failed to delete conversation", 'error');
+            }
+        } catch {
+            showToast("Network error deleting conversation", 'error');
+        } finally {
+            setDeletingConversationId(null);
+        }
+    };
+
+    const handleClearAllConversations = async () => {
+        if (!token) return;
+
+        const result = await Swal.fire({
+            title: 'Clear All Chat History?',
+            text: 'Are you sure you want to delete all saved PULSEAI conversations? This action cannot be undone.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ea580c',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Yes, clear all',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/pulseai/conversations`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                showToast("All chat history cleared");
+                setAiConversations([]);
+                handleStartNewChat();
+            } else {
+                showToast("Failed to clear chat history", 'error');
+            }
+        } catch {
+            showToast("Network error clearing history", 'error');
+        }
+    };
+
+    // Auto-fetch conversations and restore active conversation when chat opens
+    useEffect(() => {
+        if (isAIChatOpen && token && (currentUser?.id || user?.id)) {
+            if (!hasFetchedConversationsOnOpen.current) {
+                hasFetchedConversationsOnOpen.current = true;
+                fetchAIConversations();
+                const uid = currentUser?.id || user?.id;
+                const storedConvId = localStorage.getItem(`pulso_pulseai_active_conv_${uid}`);
+                if (storedConvId) {
+                    loadConversationMessages(parseInt(storedConvId, 10));
+                }
+            }
+        } else if (!isAIChatOpen) {
+            hasFetchedConversationsOnOpen.current = false;
+        }
+    }, [isAIChatOpen, token, currentUser?.id, user?.id, fetchAIConversations, loadConversationMessages]);
+
+    const handleResidentAIChat = async (e, overrideQuery = null) => {
+        if (e && e.preventDefault) e.preventDefault();
+        const queryToSend = (overrideQuery || aiQuery).trim();
+        if (!queryToSend || isAILoading) return;
+
+        const userMsg = { role: 'user', text: queryToSend };
         setAiMessages(prev => [...prev, userMsg]);
-        const captured = aiQuery;
         setAiQuery('');
         setIsAILoading(true);
 
+        const uid = currentUser?.id || user?.id;
+        const userName = currentUser?.full_name || user?.name || 'Resident';
+        const userBrgy = currentUser?.barangay || user?.barangay || 'North Caloocan';
+
+        // 1. Try persistent conversation if authenticated
+        if (token && uid) {
+            try {
+                let convId = activeConversationId;
+                if (!convId) {
+                    const createRes = await fetch(`${API_BASE_URL}/api/pulseai/conversations`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ title: queryToSend.slice(0, 42) })
+                    });
+                    if (createRes.ok) {
+                        const convData = await createRes.json();
+                        convId = convData.id;
+                        setActiveConversationId(convId);
+                        localStorage.setItem(`pulso_pulseai_active_conv_${uid}`, convId.toString());
+                    }
+                }
+
+                if (convId) {
+                    const resp = await fetch(`${API_BASE_URL}/api/pulseai/conversations/${convId}/messages`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            query: queryToSend,
+                            context: `Resident Portal. User: ${userName}, Barangay: ${userBrgy}. Active tab: ${activeTab}. The user is a citizen, NOT a staff member. Help them navigate PULSO, understand how to report issues, check their report status, learn about city services, evacuation routes, and local government procedures in Caloocan City North.`
+                        })
+                    });
+
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        setAiMessages(prev => [...prev, {
+                            role: 'assistant',
+                            text: data.response,
+                            tool_name: data.assistant_message?.tool_name
+                        }]);
+                        fetchAIConversations(true);
+                        setIsAILoading(false);
+                        setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn("Persistent conversation failed, trying fallback:", err);
+            }
+        }
+
+        // 2. Unauthenticated or fallback to legacy assistant endpoint
         try {
             const resp = await fetch(`${API_BASE_URL}/api/ai/assistant`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({
-                    query: captured,
-                    context: `Resident Portal. User: ${user.name}, Barangay: ${user.barangay}. Active tab: ${activeTab}. The user is a citizen, NOT a staff member. Help them navigate PULSO, understand how to report issues, check their report status, learn about city services, evacuation routes, and local government procedures in Caloocan City North.`
+                    query: queryToSend,
+                    context: `Resident Portal. User: ${userName}, Barangay: ${userBrgy}. Active tab: ${activeTab}. The user is a citizen, NOT a staff member. Help them navigate PULSO, understand how to report issues, check their report status, learn about city services, evacuation routes, and local government procedures in Caloocan City North.`
                 })
             });
             const data = await resp.json();
             setAiMessages(prev => [...prev, { role: 'assistant', text: data.response }]);
         } catch {
-            setAiMessages(prev => [...prev, { role: 'assistant', text: 'Sorry, I am temporarily unavailable. Please try again shortly.' }]);
+            setAiMessages(prev => [...prev, {
+                role: 'assistant',
+                text: 'I am temporarily unable to connect to the PULSO network. For emergency services, please dial **911** (NDRRMC) or contact the **Caloocan Action Center** at **(02) 8288-8811**.'
+            }]);
         } finally {
             setIsAILoading(false);
             setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -7341,6 +8907,7 @@ export default function ResidentDashboard() {
                 theme={theme}
                 borderData={borderData}
                 isLocating={isLocating}
+                locatingStep={locatingStep}
                 requestDeviceLocation={requestDeviceLocation}
                 showHeatmap={showHeatmap}
                 setShowHeatmap={setShowHeatmap}
@@ -7548,7 +9115,11 @@ export default function ResidentDashboard() {
                                     userReports={userReports}
                                     showToast={showToast}
                                     handleLogout={handleLogout}
+                                    handleSetModal={handleSetModal}
                                     t={t}
+                                    i18n={i18n}
+                                    subView={accountSubView}
+                                    setSubView={setAccountSubView}
                                 />
                             </div>
                         )}
@@ -7562,6 +9133,7 @@ export default function ResidentDashboard() {
                                     token={token}
                                     showToast={showToast}
                                     t={t}
+                                    onClearAIChatHistory={handleClearAllConversations}
                                 />
                             </div>
                         )}
@@ -7571,7 +9143,7 @@ export default function ResidentDashboard() {
 
             {/* ── Mobile Bottom Navigation Bar (Ultra-responsive, glassmorphism, touch-optimized, persistent across all scroll states) ── */}
             <nav
-                className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4rem] h-[calc(4rem+env(safe-area-inset-bottom,0px))] px-2 flex items-center justify-around select-none w-full"
+                className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4.25rem] sm:min-h-[4.5rem] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 flex items-center justify-around select-none w-full"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             >
                 {navItems.map((item) => {
@@ -7581,13 +9153,13 @@ export default function ResidentDashboard() {
                                 key="report"
                                 type="button"
                                 onClick={() => handleSetModal('file-report')}
-                                className="flex flex-col items-center justify-center -mt-6 group focus:outline-none cursor-pointer"
+                                className="flex flex-col items-center justify-center -mt-7 sm:-mt-8 px-2 sm:px-3 group focus:outline-none cursor-pointer shrink-0"
                                 aria-label="Report an issue"
                             >
-                                <div className="w-12 h-12 rounded-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-90 text-white shadow-lg flex items-center justify-center border-3 border-white dark:border-slate-900 transition-transform group-hover:scale-105">
+                                <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white shadow-xl shadow-orange-500/30 flex items-center justify-center border-[3.5px] border-white dark:border-slate-900 transition-all group-hover:scale-105">
                                     <Plus size={26} strokeWidth={3} />
                                 </div>
-                                <span className="text-[10px] font-extrabold text-[#ff6b00] mt-0.5">
+                                <span className="text-[10px] font-extrabold text-[#ff6b00] mt-1 tracking-tight">
                                     {item.label}
                                 </span>
                             </button>
@@ -7599,7 +9171,7 @@ export default function ResidentDashboard() {
                         <button
                             key={item.id}
                             onClick={() => handleSetTab(item.id)}
-                            className={`flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all duration-200 relative group active:scale-95 ${
+                            className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 sm:px-2 min-h-[44px] rounded-xl transition-all duration-200 relative group active:scale-95 ${
                                 isActive
                                     ? 'text-orange-500 font-bold'
                                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -7607,17 +9179,17 @@ export default function ResidentDashboard() {
                         >
                             <div className="relative">
                                 {React.cloneElement(item.icon, {
-                                    size: 22,
+                                    size: 21,
                                     className: `transition-transform duration-200 ${isActive ? 'stroke-[2.5px] scale-110' : ''}`
                                 })}
                                 {isActive && (
                                     <motion.div
                                         layoutId="mobileNavActivePill"
-                                        className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-orange-500 rounded-full"
+                                        className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3.5 h-1 bg-orange-500 rounded-full"
                                     />
                                 )}
                             </div>
-                            <span className={`text-[10px] mt-0.5 tracking-tight truncate max-w-[64px] ${isActive ? 'font-bold text-orange-500' : 'font-medium'}`}>
+                            <span className={`text-[10px] mt-1 tracking-tight truncate max-w-[64px] ${isActive ? 'font-bold text-orange-500' : 'font-medium'}`}>
                                 {item.label}
                             </span>
                         </button>
@@ -7663,109 +9235,393 @@ export default function ResidentDashboard() {
                             {/* Header */}
                             <div className="p-3.5 sm:p-4 bg-gradient-to-r from-[#e65100] via-[#f97316] to-[#ea580c] flex justify-between items-center shrink-0">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0 shadow-xs">
                                         <Brain size={18} className="text-white" />
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-white text-sm leading-tight">PULSEAI</h4>
+                                        <div className="flex items-center gap-1.5">
+                                            <h4 className="font-bold text-white text-sm leading-tight">PULSEAI</h4>
+                                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="System Operational" />
+                                        </div>
                                         <p className="text-[10px] text-orange-100 font-semibold uppercase tracking-wider">Community Helper · 24/7</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1">
+                                    {/* Start New Chat Button */}
+                                    <button
+                                        type="button"
+                                        onClick={handleStartNewChat}
+                                        title="Start New Chat"
+                                        aria-label="New Chat"
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+                                    >
+                                        <Plus size={17} strokeWidth={2.5} />
+                                    </button>
+                                    {/* Toggle History View Button */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsAIHistoryOpen(prev => {
+                                                const next = !prev;
+                                                if (next && aiConversations.length === 0) {
+                                                    fetchAIConversations();
+                                                }
+                                                return next;
+                                            });
+                                        }}
+                                        title={isAIHistoryOpen ? "Return to chat" : "Past Conversations"}
+                                        aria-label="Toggle Conversation History"
+                                        className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                                            isAIHistoryOpen
+                                                ? 'bg-white/30 text-white shadow-xs'
+                                                : 'text-white/90 hover:text-white hover:bg-white/20'
+                                        }`}
+                                    >
+                                        <History size={16} />
+                                    </button>
+                                    {/* Maximize/Minimize */}
                                     <button
                                         type="button"
                                         onClick={() => setIsAIMaximized(prev => !prev)}
                                         title={isAIMaximized ? 'Minimize' : 'Maximize'}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
                                     >
                                         {isAIMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                                     </button>
+                                    {/* Close Button */}
                                     <button
                                         type="button"
-                                        onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
+                                        onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); setIsAIHistoryOpen(false); }}
                                         title="Close"
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
                                     >
                                         <X size={16} />
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Suggested quick-actions (Horizontally scrollable on mobile, saving vertical space) */}
-                            {aiMessages.length === 1 && (
-                                <div className="px-3 py-2 bg-orange-50/90 dark:bg-slate-800/90 border-b border-orange-100 dark:border-slate-700 flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-                                    {['How to file a report?', 'My report status', 'City hotlines', 'Evacuation routes'].map(q => (
+                            {/* Content Body: Either History View or Chat View */}
+                            {isAIHistoryOpen ? (
+                                /* History Drawer / Panel */
+                                <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-900">
+                                    {/* Panel Sub-Header */}
+                                    <div className="px-3.5 py-2.5 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/80 flex items-center justify-between shrink-0">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsAIHistoryOpen(false)}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                                title="Back to conversation"
+                                            >
+                                                <ChevronLeft size={16} />
+                                            </button>
+                                            <div>
+                                                <h5 className="font-bold text-xs text-slate-900 dark:text-white">Chat History</h5>
+                                                <p className="text-[10px] text-slate-400">
+                                                    {aiConversations.length} {aiConversations.length === 1 ? 'thread' : 'threads'}
+                                                </p>
+                                            </div>
+                                        </div>
                                         <button
-                                            key={q}
                                             type="button"
-                                            onClick={() => { setAiQuery(q); }}
-                                            className="text-[11px] font-semibold whitespace-nowrap text-[#ea580c] dark:text-orange-300 bg-white dark:bg-slate-700 border border-orange-200 dark:border-orange-900/40 px-3 py-1 rounded-full hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] transition-colors shrink-0 cursor-pointer shadow-2xs"
+                                            onClick={handleStartNewChat}
+                                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#ea580c] hover:bg-[#c2410c] text-white flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
                                         >
-                                            {q}
+                                            <Plus size={13} strokeWidth={2.5} />
+                                            <span>New Chat</span>
                                         </button>
-                                    ))}
-                                </div>
-                            )}
+                                    </div>
 
-                            {/* Messages Area */}
-                            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
-                                {aiMessages.map((msg, i) => (
-                                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        {msg.role === 'assistant' && (
-                                            <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0 shadow-xs">
-                                                <Brain size={12} className="text-white" />
+                                    {/* Conversation List */}
+                                    <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+                                        {loadingAIConversations ? (
+                                            <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
+                                                <Loader2 size={24} className="animate-spin text-[#ea580c]" />
+                                                <span className="text-xs font-medium">Loading conversations...</span>
+                                            </div>
+                                        ) : aiConversations.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                                                <div className="w-12 h-12 rounded-2xl bg-orange-100 dark:bg-orange-950/40 text-[#ea580c] dark:text-orange-400 flex items-center justify-center mb-3">
+                                                    <MessageSquare size={22} />
+                                                </div>
+                                                <h6 className="font-bold text-sm text-slate-800 dark:text-slate-200 mb-1">No saved conversations yet</h6>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-[240px] mb-4">
+                                                    Your inquiries, ticket lookups, and advisory questions will automatically be preserved here.
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleStartNewChat}
+                                                    className="px-3.5 py-2 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                                >
+                                                    Start First Conversation
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            aiConversations.map(conv => {
+                                                const isActive = conv.id === activeConversationId;
+                                                return (
+                                                    <div
+                                                        key={conv.id}
+                                                        onClick={() => loadConversationMessages(conv.id)}
+                                                        className={`p-3 rounded-xl border transition-all cursor-pointer relative group ${
+                                                            isActive
+                                                                ? 'bg-orange-50/90 dark:bg-orange-950/25 border-orange-300 dark:border-orange-800/60 shadow-xs'
+                                                                : 'bg-white dark:bg-slate-800/70 border-slate-200 dark:border-slate-700/60 hover:border-orange-200 dark:hover:border-orange-900/40 hover:shadow-2xs'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2 mb-1">
+                                                            <h6 className={`font-semibold text-xs leading-snug line-clamp-1 ${
+                                                                isActive
+                                                                    ? 'text-orange-600 dark:text-orange-400 font-bold'
+                                                                    : 'text-slate-800 dark:text-slate-200 group-hover:text-orange-600 dark:group-hover:text-orange-400'
+                                                            }`}>
+                                                                {conv.title || 'Conversation'}
+                                                            </h6>
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                {isActive && (
+                                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500 text-white">
+                                                                        Active
+                                                                    </span>
+                                                                )}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => handleDeleteConversation(conv.id, e)}
+                                                                    title="Delete conversation"
+                                                                    disabled={deletingConversationId === conv.id}
+                                                                    className="opacity-70 group-hover:opacity-100 hover:text-rose-500 p-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-400 transition-all cursor-pointer"
+                                                                >
+                                                                    {deletingConversationId === conv.id ? (
+                                                                        <Loader2 size={13} className="animate-spin text-rose-500" />
+                                                                    ) : (
+                                                                        <Trash2 size={13} />
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        {conv.last_message && (
+                                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed mb-1.5 font-medium">
+                                                                {conv.last_message}
+                                                            </p>
+                                                        )}
+                                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-0.5 border-t border-slate-100 dark:border-slate-700/40">
+                                                            <span>{formatRelativeTime(conv.updated_at || conv.created_at)}</span>
+                                                            <span>{conv.message_count || 0} msgs</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+
+                                    {/* Privacy Note & Clear All Footer */}
+                                    <div className="p-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700/80 shrink-0 space-y-2">
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
+                                            Saved to your resident account in compliance with RA 10173. You can erase threads at any time.
+                                        </p>
+                                        {aiConversations.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={handleClearAllConversations}
+                                                className="w-full py-1.5 text-[11px] font-bold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg border border-rose-200 dark:border-rose-900/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                            >
+                                                <Trash2 size={12} />
+                                                <span>Clear All Chat History</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                /* Regular Chat View */
+                                <>
+                                    {/* Suggested quick-actions (Horizontally scrollable with Left & Right Chevrons) */}
+                                    {aiMessages.length === 1 && (
+                                        <div className="px-1.5 sm:px-2 py-1.5 bg-orange-50/90 dark:bg-slate-800/90 border-b border-orange-100 dark:border-slate-700 flex items-center gap-1 shrink-0 relative">
+                                            {/* Chevron Left Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => scrollAiSuggestions('left')}
+                                                disabled={!canScrollAiLeft}
+                                                aria-label="Scroll suggestions left"
+                                                className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-150 ${
+                                                    canScrollAiLeft
+                                                        ? 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs border border-orange-200/90 dark:border-slate-600 hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] cursor-pointer active:scale-95'
+                                                        : 'text-slate-300 dark:text-slate-600 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
+                                                }`}
+                                            >
+                                                <ChevronLeft size={13} strokeWidth={2.5} />
+                                            </button>
+
+                                            {/* Scrollable Pills Container */}
+                                            <div
+                                                ref={aiSuggestionsScrollRef}
+                                                onScroll={updateAiSuggestionsScroll}
+                                                className="flex-1 flex gap-1.5 overflow-x-auto no-scrollbar scroll-smooth items-center py-0.5"
+                                            >
+                                                {[
+                                                    { label: 'How to file a report?', query: 'How to file a report?' },
+                                                    { label: 'My report status', query: 'What is the status of my reports?' },
+                                                    { label: 'City hotlines', query: 'What are the city emergency hotlines?' },
+                                                    { label: 'Evacuation routes', query: 'Where are the evacuation routes in Caloocan?' }
+                                                ].map(item => (
+                                                    <button
+                                                        key={item.label}
+                                                        type="button"
+                                                        onClick={() => handleResidentAIChat(null, item.query)}
+                                                        className="text-[11px] font-semibold whitespace-nowrap text-[#ea580c] dark:text-orange-300 bg-white dark:bg-slate-700 border border-orange-200 dark:border-orange-900/40 px-3 py-1 rounded-full hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] transition-colors shrink-0 cursor-pointer shadow-2xs"
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {/* Chevron Right Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => scrollAiSuggestions('right')}
+                                                disabled={!canScrollAiRight}
+                                                aria-label="Scroll suggestions right"
+                                                className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-150 ${
+                                                    canScrollAiRight
+                                                        ? 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs border border-orange-200/90 dark:border-slate-600 hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] cursor-pointer active:scale-95'
+                                                        : 'text-slate-300 dark:text-slate-600 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
+                                                }`}
+                                            >
+                                                <ChevronRight size={13} strokeWidth={2.5} />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Messages Area */}
+                                    <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+                                        {aiMessages.map((msg, i) => (
+                                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                {msg.role === 'assistant' && (
+                                                    <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0 shadow-xs">
+                                                        <Brain size={12} className="text-white" />
+                                                    </div>
+                                                )}
+                                                <div className={`${isAIMaximized ? 'max-w-[85%] sm:max-w-[70%]' : 'max-w-[85%]'
+                                                    } p-3 rounded-2xl text-[13px] font-medium leading-relaxed ${msg.role === 'user'
+                                                        ? 'bg-[#f05a00] text-white rounded-br-xs shadow-xs'
+                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-xs border border-slate-200/50 dark:border-slate-700/50'
+                                                    }`}>
+                                                    {msg.role === 'assistant' ? (
+                                                        <PulseAIMarkdown content={msg.text} />
+                                                    ) : (
+                                                        <p className="whitespace-pre-wrap">{msg.text}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Empty state quick-service shortcuts */}
+                                        {aiMessages.length === 1 && (
+                                            <div className="pt-1 pb-2">
+                                                <div className="flex items-center gap-2 mb-2 px-0.5">
+                                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Frequently Requested Services</span>
+                                                    <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700/60" />
+                                                </div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    {[
+                                                        {
+                                                            title: 'How to file a report?',
+                                                            desc: 'Step-by-step guide for hazard photo, map pin & ticket creation',
+                                                            badge: 'Guide',
+                                                            icon: AlertTriangle,
+                                                            query: 'How to file a report?'
+                                                        },
+                                                        {
+                                                            title: 'My report status',
+                                                            desc: 'Check live inspection and repair progress on your filed reports',
+                                                            badge: 'Live Data',
+                                                            icon: Clock,
+                                                            query: 'What is the status of my reports?'
+                                                        },
+                                                        {
+                                                            title: 'City hotlines',
+                                                            desc: 'Verified numbers for PNP, BFP Fire, DRRMO, and NDRRMC 911',
+                                                            badge: 'Emergency',
+                                                            icon: PhoneCall,
+                                                            query: 'What are the city emergency hotlines?'
+                                                        },
+                                                        {
+                                                            title: 'Evacuation routes',
+                                                            desc: 'Emergency guidance and DRRMO disaster shelter contacts',
+                                                            badge: 'Safety',
+                                                            icon: Compass,
+                                                            query: 'Where are the evacuation routes in Caloocan?'
+                                                        }
+                                                    ].map((card, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            type="button"
+                                                            onClick={() => handleResidentAIChat(null, card.query)}
+                                                            className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white/70 dark:bg-slate-800/70 hover:bg-orange-50/70 dark:hover:bg-orange-950/20 hover:border-orange-300 dark:hover:border-orange-800/60 text-left transition-all duration-150 group cursor-pointer shadow-xs flex flex-col justify-between"
+                                                        >
+                                                            <div className="flex items-center justify-between gap-1.5 mb-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-6 h-6 rounded-lg bg-orange-100 dark:bg-orange-900/40 text-[#ea580c] dark:text-orange-400 flex items-center justify-center shrink-0">
+                                                                        <card.icon size={13} />
+                                                                    </div>
+                                                                    <span className="font-semibold text-xs text-slate-800 dark:text-slate-100 group-hover:text-[#ea580c] dark:group-hover:text-orange-300 transition-colors">
+                                                                        {card.title}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                                                    {card.badge}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug pl-8">
+                                                                {card.desc}
+                                                            </p>
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
-                                        <div className={`${isAIMaximized ? 'max-w-[85%] sm:max-w-[70%]' : 'max-w-[85%]'
-                                            } p-3 rounded-2xl text-[13px] font-medium leading-relaxed ${msg.role === 'user'
-                                                ? 'bg-[#f05a00] text-white rounded-br-xs shadow-xs'
-                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-xs border border-slate-200/50 dark:border-slate-700/50'
-                                            }`}>
-                                            {msg.text}
-                                        </div>
+                                        {isAILoading && (
+                                            <div className="flex justify-start">
+                                                <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0">
+                                                    <Brain size={12} className="text-white" />
+                                                </div>
+                                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-xs flex gap-1 border border-slate-200/50 dark:border-slate-700/50">
+                                                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
+                                                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div ref={aiChatEndRef} />
                                     </div>
-                                ))}
-                                {isAILoading && (
-                                    <div className="flex justify-start">
-                                        <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0">
-                                            <Brain size={12} className="text-white" />
-                                        </div>
-                                        <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-xs flex gap-1 border border-slate-200/50 dark:border-slate-700/50">
-                                            <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
-                                            <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                            <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                                        </div>
-                                    </div>
-                                )}
-                                <div ref={aiChatEndRef} />
-                            </div>
 
-                            {/* Input Form with safe bottom area */}
-                            <form onSubmit={handleResidentAIChat} className="p-2.5 sm:p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={aiQuery}
-                                        onChange={e => setAiQuery(e.target.value)}
-                                        placeholder="Ask PULSEAI..."
-                                        className="flex-1 bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-[#f05a00]/30 rounded-xl px-3.5 py-2.5 text-xs sm:text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-[#f05a00] outline-none placeholder:text-slate-400"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={isAILoading || !aiQuery.trim()}
-                                        className="w-10 h-10 rounded-xl bg-[#f05a00] hover:bg-[#d94e00] flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0 shadow-sm cursor-pointer"
-                                    >
-                                        <Search size={16} />
-                                    </button>
-                                </div>
-                            </form>
+                                    {/* Input Form with safe bottom area */}
+                                    <form onSubmit={handleResidentAIChat} className="p-2.5 sm:p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={aiQuery}
+                                                onChange={e => setAiQuery(e.target.value)}
+                                                placeholder="Ask PULSEAI..."
+                                                className="flex-1 bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-[#f05a00]/30 rounded-xl px-3.5 py-2.5 text-xs sm:text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-[#f05a00] outline-none placeholder:text-slate-400"
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={isAILoading || !aiQuery.trim()}
+                                                className="w-10 h-10 rounded-xl bg-[#f05a00] hover:bg-[#d94e00] flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0 shadow-sm cursor-pointer"
+                                            >
+                                                <Search size={16} />
+                                            </button>
+                                        </div>
+                                    </form>
+                                </>
+                            )}
                         </motion.div>
                     </>
                 )}
             </AnimatePresence>
 
             {/* ── Floating FAB Button (Hidden when maximized on mobile) ── */}
-            <div className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-8 right-3 sm:right-5 md:right-6 z-[60] ${isAIChatOpen && isAIMaximized ? 'hidden' : 'block'}`}>
+            <div className={`fixed bottom-[calc(5.1rem+env(safe-area-inset-bottom,0px))] md:bottom-8 right-3.5 sm:right-5 md:right-6 z-[60] ${isAIChatOpen && isAIMaximized ? 'hidden' : 'block'}`}>
                 <motion.button
                     onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                     whileHover={{ scale: 1.05 }}

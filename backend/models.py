@@ -383,5 +383,42 @@ class NewsItem(Base):
     posted_by = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
+class ChatConversation(Base):
+    """
+    PULSEAI Resident Chat Conversation Session.
+    Maintains persistent conversation history per resident account.
+    """
+    __tablename__ = "chat_conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("residents.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False, default="New Conversation")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    resident = relationship("Resident", backref="chat_conversations")
+    messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan", order_by="ChatMessage.created_at.asc()")
+
+
+class ChatMessage(Base):
+    """
+    PULSEAI Chat Message Record.
+    Stores user queries, AI responses, and audit records of invoked tools.
+    """
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("chat_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(20), nullable=False)  # 'user' | 'assistant'
+    content = Column(Text, nullable=False)
+    tool_name = Column(String(100), nullable=True)  # Tool called during grounding (e.g. get_my_reports)
+    tool_data = Column(Text, nullable=True)  # Reference snippet of retrieved data for audit/debugging
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    conversation = relationship("ChatConversation", back_populates="messages")
+
+
 # Import gov_models at the end to resolve circular dependency for relationships
 import gov_models
+

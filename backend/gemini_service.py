@@ -266,6 +266,36 @@ def _generate(prompt: str, json_mode: bool = True, user_id: str = "system") -> O
         return None
 
 
+def _generate_with_tools(prompt: str, tools: list, user_id: str = "system") -> Optional[str]:
+    """Call Gemini with Python callable tools for automatic grounding and tool calling."""
+    if not _SDK_READY or _client is None:
+        return None
+
+    # Rate limit check
+    allowed, reason = _rate_limiter.check_and_consume(user_id)
+    if not allowed:
+        print(f"[AI] Rate limited: {reason}")
+        return None
+
+    try:
+        from google.genai import types
+        cfg = types.GenerateContentConfig(
+            tools=tools,
+            temperature=0.1
+        )
+        resp = _client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=cfg,
+        )
+        if resp and resp.text:
+            return resp.text.strip()
+    except Exception as e:
+        print(f"[AI] generate_with_tools error: {e}")
+    return None
+
+
+
 def _detect_image_mime(image_bytes: bytes, default_mime: str = "image/jpeg") -> str:
     """Detect image MIME from magic bytes."""
     if not image_bytes:
@@ -363,22 +393,23 @@ def _generate_multimodal_dual(prompt: str, img1: bytes, img2: bytes, mime: str =
 
 def _clean_response(text: str) -> str:
     """
-    Strip markdown formatting symbols from AI responses so they display
-    cleanly in the PULSO chat UI without raw asterisks or hashes.
+    Sanitizes AI assistant responses:
+    - Strips all emojis and emoji variation selectors to enforce official civic tone.
+    - Normalizes line breaks and whitespace.
+    - Preserves all markdown formatting (**bold**, *italic*, headers, lists, code, tables).
     """
+    if not text:
+        return ""
     import re
-    # Remove bold (**text** or __text__)
-    text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', text)
-    text = re.sub(r'_{1,2}(.*?)_{1,2}', r'\1', text)
-    # Remove heading markers
-    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-    # Replace bullet points (* item or - item) with a clean dash
-    text = re.sub(r'^[\*\-]\s+', '• ', text, flags=re.MULTILINE)
-    # Remove leftover lone asterisks
-    text = text.replace('**', '').replace('*', '')
-    # Collapse 3+ blank lines into 2
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    return text.strip()
+    # Strip emojis, transport/map symbols, pictographs, and variation selectors
+    EMOJI_PATTERN = re.compile(
+        r'[\U00010000-\U0010ffff]|[\u2600-\u27bf]|[\u2300-\u23ff]|[\u2b50\u2b55\u203c\u2049\u2122\u2139\u2194-\u2199\u21a9-\u21aa]|[\ufe00-\ufe0f]',
+        flags=re.UNICODE
+    )
+    cleaned = EMOJI_PATTERN.sub('', text)
+    # Collapse 3+ consecutive newlines into 2
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip()
 
 
 def analyze_report(description: str, image_data: Optional[bytes] = None) -> Dict:
@@ -663,51 +694,191 @@ Priority options: High | Medium | Info
     }
 
 
-def get_ai_assistant_response(query: str, context: Optional[str] = None) -> Dict:
+def get_ai_assistant_response(
+    query: str,
+    context: Optional[str] = None,
+    user: Optional[Any] = None,
+    db: Optional[Any] = None
+) -> Dict:
     """
-    PULSO Omni-Assistant — Domain-aware AI chat for LGU staff and Citizens.
-    Covers DPWH standards, procurement law, city workflows, and system guidance.
+    PULSO Omni-Assistant — Domain-aware AI chat grounded in real PULSO database records.
+    Provides tool calling for resident report statuses, verified city hotlines,
+    real-time advisories, and disaster guidance. Enforces professional civic tone with zero emojis.
     """
+    # ── Tool Tracking & Definitions ───────────────────────────────────────────
+    invoked_tools = []
+
+    def get_my_reports(status_filter: Optional[str] = None) -> str:
+        """Retrieve the authenticated resident's real filed and claimed infrastructure hazard reports from the PULSO database, including Ticket IDs, categories, statuses, locations, and filing dates."""
+        if not user or not hasattr(user, "id"):
+            msg = "User is not authenticated. Please log in to check your filed reports."
+            invoked_tools.append({"tool": "get_my_reports", "data": msg})
+            return msg
+        if not db:
+            msg = "Database connection unavailable to retrieve reports."
+            invoked_tools.append({"tool": "get_my_reports", "data": msg})
+            return msg
+        try:
+            from sqlalchemy import or_
+            import models
+            reports = db.query(models.Report).filter(
+                or_(
+                    models.Report.resident_id == user.id,
+                    models.Report.claimed_by_user_id == user.id
+                )
+            ).order_by(models.Report.created_at.desc()).limit(8).all()
+
+            if not reports:
+                msg = (
+                    "No infrastructure reports were found under your resident account. "
+                    "If you submitted a report earlier as a guest, you can track it on the Track page using your Ticket ID and private access token."
+                )
+                invoked_tools.append({"tool": "get_my_reports", "data": msg})
+                return msg
+
+            lines = ["Reports on record for your account:"]
+            for r in reports:
+                date_str = r.created_at.strftime('%B %d, %Y') if r.created_at else 'Recent'
+                loc = r.location_barangay or r.location_string or 'Caloocan City'
+                lines.append(
+                    f"- Ticket ID: **{r.ticket_id}** | Category: **{r.category}** | Status: **{r.status}** | Location: {loc} | Filed: {date_str} | Urgency: {r.ai_urgency or 'Normal'}"
+                )
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_my_reports", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"Error querying reports: {err}"
+            invoked_tools.append({"tool": "get_my_reports", "data": err_msg})
+            return err_msg
+
+    def get_city_hotlines() -> str:
+        """Retrieve verified official emergency hotline telephone numbers for Caloocan City (NDRRMC, PNP, BFP, DRRMO, and City Engineering Office)."""
+        res = (
+            "Official Caloocan City Emergency Hotlines:\n"
+            "- **NDRRMC Rescue**: **911** (National Emergency & Disaster Rescue)\n"
+            "- **Caloocan PNP (Philippine National Police)**: **(02) 8892-6166** / **8892-6166**\n"
+            "- **BFP Caloocan (Bureau of Fire Protection)**: **(02) 8896-5700** / **8896-5700**\n"
+            "- **Caloocan DRRMO (Disaster Risk Reduction and Management Office)**: **(02) 8397-6212** / **8397-6212**\n"
+            "- **Caloocan City Engineering Office / Action Center**: **(02) 8288-8811 to 8830**\n"
+            "- **Caloocan City North Action Center**: **(02) 8288-8811** (Local 2200 / 2201)"
+        )
+        invoked_tools.append({"tool": "get_city_hotlines", "data": res[:500]})
+        return res
+
+    def get_active_advisories() -> str:
+        """Retrieve active city engineering notices, roadwork advisories, and emergency alerts from the Caloocan City Engineering Office."""
+        if not db:
+            msg = "Advisory service temporarily unavailable."
+            invoked_tools.append({"tool": "get_active_advisories", "data": msg})
+            return msg
+        try:
+            import models
+            advisories = db.query(models.Advisory).order_by(models.Advisory.created_at.desc()).limit(5).all()
+            if not advisories:
+                msg = "There are currently no active public advisories or emergency notices from the Caloocan City Engineering Office. Check the Updates tab for real-time announcements."
+                invoked_tools.append({"tool": "get_active_advisories", "data": msg})
+                return msg
+            lines = ["Active Public Advisories:"]
+            for adv in advisories:
+                date_str = adv.created_at.strftime('%B %d, %Y') if adv.created_at else 'Recent'
+                lines.append(
+                    f"- **[{adv.priority.upper()}] {adv.title}** ({adv.department or 'City Engineering Office'} — {date_str}): {adv.description[:220]}"
+                )
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_active_advisories", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"Error retrieving advisories: {err}"
+            invoked_tools.append({"tool": "get_active_advisories", "data": err_msg})
+            return err_msg
+
+    def get_evacuation_routes(barangay: Optional[str] = None) -> str:
+        """Check designated evacuation routes and emergency evacuation centers for Caloocan City."""
+        res = (
+            "Official mapped evacuation route data is not yet available in the PULSO digital system. "
+            "Residents requiring emergency evacuation guidance or shelter locations during severe weather or flooding "
+            "should immediately contact **Caloocan DRRMO** at **(02) 8397-6212**, **NDRRMC** at **911**, "
+            "or consult their local **Barangay Hall** for designated emergency evacuation centers."
+        )
+        invoked_tools.append({"tool": "get_evacuation_routes", "data": res[:500]})
+        return res
+
+    # ── Grounded Knowledge: Filing a report in PULSO ───────────────────────────
+    REPORTING_GUIDE = (
+        "To file an infrastructure report in PULSO, follow these steps:\n\n"
+        "1. **Access Report Flow**: Tap the orange **Report Issue** action button on the resident dashboard.\n"
+        "2. **Upload Photo Evidence**: Capture or upload a clear photo of the hazard. PULSO's AI vision system verifies the image, detects the issue type (e.g., pothole, broken streetlight, clogged drainage), and assesses initial urgency.\n"
+        "3. **Pin Location**: Confirm or adjust the pin on the North Caloocan interactive map (Barangays 165 to 188).\n"
+        "4. **Review & Confirm**: Review the auto-detected category and enter any additional notes, then tap **Submit**.\n"
+        "5. **Track Progress**: You will receive a unique **Ticket ID** (e.g., **CE-2026-XXXX**) and private tracking token. You can track real-time inspection, dispatch, and completion under **My Reports**."
+    )
+
+    # ── Deterministic Keyword Fallback Handler ─────────────────────────────────
+    def _deterministic_fallback(q: str) -> str:
+        ql = q.lower()
+        if any(w in ql for w in ["hotline", "emergency", "police", "pnp", "fire", "bfp", "drrmo", "contact number"]):
+            return get_city_hotlines()
+        if any(w in ql for w in ["my report", "report status", "ticket status", "track report", "check report", "my ticket"]):
+            return get_my_reports()
+        if any(w in ql for w in ["evacuation", "evacuate", "flood route", "evacuation center"]):
+            return get_evacuation_routes()
+        if any(w in ql for w in ["advisory", "advisories", "bulletin", "announcement"]):
+            return get_active_advisories()
+        if any(w in ql for w in ["how to file", "how to report", "file a report", "submit a report"]):
+            return REPORTING_GUIDE
+        return (
+            "PULSO AI is currently operating in offline mode. "
+            "For urgent emergencies or infrastructure hazards, please contact the **Caloocan City Action Center** at **(02) 8288-8811** "
+            "or **Caloocan DRRMO** at **(02) 8397-6212**."
+        )
+
     if not _SDK_READY:
-        return {"response": (
-            "Pagpasensya na, ang PULSO AI ay pansamantalang hindi available. "
-            "Subukan muli sa ilang sandali.\n"
-            "PULSO AI is temporarily unavailable. Please try again shortly."
-        )}
+        fallback_res = _deterministic_fallback(query)
+        return {
+            "response": _clean_response(fallback_res),
+            "tool_name": invoked_tools[0]["tool"] if invoked_tools else None,
+            "tool_data": invoked_tools[0]["data"] if invoked_tools else None
+        }
 
-    prompt = f"""You are PULSO AI, the official intelligent assistant for the Caloocan City Infrastructure Management System.
-You assist both LGU Staff (Engineers, Dispatchers, Clerks) and Citizens.
+    prompt = f"""You are PULSO AI, the official intelligent assistant for the Caloocan City Engineering Office (PULSO System).
+You assist citizens and LGU staff with infrastructure management, hazard reporting, and city operations.
 
-Knowledge Domain:
-- DPWH engineering standards (roads, drainage, electrical, structural)
-- Philippine government ID verification (PhilSys, LTO, UMID)
-- RA 9184 Government Procurement Law
-- Caloocan City Engineering Office procedures
-- PULSO system navigation, features, and workflows
-- Barangay-level infrastructure issues in Caloocan City
+STRICT OPERATIONAL & TONE RULES:
+1. NO EMOJIS: Do not use emojis in any response. Maintain a professional, helpful tone appropriate for an official city government service.
+2. MARKDOWN STRUCTURE: Always structure responses with clean paragraph breaks (double newlines). Use markdown bold (**text**) for all key terms: hotline numbers, ticket IDs, report statuses (**pending**, **in_progress**, **resolved**), department names, and important notices. Use bullet points (- ) or numbered lists (1. ) for readability.
+3. GROUNDING IN REAL DATA (MANDATORY TOOL USE):
+   - When asked about the user's reports or report status: You MUST call `get_my_reports` to fetch their real database records. Present the actual ticket IDs, categories, and statuses. Never invent a status or ticket ID.
+   - When asked about city hotlines or emergency contacts: You MUST call `get_city_hotlines`. Present the official Caloocan City emergency numbers exactly as retrieved. Never fabricate hotline numbers.
+   - When asked about active advisories, roadworks, or city notices: You MUST call `get_active_advisories`.
+   - When asked about evacuation routes: You MUST call `get_evacuation_routes`. Plainly state that mapped digital evacuation route data is not yet available, and instruct them to contact Caloocan DRRMO at (02) 8397-6212 or NDRRMC at 911.
+   - When asked how to file a report: Describe the 5-step PULSO workflow (Tap **Report Issue**, upload evidence photo for AI scan, pin location on North Caloocan map, review & submit, receive unique **Ticket ID** to track under **My Reports**).
+4. HONEST FALLBACK: If requested data is genuinely not available or a tool returns no records, state this plainly (e.g., "I don't have that information right now — you can check the Updates tab or call the relevant hotline.") rather than guessing.
 
-Communication Style:
-- Technical and precise for engineers/dispatchers
-- Friendly and bilingual (English/Tagalog) for citizens
-- Always helpful, clear, and professional
-- IMPORTANT: Do NOT use markdown formatting. No asterisks, no bold (**), no bullet symbols (*), no headers (#). Use plain text only. For lists, use numbered items (1. 2. 3.) or write in full sentences.
-
-System Context: {context or "General system inquiry"}
+System Context: {context or "General citizen inquiry"}
 User Query: {query}
+"""
 
-Provide a helpful, accurate, plain-text response:"""
+    tools = [get_my_reports, get_city_hotlines, get_active_advisories, get_evacuation_routes]
+    user_id = str(getattr(user, "id", "citizen"))
 
     try:
-        raw = _generate(prompt, json_mode=False)
+        raw = _generate_with_tools(prompt, tools=tools, user_id=user_id)
         if raw:
-            return {"response": _clean_response(raw)}
+            return {
+                "response": _clean_response(raw),
+                "tool_name": invoked_tools[0]["tool"] if invoked_tools else None,
+                "tool_data": invoked_tools[0]["data"] if invoked_tools else None
+            }
     except Exception as e:
-        print(f"[AI] Assistant error: {e}")
+        print(f"[AI] Assistant tool-calling error: {e}")
 
-    return {"response": (
-        "Pagpasensya na, ang PULSO Brain ay abala ngayon. Subukan muli sa ilang sandali.\n"
-        "The PULSO Brain is currently processing. Please try again in a moment."
-    )}
+    # Fallback if API fails or is rate limited
+    fallback_res = _deterministic_fallback(query)
+    return {
+        "response": _clean_response(fallback_res),
+        "tool_name": invoked_tools[0]["tool"] if invoked_tools else None,
+        "tool_data": invoked_tools[0]["data"] if invoked_tools else None
+    }
 
 
 # ── Public Vision API Wrapper (used by philsys_service.py) ───────────────────
