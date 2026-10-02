@@ -215,9 +215,9 @@ export default function Step2LocationMap({
           type="button"
           onClick={handleGeolocate}
           disabled={isLocating}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/40 dark:hover:bg-orange-900/60 border border-orange-200 dark:border-orange-800/60 text-orange-700 dark:text-orange-300 text-xs sm:text-sm font-bold shadow-sm transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/60 hover:bg-white/90 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-slate-800 dark:text-white text-xs sm:text-sm font-bold shadow-xs dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_4px_16px_rgba(0,0,0,0.25)] transition-all active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 shrink-0"
         >
-          {isLocating ? <Loader2 size={16} className="animate-spin text-orange-600" /> : <Navigation size={16} />}
+          {isLocating ? <Loader2 size={16} className="animate-spin text-orange-500" /> : <Navigation size={16} className="text-orange-500 dark:text-orange-400" />}
           <span>{isLocating ? t('reportWizard.step2Location.locating', 'Acquiring GPS...') : t('reportWizard.step2Location.useMyLocation', 'Use My Current GPS')}</span>
         </button>
       </div>

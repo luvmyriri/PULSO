@@ -37,8 +37,8 @@ export default function WizardHeader({ currentStep, totalSteps = 6 }) {
 
         {/* Center: Guest Badge / Step count */}
         <div className="flex items-center gap-2">
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/60 text-orange-700 dark:text-orange-300 text-xs font-semibold">
-            <ShieldCheck size={14} className="text-orange-600 dark:text-orange-400" />
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/60 dark:bg-white/[0.04] backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-slate-800 dark:text-white text-xs font-semibold shadow-xs dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]">
+            <ShieldCheck size={14} className="text-orange-500 dark:text-orange-400" />
             <span>{t('reportWizard.guestBadge', 'No Sign-In Needed')}</span>
           </div>
           <span className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">

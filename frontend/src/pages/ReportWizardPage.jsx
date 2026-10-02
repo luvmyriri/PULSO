@@ -30,7 +30,6 @@ export default function ReportWizardPage() {
   const [maxStepReached, setMaxStepReached] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [announcement, setAnnouncement] = useState('');
-  const [draftBannerVisible, setDraftBannerVisible] = useState(false);
   const [duplicateModalData, setDuplicateModalData] = useState(null);
   const [submissionError, setSubmissionError] = useState(null);
 
@@ -67,51 +66,6 @@ export default function ReportWizardPage() {
     consentAccepted: false,
   });
 
-  // Check for existing saved draft on initial mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.savedAt && (Date.now() - parsed.savedAt < 86400000)) {
-          setDraftBannerVisible(true);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to parse draft from localStorage:', e);
-    }
-  }, []);
-
-  // Restore Draft Handler
-  const handleResumeDraft = () => {
-    try {
-      const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setFormData(prev => ({
-          ...prev,
-          ...parsed.formData,
-          evidence: {
-            ...prev.evidence,
-            ...(parsed.formData?.evidence || {}),
-            file: null, // Binary cannot be fully serialized in LS; preview is preserved if dataUrl
-          }
-        }));
-        const stepToResume = Math.min(Math.max(parsed.currentStep || 1, 1), 6);
-        setCurrentStep(stepToResume);
-        setMaxStepReached(Math.max(parsed.maxStepReached || stepToResume, stepToResume));
-        setDraftBannerVisible(false);
-        setAnnouncement(t('reportWizard.draftResumed', 'Draft successfully restored from your previous session.'));
-      }
-    } catch (e) {
-      console.error('Failed to restore draft:', e);
-    }
-  };
-
-  const handleDiscardDraft = () => {
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
-    setDraftBannerVisible(false);
-  };
 
   // Auto-Save Draft to LocalStorage (debounced 400ms)
   useEffect(() => {
@@ -277,36 +231,6 @@ export default function ReportWizardPage() {
 
       {/* Top Header */}
       <WizardHeader currentStep={currentStep} totalSteps={6} />
-
-      {/* Draft Recovery Banner */}
-      {draftBannerVisible && (
-        <aside 
-          aria-label="Draft Recovery"
-          className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-200"
-        >
-          <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
-            <span className="text-xs sm:text-sm font-medium">
-              {t('reportWizard.draftFound', 'You have an unfinished report draft. Would you like to resume?')}
-            </span>
-            <div className="flex gap-2">
-              <button 
-                type="button"
-                onClick={handleResumeDraft}
-                className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-lg text-xs transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 cursor-pointer"
-              >
-                {t('reportWizard.resumeDraft', 'Resume Draft')}
-              </button>
-              <button 
-                type="button"
-                onClick={handleDiscardDraft}
-                className="px-3 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 cursor-pointer"
-              >
-                {t('reportWizard.startFresh', 'Start Fresh')}
-              </button>
-            </div>
-          </div>
-        </aside>
-      )}
 
       {/* Main Container */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col">

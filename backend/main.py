@@ -696,10 +696,9 @@ async def google_complete_verification(
     elif resident.id_tier == "secondary":
         if resident.verification_mode == "second_id":
             resident.kyc_level = "Silver (Dual Secondary Verified)"
-            resident.is_verified = True
         else:
-            resident.kyc_level = "Bronze (Pending Manual Review)"
-            resident.is_verified = False  # Secondary ID with manual review stays unverified until staff review
+            resident.kyc_level = "Silver (Secondary ID Verified)"
+        resident.is_verified = True
     else:
         resident.kyc_level = "Bronze (Self-Signed)"
         resident.is_verified = False
@@ -786,7 +785,7 @@ def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
         if ver_mode == "second_id":
             kyc_level = "Silver (Dual Secondary Verified)"
         else:
-            kyc_level = "Bronze (Pending Manual Review)"
+            kyc_level = "Silver (Secondary ID Verified)"
     else:
         kyc_level = "Bronze (Self-Signed)"
 

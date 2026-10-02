@@ -319,9 +319,9 @@ export const SUPPORTED_ID_TYPES = [
         pattern: /^[A-Z0-9\/-]{4,25}$/i,
         frontCopy: 'Front of Barangay ID / Cert',
         backCopy: 'Back / Official Seal',
-        instructions: 'Notice: Barangay credentials require manual LGU verification review before full civic access.',
+        instructions: 'Ensure control number, barangay dry seal, and resident photo are clearly visible for AI verification.',
         tier: 'secondary',
-        requiresManualReview: true,
+        requiresManualReview: false,
     }
 ];
 
@@ -863,15 +863,8 @@ export default function Register() {
             
             setVerifiedBadge(`${data.id_type ? data.id_type.toUpperCase() : 'ID'} — Caloocan City Verified`);
             if (autoNext) {
-                if (selectedIdTypeObj && selectedIdTypeObj.tier === 'secondary' && selectedIdTypeObj.id !== 'barangay') {
-                    // Secondary ID requires prompt for 2nd ID or manual staff review
-                    setShowSecondaryModal(true);
-                } else {
-                    if (selectedIdTypeObj?.id === 'barangay') {
-                        setFormData(prev => ({ ...prev, secondaryMode: 'manual_review' }));
-                    }
-                    setStep(3); // Advances to Step 3: Review Details
-                }
+                setFormData(prev => ({ ...prev, secondaryMode: 'automated' }));
+                setStep(3); // Advances to Step 3: Review Details
             }
 
         } catch (err) {
@@ -955,11 +948,7 @@ export default function Register() {
             try {
                 const addressParts = [formData.houseNo, formData.blockLot, formData.subdivision, formData.street].filter(Boolean);
                 const effectiveTier = selectedIdTypeObj ? selectedIdTypeObj.tier : (formData.idTier || 'primary');
-                const effectiveMode = selectedIdTypeObj?.id === 'barangay'
-                    ? 'manual_review'
-                    : (effectiveTier === 'primary' 
-                        ? 'automated' 
-                        : (formData.secondaryMode || 'manual_review'));
+                const effectiveMode = formData.secondaryMode === 'second_id' ? 'second_id' : 'automated';
 
                 const payload = {
                     email: formData.email,
@@ -998,11 +987,7 @@ export default function Register() {
         try {
             const addressParts = [formData.houseNo, formData.blockLot, formData.subdivision, formData.street].filter(Boolean);
             const effectiveTier = selectedIdTypeObj ? selectedIdTypeObj.tier : (formData.idTier || 'primary');
-            const effectiveMode = selectedIdTypeObj?.id === 'barangay'
-                ? 'manual_review'
-                : (effectiveTier === 'primary' 
-                    ? 'automated' 
-                    : (formData.secondaryMode || 'manual_review'));
+            const effectiveMode = formData.secondaryMode === 'second_id' ? 'second_id' : 'automated';
 
             const payload = {
                 full_name: [formData.firstName, formData.middleName, formData.lastName, formData.suffix].filter(Boolean).join(' '),
@@ -1268,7 +1253,7 @@ export default function Register() {
                                     <div className="mt-2 mb-1.5">
                                         <div className="flex items-center justify-between mb-1.5">
                                             <h3 className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 leading-snug">
-                                                SECONDARY ID <span className="font-normal text-slate-400 dark:text-slate-500">· Pair with another ID or allow extra review time</span>
+                                                SECONDARY ID <span className="font-normal text-slate-400 dark:text-slate-500">· Supporting ID</span>
                                             </h3>
                                         </div>
                                         <div className="grid grid-cols-2 landscape:grid-cols-3 sm:grid-cols-3 gap-1.5 sm:gap-2">
@@ -1285,7 +1270,7 @@ export default function Register() {
                                                                 selectedIdType: t.id, 
                                                                 idType: t.name,
                                                                 idTier: 'secondary',
-                                                                secondaryMode: t.id === 'barangay' ? 'manual_review' : 'second_id',
+                                                                secondaryMode: 'automated',
                                                             }));
                                                             setScanError('');
                                                         }}
@@ -1412,11 +1397,7 @@ export default function Register() {
                                         <span className="truncate">
                                             {!selectedIdTypeObj
                                                 ? 'Select an ID to continue'
-                                                : selectedIdTypeObj.id === 'barangay'
-                                                    ? 'Continue — Requires Manual Review'
-                                                    : selectedIdTypeObj.tier === 'secondary'
-                                                        ? "Continue — You'll add a second ID next"
-                                                        : `Continue with ${selectedIdTypeObj.shortName}`
+                                                : `Continue with ${selectedIdTypeObj.shortName}`
                                             }
                                         </span>
                                         <ArrowRight size={15} className="shrink-0" />
@@ -1746,18 +1727,8 @@ export default function Register() {
                                         </div>
                                     </div>
 
-                                    {/* Barangay Specific Notice or Tips Banner */}
-                                    {selectedIdTypeObj?.id === 'barangay' && !isCapturingSecondId ? (
-                                        <div className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-r from-amber-500/[0.14] via-amber-500/[0.08] to-amber-500/[0.12] dark:from-amber-400/[0.12] dark:via-amber-500/[0.06] dark:to-amber-400/[0.10] backdrop-blur-md border border-amber-400/35 dark:border-amber-400/25 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_16px_rgba(245,158,11,0.08)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_4px_20px_rgba(0,0,0,0.35)] flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-200 my-1 transition-all">
-                                            <div className="p-1 rounded-lg bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 border border-amber-500/20 dark:border-amber-400/20 shadow-xs">
-                                                <Clock size={13} className="stroke-[2.5]" />
-                                            </div>
-                                            <span className="leading-relaxed">
-                                                <strong className="font-bold text-slate-900 dark:text-white">Manual Review Notice:</strong>{' '}
-                                                Barangay ID &amp; Certifications will be manually reviewed by City Engineering staff before full verification is cleared.
-                                            </span>
-                                        </div>
-                                    ) : scanError ? (
+                                    {/* Capture Tips or Scan Error */}
+                                    {scanError ? (
                                         <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-start gap-1.5 text-xs font-medium my-1">
                                             <AlertCircle size={14} className="shrink-0 mt-0.5 text-red-500" />
                                             <span>{scanError}</span>
@@ -1899,9 +1870,9 @@ export default function Register() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Clock size={15} className="text-amber-500 shrink-0" />
+                                                    <ShieldCheck size={15} className="text-emerald-500 shrink-0" />
                                                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                                                        Manual Staff Review Required ({selectedIdTypeObj?.shortName || 'Secondary ID'})
+                                                        AI-Verified: {selectedIdTypeObj?.shortName || 'Secondary ID'}
                                                     </span>
                                                 </>
                                             )}
