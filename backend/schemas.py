@@ -254,22 +254,26 @@ class PublicTimelineItem(BaseModel):
 
 
 class ReportTrackRequest(BaseModel):
-    ticket_id: str
+    ticket_id: Optional[str] = None
+    report_id: Optional[str] = None
     tracking_token: Optional[str] = None
     tracking_code: Optional[str] = None
+    contact: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
 
-    @field_validator('ticket_id')
+    @field_validator('ticket_id', mode='before')
     @classmethod
-    def normalize_ticket_id(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError('Ticket ID is required.')
-        return v.strip().upper()
+    def normalize_ticket_id(cls, v: Optional[str]) -> Optional[str]:
+        if v and isinstance(v, str) and v.strip():
+            return v.strip().upper()
+        return v
 
-    def get_token(self) -> str:
+    def get_token(self) -> Optional[str]:
         token = self.tracking_token or self.tracking_code
-        if not token or not token.strip():
-            raise ValueError('Tracking token or tracking code is required.')
-        return token.strip().upper()
+        if token and token.strip():
+            return token.strip().upper()
+        return None
 
 
 class ReportTrackResponse(BaseModel):

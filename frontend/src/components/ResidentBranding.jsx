@@ -10,16 +10,11 @@ const ResidentBranding = ({
 }) => {
     return (
         <div className={`flex ${vertical ? 'flex-col items-center text-center' : 'items-center'} gap-3 ${className}`}>
-            <div className={`flex items-center ${vertical ? 'gap-2' : 'gap-2'}`}>
+            <div className="flex items-center">
                 <img
-                    src="/resident-engineering-logo.jpg"
+                    src="/city-engineering-logo.png"
                     alt="Caloocan City Seal"
-                    className={`${size} w-auto object-contain drop-shadow-sm rounded-full bg-white border border-[#f3e9e2] hover:scale-105 transition-transform duration-200`}
-                />
-                <img
-                    src="/resident-pulso-logo.png"
-                    alt="PULSO Map Pin Logo"
-                    className={`${size} w-auto object-contain drop-shadow-sm rounded-full bg-white border border-[#f3e9e2] hover:scale-105 transition-transform duration-200`}
+                    className={`${size} aspect-square object-contain drop-shadow-sm rounded-full bg-white border border-slate-200 dark:border-slate-700 hover:scale-105 transition-transform duration-200`}
                 />
             </div>
             {showText && (

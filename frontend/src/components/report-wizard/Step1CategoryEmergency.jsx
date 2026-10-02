@@ -2,10 +2,26 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   AlertTriangle, PhoneCall, Route, Droplets, Lightbulb, 
-  Building2, ShieldAlert, ArrowRight, CheckCircle2, Signpost
+  Building2, ShieldAlert, ArrowRight, CheckCircle2, Signpost, HelpCircle
 } from 'lucide-react';
 
 const CATEGORIES = [
+  {
+    id: 'Water Supply & Distribution',
+    key: 'water_supply_distribution',
+    icon: Droplets,
+    iconColor: 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-950/50',
+    defaultLabel: 'Water Supply & Distribution',
+    defaultDesc: 'Clogged storm drains, missing manhole covers, flash flooding, burst pipes',
+  },
+  {
+    id: 'Power & Street Lighting',
+    key: 'power_street_lighting',
+    icon: Lightbulb,
+    iconColor: 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-950/50',
+    defaultLabel: 'Power & Street Lighting',
+    defaultDesc: 'Dark lampposts, flickering lights, dangling low-voltage lines, damaged poles',
+  },
   {
     id: 'Roads & Bridges',
     key: 'roads_bridges',
@@ -15,28 +31,12 @@ const CATEGORIES = [
     defaultDesc: 'Potholes, broken asphalt, damaged bridges, sidewalk cracks',
   },
   {
-    id: 'Water & Drainage',
-    key: 'drainage_flooding',
-    icon: Droplets,
-    iconColor: 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-950/50',
-    defaultLabel: 'Water & Drainage',
-    defaultDesc: 'Clogged storm drains, missing manholes, localized flooding, broken pipes',
-  },
-  {
-    id: 'Street Lighting & Power',
-    key: 'streetlights_electrical',
-    icon: Lightbulb,
-    iconColor: 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-950/50',
-    defaultLabel: 'Street Lighting & Power',
-    defaultDesc: 'Dark lampposts, flickering fixtures, dangling low-voltage lines, damaged poles',
-  },
-  {
-    id: 'Public Facilities & Buildings',
-    key: 'public_facilities',
-    icon: Building2,
-    iconColor: 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/50',
-    defaultLabel: 'Public Facilities & Buildings',
-    defaultDesc: 'Damaged health centers, public school defects, broken playground gear',
+    id: 'Traffic & Road Signs',
+    key: 'traffic_signage',
+    icon: Signpost,
+    iconColor: 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-950/50',
+    defaultLabel: 'Traffic & Road Signs',
+    defaultDesc: 'Broken traffic lights, missing or faded signs, damaged road markings',
   },
   {
     id: 'Public Safety & Hazards',
@@ -44,15 +44,23 @@ const CATEGORIES = [
     icon: ShieldAlert,
     iconColor: 'text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/50',
     defaultLabel: 'Public Safety & Hazards',
-    defaultDesc: 'Fallen roadside trees, hazardous debris, unstable retaining walls',
+    defaultDesc: 'Fallen roadside trees, hazardous debris on road, landslides, unstable retaining walls',
   },
   {
-    id: 'Traffic & Road Signs',
-    key: 'traffic_signage',
-    icon: Signpost,
-    iconColor: 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-950/50',
-    defaultLabel: 'Traffic & Road Signs',
-    defaultDesc: 'Broken traffic signals, missing regulatory signage, damaged center railings',
+    id: 'Public Buildings & Facilities',
+    key: 'public_facilities',
+    icon: Building2,
+    iconColor: 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/50',
+    defaultLabel: 'Public Buildings & Facilities',
+    defaultDesc: 'Damaged barangay halls, public health centers, school building defects, broken park facilities',
+  },
+  {
+    id: 'Others',
+    key: 'others',
+    icon: HelpCircle,
+    iconColor: 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-950/50',
+    defaultLabel: 'Others',
+    defaultDesc: 'Any civic infrastructure issue not listed above (please describe in detail in the next steps)',
   },
 ];
 
@@ -64,18 +72,18 @@ export default function Step1CategoryEmergency({ selectedCategory, onSelectCateg
       {/* ── EMERGENCY WARNING BANNER ────────────────────────────────────────── */}
       <aside 
         aria-label="Emergency Hotline Notice"
-        className="rounded-2xl border-2 border-amber-300 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-950/30 p-4 sm:p-5 shadow-sm"
+        className="rounded-2xl border border-amber-500/30 dark:border-amber-400/20 bg-amber-500/[0.04] dark:bg-white/[0.03] backdrop-blur-xl p-4 sm:p-5 shadow-xs dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.2)] transition-all"
       >
         <div className="flex items-start gap-3.5">
-          <div className="p-2 rounded-xl bg-amber-200/70 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 shrink-0 mt-0.5">
+          <div className="p-2 rounded-xl bg-amber-500/10 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 dark:border-amber-400/20 shrink-0 mt-0.5">
             <AlertTriangle size={22} strokeWidth={2.2} />
           </div>
           <div className="flex-1 space-y-2">
-            <h2 className="font-bold text-base sm:text-lg text-amber-950 dark:text-amber-200 leading-tight">
+            <h2 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white leading-tight">
               {t('reportWizard.emergencyBanner.title', 'Is this an immediate life-threatening emergency?')}
             </h2>
-            <p className="text-xs sm:text-sm text-amber-900/90 dark:text-amber-300/90 leading-relaxed">
-              {t('reportWizard.emergencyBanner.body', 'For active fires, severe medical crises, active crimes, or live fallen power lines during floods, call emergency hotlines directly. PULSO is for municipal infrastructure repair and engineering triage.')}
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              {t('reportWizard.emergencyBanner.body', 'For active fires, severe medical crises, active crimes, or live fallen power lines during floods, call emergency hotlines directly. PULSO is for non-emergency public infrastructure repair and maintenance.')}
             </p>
             {/* Direct Dial Hotlines */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -88,7 +96,7 @@ export default function Step1CategoryEmergency({ selectedCategory, onSelectCateg
               </a>
               <a
                 href="tel:8881234"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-900 dark:bg-amber-700 dark:hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-amber-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 text-white text-xs font-bold shadow-sm transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-amber-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
                 <PhoneCall size={14} />
                 <span>{t('reportWizard.emergencyBanner.callCDRRMO', 'Call 888-1234 (Caloocan CDRRMO)')}</span>
@@ -111,11 +119,12 @@ export default function Step1CategoryEmergency({ selectedCategory, onSelectCateg
       {/* ── CATEGORY GRID ────────────────────────────────────────────────────── */}
       <fieldset role="radiogroup" aria-label="Issue category selector" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
         <legend className="sr-only">Choose an infrastructure category</legend>
-        {CATEGORIES.map((cat) => {
+        {CATEGORIES.map((cat, idx) => {
           const isSelected = selectedCategory === cat.id;
           const IconComponent = cat.icon;
           const label = t(`reportWizard.step1Category.categories.${cat.key}.label`, cat.defaultLabel);
           const desc = t(`reportWizard.step1Category.categories.${cat.key}.desc`, cat.defaultDesc);
+          const isLastOddCard = idx === 6;
 
           return (
             <button
@@ -123,9 +132,13 @@ export default function Step1CategoryEmergency({ selectedCategory, onSelectCateg
               type="button"
               role="radio"
               aria-checked={isSelected}
+              aria-label={`Select category: ${label} — ${desc}`}
               onClick={() => onSelectCategory(cat.id)}
-              aria-pressed={isSelected}
-              className={`group relative text-left p-4 sm:p-5 rounded-2xl border-2 transition-all duration-200 flex flex-col justify-between min-h-[140px] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+              className={`group relative text-left p-4 sm:p-5 rounded-2xl border-2 transition-all duration-200 flex flex-col justify-between min-h-[140px] cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                isLastOddCard
+                  ? 'sm:col-span-2 sm:max-w-md sm:mx-auto lg:col-span-1 lg:col-start-2 lg:max-w-none w-full'
+                  : 'w-full'
+              } ${
                 isSelected
                   ? 'border-orange-500 dark:border-orange-400 bg-orange-50/70 dark:bg-orange-950/30 shadow-md ring-2 ring-orange-400/20'
                   : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm'
@@ -153,6 +166,7 @@ export default function Step1CategoryEmergency({ selectedCategory, onSelectCateg
           );
         })}
       </fieldset>
+
 
       {/* ── ACTION FOOTER ────────────────────────────────────────────────────── */}
       <div className="pt-4 flex justify-end">

@@ -205,6 +205,31 @@ export default function ReportSuccessPage() {
 
         </div>
 
+        {/* ── GUEST TO RESIDENT CONVERSION PROMPT ───────────────────────────── */}
+        {(!receiptState.reporterType || receiptState.reporterType === 'guest') && (
+          <div className="rounded-3xl border-2 border-[#ff6b00]/30 bg-gradient-to-br from-orange-500/10 via-amber-500/5 to-transparent p-6 sm:p-7 shadow-md flex flex-col sm:flex-row items-center justify-between gap-5 text-left">
+            <div className="space-y-1.5 flex-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] text-[11px] font-bold uppercase tracking-wider">
+                <UserPlus size={13} />
+                <span>Verified Resident Access</span>
+              </div>
+              <h3 className="font-heading font-black text-lg sm:text-xl text-slate-900 dark:text-white">
+                Want to track all your reports in one place?
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Create a free resident account to unlock your personal citizen dashboard, view live repair updates across Caloocan, and automatically link this report.
+              </p>
+            </div>
+            <Link
+              to={`/register?claim_ticket=${ticketId}&claim_token=${trackingToken}`}
+              className="shrink-0 w-full sm:w-auto px-6 py-3.5 bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white rounded-xl font-heading font-bold text-xs uppercase tracking-wider shadow-md hover:shadow-lg hover:shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <span>Create Free Account</span>
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        )}
+
         {/* ── WHAT HAPPENS NEXT TIMELINE ─────────────────────────────────────── */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-4">
           <h2 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">

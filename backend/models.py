@@ -83,6 +83,8 @@ class Resident(Base):
     secondary_id_type = Column(String, nullable=True)
     verification_mode = Column(String, nullable=True)  # "automated", "second_id", "manual_review"
     last_kyc_verification = Column(DateTime(timezone=True), nullable=True)
+    google_id = Column(String, nullable=True, index=True)
+    auth_provider = Column(String, nullable=True, default="local")
     
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

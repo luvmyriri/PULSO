@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { GoogleMapsProvider } from './contexts/GoogleMapsContext';
 
 import GovLanding       from './pages/GovLanding';
 import Landing          from './pages/Landing';
@@ -73,7 +74,8 @@ const ResidentSurface = ({ children }) => (
 function App() {
     return (
         <ThemeProvider>
-            <BrowserRouter>
+            <GoogleMapsProvider>
+                <BrowserRouter>
                 <ErrorBoundary>
                     <Routes>
                         {/* ── PUBLIC RESIDENT ROUTES ─────────────────────────── */}
@@ -293,7 +295,8 @@ function App() {
 
                 <ScrollToTop />
             </BrowserRouter>
-        </ThemeProvider>
+        </GoogleMapsProvider>
+    </ThemeProvider>
     );
 }
 

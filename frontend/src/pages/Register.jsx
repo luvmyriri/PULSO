@@ -8,14 +8,14 @@ import {
     Layers, Clock
 } from 'lucide-react';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
 import IDCameraModal from '../components/IDCameraModal';
 import LegalModal from '../components/LegalModal';
 import CustomDatePicker from '../components/CustomDatePicker';
-import { clearAuthSession } from '../utils/authSession';
+import { clearAuthSession, setAuthSession } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
 
 // ---------------------------------------------------------------------------
@@ -563,6 +563,9 @@ function AutoFilledBadge() {
 // ---------------------------------------------------------------------------
 export default function Register() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const googleAuthState = location.state?.googleAuth ? location.state : null;
+    const isGoogleAuth = Boolean(googleAuthState);
     const { theme, changeTheme } = useTheme();
 
     const [step, setStep] = React.useState(1);
@@ -583,12 +586,12 @@ export default function Register() {
     const [showSecondaryModal, setShowSecondaryModal] = React.useState(false);
     const [isCapturingSecondId, setIsCapturingSecondId] = React.useState(false);
 
-    // 5-Step Journey Progress (1: ID Select, 2: Photos, 3: Details, 4: Login, 5: OTP)
+    // 5-Step Journey Progress (1: ID Select, 2: Photos, 3: Details, 4: Login/Finalize, 5: OTP)
     const STEP_LABELS = {
         1: 'Choose your ID',
         2: 'Front & back photos',
         3: 'Review details',
-        4: 'Create login',
+        4: isGoogleAuth ? 'Finalize verification' : 'Create login',
         5: 'Confirm code',
     };
 
@@ -654,6 +657,18 @@ export default function Register() {
     const [resendTimer, setResendTimer] = useState(0);
     const [canResend, setCanResend] = useState(true);
     const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
+
+    // Pre-populate verified identity data if arriving from Google Sign-In
+    React.useEffect(() => {
+        if (googleAuthState?.email) {
+            setFormData(prev => ({
+                ...prev,
+                email: googleAuthState.email,
+                firstName: prev.firstName || (googleAuthState.fullName ? googleAuthState.fullName.split(' ')[0] : ''),
+                lastName: prev.lastName || (googleAuthState.fullName ? googleAuthState.fullName.split(' ').slice(1).join(' ') : ''),
+            }));
+        }
+    }, [googleAuthState]);
 
     React.useEffect(() => {
         let interval = null;
@@ -933,6 +948,47 @@ export default function Register() {
 
     const handleSubmit = async (e) => {
         if (e && e.preventDefault) e.preventDefault();
+
+        if (isGoogleAuth) {
+            setRegistering(true);
+            setRegistrationError('');
+            try {
+                const addressParts = [formData.houseNo, formData.blockLot, formData.subdivision, formData.street].filter(Boolean);
+                const effectiveTier = selectedIdTypeObj ? selectedIdTypeObj.tier : (formData.idTier || 'primary');
+                const effectiveMode = selectedIdTypeObj?.id === 'barangay'
+                    ? 'manual_review'
+                    : (effectiveTier === 'primary' 
+                        ? 'automated' 
+                        : (formData.secondaryMode || 'manual_review'));
+
+                const payload = {
+                    email: formData.email,
+                    full_name: [formData.firstName, formData.middleName, formData.lastName, formData.suffix].filter(Boolean).join(' ') || googleAuthState.fullName || 'Resident',
+                    phone_number: formData.mobile,
+                    address: [...addressParts, formData.barangay, formData.municipality].filter(Boolean).join(', '),
+                    barangay: formData.barangay,
+                    id_tier: effectiveTier,
+                    id_type: formData.selectedIdType || formData.idType,
+                    secondary_id_type: formData.secondIdType || null,
+                    verification_mode: effectiveMode,
+                    id_number: formData.idNumber
+                };
+
+                const res = await axios.post(`${API_BASE_URL}/api/auth/google/complete-verification`, payload);
+                if (res.data.status === 'verified') {
+                    setAuthSession(res.data.access_token, res.data.user);
+                    setStep(6); // Step 6 Celebration!
+                } else if (res.data.status === 'pending_manual_review') {
+                    setStep(6);
+                }
+            } catch (err) {
+                setRegistrationError(err.response?.data?.detail || 'ID verification submission failed. Please check your account details.');
+            } finally {
+                setRegistering(false);
+            }
+            return;
+        }
+
         if (formData.password !== formData.confirmPassword) {
             setRegistrationError("Passwords do not match.");
             return;
@@ -1025,9 +1081,9 @@ export default function Register() {
                 onChange={(e) => handleFileUpload(e, 'secondIdBack')}
             />
 
-            {/* ── Background Seal Watermark ───── */}
+            {/* ── Background Seal Watermark (Desktop only, hidden on mobile) ───── */}
             <div
-                className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 flex items-center justify-end"
+                className="hidden lg:flex absolute inset-0 overflow-hidden pointer-events-none select-none z-0 items-center justify-end"
                 aria-hidden="true"
             >
                 <div className="relative w-[320px] h-[320px] sm:w-[480px] sm:h-[480px] lg:w-[600px] lg:h-[600px] mr-[-5%] sm:mr-[2%] lg:mr-[4%] opacity-[0.10] dark:opacity-[0.07] transition-all duration-500">
@@ -1042,29 +1098,33 @@ export default function Register() {
                 </div>
             </div>
 
-            {/* ── Top Header: Logo, Dynamic Progress, Theme Toggle ───────────── */}
-            <header className="relative z-20 w-full h-14 sm:h-16 px-4 sm:px-8 border-b border-slate-200/60 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-between shrink-0">
-                <Link
-                    to="/"
-                    className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
-                    title="Caloocan City PULSO Home"
-                >
-                    <Branding size="h-8 w-8 sm:h-9 sm:w-9" />
-                </Link>
+            {/* ── Top Header: Logo, Dynamic Progress, Theme Toggle (Mirrored from Login) ───────────── */}
+            <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex flex-col gap-2 shrink-0">
+                {/* Main Header Row */}
+                <div className="w-full flex justify-between items-center gap-2">
+                    <Link
+                        to="/"
+                        className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer shrink-0"
+                        title="Caloocan City PULSO Home"
+                        aria-label="Caloocan City PULSO Home"
+                    >
+                        <Branding size="h-9 w-9 sm:h-10 sm:w-10" />
+                    </Link>
 
                 {/* Center Dynamic Progress Bar (5 Steps) */}
                 {step <= 5 ? (
-                    <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100">
-                                Step {step} of 5
+                    <div className="hidden sm:flex flex-col items-center gap-0.5 sm:gap-1 px-1 min-w-0">
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <span className="text-[11px] sm:text-sm font-black text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                                <span className="hidden xs:inline">Step {step} of 5</span>
+                                <span className="xs:hidden">{step}/5</span>
                             </span>
-                            <span className="text-xs text-slate-300 dark:text-slate-600">•</span>
-                            <span className="text-xs sm:text-sm font-semibold text-[#ff6b00]">
+                            <span className="text-[10px] text-slate-300 dark:text-slate-600">•</span>
+                            <span className="text-[11px] sm:text-sm font-semibold text-[#ff6b00] truncate max-w-[105px] xs:max-w-[150px] sm:max-w-none">
                                 {STEP_LABELS[step]}
                             </span>
                         </div>
-                        <div className="w-36 sm:w-56 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div className="sm:w-56 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                             <motion.div 
                                 className="h-full bg-[#ff6b00] rounded-full" 
                                 initial={{ width: 0 }}
@@ -1074,26 +1134,61 @@ export default function Register() {
                         </div>
                     </div>
                 ) : (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                    <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">
                         <CheckCircle2 size={14} />
-                        <span>Registration Complete</span>
+                        <span className="hidden xs:inline">Registration Complete</span>
+                        <span className="xs:hidden">Complete</span>
                     </div>
                 )}
 
-                <div className="flex items-center gap-3">
-                    <ThemeToggle />
-                    <Link
-                        to="/login"
-                        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                    >
-                        Sign In
-                    </Link>
+                    {/* Right side: Theme Toggle & Home Navigation (Mirrored from Login) */}
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                        <ThemeToggle />
+                        <Link
+                            to="/"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                            title="Return to Home Section"
+                            aria-label="Return to Home Section"
+                        >
+                            <Home size={14} className="text-[#ff6b00]" />
+                            <span className="hidden sm:inline">Home</span>
+                        </Link>
+                    </div>
                 </div>
+
+                {/* Mobile: Step-by-Step progress placed at the bottom of the header */}
+                {step <= 5 ? (
+                    <div className="sm:hidden w-full flex flex-col gap-1.5 pt-1">
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="font-black text-slate-800 dark:text-slate-100">
+                                Step {step} of 5
+                            </span>
+                            <span className="font-semibold text-[#ff6b00] truncate max-w-[220px]">
+                                {STEP_LABELS[step]}
+                            </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-200/80 dark:bg-slate-800/80 rounded-full overflow-hidden">
+                            <motion.div 
+                                className="h-full bg-[#ff6b00] rounded-full" 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(step / 5) * 100}%` }}
+                                transition={{ duration: 0.3, ease: 'easeOut' }}
+                            />
+                        </div>
+                    </div>
+                ) : (
+                    <div className="sm:hidden w-full flex items-center justify-center pt-1">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                            <CheckCircle2 size={13} />
+                            <span>Registration Complete</span>
+                        </div>
+                    </div>
+                )}
             </header>
 
-            {/* ── Main Single-Focus Content Area (Zero-Scroll Guaranteed) ────── */}
-            <main className="relative z-10 w-full flex-1 flex flex-col items-center px-4 sm:px-6 overflow-y-auto py-2 sm:py-3">
-                <div className={`w-full ${step === 2 || step === 3 ? 'max-w-3xl lg:max-w-4xl' : 'max-w-2xl'} bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex flex-col ${step === 3 ? 'p-3.5 sm:p-5' : 'p-4 sm:p-6'} transition-all duration-300 my-auto`}>
+            {/* ── Main Single-Focus Content Area (Mobile & Landscape Responsive) ────── */}
+            <main className="relative z-10 w-full flex-1 flex flex-col items-center justify-start sm:justify-center px-3 sm:px-6 overflow-y-auto py-2.5 sm:py-4 landscape:py-2">
+                <div className={`w-full ${step === 2 || step === 3 ? 'max-w-3xl lg:max-w-4xl' : 'max-w-2xl'} bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex flex-col ${step === 3 ? 'p-3.5 sm:p-5' : 'p-3.5 sm:p-6 landscape:p-3'} transition-all duration-300 my-auto`}>
                     <AnimatePresence mode="wait">
 
                         {/* ── STEP 1: Which ID do you have with you? ── */}
@@ -1108,7 +1203,7 @@ export default function Register() {
                             >
                                 <div>
                                     <div className="mb-2 text-center sm:text-left">
-                                        <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                        <h2 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                                             Which ID do you have with you?
                                         </h2>
                                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
@@ -1119,11 +1214,11 @@ export default function Register() {
                                     {/* PRIMARY ID SECTION */}
                                     <div className="mt-1 mb-2">
                                         <div className="flex items-center justify-between mb-1.5">
-                                            <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                                                PRIMARY ID · Use on its own
+                                            <h3 className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 leading-snug">
+                                                PRIMARY ID <span className="font-normal text-slate-400 dark:text-slate-500">· Use on its own</span>
                                             </h3>
                                         </div>
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
+                                        <div className="grid grid-cols-2 landscape:grid-cols-4 sm:grid-cols-4 gap-1.5 sm:gap-2">
                                             {SUPPORTED_ID_TYPES.filter(t => t.tier === 'primary').map((t) => {
                                                 const isSelected = formData.selectedIdType === t.id;
                                                 return (
@@ -1140,26 +1235,26 @@ export default function Register() {
                                                             }));
                                                             setScanError('');
                                                         }}
-                                                        className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between h-[56px] sm:h-[60px] cursor-pointer group ${
+                                                        className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between min-h-[58px] sm:min-h-[62px] cursor-pointer group select-none ${
                                                             isSelected
                                                                 ? 'bg-orange-50/80 dark:bg-orange-950/40 border-[#ff6b00] ring-2 ring-[#ff6b00]/30 shadow-xs'
                                                                 : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-orange-300 dark:hover:border-slate-700 hover:bg-white dark:hover:bg-slate-800/80'
                                                         }`}
                                                     >
-                                                        <div className="flex items-center justify-between gap-1.5 w-full">
-                                                            <span className={`text-xs font-bold leading-tight min-w-0 flex-1 truncate ${isSelected ? 'text-[#ff6b00]' : 'text-slate-800 dark:text-slate-200'}`}>
+                                                        <div className="flex items-start justify-between gap-1 w-full">
+                                                            <span className={`text-xs font-bold leading-tight min-w-0 flex-1 break-words ${isSelected ? 'text-[#ff6b00]' : 'text-slate-800 dark:text-slate-200'}`}>
                                                                 {t.shortName}
                                                             </span>
                                                             {isSelected ? (
-                                                                <div className="w-4 h-4 rounded-full bg-[#ff6b00] text-white flex items-center justify-center shrink-0">
+                                                                <div className="w-4 h-4 rounded-full bg-[#ff6b00] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
                                                                     <Check size={10} strokeWidth={3} />
                                                                 </div>
                                                             ) : (
-                                                                <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0 group-hover:border-orange-400" />
+                                                                <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0 mt-0.5 group-hover:border-orange-400 transition-colors" />
                                                             )}
                                                         </div>
-                                                        <div className="flex items-center justify-between gap-1 w-full">
-                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                                        <div className="flex items-center justify-between gap-1 w-full mt-1">
+                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight break-words">
                                                                 {t.idNumberLabel}
                                                             </span>
                                                         </div>
@@ -1172,13 +1267,14 @@ export default function Register() {
                                     {/* SECONDARY ID SECTION */}
                                     <div className="mt-2 mb-1.5">
                                         <div className="flex items-center justify-between mb-1.5">
-                                            <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                                                SECONDARY ID · Pair with another ID or allow extra review time
+                                            <h3 className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 leading-snug">
+                                                SECONDARY ID <span className="font-normal text-slate-400 dark:text-slate-500">· Pair with another ID or allow extra review time</span>
                                             </h3>
                                         </div>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
-                                            {SUPPORTED_ID_TYPES.filter(t => t.tier === 'secondary').map((t) => {
+                                        <div className="grid grid-cols-2 landscape:grid-cols-3 sm:grid-cols-3 gap-1.5 sm:gap-2">
+                                            {SUPPORTED_ID_TYPES.filter(t => t.tier === 'secondary').map((t, idx, arr) => {
                                                 const isSelected = formData.selectedIdType === t.id;
+                                                const isLastOdd = arr.length % 2 !== 0 && idx === arr.length - 1;
                                                 return (
                                                     <button
                                                         key={t.id}
@@ -1193,26 +1289,28 @@ export default function Register() {
                                                             }));
                                                             setScanError('');
                                                         }}
-                                                        className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between h-[56px] sm:h-[60px] cursor-pointer group ${
+                                                        className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between min-h-[58px] sm:min-h-[62px] cursor-pointer group select-none ${
+                                                            isLastOdd ? 'col-span-2 sm:col-span-1' : ''
+                                                        } ${
                                                             isSelected
                                                                 ? 'bg-orange-50/80 dark:bg-orange-950/40 border-[#ff6b00] ring-2 ring-[#ff6b00]/30 shadow-xs'
                                                                 : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-orange-300 dark:hover:border-slate-700 hover:bg-white dark:hover:bg-slate-800/80'
                                                         }`}
                                                     >
-                                                        <div className="flex items-center justify-between gap-1.5 w-full">
-                                                            <span className={`text-xs font-bold leading-tight min-w-0 flex-1 truncate ${isSelected ? 'text-[#ff6b00]' : 'text-slate-800 dark:text-slate-200'}`}>
+                                                        <div className="flex items-start justify-between gap-1 w-full">
+                                                            <span className={`text-xs font-bold leading-tight min-w-0 flex-1 break-words ${isSelected ? 'text-[#ff6b00]' : 'text-slate-800 dark:text-slate-200'}`}>
                                                                 {t.shortName}
                                                             </span>
                                                             {isSelected ? (
-                                                                <div className="w-4 h-4 rounded-full bg-[#ff6b00] text-white flex items-center justify-center shrink-0">
+                                                                <div className="w-4 h-4 rounded-full bg-[#ff6b00] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
                                                                     <Check size={10} strokeWidth={3} />
                                                                 </div>
                                                             ) : (
-                                                                <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0 group-hover:border-orange-400" />
+                                                                <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0 mt-0.5 group-hover:border-orange-400 transition-colors" />
                                                             )}
                                                         </div>
-                                                        <div className="flex items-center justify-between gap-1 w-full">
-                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                                        <div className="flex items-center justify-between gap-1 w-full mt-1">
+                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight break-words">
                                                                 {t.idNumberLabel}
                                                             </span>
                                                         </div>
@@ -1239,10 +1337,11 @@ export default function Register() {
                                             </span>
                                         </div>
                                     )}
+
                                     {/* Privacy Policy & Terms of Service Agreement Checkbox */}
                                     <div 
                                         onClick={() => setAgreedToTerms(prev => !prev)}
-                                        className="mt-2 p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100/60 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 flex items-start gap-2.5 cursor-pointer transition-colors group select-none"
+                                        className="mt-2 p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100/60 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 flex items-start gap-2.5 cursor-pointer transition-colors group select-none min-h-[44px]"
                                     >
                                         {/* Custom Styled Checkbox with Guaranteed Pure White Checkmark */}
                                         <div 
@@ -1255,17 +1354,17 @@ export default function Register() {
                                                     setAgreedToTerms(prev => !prev);
                                                 }
                                             }}
-                                            className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center shrink-0 transition-all border ${
+                                            className={`mt-0.5 w-4.5 h-4.5 rounded-md flex items-center justify-center shrink-0 transition-all border ${
                                                 agreedToTerms 
                                                     ? 'bg-[#ff6b00] border-[#ff6b00] text-white shadow-2xs' 
                                                     : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-[#ff6b00]'
                                             }`}
                                         >
                                             {agreedToTerms && (
-                                                <Check size={11} strokeWidth={3.5} className="text-white stroke-white" />
+                                                <Check size={12} strokeWidth={3.5} className="text-white stroke-white" />
                                             )}
                                         </div>
-                                        <span className="text-xs text-slate-600 dark:text-slate-300 leading-tight">
+                                        <span className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                                             I agree to the{' '}
                                             <button
                                                 type="button"
@@ -1274,7 +1373,7 @@ export default function Register() {
                                                     e.stopPropagation();
                                                     setLegalModal({ isOpen: true, tab: 'privacy' });
                                                 }}
-                                                className="text-[#ff6b00] font-bold hover:underline cursor-pointer inline"
+                                                className="text-[#ff6b00] font-bold hover:underline cursor-pointer inline py-0.5 px-0.5 rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#ff6b00]"
                                             >
                                                 Privacy Policy
                                             </button>{' '}
@@ -1286,7 +1385,7 @@ export default function Register() {
                                                     e.stopPropagation();
                                                     setLegalModal({ isOpen: true, tab: 'terms' });
                                                 }}
-                                                className="text-[#ff6b00] font-bold hover:underline cursor-pointer inline"
+                                                className="text-[#ff6b00] font-bold hover:underline cursor-pointer inline py-0.5 px-0.5 rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#ff6b00]"
                                             >
                                                 Terms of Service
                                             </button>{' '}
@@ -1295,18 +1394,22 @@ export default function Register() {
                                     </div>
                                 </div>
 
-                                {/* Bottom Action Bar */}
-                                <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 dark:border-slate-800/60">
-                                    <Link to="/" className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                                        Cancel
+                                {/* Bottom Action Bar: Stacked on mobile for guaranteed touch targets, side-by-side on tablet/desktop */}
+                                <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4 pt-3 mt-2 border-t border-slate-100 dark:border-slate-800/60">
+                                    <Link 
+                                        to="/login" 
+                                        className="inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-[40px] px-3 py-2 text-xs sm:text-sm font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer group text-center"
+                                    >
+                                        <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform shrink-0" />
+                                        <span>Back to Sign In</span>
                                     </Link>
                                     <button
                                         type="button"
                                         disabled={!formData.selectedIdType || !agreedToTerms}
                                         onClick={() => setStep(2)}
-                                        className="bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-2.5 px-5 rounded-xl font-heading font-bold text-xs sm:text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-2 cursor-pointer"
+                                        className="w-full sm:w-auto min-h-[44px] bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-2.5 px-5 rounded-xl font-heading font-bold text-xs sm:text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer"
                                     >
-                                        <span>
+                                        <span className="truncate">
                                             {!selectedIdTypeObj
                                                 ? 'Select an ID to continue'
                                                 : selectedIdTypeObj.id === 'barangay'
@@ -1316,7 +1419,7 @@ export default function Register() {
                                                         : `Continue with ${selectedIdTypeObj.shortName}`
                                             }
                                         </span>
-                                        <ArrowRight size={15} />
+                                        <ArrowRight size={15} className="shrink-0" />
                                     </button>
                                 </div>
                             </motion.div>
@@ -1645,10 +1748,13 @@ export default function Register() {
 
                                     {/* Barangay Specific Notice or Tips Banner */}
                                     {selectedIdTypeObj?.id === 'barangay' && !isCapturingSecondId ? (
-                                        <div className="p-2 sm:p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300 my-1">
-                                            <Clock size={15} className="text-amber-600 shrink-0 mt-0.5" />
-                                            <span>
-                                                <strong>Manual Review Notice:</strong> Barangay ID &amp; Certifications will be manually reviewed by City Engineering staff before full verification is cleared.
+                                        <div className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-r from-amber-500/[0.14] via-amber-500/[0.08] to-amber-500/[0.12] dark:from-amber-400/[0.12] dark:via-amber-500/[0.06] dark:to-amber-400/[0.10] backdrop-blur-md border border-amber-400/35 dark:border-amber-400/25 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_16px_rgba(245,158,11,0.08)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_4px_20px_rgba(0,0,0,0.35)] flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-200 my-1 transition-all">
+                                            <div className="p-1 rounded-lg bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 border border-amber-500/20 dark:border-amber-400/20 shadow-xs">
+                                                <Clock size={13} className="stroke-[2.5]" />
+                                            </div>
+                                            <span className="leading-relaxed">
+                                                <strong className="font-bold text-slate-900 dark:text-white">Manual Review Notice:</strong>{' '}
+                                                Barangay ID &amp; Certifications will be manually reviewed by City Engineering staff before full verification is cleared.
                                             </span>
                                         </div>
                                     ) : scanError ? (
@@ -1657,12 +1763,20 @@ export default function Register() {
                                             <span>{scanError}</span>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center justify-center gap-4 sm:gap-8 text-xs font-semibold text-slate-600 dark:text-slate-400 py-1.5 px-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800/60 mt-1">
-                                            <span>Lay card flat</span>
-                                            <span className="text-slate-300 dark:text-slate-600">•</span>
-                                            <span>Good natural lighting</span>
-                                            <span className="text-slate-300 dark:text-slate-600">•</span>
-                                            <span>Avoid flash glare</span>
+                                        <div className="flex items-center justify-between sm:justify-center flex-nowrap w-full gap-1.5 sm:gap-6 text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 py-1.5 px-2.5 sm:px-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800/60 mt-1 select-none">
+                                            <span className="flex-1 min-w-0 text-center truncate" title="Lay card flat">
+                                                Lay card flat
+                                            </span>
+                                            <span className="text-slate-300 dark:text-slate-600 shrink-0 select-none">•</span>
+                                            <span className="flex-1 min-w-0 text-center truncate" title="Good natural lighting">
+                                                <span className="hidden sm:inline">Good natural lighting</span>
+                                                <span className="sm:hidden">Good lighting</span>
+                                            </span>
+                                            <span className="text-slate-300 dark:text-slate-600 shrink-0 select-none">•</span>
+                                            <span className="flex-1 min-w-0 text-center truncate" title="Avoid flash glare">
+                                                <span className="hidden sm:inline">Avoid flash glare</span>
+                                                <span className="sm:hidden">No flash glare</span>
+                                            </span>
                                         </div>
                                     )}
                                 </div>
@@ -2135,7 +2249,7 @@ export default function Register() {
                             </motion.div>
                         )}
 
-                        {/* ── STEP 4: CREATE LOGIN ── */}
+                        {/* ── STEP 4: CREATE LOGIN / FINALIZE GOOGLE VERIFICATION ── */}
                         {step === 4 && (
                             <motion.div
                                 key="step4"
@@ -2146,38 +2260,43 @@ export default function Register() {
                                 className="flex flex-col h-full justify-between"
                             >
                                 <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
-                                    <div>
-                                        <div className="mb-2 text-center sm:text-left">
-                                            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                                Create your login
-                                            </h2>
-                                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                                                Set up your credentials to sign in and submit community reports.
-                                            </p>
-                                        </div>
+                                    {isGoogleAuth ? (
+                                        <div>
+                                            <div className="mb-2 text-center sm:text-left">
+                                                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                                    Finalize your verified registration
+                                                </h2>
+                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                                                    Your Google identity is linked. Confirm your contact mobile number to link your verified ID.
+                                                </p>
+                                            </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 my-2">
-                                            <div>
-                                                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
-                                                    Email Address <span className="text-red-400">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <Mail size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                                                    <input
-                                                        type="email"
-                                                        name="email"
-                                                        value={formData.email}
-                                                        onChange={handleChange}
-                                                        placeholder="juan@example.com"
-                                                        required
-                                                        className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-2.5 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
-                                                    />
+                                            {/* Google Authenticated Account Card */}
+                                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 my-2 flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-600 shadow-xs">
+                                                        <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                                                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                                                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                                                        </svg>
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Authenticated Google Account</p>
+                                                        <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white font-mono-data">{formData.email}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 shrink-0">
+                                                    <Check size={12} />
+                                                    <span>Verified</span>
                                                 </div>
                                             </div>
 
-                                            <div>
+                                            {/* Mobile Number Field */}
+                                            <div className="my-3 text-left">
                                                 <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
-                                                    Mobile Number <span className="text-red-400">*</span>
+                                                    Mobile Number for Emergency & Dispatch Alerts <span className="text-red-400">*</span>
                                                 </label>
                                                 <div className="relative">
                                                     <Phone size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -2188,92 +2307,157 @@ export default function Register() {
                                                         onChange={handleChange}
                                                         placeholder="0917 123 4567"
                                                         required
-                                                        className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-2.5 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none font-mono-data"
+                                                        className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-2.5 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none font-mono-data"
                                                     />
                                                 </div>
+                                                <p className="text-[11px] text-slate-400 mt-1">
+                                                    Used exclusively by City Engineering for critical field dispatch updates and tracking.
+                                                </p>
                                             </div>
 
-                                            <div>
-                                                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
-                                                    Password <span className="text-red-400">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <Lock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                                                    <input
-                                                        type={showPassword ? 'text' : 'password'}
-                                                        name="password"
-                                                        value={formData.password}
-                                                        onChange={handleChange}
-                                                        placeholder="At least 8 characters"
-                                                        required
-                                                        className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-8 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowPassword(!showPassword)}
-                                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-500 transition-colors"
-                                                    >
-                                                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                                                    </button>
-                                                </div>
+                                            {/* Info Notice */}
+                                            <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/40 text-left text-xs text-orange-800 dark:text-orange-300 flex items-center gap-2">
+                                                <ShieldCheck size={16} className="text-orange-500 shrink-0" />
+                                                <span>Password creation bypassed — your account will sign in securely using your authenticated Google credentials.</span>
                                             </div>
 
-                                            <div>
-                                                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
-                                                    Confirm Password <span className="text-red-400">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <Lock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                                                    <input
-                                                        type={showConfirmPassword ? 'text' : 'password'}
-                                                        name="confirmPassword"
-                                                        value={formData.confirmPassword}
-                                                        onChange={handleChange}
-                                                        placeholder="Repeat password"
-                                                        required
-                                                        className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-8 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-500 transition-colors"
-                                                    >
-                                                        {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                                                    </button>
+                                            {registrationError && (
+                                                <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold my-2 flex items-center gap-1.5">
+                                                    <AlertCircle size={14} />
+                                                    <span>{registrationError}</span>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
+                                    ) : (
+                                        <div>
+                                            <div className="mb-2 text-center sm:text-left">
+                                                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                                    Create your login
+                                                </h2>
+                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                                                    Set up your credentials to sign in and submit community reports.
+                                                </p>
+                                            </div>
 
-                                        {/* Password strength bar */}
-                                        {formData.password && (
-                                            <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 my-1">
-                                                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mb-1">
-                                                    <span className="text-slate-400">Password Strength</span>
-                                                    <span className={
-                                                        formData.password.length < 8
-                                                            ? 'text-red-500'
-                                                            : !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password)
-                                                            ? 'text-orange-500'
-                                                            : 'text-emerald-500'
-                                                    }>
-                                                        {formData.password.length < 8 ? 'Too Short' : !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password) ? 'Medium' : 'Strong'}
-                                                    </span>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 my-2">
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                                                        Email Address <span className="text-red-400">*</span>
+                                                    </label>
+                                                    <div className="relative">
+                                                        <Mail size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                                        <input
+                                                            type="email"
+                                                            name="email"
+                                                            value={formData.email}
+                                                            onChange={handleChange}
+                                                            placeholder="juan@example.com"
+                                                            required
+                                                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-2.5 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div className="h-1 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex gap-1">
-                                                    <div className={`h-full rounded-full transition-all ${formData.password.length >= 8 ? 'bg-orange-500 w-1/3' : 'bg-red-500 w-1/3'}`} />
-                                                    <div className={`h-full rounded-full transition-all ${/[A-Z]/.test(formData.password) ? 'bg-orange-500 w-1/3' : 'bg-transparent w-1/3'}`} />
-                                                    <div className={`h-full rounded-full transition-all ${/[0-9]/.test(formData.password) ? 'bg-emerald-500 w-1/3' : 'bg-transparent w-1/3'}`} />
+
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                                                        Mobile Number <span className="text-red-400">*</span>
+                                                    </label>
+                                                    <div className="relative">
+                                                        <Phone size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                                        <input
+                                                            type="tel"
+                                                            name="mobile"
+                                                            value={formData.mobile}
+                                                            onChange={handleChange}
+                                                            placeholder="0917 123 4567"
+                                                            required
+                                                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-2.5 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none font-mono-data"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                                                        Password <span className="text-red-400">*</span>
+                                                    </label>
+                                                    <div className="relative">
+                                                        <Lock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                                        <input
+                                                            type={showPassword ? 'text' : 'password'}
+                                                            name="password"
+                                                            value={formData.password}
+                                                            onChange={handleChange}
+                                                            placeholder="At least 8 characters"
+                                                            required
+                                                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-8 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowPassword(!showPassword)}
+                                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-500 transition-colors"
+                                                        >
+                                                            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                                                        Confirm Password <span className="text-red-400">*</span>
+                                                    </label>
+                                                    <div className="relative">
+                                                        <Lock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                                        <input
+                                                            type={showConfirmPassword ? 'text' : 'password'}
+                                                            name="confirmPassword"
+                                                            value={formData.confirmPassword}
+                                                            onChange={handleChange}
+                                                            placeholder="Repeat password"
+                                                            required
+                                                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-8 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-500 transition-colors"
+                                                        >
+                                                            {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        )}
 
-                                        {registrationError && (
-                                            <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold my-1 flex items-center gap-1.5">
-                                                <AlertCircle size={14} />
-                                                <span>{registrationError}</span>
-                                            </div>
-                                        )}
-                                    </div>
+                                            {/* Password strength bar */}
+                                            {formData.password && (
+                                                <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 my-1">
+                                                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mb-1">
+                                                        <span className="text-slate-400">Password Strength</span>
+                                                        <span className={
+                                                            formData.password.length < 8
+                                                                ? 'text-red-500'
+                                                                : !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password)
+                                                                ? 'text-orange-500'
+                                                                : 'text-emerald-500'
+                                                        }>
+                                                            {formData.password.length < 8 ? 'Too Short' : !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password) ? 'Medium' : 'Strong'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-1 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex gap-1">
+                                                        <div className={`h-full rounded-full transition-all ${formData.password.length >= 8 ? 'bg-orange-500 w-1/3' : 'bg-red-500 w-1/3'}`} />
+                                                        <div className={`h-full rounded-full transition-all ${/[A-Z]/.test(formData.password) ? 'bg-orange-500 w-1/3' : 'bg-transparent w-1/3'}`} />
+                                                        <div className={`h-full rounded-full transition-all ${/[0-9]/.test(formData.password) ? 'bg-emerald-500 w-1/3' : 'bg-transparent w-1/3'}`} />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {registrationError && (
+                                                <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold my-1 flex items-center gap-1.5">
+                                                    <AlertCircle size={14} />
+                                                    <span>{registrationError}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Bottom Action Bar */}
                                     <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 dark:border-slate-800/60">
@@ -2287,17 +2471,21 @@ export default function Register() {
                                         </button>
                                         <button
                                             type="submit"
-                                            disabled={!formData.email || !formData.mobile || !formData.password || formData.password !== formData.confirmPassword || registering}
+                                            disabled={
+                                                isGoogleAuth 
+                                                    ? (!formData.email || !formData.mobile || registering)
+                                                    : (!formData.email || !formData.mobile || !formData.password || formData.password !== formData.confirmPassword || registering)
+                                            }
                                             className="bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-2.5 px-5 rounded-xl font-heading font-bold text-xs sm:text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-2 cursor-pointer"
                                         >
                                             {registering ? (
                                                 <>
                                                     <Loader2 size={16} className="animate-spin" />
-                                                    <span>Creating Account...</span>
+                                                    <span>{isGoogleAuth ? 'Verifying ID...' : 'Creating Account...'}</span>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <span>Create Account</span>
+                                                    <span>{isGoogleAuth ? 'Complete ID Verification' : 'Create Account'}</span>
                                                     <ArrowRight size={15} />
                                                 </>
                                             )}
@@ -2430,10 +2618,10 @@ export default function Register() {
                                     </p>
                                 </div>
                                 <Link
-                                    to="/login"
+                                    to={localStorage.getItem('token') ? "/dashboard" : "/login"}
                                     className="mt-2 bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white px-8 py-3 rounded-xl font-heading font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 flex items-center gap-2 cursor-pointer"
                                 >
-                                    <span>Proceed to Sign In</span>
+                                    <span>{localStorage.getItem('token') ? "Go to Dashboard" : "Proceed to Sign In"}</span>
                                     <ArrowRight size={16} />
                                 </Link>
                             </motion.div>
@@ -2610,6 +2798,11 @@ export default function Register() {
                 onClose={() => setCameraOpen(false)}
                 onCapture={handleCameraCapture}
                 side={activeCameraSide}
+                idTypeName={
+                    (activeCameraSide === 'secondFront' || activeCameraSide === 'secondBack')
+                        ? (secondIdObj?.shortName || secondIdObj?.name || '2nd Supporting ID')
+                        : (selectedIdTypeObj?.shortName || selectedIdTypeObj?.name || formData.idType || 'ID')
+                }
             />
         </div>
     );

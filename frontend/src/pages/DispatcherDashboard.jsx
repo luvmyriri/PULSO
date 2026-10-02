@@ -48,7 +48,8 @@ import {
     Compass,
     RotateCcw
 } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, OverlayViewF } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, InfoWindowF, CircleF, PolygonF, DirectionsRenderer, PolylineF, OverlayViewF } from '@react-google-maps/api';
+import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
@@ -88,11 +89,12 @@ const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
 
 const INFRASTRUCTURE_CATEGORIES = [
     'All Categories',
+    'Water Supply & Distribution',
+    'Power & Street Lighting',
     'Roads & Bridges',
-    'Water & Drainage',
-    'Street Lighting',
-    'Public Safety & Regulatory',
-    'Public Facilities',
+    'Traffic & Road Signs',
+    'Public Safety & Hazards',
+    'Public Buildings & Facilities',
     'Others'
 ];
 
@@ -923,11 +925,7 @@ const DispatcherDashboard = () => {
         streetViewControl: false,
     }), [currentMapStyles]);
 
-    const { isLoaded } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-        libraries: GOOGLE_MAPS_LIBRARIES,
-    });
+    const { isLoaded } = useGoogleMaps();
 
     const onUnmount = useCallback(function callback(map) {
         setMap(null)
@@ -1328,10 +1326,15 @@ const DispatcherDashboard = () => {
                 
                 // Map of keywords for each high-level category
                 const CATEGORY_KEYWORDS = {
-                    'Roads & Bridges': ['road', 'bridge', 'pothole', 'pavement', 'asphalt', 'infrastructure', 'sidewalk'],
+                    'Water Supply & Distribution': ['water', 'drain', 'flood', 'leak', 'pipe', 'sewage', 'canal', 'clog', 'supply', 'distribution'],
                     'Water & Drainage': ['water', 'drain', 'flood', 'leak', 'pipe', 'sewage', 'canal', 'clog'],
+                    'Power & Street Lighting': ['light', 'lamp', 'electric', 'power', 'post', 'wire', 'dark', 'bulb'],
                     'Street Lighting': ['light', 'lamp', 'electric', 'power', 'post', 'wire', 'dark', 'bulb'],
+                    'Roads & Bridges': ['road', 'bridge', 'pothole', 'pavement', 'asphalt', 'infrastructure', 'sidewalk'],
+                    'Traffic & Road Signs': ['traffic', 'sign', 'signal', 'lane', 'bollard', 'railing', 'marking', 'post'],
+                    'Public Safety & Hazards': ['safety', 'hazard', 'regulatory', 'security', 'emergency', 'danger', 'risk', 'collapsed', 'obstacle', 'tree', 'debris'],
                     'Public Safety & Regulatory': ['safety', 'hazard', 'regulatory', 'security', 'emergency', 'danger', 'risk', 'collapsed', 'obstacle'],
+                    'Public Buildings & Facilities': ['facility', 'building', 'park', 'playground', 'library', 'school', 'office', 'center', 'court'],
                     'Public Facilities': ['facility', 'building', 'park', 'playground', 'library', 'school', 'office', 'center'],
                     'Others': ['other', 'others', 'uncategorized', 'misc']
                 };
@@ -2172,6 +2175,11 @@ const DispatcherDashboard = () => {
                                                     <span className="text-slate-400 dark:text-slate-600 font-mono text-[10px]">
                                                         {formatTicketId(report.ticket_id, report.id)}
                                                     </span>
+                                                    {(report.reporter_type === 'guest' || !report.resident_id) && (
+                                                        <span className="shrink-0 text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                                            Guest
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <span className="text-[10px] text-slate-400 shrink-0 font-medium">
                                                     {new Date(report.created_at).toLocaleDateString()}

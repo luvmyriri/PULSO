@@ -26,9 +26,9 @@ export default function WizardHeader({ currentStep, totalSteps = 6 }) {
           >
             <ArrowLeft size={20} />
           </Link>
-          <Link to="/" className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 rounded-lg">
+          <Link to="/" className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 rounded-lg group">
             <ResidentBranding size="h-8" showText={false} />
-            <div className="hidden sm:flex flex-col">
+            <div className="flex flex-col">
               <span className="font-bold text-sm text-slate-900 dark:text-white leading-tight">PULSO</span>
               <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold tracking-wider uppercase">Caloocan City</span>
             </div>
@@ -39,7 +39,7 @@ export default function WizardHeader({ currentStep, totalSteps = 6 }) {
         <div className="flex items-center gap-2">
           <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/60 text-orange-700 dark:text-orange-300 text-xs font-semibold">
             <ShieldCheck size={14} className="text-orange-600 dark:text-orange-400" />
-            <span>{t('reportWizard.guestBadge', 'Open Citizen Intake · No Sign-in Required')}</span>
+            <span>{t('reportWizard.guestBadge', 'No Sign-In Needed')}</span>
           </div>
           <span className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">
             {t('reportWizard.stepCounter', 'Step {{current}} of {{total}}', { current: currentStep, total: totalSteps })}

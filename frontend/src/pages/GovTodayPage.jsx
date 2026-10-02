@@ -23,7 +23,8 @@ import {
     Layers,
     Compass
 } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, PolygonF, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { GoogleMap, PolygonF, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import ReportDensityLayer from '../components/maps/ReportDensityLayer';
 import GovSidebar from '../components/GovSidebar';
 import ThemeToggle from '../components/ThemeToggle';
@@ -32,7 +33,6 @@ import GovBreadcrumb from '../components/GovBreadcrumb';
 import GovUserDropdown from '../components/GovUserDropdown';
 import { useTheme } from '../contexts/ThemeContext';
 import { API_BASE_URL } from '../utils/apiBase';
-import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import { formatTicketId } from '../utils/reportWorkflow';
 import {
@@ -44,8 +44,6 @@ import {
     getCaloocanDistrict
 } from '../data/caloocanBoundaries';
 import './citizen-reports.css';
-
-const LIBRARIES = GOOGLE_MAPS_LIBRARIES;
 
 const DARK_MAP_STYLE = [
     { featureType: 'poi', stylers: [{ visibility: 'off' }] },
@@ -92,11 +90,7 @@ export default function GovTodayPage() {
     const { theme } = useTheme();
     const isDark = theme === 'dark' || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
 
-    const { isLoaded: isMapLoaded } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-        libraries: LIBRARIES,
-    });
+    const { isLoaded: isMapLoaded } = useGoogleMaps();
 
     const [todayData, setTodayData] = useState(null);
     const [publicReports, setPublicReports] = useState([]);

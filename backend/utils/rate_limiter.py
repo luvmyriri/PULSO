@@ -102,3 +102,9 @@ claim_limiter = SlidingWindowRateLimiter(
     window_seconds=900,  # 15 minutes
     error_detail="Too many claim attempts. Please try again in 15 minutes."
 )
+
+auth_limiter = SlidingWindowRateLimiter(
+    max_requests=30,
+    window_seconds=60,   # 1 minute
+    error_detail="Too many authentication attempts. Please try again in 1 minute."
+)

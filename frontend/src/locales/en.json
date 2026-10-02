@@ -240,7 +240,7 @@
     "reportWizard": {
       "title": "Report an Issue",
       "subtitle": "Submit an infrastructure repair request directly to the Caloocan City Engineering Department.",
-      "guestBadge": "Open Citizen Intake · No Sign-in Required",
+      "guestBadge": "No Sign-In Needed",
       "stepCounter": "Step {{current}} of {{total}}",
       "saveDraft": "Draft saved automatically",
       "draftResumed": "Draft successfully restored from your previous session.",
@@ -249,7 +249,7 @@
       "startFresh": "Start Fresh",
       "emergencyBanner": {
         "title": "Is this an immediate life-threatening emergency?",
-        "body": "For active fires, severe medical crises, active crimes, or live fallen power lines during floods, call emergency hotlines directly. PULSO is for municipal infrastructure repair and engineering triage.",
+        "body": "For active fires, severe medical crises, active crimes, or live fallen power lines during floods, call emergency hotlines directly. PULSO is for non-emergency public infrastructure repair and maintenance.",
         "call911": "Call 911 (National Emergency)",
         "callCDRRMO": "Call 888-1234 (Caloocan CDRRMO)",
         "callMaynilad": "Maynilad: 1626",
@@ -285,29 +285,41 @@
         "subtitle": "What kind of public infrastructure requires repair or inspection?",
         "selectPlaceholder": "Choose category...",
         "categories": {
+          "water_supply_distribution": {
+            "label": "Water Supply & Distribution",
+            "desc": "Clogged storm drains, missing manhole covers, flash flooding, burst pipes"
+          },
+          "drainage_flooding": {
+            "label": "Water Supply & Distribution",
+            "desc": "Clogged storm drains, missing manhole covers, flash flooding, burst pipes"
+          },
+          "power_street_lighting": {
+            "label": "Power & Street Lighting",
+            "desc": "Dark lampposts, flickering lights, dangling low-voltage lines, damaged poles"
+          },
+          "streetlights_electrical": {
+            "label": "Power & Street Lighting",
+            "desc": "Dark lampposts, flickering lights, dangling low-voltage lines, damaged poles"
+          },
           "roads_bridges": {
             "label": "Roads & Bridges",
             "desc": "Potholes, broken asphalt, damaged bridges, sidewalk cracks"
           },
-          "drainage_flooding": {
-            "label": "Water & Drainage",
-            "desc": "Clogged storm drains, missing manhole covers, flash flooding, burst pipes"
-          },
-          "streetlights_electrical": {
-            "label": "Street Lighting & Power",
-            "desc": "Dark lampposts, flickering lights, dangling low-voltage lines, damaged poles"
-          },
-          "public_facilities": {
-            "label": "Public Facilities & Buildings",
-            "desc": "Damaged health centers, public school defects, broken playground gear"
+          "traffic_signage": {
+            "label": "Traffic & Road Signs",
+            "desc": "Broken traffic lights, missing or faded signs, damaged road markings"
           },
           "public_safety": {
             "label": "Public Safety & Hazards",
-            "desc": "Fallen roadside trees, hazardous debris on carriageway, unstable retaining walls"
+            "desc": "Fallen roadside trees, hazardous debris on road, landslides, unstable retaining walls"
           },
-          "traffic_signage": {
-            "label": "Traffic & Road Signs",
-            "desc": "Broken traffic signals, missing regulatory street signage, bent guardrails"
+          "public_facilities": {
+            "label": "Public Buildings & Facilities",
+            "desc": "Damaged barangay halls, public health centers, school building defects, broken park facilities"
+          },
+          "others": {
+            "label": "Others",
+            "desc": "Any civic infrastructure issue not listed above (please describe in detail in the next steps)"
           }
         },
         "validationError": "Please select an infrastructure category to continue."
@@ -410,7 +422,7 @@
         "anonymousReporter": "Anonymous Guest (Tracking via Private Token)",
         "notifyReporter": "SMS / Email Alerts ({{contact}})",
         "consentCheckbox": "I declare that the information provided in this report is true and accurate. I understand that submitting false or malicious emergency reports is prohibited under Philippine law.",
-        "privacyStatement": "Photos and location data will be used solely for municipal engineering triage and repair. Personal contact info is never published on public boards.",
+        "privacyStatement": "Photos and location data will be used solely for city infrastructure inspection and repair. Personal contact info is never published on public boards.",
         "validationConsentError": "You must certify the truthfulness of your report before submitting."
       },
       "step7Submitting": {

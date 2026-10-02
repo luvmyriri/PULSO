@@ -1,19 +1,135 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     User, Shield, Eye, EyeOff, ChevronRight,
     Activity, Mail, ArrowLeft, CheckCircle, Lock,
-    ShieldCheck, MapPinned, Clock, Clipboard, HardHat, Check, AlertCircle, Home
+    ShieldCheck, MapPinned, Clock, Clipboard, HardHat, Check, AlertCircle, Home, UserX
 } from 'lucide-react';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
+import { useTheme } from '../contexts/ThemeContext';
 import LegalModal from '../components/LegalModal';
-import OfficialBanner from '../components/landing/OfficialBanner';
+import PendingVerificationModal from '../components/PendingVerificationModal';
 import { setAuthSession } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
 import '../index.css';
+
+/**
+ * GoogleSignInButton
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Self-contained GIS button component scoped directly to the login-form DOM lifecycle.
+ * Mounts with a fresh ref, renders as soon as the DOM element is attached,
+ * and cleanly unmounts without leaving stale render guards when navigating to/from
+ * Forgot Password or other view states.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+function GoogleSignInButton({ isDark, onSignIn, clientId }) {
+    const containerRef = useRef(null);
+    const hasRenderedRef = useRef(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        let resizeObserver = null;
+        let pollTimer = null;
+        let renderTimer = null;
+
+        const renderButton = () => {
+            if (!isMounted || !containerRef.current) return;
+            if (!window.google?.accounts?.id) return;
+
+            try {
+                window.google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: onSignIn,
+                    auto_select: false,
+                    cancel_on_tap_outside: true,
+                });
+
+                // Measure container width reliably
+                const measured = containerRef.current.offsetWidth || containerRef.current.getBoundingClientRect().width;
+                const fallbackWidth = Math.min(Math.max(window.innerWidth - 80, 280), 384);
+                const targetWidth = Math.min(Math.max(Math.floor(measured > 220 ? measured : fallbackWidth), 200), 400);
+
+                // Use Google's standard light (outline) theme
+                const currentTheme = 'outline';
+
+                // Clear any prior children to prevent duplication
+                containerRef.current.innerHTML = '';
+
+                window.google.accounts.id.renderButton(containerRef.current, {
+                    type: 'standard',
+                    theme: currentTheme,
+                    size: 'large',
+                    text: 'signin_with',
+                    shape: 'rectangular',
+                    logo_alignment: 'center',
+                    width: targetWidth,
+                });
+
+                hasRenderedRef.current = true;
+            } catch (err) {
+                console.error('[GoogleSignInButton] renderButton error:', err);
+            }
+        };
+
+        const scheduleRender = () => {
+            requestAnimationFrame(() => {
+                if (isMounted) renderButton();
+            });
+        };
+
+        if (window.google?.accounts?.id) {
+            scheduleRender();
+        } else {
+            // Script still loading from index.html: poll briefly until ready
+            pollTimer = setInterval(() => {
+                if (window.google?.accounts?.id) {
+                    clearInterval(pollTimer);
+                    scheduleRender();
+                }
+            }, 80);
+        }
+
+        // Dynamically respond to container width / viewport changes
+        if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+            let lastWidth = containerRef.current.offsetWidth || 0;
+            resizeObserver = new ResizeObserver((entries) => {
+                for (const entry of entries) {
+                    const newWidth = Math.floor(entry.contentRect.width);
+                    if (newWidth > 200 && Math.abs(newWidth - lastWidth) > 12) {
+                        lastWidth = newWidth;
+                        clearTimeout(renderTimer);
+                        renderTimer = setTimeout(() => {
+                            if (isMounted) renderButton();
+                        }, 100);
+                    }
+                }
+            });
+            resizeObserver.observe(containerRef.current);
+        }
+
+        return () => {
+            isMounted = false;
+            hasRenderedRef.current = false;
+            clearInterval(pollTimer);
+            clearTimeout(renderTimer);
+            if (resizeObserver) resizeObserver.disconnect();
+        };
+    }, [isDark, clientId, onSignIn]);
+
+    return (
+        <div className="w-full flex items-center justify-center min-h-[44px]">
+            <div 
+                ref={containerRef} 
+                id="google-signin-btn-container"
+                className="w-full min-h-[44px] block flex justify-center [&>div]:!w-full [&>div]:!max-w-full [&_iframe]:!w-full [&_iframe]:!max-w-full [&_iframe]:!mx-auto" 
+                style={{ width: '100%', minHeight: '44px' }}
+            />
+        </div>
+    );
+}
 
 export default function Login() {
     const navigate = useNavigate();
@@ -38,6 +154,43 @@ export default function Login() {
     const [verificationEmail, setVerificationEmail] = useState('');
     const [verificationOtp, setVerificationOtp]     = useState(['', '', '', '', '', '']);
     const [verificationSuccess, setVerificationSuccess] = useState(false);
+
+    // Google Identity Services (GIS) States
+    const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1005696776742-cb6hpoeho2qap0plhgljboc3agf33d2s.apps.googleusercontent.com';
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const [pendingVerificationInfo, setPendingVerificationInfo] = useState(null);
+
+    // Theme state for dynamic Google button styling
+    const { theme } = useTheme();
+    const [isDark, setIsDark] = useState(() => {
+        if (typeof document !== 'undefined') {
+            return document.documentElement.classList.contains('dark');
+        }
+        return false;
+    });
+
+    useEffect(() => {
+        const checkDark = () => {
+            if (typeof document !== 'undefined') {
+                setIsDark(document.documentElement.classList.contains('dark'));
+            }
+        };
+        checkDark();
+
+        const observer = new MutationObserver(checkDark);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+        return () => observer.disconnect();
+    }, [theme]);
+
+    // Reset reCAPTCHA verification on theme change to prevent submitting an invalidated token
+    const prevThemeStateRef = useRef(isDark);
+    useEffect(() => {
+        if (prevThemeStateRef.current !== isDark) {
+            prevThemeStateRef.current = isDark;
+            setCaptchaValue(null);
+        }
+    }, [isDark]);
 
     // Gmail Two-Factor Authentication States
     const [twoFactorOtp, setTwoFactorOtp]           = useState(['', '', '', '', '', '']);
@@ -71,6 +224,104 @@ export default function Login() {
         }
         return () => clearInterval(interval);
     }, [resendTimer]);
+
+    /* ── Google Sign-In Handler ─────────────────────────────────────────── */
+    const handleGoogleSignIn = useCallback(async (credentialResponse) => {
+        const credential = credentialResponse?.credential || credentialResponse;
+        if (!credential) {
+            setError('Google sign-in was cancelled or failed. Please try again.');
+            return;
+        }
+
+        setGoogleLoading(true);
+        setError('');
+        setPendingVerificationInfo(null);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ credential, auto_link: true }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Google authentication failed. Please try again.');
+            }
+
+            if (data.status === 'authenticated') {
+                // Check if Gmail 2FA is active
+                const userEmail = data.user?.email;
+                const is2FAActive = localStorage.getItem(`pulso_gmail_2fa_${userEmail}`) === 'true' || localStorage.getItem('pulso_gmail_2fa') === 'true';
+
+                if (is2FAActive) {
+                    setPendingAuth({ token: data.access_token, user: data.user });
+                    setTwoFactorEmail(userEmail);
+                    setTwoFactorOtp(['', '', '', '', '', '']);
+                    setView('2fa');
+                    setError('');
+                    setResendTimer(60);
+                    setCanResend(false);
+
+                    try {
+                        const res2fa = await fetch(`${API_BASE_URL}/api/auth/send-2fa-code`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: userEmail })
+                        });
+                        const data2fa = await res2fa.json();
+                        if (data2fa.code) setGenerated2FACode(data2fa.code);
+                    } catch {
+                        const code = Math.floor(100000 + Math.random() * 900000).toString();
+                        setGenerated2FACode(code);
+                    }
+                    return;
+                }
+
+                setAuthSession(data.access_token, data.user);
+                navigate('/dashboard');
+            } else if (data.status === 'new_unverified') {
+                // First-time resident via Google: route directly into ID verification flow!
+                navigate('/register', {
+                    state: {
+                        googleAuth: true,
+                        email: data.user.email,
+                        fullName: data.user.full_name
+                    }
+                });
+            } else if (data.status === 'pending_verification') {
+                // Returning user whose ID verification is incomplete
+                setPendingVerificationInfo({
+                    email: data.user.email,
+                    fullName: data.user.full_name,
+                    hasSubmittedId: data.has_submitted_id,
+                    kycLevel: data.kyc_level
+                });
+            }
+        } catch (err) {
+            setError(err.message || 'Google sign-in encountered an error. Please try again.');
+        } finally {
+            setGoogleLoading(false);
+        }
+    }, [navigate]);
+
+    const handleCompletePendingVerification = () => {
+        if (!pendingVerificationInfo) return;
+        const info = pendingVerificationInfo;
+        setPendingVerificationInfo(null);
+        navigate('/register', {
+            state: {
+                googleAuth: true,
+                email: info.email,
+                fullName: info.fullName
+            }
+        });
+    };
+
+    const handleDismissPendingVerification = () => {
+        setPendingVerificationInfo(null);
+    };
 
     /* ── Auth handlers ──────────────────────────────────────────────────── */
     const handleLogin = async (e) => {
@@ -454,10 +705,6 @@ export default function Login() {
     return (
         <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden">
 
-            {/* ── Official Header Ribbon (Without GOVPH) ───────────── */}
-            <div className="relative z-30 w-full">
-                <OfficialBanner />
-            </div>
 
             {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
             <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
@@ -471,7 +718,7 @@ export default function Login() {
                 </Link>
 
                 {/* Right side: Theme Toggle & Home Navigation */}
-                <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                     <ThemeToggle />
                     <Link
                         to="/"
@@ -484,9 +731,9 @@ export default function Login() {
                 </div>
             </header>
 
-            {/* ── Background Seal Watermark (Inherited from Landing Page) ───── */}
+            {/* ── Background Seal Watermark (Desktop only, hidden on mobile) ───── */}
             <div
-                className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 flex items-center justify-end"
+                className="hidden lg:flex absolute inset-0 overflow-hidden pointer-events-none select-none z-0 items-center justify-end"
                 aria-hidden="true"
             >
                 <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
@@ -505,12 +752,12 @@ export default function Login() {
                 </div>
             </div>
 
-            {/* ── Main Content Grid (60/40 Ratio in max-w-7xl) ───────────── */}
-            <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10 lg:py-14 flex-1 flex items-center">
+            {/* ── Main Content Grid (60/40 Ratio in max-w-7xl on Desktop, Hero hidden on Mobile) ───────────── */}
+            <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-6 lg:py-12 flex-1 flex items-center justify-center">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center w-full">
                     
-                    {/* Left Column: Hero & System Context (60% / 7 cols) */}
-                    <div className="lg:col-span-7 flex flex-col items-start text-left w-full">
+                    {/* Left Column: Hero & System Context (60% / 7 cols) — Hidden on mobile/tablet (< lg), visible on desktop */}
+                    <div className="hidden lg:flex lg:col-span-7 flex-col items-start text-left w-full">
                         
                         {/* Category Tag Pill */}
                         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
@@ -528,12 +775,10 @@ export default function Login() {
                         <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-300 font-normal leading-relaxed mb-6 max-w-xl">
                             Access your resident dashboard to report municipal infrastructure hazards, track field crew dispatches in real-time, and view verified repair updates across North and South Caloocan.
                         </p>
-
-
                     </div>
 
-                    {/* Right Column: Structured Auth Container (40% / 5 cols) */}
-                    <div className="lg:col-span-5 flex justify-center lg:justify-end w-full">
+                    {/* Right Column: Structured Auth Container (40% / 5 cols on desktop, full-width centered on mobile) */}
+                    <div className="w-full lg:col-span-5 flex justify-center lg:justify-end">
                         <div className="w-full max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden">
                             
 
@@ -652,12 +897,13 @@ export default function Login() {
                                                                 transition={{ duration: 0.25, ease: 'easeOut' }}
                                                                 className="flex justify-center w-full py-1 overflow-hidden"
                                                             >
-                                                                <div className="scale-90 origin-center">
+                                                                <div className="p-1 rounded-2xl bg-slate-50/60 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800/80 shadow-xs inline-flex justify-center items-center scale-90 sm:scale-95 origin-center transition-colors">
                                                                     <ReCAPTCHA
+                                                                        key={isDark ? 'recaptcha-dark' : 'recaptcha-light'}
                                                                         ref={recaptchaRef}
                                                                         sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
                                                                         onChange={(val) => setCaptchaValue(val)}
-                                                                        theme="light"
+                                                                        theme={isDark ? 'dark' : 'light'}
                                                                     />
                                                                 </div>
                                                             </motion.div>
@@ -681,14 +927,43 @@ export default function Login() {
                                                     </button>
                                                 </form>
 
-                                            <div className="pt-5 mt-5 border-t border-slate-100 dark:border-slate-800 text-center">
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                    Need to file an urgent hazard report right away?{' '}
-                                                    <Link to="/register" className="text-[#ff6b00] font-bold hover:underline cursor-pointer">
-                                                        Register as resident
+                                                {/* Divider: — or continue with — */}
+                                                <div className="relative my-4 flex items-center justify-center">
+                                                    <div className="absolute inset-0 flex items-center">
+                                                        <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+                                                    </div>
+                                                    <div className="relative px-3 bg-white dark:bg-slate-900 text-[11px] font-mono-data font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                                        — or continue with —
+                                                    </div>
+                                                </div>
+
+                                                {/* Official Google Sign-In Button (Self-contained, reliably mounted with fresh ref on view return) */}
+                                                <GoogleSignInButton 
+                                                    isDark={isDark} 
+                                                    onSignIn={handleGoogleSignIn} 
+                                                    clientId={GOOGLE_CLIENT_ID} 
+                                                />
+
+                                                {/* Continue as Guest Button (Secondary Action) */}
+                                                <div className="mt-2.5">
+                                                    <Link
+                                                        to="/report?source=guest"
+                                                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-750 hover:border-slate-300 dark:hover:border-slate-650 bg-slate-50/70 hover:bg-slate-100/80 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold transition-all shadow-2xs hover:shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                                        title="File a report immediately without creating an account"
+                                                    >
+                                                        <UserX size={15} className="text-slate-500 dark:text-slate-400" />
+                                                        <span>Continue as Guest</span>
                                                     </Link>
-                                                </p>
-                                            </div>
+                                                </div>
+
+                                                <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 text-center">
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                        Need to file an urgent hazard report right away?{' '}
+                                                        <Link to="/register" className="text-[#ff6b00] font-bold hover:underline cursor-pointer">
+                                                            Register as resident
+                                                        </Link>
+                                                    </p>
+                                                </div>
                                         </motion.div>
                                     ) : view === 'verify' ? (
                                         /* ── 2. Account Verification Flow ─────────────── */
@@ -1125,6 +1400,18 @@ export default function Login() {
                 onClose={() => setLegalModal(prev => ({ ...prev, isOpen: false }))}
                 initialTab={legalModal.tab}
             />
+
+            {/* Non-dismissible Government ID Verification Pending Modal for unverified Google-linked accounts */}
+            <AnimatePresence>
+                {pendingVerificationInfo && (
+                    <PendingVerificationModal
+                        isOpen={Boolean(pendingVerificationInfo)}
+                        info={pendingVerificationInfo}
+                        onComplete={handleCompletePendingVerification}
+                        onDismiss={handleDismissPendingVerification}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

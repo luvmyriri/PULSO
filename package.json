@@ -9,5 +9,8 @@
     "dev:backend": "cd backend && python main.py",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build"
+  },
+  "dependencies": {
+    "google-auth-library": "^11.1.0"
   }
 }

@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   GoogleMap,
-  useJsApiLoader,
   MarkerF,
   PolygonF,
 } from '@react-google-maps/api';
+import { useGoogleMaps } from '../../contexts/GoogleMapsContext';
 import {
   MapPin,
   Droplets,
@@ -30,7 +30,6 @@ import {
   COMBINED_CALOOCAN_BOUNDS,
 } from '../../data/caloocanBoundaries';
 import { useTheme } from '../../contexts/ThemeContext';
-import { GOOGLE_MAPS_LIBRARIES } from '../../utils/mapsConfig';
 
 const CALOOCAN_CENTER = { lat: 14.7104, lng: 121.0298 };
 
@@ -249,11 +248,7 @@ export default function MapPreviewSection() {
       ? document.documentElement.classList.contains('dark')
       : false;
 
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
+  const { isLoaded } = useGoogleMaps();
 
   const activeStyles = useMemo(
     () => (isDarkMode ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE),

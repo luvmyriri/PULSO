@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useJsApiLoader } from '@react-google-maps/api';
+import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getStoredToken } from '../utils/auth';
 import { CALOOCAN_CENTERS } from '../utils/geospatial';
@@ -16,20 +16,14 @@ import Step5ContactPreferences from '../components/report-wizard/Step5ContactPre
 import Step6ReviewConsent from '../components/report-wizard/Step6ReviewConsent';
 import DuplicateWarningModal from '../components/report-wizard/DuplicateWarningModal';
 
-import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
-
 const DRAFT_STORAGE_KEY = 'pulso_report_wizard_draft_v1';
 
 export default function ReportWizardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  // Load Google Maps API safely
-  const { isLoaded: isMapLoaded } = useJsApiLoader({
-    id: 'pulso-google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
+  // Centralized Google Maps API loader state
+  const { isLoaded: isMapLoaded } = useGoogleMaps();
 
   // Stepper State (1 - 6)
   const [currentStep, setCurrentStep] = useState(1);
@@ -200,9 +194,11 @@ export default function ReportWizardPage() {
         submitData.append('landmark', formData.location.landmark);
       }
 
-      if (formData.contact.type === 'notify') {
-        if (formData.contact.email) submitData.append('contact_email', formData.contact.email);
-        if (formData.contact.phone) submitData.append('contact_phone', formData.contact.phone);
+      if (formData.contact?.email) {
+        submitData.append('contact_email', formData.contact.email.trim());
+      }
+      if (formData.contact?.phone) {
+        submitData.append('contact_phone', formData.contact.phone.trim());
       }
 
       const token = getStoredToken();

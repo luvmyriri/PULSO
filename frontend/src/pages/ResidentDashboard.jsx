@@ -4,13 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     GoogleMap,
-    useJsApiLoader,
     MarkerF,
     InfoWindowF,
     PolygonF,
     StreetViewPanorama,
     OverlayViewF
 } from '@react-google-maps/api';
+import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import {
     LayoutDashboard,
     Bell,
@@ -96,7 +96,8 @@ import {
     Compass,
     HelpCircle,
     History,
-    Trash2
+    Trash2,
+    Signpost
 } from 'lucide-react';
 
 import PulseAIMarkdown from '../components/PulseAIMarkdown';
@@ -236,11 +237,12 @@ const LIGHT_CIVIC_MAP_STYLE = [
 ];
 
 const REPORT_CATEGORIES = (t) => [
-    { value: 'Water Supply Network', label: t('landing.solutions.s1_title', { defaultValue: 'Water Supply & Distribution' }) },
+    { value: 'Water Supply & Distribution', label: t('landing.solutions.s1_title', { defaultValue: 'Water Supply & Distribution' }) },
     { value: 'Power & Street Lighting', label: t('landing.solutions.s2_title', { defaultValue: 'Power & Street Lighting' }) },
-    { value: 'Roads & Drainage', label: t('landing.solutions.s3_title', { defaultValue: 'Roads & Bridges' }) },
-    { value: 'Public Safety & Regulatory', label: t('landing.solutions.s4_title', { defaultValue: 'Public Safety & Hazards' }) },
-    { value: 'Public Facilities', label: t('landing.solutions.s5_title', { defaultValue: 'Public Buildings & Facilities' }) },
+    { value: 'Roads & Bridges', label: t('landing.solutions.s3_title', { defaultValue: 'Roads & Bridges' }) },
+    { value: 'Traffic & Road Signs', label: t('landing.solutions.traffic_title', { defaultValue: 'Traffic & Road Signs' }) },
+    { value: 'Public Safety & Hazards', label: t('landing.solutions.s4_title', { defaultValue: 'Public Safety & Hazards' }) },
+    { value: 'Public Buildings & Facilities', label: t('landing.solutions.s5_title', { defaultValue: 'Public Buildings & Facilities' }) },
     { value: 'Others', label: t('landing.solutions.s6_title', { defaultValue: 'Others' }) },
 ];
 
@@ -4141,58 +4143,68 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
 
 // Rich metadata for each report category — color + info popover content
 const CATEGORY_META = {
-    'Water Supply Network': {
+    'Water Supply & Distribution': {
         color: 'blue',
-        icon: <Droplets size={24} strokeWidth={1.5} />,
+        icon: <Droplets size={20} strokeWidth={1.7} />,
         scope: [
-            'De-clogging of blocked canals and manholes',
-            'Pumping stations and estero flood control (city jurisdiction)',
-            'Maintenance of public water fountains and toilets in city parks',
-            'Note: Potable water supply (Maynilad) and major rivers are NOT covered',
+            'De-clogging of blocked canals, storm drains, and manholes',
+            'Localized flooding and estero flood control (city jurisdiction)',
+            'Broken city pipes, water fountains, and public drainage infrastructure',
+            'Note: Potable water main lines (Maynilad) are reported for coordination',
         ],
     },
     'Power & Street Lighting': {
         color: 'yellow',
-        icon: <Lightbulb size={24} strokeWidth={1.5} />,
+        icon: <Lightbulb size={20} strokeWidth={1.7} />,
         scope: [
             'Installation and replacement of burned-out streetlight bulbs',
             'Repair of city-owned electrical wiring and lamp posts',
             'Ensuring nighttime safety along city and barangay roads',
         ],
     },
-    'Roads & Drainage': {
+    'Roads & Bridges': {
         color: 'orange',
-        icon: <Cone size={24} strokeWidth={1.5} />,
+        icon: <Cone size={20} strokeWidth={1.7} />,
         scope: [
             'Local city roads and barangay road repair',
-            'Pothole patching and broken pavement',
-            'Sidewalks, gutters, and drainage channels beside roads',
-            'Pavement markings (pedestrian crossings, lane dividers)',
+            'Pothole patching, asphalt cracking, and broken pavement',
+            'Damaged footbridges, pedestrian crossings, and curbs',
+            'Sidewalk cracks and carriageway obstructions',
         ],
     },
-    'Public Safety & Regulatory': {
-        color: 'red',
-        icon: <ShieldAlert size={24} strokeWidth={1.5} />,
+    'Traffic & Road Signs': {
+        color: 'orange',
+        icon: <Signpost size={20} strokeWidth={1.7} />,
         scope: [
-            'Structural safety inspection of buildings (especially post-earthquake)',
-            'Building permit evaluation — compliance with National Building Code',
-            'Debris and fallen tree clearing after typhoons or disasters',
-            'Fire safety and electrical compliance checks for new constructions',
+            'Broken or malfunctioning traffic light signals and timers',
+            'Missing, damaged, or obscured regulatory street signs',
+            'Damaged median railings, bollards, and lane markers',
+            'Street nameplates and directional civic signage',
         ],
     },
-    'Public Facilities': {
+    'Public Safety & Hazards': {
+        color: 'red',
+        icon: <ShieldAlert size={20} strokeWidth={1.7} />,
+        scope: [
+            'Structural safety inspection of buildings and retaining walls',
+            'Debris and fallen tree clearing along roadways after typhoons',
+            'Immediate public safety hazards and carriageway obstacles',
+            'Building permit and national building code safety violations',
+        ],
+    },
+    'Public Buildings & Facilities': {
         color: 'green',
-        icon: <Landmark size={24} strokeWidth={1.5} />,
+        icon: <Landmark size={20} strokeWidth={1.7} />,
         scope: [
             'Construction and maintenance of public school buildings',
-            'Barangay health centers and City Hall office repairs',
-            'Basketball courts, plazas, and recreational areas',
-            'Covered courts, parks, and other city-owned public spaces',
+            'Barangay health centers and City Hall facility repairs',
+            'Basketball courts, public plazas, and community playgrounds',
+            'Covered courts, parks, and other city-owned facilities',
         ],
     },
     'Others': {
         color: 'purple',
-        icon: <HelpCircle size={24} strokeWidth={1.5} />,
+        icon: <HelpCircle size={20} strokeWidth={1.7} />,
         scope: [
             'General civic infrastructure concerns not covered by defined categories',
             'Uncategorized city engineering maintenance requests',
@@ -4201,6 +4213,16 @@ const CATEGORY_META = {
         ],
     },
 };
+
+// Backward-compatible category aliases
+CATEGORY_META['Water Supply Network'] = CATEGORY_META['Water Supply & Distribution'];
+CATEGORY_META['Water & Drainage'] = CATEGORY_META['Water Supply & Distribution'];
+CATEGORY_META['Roads & Drainage'] = CATEGORY_META['Roads & Bridges'];
+CATEGORY_META['Public Safety & Regulatory'] = CATEGORY_META['Public Safety & Hazards'];
+CATEGORY_META['Public Facilities'] = CATEGORY_META['Public Buildings & Facilities'];
+CATEGORY_META['Public Facilities & Buildings'] = CATEGORY_META['Public Buildings & Facilities'];
+CATEGORY_META['Street Lighting & Power'] = CATEGORY_META['Power & Street Lighting'];
+CATEGORY_META['Street Lighting'] = CATEGORY_META['Power & Street Lighting'];
 
 const COLOR_MAP = {
     orange: { ring: 'ring-orange-500', bg: 'bg-orange-500/10 dark:bg-orange-500/15', dot: 'bg-orange-500', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-400', badge: 'bg-orange-500' },
@@ -4281,12 +4303,12 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
             </div>
 
             {/* Accessible Single-Line Category Cards */}
-            <div className="flex flex-col gap-1.5" ref={tooltipRef}>
+            <div className="flex flex-col gap-1 sm:gap-1.5 max-h-[295px] sm:max-h-[315px] overflow-y-auto pr-1 scrollbar-thin" ref={tooltipRef}>
                 {options.map((optObj, index) => {
                     const opt = typeof optObj === 'string' ? optObj : optObj.value;
                     const label = typeof optObj === 'string' ? optObj : optObj.label;
-                    const meta = CATEGORY_META[opt] || CATEGORY_META['Roads & Drainage'];
-                    const clr = COLOR_MAP[meta.color] || COLOR_MAP.orange;
+                    const meta = CATEGORY_META[opt] || CATEGORY_META['Roads & Bridges'] || CATEGORY_META['Roads & Drainage'];
+                    const clr = COLOR_MAP[meta?.color] || COLOR_MAP.orange;
                     const selected = selectedOptions.includes(opt);
                     const infoOpen = tooltip === opt;
                     const atCapacity = !selected && selectedOptions.length >= 3;
@@ -4302,7 +4324,7 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
                                     }
                                 }}
                                 aria-disabled={disabled}
-                                className={`flex items-center justify-between gap-3 px-3.5 py-2.5 min-h-[44px] rounded-xl border transition-all duration-150 select-none w-full ${
+                                className={`flex items-center justify-between gap-2.5 px-3 py-1.5 sm:py-2 min-h-[38px] sm:min-h-[40px] rounded-xl border transition-all duration-150 select-none w-full ${
                                     disabled
                                         ? 'border-slate-200/80 dark:border-slate-800/80 bg-slate-100/60 dark:bg-slate-900/50 opacity-40 grayscale cursor-not-allowed text-slate-400 dark:text-slate-600 pointer-events-none'
                                         : selected
@@ -4314,17 +4336,17 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
                                 title={disabled ? (disabledReason || 'Please capture photo of the problem to select categories') : atCapacity ? 'Maximum 3 categories selected' : undefined}
                             >
                                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    <div className={`p-1.5 rounded-lg shrink-0 transition-colors ${
+                                    <div className={`p-1 sm:p-1.5 rounded-lg shrink-0 transition-colors ${
                                         disabled
                                             ? 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-600'
                                             : selected
                                                 ? 'bg-orange-500 text-white shadow-xs'
                                                 : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 group-hover:text-orange-500'
                                     }`}>
-                                        {meta.icon}
+                                        {meta?.icon}
                                     </div>
 
-                                    <span className={`text-[13px] font-bold whitespace-nowrap truncate ${
+                                    <span className={`text-xs sm:text-[13px] font-bold whitespace-nowrap truncate ${
                                         disabled
                                             ? 'text-slate-400 dark:text-slate-600'
                                             : selected
@@ -4337,8 +4359,8 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
 
                                 <div className="flex items-center gap-1.5 shrink-0">
                                     {selected && !disabled && (
-                                        <span className="w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-xs">
-                                            <Check size={12} strokeWidth={3} />
+                                        <span className="w-4.5 h-4.5 sm:w-5 sm:h-5 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-xs">
+                                            <Check size={11} strokeWidth={3} />
                                         </span>
                                     )}
                                     <button
@@ -4348,7 +4370,7 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
                                             e.stopPropagation();
                                             if (!disabled) setTooltip(infoOpen ? null : opt);
                                         }}
-                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black transition-colors shrink-0 ${
+                                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[11px] font-black transition-colors shrink-0 ${
                                             disabled
                                                 ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed pointer-events-none'
                                                 : infoOpen
@@ -4998,14 +5020,16 @@ const ResidentModals = ({
                                                     let mapped = [];
                                                     if (aiCat.includes('light') || aiCat.includes('electric') || aiCat.includes('power') || aiCat.includes('lamp') || aiCat.includes('street')) {
                                                         mapped.push('Power & Street Lighting');
+                                                    } else if (aiCat.includes('traffic') || aiCat.includes('sign') || aiCat.includes('signal') || aiCat.includes('marking')) {
+                                                        mapped.push('Traffic & Road Signs');
                                                     } else if (aiCat.includes('road') || aiCat.includes('bridge') || aiCat.includes('pothole') || aiCat.includes('asphalt') || aiCat.includes('pavement')) {
-                                                        mapped.push('Roads & Drainage');
+                                                        mapped.push('Roads & Bridges');
                                                     } else if (aiCat.includes('water') || aiCat.includes('drain') || aiCat.includes('flood') || aiCat.includes('canal') || aiCat.includes('sewer') || aiCat.includes('pipe') || aiCat.includes('manhole')) {
-                                                        mapped.push('Water Supply Network');
+                                                        mapped.push('Water Supply & Distribution');
                                                     } else if (aiCat.includes('safety') || aiCat.includes('regulat') || aiCat.includes('hazard') || aiCat.includes('fire') || aiCat.includes('building') || aiCat.includes('debris') || aiCat.includes('tree')) {
-                                                        mapped.push('Public Safety & Regulatory');
+                                                        mapped.push('Public Safety & Hazards');
                                                     } else if (aiCat.includes('facilit') || aiCat.includes('park') || aiCat.includes('hall') || aiCat.includes('court') || aiCat.includes('school') || aiCat.includes('gym')) {
-                                                        mapped.push('Public Facilities');
+                                                        mapped.push('Public Buildings & Facilities');
                                                     } else if (aiCat.includes('other') || aiCat.includes('unknown') || aiCat.includes('unclear') || aiCat.includes('misc')) {
                                                         mapped.push('Others');
                                                     }
@@ -7141,13 +7165,7 @@ export default function ResidentDashboard() {
         return 'overview';
     });
 
-    const loaderOptions = React.useMemo(() => ({
-        id: 'google-map-script',
-        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-        libraries: GOOGLE_MAPS_LIBRARIES,
-    }), []);
-
-    const { isLoaded, loadError } = useJsApiLoader(loaderOptions);
+    const { isLoaded, loadError } = useGoogleMaps();
 
     const [pulseRadius] = useState(0);
 
@@ -8130,14 +8148,18 @@ export default function ResidentDashboard() {
 
                     if (aiCat.includes('light') || aiCat.includes('electric') || aiCat.includes('power') || aiCat.includes('lamp') || aiCat.includes('street')) {
                         mapped.push('Power & Street Lighting');
+                    } else if (aiCat.includes('traffic') || aiCat.includes('sign') || aiCat.includes('signal') || aiCat.includes('marking')) {
+                        mapped.push('Traffic & Road Signs');
                     } else if (aiCat.includes('road') || aiCat.includes('bridge') || aiCat.includes('pothole') || aiCat.includes('asphalt') || aiCat.includes('pavement')) {
-                        mapped.push('Roads & Drainage');
+                        mapped.push('Roads & Bridges');
                     } else if (aiCat.includes('water') || aiCat.includes('drain') || aiCat.includes('flood') || aiCat.includes('canal') || aiCat.includes('sewer') || aiCat.includes('pipe') || aiCat.includes('manhole')) {
-                        mapped.push('Water Supply Network');
+                        mapped.push('Water Supply & Distribution');
                     } else if (aiCat.includes('safety') || aiCat.includes('regulat') || aiCat.includes('hazard') || aiCat.includes('fire') || aiCat.includes('building') || aiCat.includes('debris') || aiCat.includes('tree')) {
-                        mapped.push('Public Safety & Regulatory');
+                        mapped.push('Public Safety & Hazards');
                     } else if (aiCat.includes('facilit') || aiCat.includes('park') || aiCat.includes('hall') || aiCat.includes('court') || aiCat.includes('school') || aiCat.includes('gym')) {
-                        mapped.push('Public Facilities');
+                        mapped.push('Public Buildings & Facilities');
+                    } else if (aiCat.includes('other') || aiCat.includes('unknown') || aiCat.includes('unclear') || aiCat.includes('misc')) {
+                        mapped.push('Others');
                     }
 
                     if (mapped.length > 0) {

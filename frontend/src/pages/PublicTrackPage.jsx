@@ -39,8 +39,10 @@ export default function PublicTrackPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ticket_id: id,
           report_id: id,
           tracking_token: token,
+          contact: token,
         }),
       });
 
@@ -48,9 +50,8 @@ export default function PublicTrackPage() {
         const data = await response.json();
         setReportData(data);
       } else {
-        // Fallback for demo / direct inspection if backend is unavailable or using alternative endpoint
         if (response.status === 404 || response.status === 403) {
-          setErrorMsg(t('track.lookup.errorNotFound', 'Report not found or invalid tracking credentials. Please check your Ticket ID and Token.'));
+          setErrorMsg(t('track.lookup.errorNotFound', 'Report not found or invalid tracking credentials. Please check your Ticket ID and Tracking Token or Contact Number.'));
         } else {
           setErrorMsg('Unable to retrieve tracking record. Please try again.');
         }
@@ -140,14 +141,14 @@ export default function PublicTrackPage() {
 
             <div>
               <label htmlFor="track-token" className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('track.lookup.tokenLabel', 'Secret Tracking Token (Optional)')}
+                {t('track.lookup.tokenLabel', 'Tracking Code OR Contact (Phone / Email)')}
               </label>
               <input
                 id="track-token"
                 type="text"
                 value={trackingToken}
                 onChange={(e) => setTrackingToken(e.target.value)}
-                placeholder={t('track.lookup.tokenPlaceholder', 'TRK-XXXX-XXXX-XXXX-XXXX')}
+                placeholder={t('track.lookup.tokenPlaceholder', 'TRK-XXXX-XXXX or 0917XXXXXXX or name@email.com')}
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm font-mono placeholder:font-sans placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               />
             </div>

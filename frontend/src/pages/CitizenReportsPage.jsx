@@ -453,7 +453,14 @@ export default function CitizenReportsPage({ workspace }) {
                                         <span className="citizen-report-row__signal" aria-hidden="true" />
                                         <span className="citizen-report-row__id">{reportId(report)}</span>
                                         <span className="citizen-report-row__issue">
-                                            <strong>{humanize(report.title, 'Infrastructure report')}</strong>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <strong>{humanize(report.title, 'Infrastructure report')}</strong>
+                                                {(report.reporter_type === 'guest' || !report.resident_id) && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-wide uppercase bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                                                        Guest Submission
+                                                    </span>
+                                                )}
+                                            </div>
                                             <small>{report.location || report.barangay || 'Location not provided'}</small>
                                         </span>
                                         <StatusLabel status={report.status} />
@@ -485,7 +492,18 @@ export default function CitizenReportsPage({ workspace }) {
                             <>
                                 <header className="citizen-report-docket__header">
                                     <div>
-                                        <span className="citizen-report-docket__id">{reportId(selected)}</span>
+                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                            <span className="citizen-report-docket__id">{reportId(selected)}</span>
+                                            {(selected.reporter_type === 'guest' || !selected.resident_id) ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                                    Guest Submission (Unverified)
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                                    Verified Resident
+                                                </span>
+                                            )}
+                                        </div>
                                         <h2 id="citizen-report-docket-title">{humanize(selected.category || selected.title, 'Infrastructure report')}</h2>
                                         <p>{formatDateTime(selected.created_at)} · {selected.location_barangay || selected.barangay || 'Barangay not provided'}</p>
                                     </div>

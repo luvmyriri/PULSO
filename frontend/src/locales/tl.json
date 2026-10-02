@@ -237,7 +237,7 @@
     "reportWizard": {
       "title": "Mag-ulat ng Problema",
       "subtitle": "Magsumite ng kahilingan sa pagkumpuni nang direkta sa City Engineering Department ng Caloocan.",
-      "guestBadge": "Bukas na Pag-uulat · Hindi Kailangan Mag-login",
+      "guestBadge": "Walang Sign-In na Kailangan",
       "stepCounter": "Hakbang {{current}} ng {{total}}",
       "saveDraft": "Kusang nase-save ang draft",
       "draftResumed": "Matagumpay na naibalik ang iyong draft mula sa nakaraang sesyon.",
@@ -282,29 +282,41 @@
         "subtitle": "Anong uri ng pampublikong imprastraktura ang nangangailangan ng kumpuni o inspeksyon?",
         "selectPlaceholder": "Pumili ng kategorya...",
         "categories": {
+          "water_supply_distribution": {
+            "label": "Suplay ng Tubig at Kanal",
+            "desc": "Baradong kanal, nawawalang manhole, baha sa kalsada, sirang tubo"
+          },
+          "drainage_flooding": {
+            "label": "Suplay ng Tubig at Kanal",
+            "desc": "Baradong kanal, nawawalang manhole, baha sa kalsada, sirang tubo"
+          },
+          "power_street_lighting": {
+            "label": "Kuryente at Ilaw sa Daan",
+            "desc": "Pundidong poste, nakalaylay na kable, madilim na daan, sirang poste"
+          },
+          "streetlights_electrical": {
+            "label": "Kuryente at Ilaw sa Daan",
+            "desc": "Pundidong poste, nakalaylay na kable, madilim na daan, sirang poste"
+          },
           "roads_bridges": {
             "label": "Kalsada at Tulay",
             "desc": "Mga lubak, sirang aspalto, basag na tulay, bitak sa bangketa"
           },
-          "drainage_flooding": {
-            "label": "Tubig at Kanal",
-            "desc": "Baradong kanal, nawawalang manhole, baha sa kalsada, sirang tubo"
-          },
-          "streetlights_electrical": {
-            "label": "Ilaw sa Daan at Kuryente",
-            "desc": "Pundidong poste, nakalaylay na kable, madilim na daan, sirang poste"
-          },
-          "public_facilities": {
-            "label": "Pampublikong Pasilidad at Gusali",
-            "desc": "Sirang health center, paaralan, o kagamitan sa pampublikong parke"
+          "traffic_signage": {
+            "label": "Trapiko at Karatula",
+            "desc": "Sirang traffic light, nawawalang signage, sirang harang sa daan"
           },
           "public_safety": {
             "label": "Kaligtasan ng Publiko at Sagabal",
             "desc": "Nabuwal na puno sa daan, mapanganib na kalat sa kalsada, gumuguhong pader"
           },
-          "traffic_signage": {
-            "label": "Trapiko at Karatula",
-            "desc": "Sirang traffic light, nawawalang signage, sirang harang sa daan"
+          "public_facilities": {
+            "label": "Pampublikong Gusali at Pasilidad",
+            "desc": "Sirang health center, paaralan, o kagamitan sa pampublikong parke"
+          },
+          "others": {
+            "label": "Iba pa",
+            "desc": "Iba pang pampublikong imprastraktura na wala sa listahan (kailangan ng detalye)"
           }
         },
         "validationError": "Pumili ng kategorya upang magpatuloy."
@@ -413,7 +425,7 @@
       "step7Submitting": {
         "title": "Isinusumite ang Iyong Ulat",
         "uploading": "Ligtas na ina-upload ang litrato...",
-        "triaging": "Sinisimulan ang pagsusuri ng AI...",
+        "triaging": "Sinisimulan ang pagsusuri...",
         "generatingToken": "Bumubuo ng pribadong tracking credentials...",
         "finalizing": "Tinatapos ang talaan ng ticket...",
         "errorTitle": "Nabigo ang Pagsumite",

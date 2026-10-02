@@ -180,9 +180,9 @@ export default function GovLanding() {
                 </div>
             </header>
 
-            {/* ── Background Seal Watermark (Inherited from Resident Login) ───── */}
+            {/* ── Background Seal Watermark (Desktop only, hidden on mobile) ───── */}
             <div
-                className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 flex items-center justify-end"
+                className="hidden lg:flex absolute inset-0 overflow-hidden pointer-events-none select-none z-0 items-center justify-end"
                 aria-hidden="true"
             >
                 <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
@@ -375,12 +375,12 @@ export default function GovLanding() {
                                                             exit={{ opacity: 0, height: 0 }}
                                                             className="flex justify-center w-full py-1 overflow-hidden"
                                                         >
-                                                            <div className="scale-90 origin-center">
+                                                            <div className="p-1 rounded-2xl bg-slate-800/40 border border-slate-750/60 shadow-xs inline-flex justify-center items-center scale-90 sm:scale-95 origin-center">
                                                                 <ReCAPTCHA
                                                                     ref={recaptchaRef}
                                                                     sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
                                                                     onChange={(token) => setCaptchaToken(token)}
-                                                                    theme="light"
+                                                                    theme="dark"
                                                                 />
                                                             </div>
                                                         </motion.div>

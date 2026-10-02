@@ -63,7 +63,7 @@ export default function DuplicateWarningModal({
               Ticket: {duplicateData.ticketId || duplicateData.ticket_id}
             </span>
             <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
-              {duplicateData.status || 'Under Active Triage'}
+              {duplicateData.status || 'Being Handled by Field Team'}
             </span>
           </div>
 

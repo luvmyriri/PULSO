@@ -212,7 +212,7 @@ export default function Step6ReviewConsent({
         </label>
 
         <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-8 leading-normal">
-          {t('reportWizard.step6Review.privacyStatement', 'Photos and location data will be used solely for municipal engineering triage and repair. Personal contact info is never published on public boards.')}
+          {t('reportWizard.step6Review.privacyStatement', 'Photos and location data will be used solely for city infrastructure inspection and repair. Personal contact info is never published on public boards.')}
         </p>
       </div>
 

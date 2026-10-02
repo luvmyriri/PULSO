@@ -11,7 +11,8 @@ import {
     PieChart, LineChart as LineChartIcon, Globe, Navigation,
     AlertCircle, Package, ChevronDown, X, RotateCcw
 } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, CircleF, MarkerF, PolygonF } from '@react-google-maps/api';
+import { GoogleMap, CircleF, MarkerF, PolygonF } from '@react-google-maps/api';
+import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import OrangeSelect from '../components/OrangeSelect';
@@ -21,11 +22,7 @@ import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
-
 import { API_BASE_URL } from '../utils/apiBase';
-import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
-const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const LIBRARIES = GOOGLE_MAPS_LIBRARIES;
 
 const CATEGORY_LABELS = {
     'roads_bridges': 'Roads & Bridges',
@@ -228,11 +225,7 @@ export default function GovAnalyticsPage({ workspace }) {
         }
     }, [mapRef, isDarkMode]);
 
-    const { isLoaded: mapsLoaded } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: GOOGLE_MAPS_KEY || '',
-        libraries: LIBRARIES,
-    });
+    const { isLoaded: mapsLoaded } = useGoogleMaps();
 
     // ── Fetch All Data ──────────────────────────────────────────────────────
     const fetchData = useCallback(async () => {

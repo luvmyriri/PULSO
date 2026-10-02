@@ -20,15 +20,16 @@ export default function Step5ContactPreferences({
   const phone = contactData.phone || '';
 
   // Email format validation regex
-  const isEmailValid = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isEmailValid = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   // PH phone validation regex (09xxxxxxxxx or +639xxxxxxxxx)
   const isPhoneValid = !phone || /^(09|\+639)\d{9}$/.test(phone.replace(/[\s-]/g, ''));
 
-  const canContinue = 
-    contactType === 'anonymous' ||
-    contactType === 'authenticated' ||
-    (contactType === 'notify' && isEmailValid && isPhoneValid && (email.length > 0 || phone.length > 0));
+  const hasAtLeastOneContact = Boolean((phone && phone.trim().length > 0) || (email && email.trim().length > 0));
+
+  const canContinue = currentUser 
+    ? (isEmailValid && isPhoneValid)
+    : (hasAtLeastOneContact && isEmailValid && isPhoneValid);
 
   return (
     <div className="space-y-6">
@@ -38,12 +39,14 @@ export default function Step5ContactPreferences({
           {t('reportWizard.step5Contact.title', 'Contact & Notification Preferences')}
         </h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          {t('reportWizard.step5Contact.subtitle', 'Choose how you would like to receive progress updates for this report.')}
+          {currentUser
+            ? t('reportWizard.step5Contact.subtitleResident', 'Your report will be automatically attached to your registered resident account.')
+            : t('reportWizard.step5Contact.subtitleGuest', 'Provide your contact info so dispatchers can send progress alerts and you can verify your ticket in Track My Report.')}
         </p>
       </div>
 
       {/* ── AUTHENTICATED RESIDENT STATUS (IF LOGGED IN) ────────────────────── */}
-      {currentUser && (
+      {currentUser ? (
         <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/60 shadow-sm flex items-center gap-3">
           <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 shrink-0">
             <UserCheck size={20} strokeWidth={2.2} />
@@ -59,125 +62,83 @@ export default function Step5ContactPreferences({
             </p>
           </div>
         </div>
+      ) : (
+        /* ── GUEST SUBMISSION CONTACT CARD ──────────────────────────────────── */
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 dark:border-amber-500/20 flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5">
+            <Bell size={18} />
+          </div>
+          <div className="text-xs sm:text-sm text-amber-900 dark:text-amber-200 space-y-1">
+            <p className="font-bold">Guest Submission · Contact Required for Tracking</p>
+            <p className="text-amber-800/90 dark:text-amber-300/80 text-xs leading-relaxed">
+              To verify and track this report later without an account, please provide at least a mobile number or email. You will use this contact detail alongside your Ticket ID in <strong>Track My Report</strong>.
+            </p>
+          </div>
+        </div>
       )}
 
-      {/* ── CONTACT PREFERENCE PATHWAY OPTIONS ───────────────────────────────── */}
-      <fieldset className="space-y-3.5">
-        <legend className="sr-only">Choose reporting contact pathway</legend>
-
-        {/* Option 1: Anonymous Guest */}
-        <label
-          className={`relative block p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer ${
-            contactType === 'anonymous'
-              ? 'border-orange-500 bg-orange-50/60 dark:bg-orange-950/30 ring-2 ring-orange-500/20'
-              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
-          }`}
-        >
-          <div className="flex items-start gap-3.5">
-            <input
-              type="radio"
-              name="contactType"
-              value="anonymous"
-              checked={contactType === 'anonymous'}
-              onChange={() => onContactChange({ ...contactData, type: 'anonymous' })}
-              className="mt-1 text-orange-600 focus:ring-orange-500"
-            />
-            <div className="flex-1">
-              <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-slate-900 dark:text-white">
-                <UserX size={18} className="text-slate-500 dark:text-slate-400" />
-                <span>{t('reportWizard.step5Contact.guestOption.title', 'Anonymous Guest (No account required)')}</span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                {t('reportWizard.step5Contact.guestOption.desc', 'No email or phone stored. You will receive a private tracking token to check status online.')}
-              </p>
+      {/* ── CONTACT INPUT FIELDS ────────────────────────────────────────────── */}
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 sm:p-6 space-y-4 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Mobile Number */}
+          <div>
+            <label htmlFor="contact-phone" className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              <span>{t('reportWizard.step5Contact.phoneLabel', 'Mobile Number (PH)')}</span>
+              {!currentUser && <span className="text-[#ff6b00] ml-1 font-bold">*</span>}
+            </label>
+            <div className="relative">
+              <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                id="contact-phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => onContactChange({ ...contactData, type: 'notify', phone: e.target.value })}
+                placeholder={t('reportWizard.step5Contact.phonePlaceholder', '0917 123 4567')}
+                className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border bg-white dark:bg-slate-900 text-xs sm:text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                  !isPhoneValid ? 'border-red-400 focus-visible:ring-red-400' : 'border-slate-200 dark:border-slate-700'
+                }`}
+              />
             </div>
+            {!isPhoneValid && (
+              <span className="text-[11px] text-red-600 dark:text-red-400 mt-1 block">
+                {t('reportWizard.step5Contact.validationPhoneError', 'Please enter a valid 11-digit Philippine mobile number (e.g. 09171234567).')}
+              </span>
+            )}
           </div>
-        </label>
 
-        {/* Option 2: Email & SMS Notifications */}
-        <label
-          className={`relative block p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer ${
-            contactType === 'notify'
-              ? 'border-orange-500 bg-orange-50/60 dark:bg-orange-950/30 ring-2 ring-orange-500/20'
-              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
-          }`}
-        >
-          <div className="flex items-start gap-3.5">
-            <input
-              type="radio"
-              name="contactType"
-              value="notify"
-              checked={contactType === 'notify'}
-              onChange={() => onContactChange({ ...contactData, type: 'notify' })}
-              className="mt-1 text-orange-600 focus:ring-orange-500"
-            />
-            <div className="flex-1 space-y-3">
-              <div>
-                <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-slate-900 dark:text-white">
-                  <Bell size={18} className="text-orange-500" />
-                  <span>{t('reportWizard.step5Contact.emailOption.title', 'Email & SMS Notifications')}</span>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                  {t('reportWizard.step5Contact.emailOption.desc', 'Receive automated notifications when work crews are assigned and repairs are completed.')}
-                </p>
-              </div>
-
-              {/* Notification input fields when selected */}
-              {contactType === 'notify' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                  <div>
-                    <label htmlFor="contact-email" className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
-                      {t('reportWizard.step5Contact.emailLabel', 'Email Address')}
-                    </label>
-                    <div className="relative">
-                      <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        id="contact-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => onContactChange({ ...contactData, email: e.target.value })}
-                        placeholder={t('reportWizard.step5Contact.emailPlaceholder', 'juan@example.com')}
-                        className={`w-full pl-9 pr-3 py-2 rounded-xl border bg-white dark:bg-slate-900 text-xs sm:text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
-                          !isEmailValid ? 'border-red-400' : 'border-slate-200 dark:border-slate-700'
-                        }`}
-                      />
-                    </div>
-                    {!isEmailValid && (
-                      <span className="text-[11px] text-red-600 dark:text-red-400 mt-1 block">
-                        {t('reportWizard.step5Contact.validationEmailError', 'Please enter a valid email address.')}
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="contact-phone" className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
-                      {t('reportWizard.step5Contact.phoneLabel', 'Mobile Number (PH)')}
-                    </label>
-                    <div className="relative">
-                      <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        id="contact-phone"
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => onContactChange({ ...contactData, phone: e.target.value })}
-                        placeholder={t('reportWizard.step5Contact.phonePlaceholder', '0917 123 4567')}
-                        className={`w-full pl-9 pr-3 py-2 rounded-xl border bg-white dark:bg-slate-900 text-xs sm:text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
-                          !isPhoneValid ? 'border-red-400' : 'border-slate-200 dark:border-slate-700'
-                        }`}
-                      />
-                    </div>
-                    {!isPhoneValid && (
-                      <span className="text-[11px] text-red-600 dark:text-red-400 mt-1 block">
-                        {t('reportWizard.step5Contact.validationPhoneError', 'Please enter a valid 11-digit Philippine mobile number.')}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
+          {/* Email Address */}
+          <div>
+            <label htmlFor="contact-email" className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              <span>{t('reportWizard.step5Contact.emailLabel', 'Email Address')}</span>
+              {!currentUser && <span className="text-[#ff6b00] ml-1 font-bold">*</span>}
+            </label>
+            <div className="relative">
+              <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                id="contact-email"
+                type="email"
+                value={email}
+                onChange={(e) => onContactChange({ ...contactData, type: 'notify', email: e.target.value })}
+                placeholder={t('reportWizard.step5Contact.emailPlaceholder', 'juan@example.com')}
+                className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border bg-white dark:bg-slate-900 text-xs sm:text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                  !isEmailValid ? 'border-red-400 focus-visible:ring-red-400' : 'border-slate-200 dark:border-slate-700'
+                }`}
+              />
             </div>
+            {!isEmailValid && (
+              <span className="text-[11px] text-red-600 dark:text-red-400 mt-1 block">
+                {t('reportWizard.step5Contact.validationEmailError', 'Please enter a valid email address.')}
+              </span>
+            )}
           </div>
-        </label>
-      </fieldset>
+        </div>
+
+        {!currentUser && !hasAtLeastOneContact && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+            * Please enter either a mobile number or email address to enable dispatch notifications and ticket tracking.
+          </p>
+        )}
+      </div>
 
       {/* ── DATA PRIVACY NOTICE (RA 10173) ──────────────────────────────────── */}
       <aside className="p-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 text-xs flex items-start gap-2.5">
