@@ -31,7 +31,7 @@
 - **Data scope:** the final jurisdiction and capability matrix is unapproved. Dispatch/report access is narrowed by active official role; assignment scoping is enforced for field work orders. Broader field-level and jurisdiction-level access remains a release gate.
 - **Evidence and records:** report-image classification, legacy public image exposure, retention, legal hold, and disposition policy need owner approval and further implementation. Work-order proof and new government documents use private delivery.
 - **Reliability:** record version checks, idempotent consequential commands, transactional notification delivery, and an end-to-end deployment exercise remain to be implemented.
-- **PostGIS deployment:** migration `b72d4e_postgis_report_locations` creates the extension and indexed generated geography points for reports and field agents. The reachable local `pulso_db` is at revision `da48716fc54d`, but its PostgreSQL installation does not provide the PostGIS extension. The migration has **not** been applied or verified against PostGIS; install the extension on the target PostgreSQL instance and run/verify the migration before claiming indexed spatial operation.
+- **PostGIS deployment:** migration `b72d4e_postgis_report_locations` has been applied and verified against a local PostgreSQL 18/PostGIS 3.6.2 instance on port 5433. The branch backend and Alembic use an ignored `.env.local` override for that instance. This is a snapshot copy of the original port-5432 database, not replication; other checkouts or deployed environments must be migrated and configured separately before claiming spatial operation there. See [`POSTGIS_LOCAL_SETUP.md`](./POSTGIS_LOCAL_SETUP.md).
 - **Predictive model:** heuristic formulas are deterministic but have not been calibrated or validated against historical failures. They must not be interpreted as probabilities, confirmed schedules, or approved costs. The retired fixed insights, dashboard BI, and sample delivery pages are no longer routed, but other government routes and exports still need a full fake-data and provenance audit.
 
 ## Verification
@@ -39,6 +39,7 @@
 - Government, SMS, and spatial duplicate checks: **66 passed**.
 - Focused report, government access, and resident clarification checks: **55 passed** after the work-order edit guard.
 - Frontend production build passed after predictive and project route changes.
+- Local PostGIS: Alembic head confirmed; both GiST indexes and generated geography values confirmed; report duplicate lookup and fresh agent suggestion both exercised through the PostGIS branch. Backend `/api/health` returned `200` with the local override.
 - Full backend suite: **321 passed, five older resident tests failed** for ticket prefix, tracking-token validator, token hash salt, exact anti-enumeration text, and a missing legacy `ProcessTimeline` model. These are the same five categories seen at the prior checkpoint; no new full-suite failures appeared.
 
 Do not present this branch as a completed government release until the blocked decisions and release gates above are resolved and verified.

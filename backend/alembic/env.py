@@ -20,11 +20,12 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import Base
+from database import Base, DATABASE_URL
 import models # Ensure models are loaded
 import gov_models # Include government models
 
 target_metadata = Base.metadata
+config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
