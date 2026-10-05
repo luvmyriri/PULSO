@@ -52,7 +52,8 @@ import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
 import pulseai_router                    # PULSEAI Persistent Chat & History Engine
 from database import engine, get_db
-from utils.geometry_utils import is_in_caloocan, calculate_haversine_distance
+from utils.geometry_utils import is_in_caloocan
+from spatial_queries import nearby_active_report
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter
 
 # Create ALL tables — citizen-side + government-side
@@ -1829,21 +1830,13 @@ async def create_new_report(
 
     # 3. Duplicate Detection within 15 meters
     if lat is not None and lng is not None:
-        active_reports = db.query(models.Report).filter(
-            models.Report.category == category,
-            models.Report.status.notin_(["resolved", "cancelled", "rejected"]),
-            models.Report.location_lat.isnot(None),
-            models.Report.location_lng.isnot(None)
-        ).all()
-        
-        for r in active_reports:
-            dist_km = calculate_haversine_distance(lat, lng, r.location_lat, r.location_lng)
-            if dist_km * 1000.0 <= 15.0: # 15 meters
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"A report for '{category}' at this exact location is already being processed.",
-                    headers={"X-Canonical-Ticket-ID": r.ticket_id or ""}
-                )
+        existing = nearby_active_report(db, category, lat, lng)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A report for '{category}' at this exact location is already being processed.",
+                headers={"X-Canonical-Ticket-ID": existing.ticket_id or ""}
+            )
 
     # 4. Upload Security & Magic Byte Inspection
     image_bytes = None
@@ -2344,7 +2337,7 @@ def update_report_status(
     status = status_update.status or status_update.targetStatus
     if status != "pending_approval" or status_update.budget is not None or status_update.deployment_date is not None:
         raise HTTPException(status_code=422, detail="Use the governed report decision endpoint")
-    report = crud.get_report(db, report_id=report_id)
+    report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     if report.status not in ("pending", "unverified", "needs_information"):
@@ -2372,7 +2365,7 @@ def reject_report(
     reason = decision.reason.strip()
     if len(reason) < 10:
         raise HTTPException(status_code=422, detail="A rejection reason of at least 10 characters is required")
-    report = crud.get_report(db, report_id=report_id)
+    report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     if report.status not in ("pending", "unverified", "needs_information", "pending_approval"):

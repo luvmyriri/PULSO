@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 import auth
+import analytics_router
 import document_router
 import gov_crud
 import gov_schemas
@@ -66,6 +67,19 @@ def test_government_role_guard_does_not_grant_every_official_access():
     assert error.value.status_code == 403
     with pytest.raises(HTTPException):
         gov_router._assert_role(models.Resident(), *gov_router.GOV_ROLES)
+
+
+def test_analytics_checks_requested_action_and_escapes_csv(monkeypatch):
+    monkeypatch.setattr(analytics_router.roles_service, "has_permission", lambda *_args: False)
+    clerk = models.Official(role="admin_clerk")
+    analytics_router._assert_permission(clerk, None, "analytics", "view")
+    for module, action in (("reports", "detail"), ("analytics", "export"), ("procurement", "manage")):
+        with pytest.raises(HTTPException) as error:
+            analytics_router._assert_permission(clerk, None, module, action)
+        assert error.value.status_code == 403
+    with pytest.raises(HTTPException):
+        analytics_router._assert_permission(models.Resident(), None, "analytics", "view")
+    assert analytics_router._safe_csv_cell(" =HYPERLINK(\"http://bad\")") == "' =HYPERLINK(\"http://bad\")"
 
 
 def test_status_and_role_paths_have_distinct_handlers():

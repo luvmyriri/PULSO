@@ -4,7 +4,7 @@ import GovReportsDashboard from './GovReportsDashboard';
 import DispatcherDashboard from './DispatcherDashboard';
 import GovAnalyticsPage from './GovAnalyticsPage';
 import AdministrationWorkspacePage from './AdministrationWorkspacePage';
-import InsightsWorkspacePage from './InsightsWorkspacePage';
+import PredictiveMaintenancePage from './PredictiveMaintenancePage';
 import RecordsWorkspacePage from './RecordsWorkspacePage';
 import WorkOrdersPage from './WorkOrdersPage';
 import GovDivisionPage from './GovDivisionPage';
@@ -30,9 +30,9 @@ const VIEW_COMPONENTS = {
         audit: RecordsWorkspacePage,
     },
     insights: {
-        overview: InsightsWorkspacePage,
+        overview: GovAnalyticsPage,
         analytics: GovAnalyticsPage,
-        predictive: InsightsWorkspacePage,
+        predictive: PredictiveMaintenancePage,
     },
     administration: {
         staff: AdministrationWorkspacePage,

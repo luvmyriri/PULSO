@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -18,6 +18,8 @@ import gemini_service
 import datetime
 from datetime import timezone
 import roles_service
+import gov_crud
+import gov_schemas
 
 router = APIRouter(prefix="/api/gov/predictive", tags=["predictive"])
 
@@ -56,7 +58,6 @@ def get_asset_incident_metrics(db: Session, asset: InfrastructureAsset, days_bac
     Returns (report_count, freq_per_month, recurrence_rate, days_since).
     """
     today = datetime.date.today()
-    ninety_days_ago = today - datetime.timedelta(days=days_back)
     ninety_days_ago_dt = datetime.datetime.now(timezone.utc) - datetime.timedelta(days=days_back)
 
     # 1. Days since last maintenance
@@ -81,30 +82,15 @@ def get_asset_incident_metrics(db: Session, asset: InfrastructureAsset, days_bac
 
     days_since = max(0, days_since)
 
-    # 2. Report count in lookback window
-    direct_incidents = db.query(func.count(MaintenanceHistory.log_id)).filter(
-        MaintenanceHistory.asset_id == asset.asset_id,
-        MaintenanceHistory.completion_date >= ninety_days_ago
-    ).scalar() or 0
-
-    direct_work_orders = db.query(func.count(WorkOrder.id)).filter(
+    # Only reports explicitly linked through a work order belong to this asset.
+    # Barangay/category similarity is not enough to attribute a citizen report.
+    report_count = db.query(func.count(func.distinct(models.Report.id))).join(
+        WorkOrder, WorkOrder.report_id == models.Report.id
+    ).filter(
         WorkOrder.asset_id == asset.asset_id,
-        WorkOrder.created_at >= ninety_days_ago_dt
+        models.Report.created_at >= ninety_days_ago_dt,
+        models.Report.status.notin_(["rejected", "spam"]),
     ).scalar() or 0
-
-    brgy_str = str(asset.barangay or "")
-    cat_str = str(asset.category or "").lower()
-
-    citizen_reports = 0
-    if brgy_str:
-        citizen_reports = db.query(func.count(models.Report.id)).filter(
-            (models.Report.location_barangay == brgy_str) | (models.Report.location_string.ilike(f"%{brgy_str}%")),
-            (models.Report.category.ilike(f"%{cat_str}%") | models.Report.ai_category.ilike(f"%{cat_str}%")),
-            models.Report.created_at >= ninety_days_ago_dt,
-            models.Report.status.notin_(["rejected", "spam"])
-        ).scalar() or 0
-
-    report_count = direct_incidents + direct_work_orders + citizen_reports
     freq_per_month = round(report_count / max(days_back / 30.0, 1.0), 2)
 
     # 3. Recurrence rate (180-day baseline)
@@ -135,7 +121,11 @@ def get_predictive_summary(
     
     total_assets = len(assets)
     if total_assets == 0:
-        return {}
+        return {
+            "model_status": "no_asset_data",
+            "total_assets_monitored": 0,
+            "limitation": "No registered infrastructure assets are available for maintenance review.",
+        }
 
     ahs_sum = 0
     critical_count = 0
@@ -185,6 +175,10 @@ def get_predictive_summary(
     rainy_active = (month >= 6 and month <= 11)
 
     return {
+        "model_status": "exploratory_heuristic_unvalidated",
+        "data_window_days": 90,
+        "source": "infrastructure_assets, maintenance_history, work_orders, reports",
+        "limitation": "Scores and costs are inspection prompts, not validated failure probabilities, schedules, or approved budgets.",
         "rainy_season_active": rainy_active,
         "total_assets_monitored": total_assets,
         "avg_health_score": round(ahs_sum / total_assets),
@@ -272,6 +266,8 @@ def get_predictive_health(
     health_scores.sort(key=lambda x: x["health_score"])
 
     return {
+        "model_status": "exploratory_heuristic_unvalidated",
+        "data_window_days": 90,
         "health_scores": health_scores
     }
 
@@ -350,6 +346,8 @@ def get_predictive_schedule(
             })
 
     return {
+        "model_status": "exploratory_heuristic_unvalidated",
+        "is_committed_schedule": False,
         "total_items": len(schedule_items),
         "critical_count": crit_count,
         "rainy_season_active": rainy_active,
@@ -427,61 +425,60 @@ def generate_ai_plan(
     asset = None
     if req.asset_id:
         asset = db.query(InfrastructureAsset).filter_by(asset_id=req.asset_id).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Infrastructure asset not found")
     
     if not asset:
-        asset = db.query(InfrastructureAsset).filter(
+        matches = db.query(InfrastructureAsset).filter(
             InfrastructureAsset.category == req.category,
             InfrastructureAsset.barangay == req.barangay
-        ).first()
+        ).limit(2).all()
+        if not matches:
+            raise HTTPException(status_code=404, detail="No registered infrastructure asset matches this location and category")
+        if len(matches) > 1:
+            raise HTTPException(status_code=409, detail="Select a specific infrastructure asset")
+        asset = matches[0]
 
-    if asset:
-        ahs = calculate_ahs(db, asset.asset_id)
-        env = db.query(EnvironmentalContext).filter_by(barangay_id=asset.barangay_id).first()
-        
-        asset_data = {
-            "asset_name": asset.asset_name,
-            "category": asset.category,
-            "barangay": str(asset.barangay),
-            "health_score": ahs,
-            "material_type": asset.material_type,
-            "design_life": asset.design_life,
-            "environmental_risks": env.flood_risk_level if env else "Standard"
-        }
-    else:
-        asset_data = {
-            "asset_name": f"{req.category} System",
-            "category": req.category,
-            "barangay": req.barangay,
-            "health_score": 50,
-            "material_type": "Various",
-            "design_life": 20
-        }
+    ahs = calculate_ahs(db, asset.asset_id)
+    env = db.query(EnvironmentalContext).filter_by(barangay_id=asset.barangay_id).first()
+    asset_data = {
+        "asset_name": asset.asset_name,
+        "category": asset.category,
+        "barangay": str(asset.barangay),
+        "health_score": ahs,
+        "material_type": asset.material_type,
+        "design_life": asset.design_life,
+        "environmental_risks": env.flood_risk_level if env else "Unknown"
+    }
 
     plan = gemini_service.generate_maintenance_plan(asset_data)
+    if not isinstance(plan, dict) or not plan.get("maintenance_plan") or not plan.get("technical_justification"):
+        raise HTTPException(status_code=503, detail="AI maintenance draft is unavailable; use manual engineering review")
     
     return {
-        "barangay": req.barangay,
-        "category": req.category,
+        "barangay": str(asset.barangay),
+        "category": asset.category,
         "health_score": asset_data["health_score"],
-        "asset_id": asset.asset_id if asset else None,
-        "priority": plan.get("priority", "HIGH"),
-        "maintenance_plan": plan.get("maintenance_plan", ""),
+        "asset_id": asset.asset_id,
+        "priority": plan.get("priority"),
+        "maintenance_plan": plan["maintenance_plan"],
         "steps": plan.get("steps", []),
-        "technical_justification": plan.get("technical_justification", ""),
-        "generated_by": "Gemini-2.1-Flash-PULSO",
-        "generated_at": datetime.datetime.now().isoformat(),
-        "estimated_cost": plan.get("estimated_cost", 35000),
-        "estimated_duration_days": plan.get("estimated_duration_days", 5)
+        "technical_justification": plan["technical_justification"],
+        "generated_by": f"Vertex AI {gemini_service.GEMINI_MODEL}",
+        "generated_at": datetime.datetime.now(timezone.utc).isoformat(),
+        "review_state": "draft_unreviewed",
+        "source": "infrastructure_asset_registry",
+        "estimated_cost": plan.get("estimated_cost"),
+        "estimated_duration_days": plan.get("estimated_duration_days")
     }
 
 
 class ConvertWORequest(BaseModel):
-    barangay: str
-    category: str
-    plan_summary: str
+    asset_id: str
+    plan_summary: str = Field(min_length=10)
     priority: str
-    estimated_cost: float
-    asset_id: Optional[str] = None
+    estimated_cost: float = Field(ge=0, allow_inf_nan=False)
+    review_reason: str = Field(min_length=10)
 
 
 @router.post("/convert-to-work-order")
@@ -490,30 +487,44 @@ def convert_to_work_order(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    if not _allow_access(current_user):
+    if not isinstance(current_user, models.Official) or current_user.role not in (
+        "dispatcher", "project_engineer", "asst_city_engineer", "city_engineer", "manager", "system_admin"
+    ):
         raise HTTPException(status_code=403, detail="Access denied to convert to work order")
-        
-    new_wo = WorkOrder(
-        title=f"Predictive Maintenance: {req.category} - Brgy. {req.barangay}",
-        description=req.plan_summary,
-        category=req.category,
-        priority=req.priority.lower() if req.priority else "high",
-        estimated_cost=req.estimated_cost,
-        wo_type="preemptive",
-        status="open",
-        assigned_by_id=current_user.id,
-        asset_id=req.asset_id,
-        ai_plan_summary=req.plan_summary
+    asset = db.query(InfrastructureAsset).filter_by(asset_id=req.asset_id).with_for_update().first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Infrastructure asset not found")
+    priority = {"critical": "critical", "high": "high", "moderate": "normal", "low": "low"}.get(req.priority.lower())
+    if priority is None:
+        raise HTTPException(status_code=422, detail="Unsupported priority")
+    existing = db.query(WorkOrder.id).filter(
+        WorkOrder.asset_id == asset.asset_id,
+        WorkOrder.wo_type == "preemptive",
+        WorkOrder.status.notin_(["completed", "cancelled"]),
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Asset already has an open preventive work order")
+    new_wo = gov_crud.create_work_order(
+        db,
+        gov_schemas.WorkOrderCreate(
+            title=f"Preventive review: {asset.asset_name}",
+            description=req.plan_summary.strip(),
+            category=asset.category,
+            priority=priority,
+            estimated_cost=req.estimated_cost,
+            wo_type="preemptive",
+            asset_id=asset.asset_id,
+            ai_plan_summary=req.plan_summary.strip(),
+            notes=f"Human review reason: {req.review_reason.strip()}",
+        ),
+        actor_id=current_user.id,
+        actor_role=current_user.role,
     )
-    
-    db.add(new_wo)
-    db.commit()
-    db.refresh(new_wo)
     
     return {
          "wo_number": new_wo.wo_number,
          "id": new_wo.id,
-         "status": "success"
+         "status": new_wo.status
     }
 
 
@@ -522,7 +533,9 @@ def export_predictive_data(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    if not _allow_access(current_user):
+    if not isinstance(current_user, models.Official) or current_user.role not in (
+        "system_admin", "city_engineer", "asst_city_engineer", "manager", "admin_officer", "division_chief"
+    ):
         raise HTTPException(status_code=403, detail="Access denied to predictive engine")
     
     import csv
@@ -533,10 +546,12 @@ def export_predictive_data(
     
     output = io.StringIO()
     writer = csv.writer(output)
+    def safe_cell(value):
+        return "'" + value if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")) else value
     writer.writerow([
         "Asset ID", "Asset Name", "Category", "Barangay", 
-        "Health Score", "Priority", "Failure Prob 30d", 
-        "Failure Prob 60d", "Failure Prob 90d", "Next Maintenance"
+        "Health Score", "Priority", "Exploratory 30d Signal",
+        "Exploratory 60d Signal", "Exploratory 90d Signal", "Suggested Review Date"
     ])
     
     for a in assets:
@@ -549,10 +564,10 @@ def export_predictive_data(
         fail_90 = max(fail_60, _failure_probability(freq_per_month, recurrence_rate, days_since, a.category or "default", target_days=90))
         next_maint = _next_maintenance_date(ahs)
         
-        writer.writerow([
+        writer.writerow([safe_cell(value) for value in [
             a.asset_id, a.asset_name, a.category, a.barangay,
             ahs, pri, fail_30, fail_60, fail_90, next_maint
-        ])
+        ]])
     
     output.seek(0)
     return StreamingResponse(

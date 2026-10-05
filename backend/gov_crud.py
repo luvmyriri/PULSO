@@ -17,7 +17,7 @@ import gov_schemas
 import models  # for User lookups
 import re
 import notification_service
-from utils import geometry_utils
+from spatial_queries import nearby_available_agents
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -189,31 +189,7 @@ def find_smart_dispatch_suggestions(db: Session, report_id: int, limit: int = 3)
     if not report or report.location_lat is None or report.location_lng is None:
         return []
 
-    # Get agents who are 'available' or 'returning'
-    active_locations = db.query(gov_models.AgentLocation).filter(
-        gov_models.AgentLocation.status.in_(["available", "returning"])
-    ).all()
-
-    suggestions = []
-    for loc in active_locations:
-        dist = geometry_utils.calculate_haversine_distance(
-            report.location_lat, report.location_lng,
-            loc.latitude, loc.longitude
-        )
-        
-        # Fetch official info
-        user = db.query(models.Official).filter(models.Official.id == loc.agent_id).first()
-        if user:
-            suggestions.append({
-                "agent_id": user.id,
-                "full_name": user.full_name,
-                "distance_km": round(dist, 2),
-                "status": loc.status
-            })
-
-    # Sort by distance (asc)
-    suggestions.sort(key=lambda x: x["distance_km"])
-    return suggestions[:limit]
+    return nearby_available_agents(db, report.location_lat, report.location_lng, limit=limit)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Work Orders
@@ -372,14 +348,27 @@ def create_work_order(
     
     assigned_to_id = data.assigned_to_id
     _validate_assignee(db, assigned_to_id)
+    asset = None
+    if data.asset_id:
+        asset = db.query(gov_models.InfrastructureAsset).filter(
+            gov_models.InfrastructureAsset.asset_id == data.asset_id
+        ).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Infrastructure asset not found")
 
     # Handle Jurisdictional Handover & Smart Dispatch
     if data.report_id:
-        report = db.query(models.Report).filter(models.Report.id == data.report_id).first()
+        report = db.query(models.Report).filter(models.Report.id == data.report_id).with_for_update().first()
         if not report:
             raise HTTPException(status_code=404, detail="Source report not found")
-        if assigned_to_id and report.status != "approved_internal":
-            raise HTTPException(status_code=409, detail="Report must be approved before field assignment")
+        if report.status != "approved_internal":
+            raise HTTPException(status_code=409, detail="Report must be approved before a work order is created")
+        existing_work = db.query(gov_models.WorkOrder.id).filter(
+            gov_models.WorkOrder.report_id == report.id,
+            gov_models.WorkOrder.status != "cancelled",
+        ).first()
+        if existing_work:
+            raise HTTPException(status_code=409, detail="Report already has a work order")
         if report:
             # Critical recommendations require an authorized human assignment.
             # Territorial Validation
@@ -409,6 +398,7 @@ def create_work_order(
         category=data.category,
         estimated_cost=data.estimated_cost,
         ai_plan_summary=data.ai_plan_summary,
+        asset_id=data.asset_id,
         notes=data.notes,
         status="open" if not assigned_to_id else "assigned",
     )
@@ -421,6 +411,10 @@ def create_work_order(
             brgy = db.query(models.Barangay).filter(models.Barangay.id == report.barangay_id).first()
             if brgy:
                 wo.district_id = brgy.district_id
+    elif asset:
+        wo.barangay_id = asset.barangay_id
+        if asset.barangay_ref and asset.barangay_ref.district:
+            wo.district_id = asset.barangay_ref.district_id
     db.add(wo)
     db.flush()
 
@@ -491,7 +485,7 @@ def update_work_order_status(
     actor_role: str,
     note: Optional[str] = None,
 ) -> Optional[gov_models.WorkOrder]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
     previous = wo.status
@@ -2626,7 +2620,7 @@ def verify_work_order_inspection(
     inspector_id: int,
     inspector_role: str,
 ) -> Dict[str, Any]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
 
@@ -2730,15 +2724,20 @@ def request_citizen_information(
     actor_id: int,
     actor_role: str,
 ) -> Dict[str, Any]:
-    report = db.query(models.Report).filter(models.Report.id == report_id).first()
+    report = db.query(models.Report).filter(models.Report.id == report_id).with_for_update().first()
     if not report:
         raise HTTPException(status_code=404, detail="Citizen report not found")
 
-    if report.status in ("resolved", "cancelled", "rejected"):
+    if report.status not in ("pending", "received", "unverified", "unvalidated", "under_review", "validated", "pending_approval"):
         raise HTTPException(
-            status_code=400,
+            status_code=409,
             detail=f"Cannot request information for report in '{report.status}' status."
         )
+
+    reason = data.reason.strip()
+    message = data.message.strip()
+    if len(reason) < 3 or len(message) < 10:
+        raise HTTPException(status_code=422, detail="A reason and actionable message are required")
 
     prev_status = report.status
     report.status = "needs_information"
@@ -2751,14 +2750,14 @@ def request_citizen_information(
         previous_status=prev_status,
         actor_id=actor_id,
         actor_role=actor_role,
-        note=f"Action Required: [{data.reason}] {data.message}",
+        note=f"Action Required: [{reason}] {message}",
         is_public=True,
         report_id=report.id,
     )
 
     # 2. Resident Notification Dispatch
     ticket = report.ticket_id or f"PUL-{report.id}"
-    notif_msg = f"City Engineering requested more information for report {ticket}: {data.message}"
+    notif_msg = f"City Engineering requested more information for report {ticket}: {message}"
     if report.resident_id:
         notif = models.Notification(
             resident_id=report.resident_id,
@@ -2774,10 +2773,10 @@ def request_citizen_information(
     _append_audit(
         db,
         trigger_type="status_change",
-        action=f"Requested citizen information for report {ticket}: {data.reason}",
+        action=f"Requested citizen information for report {ticket}: {reason}",
         actor_id=actor_id,
         actor_role=actor_role,
-        details=data.message,
+        details=message,
         report_id=report.id,
     )
 
@@ -2790,7 +2789,7 @@ def request_citizen_information(
         "ticket_id": report.ticket_id,
         "new_status": report.status,
         "timeline_id": timeline_entry.id,
-        "message": "Information request sent to citizen successfully."
+        "message": "Information request recorded on the report timeline."
     }
 
 

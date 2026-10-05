@@ -951,11 +951,7 @@ def generate_maintenance_plan(asset_data: Dict[str, Any]) -> Dict[str, Any]:
     AI Engineering Planner — Generates a detailed maintenance strategy for an asset.
     """
     if not _SDK_READY:
-        return {
-            "plan": "AI maintenance planner is currently unavailable.",
-            "steps": [],
-            "estimated_cost": 0
-        }
+        return {}
 
     prompt = f"""You are the Lead Maintenance Engineer for the Caloocan City Engineering Office.
 Generate a structured maintenance plan for the following infrastructure asset.
@@ -1000,12 +996,4 @@ Engineering Rules:
     except Exception as e:
         print(f"[AI] Maintenance plan generation error: {e}")
 
-    return {
-        "priority": "HIGH",
-        "maintenance_plan": f"Urgent preventive maintenance required for {asset_data.get('asset_name')}.",
-        "steps": ["Site inspection", "Surface cleanup", "Material patching"],
-        "estimated_cost": 45000,
-        "estimated_duration_days": 3,
-        "required_personnel": ["Field Inspector", "Maintenance Team"],
-        "technical_justification": "Fallback plan generated due to AI processing error."
-    }
+    return {}

@@ -269,6 +269,25 @@ def test_predictive_health_monotonic_probabilities(client, seeded_users_and_geo)
     assert "next_maintenance_date" in target
 
 
+def test_predictive_report_count_requires_asset_link(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    db.add(gov_models.InfrastructureAsset(
+        asset_id="CAL-DR-UNLINKED", asset_name="Camarin Inlet", category="Drainage",
+        barangay="171", barangay_id=171, condition_score=70.0,
+    ))
+    db.add(models.Report(
+        ticket_id="PUL-2026-UNLINKED", category="Drainage", status="pending",
+        location_barangay="171", location_string="Near Camarin Inlet",
+    ))
+    db.commit()
+    db.close()
+    headers = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
+    response = client.get("/api/gov/predictive/health", headers=headers)
+    assert response.status_code == 200, response.text
+    asset = next(item for item in response.json()["health_scores"] if item["asset_id"] == "CAL-DR-UNLINKED")
+    assert asset["report_count"] == 0
+
+
 def test_predictive_schedule_deterministic_weeks_and_costs(client, seeded_users_and_geo):
     """Verifies schedule bins weeks deterministically (1..4) and uses DPWH unit costs."""
     headers = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
@@ -319,8 +338,8 @@ def test_predictive_export_csv_deterministic(client, seeded_users_and_geo):
     reader = csv.reader(io.StringIO(res.text))
     rows = list(reader)
     headers_row = rows[0]
-    assert "Failure Prob 30d" in headers_row
-    assert "Next Maintenance" in headers_row
+    assert "Exploratory 30d Signal" in headers_row
+    assert "Suggested Review Date" in headers_row
     assert len(rows) >= 2
 
 
@@ -353,6 +372,48 @@ def test_predictive_maintenance_scores_and_demand_forecast(client, seeded_users_
     res_fc = client.get("/api/gov/predictive/demand-forecast?weeks_back=4&weeks_forward=2", headers=headers)
     assert res_fc.status_code == 200
     assert isinstance(res_fc.json(), list)
+
+
+def test_predictive_draft_and_review_use_registered_asset_and_canonical_work_order(
+    client, seeded_users_and_geo, monkeypatch
+):
+    import predictive_router
+
+    db = TestingSessionLocal()
+    db.add(gov_models.InfrastructureAsset(
+        asset_id="CAL-DR-171-REVIEW", asset_name="Camarin Culvert",
+        category="Drainage", barangay="171", barangay_id=171, condition_score=45.0,
+    ))
+    db.commit()
+    db.close()
+    engineer = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
+    clerk = {"Authorization": f"Bearer {seeded_users_and_geo['clerk']}"}
+    request = {"asset_id": "CAL-DR-171-REVIEW", "barangay": "171", "category": "Drainage"}
+    monkeypatch.setattr(predictive_router.gemini_service, "generate_maintenance_plan", lambda _asset: {})
+    unavailable = client.post("/api/gov/predictive/ai-plan", json=request, headers=engineer)
+    assert unavailable.status_code == 503
+    missing = client.post("/api/gov/predictive/ai-plan", json={**request, "asset_id": "MISSING"}, headers=engineer)
+    assert missing.status_code == 404
+
+    command = {
+        "asset_id": "CAL-DR-171-REVIEW", "plan_summary": "Inspect and clear the registered culvert.",
+        "priority": "MODERATE", "estimated_cost": 1200,
+        "review_reason": "Engineering review requested after field observations.",
+    }
+    assert client.post("/api/gov/predictive/convert-to-work-order", json=command, headers=clerk).status_code == 403
+    assert client.post("/api/gov/predictive/convert-to-work-order", json={**command, "review_reason": "short"}, headers=engineer).status_code == 422
+    created = client.post("/api/gov/predictive/convert-to-work-order", json=command, headers=engineer)
+    assert created.status_code == 200, created.text
+    assert created.json()["status"] == "open"
+    assert client.post("/api/gov/predictive/convert-to-work-order", json=command, headers=engineer).status_code == 409
+    db = TestingSessionLocal()
+    work_order = db.query(gov_models.WorkOrder).filter_by(id=created.json()["id"]).one()
+    assert work_order.asset_id == command["asset_id"]
+    assert work_order.barangay_id == 171
+    assert work_order.assigned_to_id is None
+    assert "Engineering review requested" in work_order.notes
+    assert db.query(gov_models.AuditLog).filter_by(work_order_id=work_order.id).count() >= 1
+    db.close()
 
 
 # =============================================================================
@@ -685,6 +746,10 @@ def test_report_work_approval_requires_reason_and_eligible_state(client, seeded_
     assert assigned.status_code == 200, assigned.text
     assert assigned.json()["status"] == "assigned"
     assert assigned.json()["is_emergency_assignment"] is False
+    duplicate = client.post("/api/gov/work-orders", json={
+        "title": "Duplicate repair", "report_id": report_id, "priority": "normal",
+    }, headers=headers)
+    assert duplicate.status_code == 409
     db = TestingSessionLocal()
     assert db.query(models.Report).filter(models.Report.id == report_id).first().status == "dispatched"
     db.close()
@@ -900,6 +965,88 @@ def test_report_request_info_and_docket(client, seeded_users_and_geo):
     assert docket["report"]["id"] == rep_id
     assert len(docket["timeline"]) >= 1
     assert any("Action Required" in t["note"] for t in docket["timeline"])
+
+
+def test_report_docket_scope_and_one_information_request(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    report = models.Report(
+        ticket_id="PUL-2026-SCOPED", category="Drainage", description="Blocked culvert",
+        status="validated", location_barangay="171", resident_id=901,
+    )
+    db.add(report)
+    db.commit()
+    report_id = report.id
+    db.close()
+
+    clerk = {"Authorization": f"Bearer {seeded_users_and_geo['clerk']}"}
+    engineer = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
+    for path in ("/api/gov/reports", "/api/gov/reports-archive", f"/api/gov/reports/{report_id}/docket"):
+        assert client.get(path, headers=clerk).status_code == 403
+    payload = {"reason": "Need a landmark", "message": "Please identify the nearest street corner."}
+    assert client.post(f"/api/gov/reports/{report_id}/request-info", json=payload, headers=clerk).status_code == 403
+    first = client.post(f"/api/gov/reports/{report_id}/request-info", json=payload, headers=engineer)
+    assert first.status_code == 200, first.text
+    repeated = client.post(f"/api/gov/reports/{report_id}/request-info", json=payload, headers=engineer)
+    assert repeated.status_code == 409
+    db = TestingSessionLocal()
+    assert db.query(models.Notification).filter(models.Notification.resident_id == 901).count() == 1
+    db.close()
+
+
+def test_report_location_proximity_uses_active_tickets(client, seeded_users_and_geo):
+    from spatial_queries import nearby_active_report
+
+    db = TestingSessionLocal()
+    active = models.Report(
+        ticket_id="PUL-2026-NEAR", category="Roads", status="pending",
+        location_lat=14.750000, location_lng=121.050000,
+    )
+    resolved = models.Report(
+        ticket_id="PUL-2026-DONE", category="Roads", status="resolved",
+        location_lat=14.750001, location_lng=121.050001,
+    )
+    db.add_all([active, resolved])
+    db.commit()
+    assert nearby_active_report(db, "Roads", 14.75005, 121.05000).id == active.id
+    assert nearby_active_report(db, "Drainage", 14.75005, 121.05000) is None
+    assert nearby_active_report(db, "Roads", 14.75100, 121.05000) is None
+    db.close()
+
+
+def test_dispatch_suggestions_require_valid_fresh_agent_location(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    report = models.Report(
+        ticket_id="PUL-2026-DISPATCH-GPS", category="Roads", status="approved_internal",
+        location_lat=14.75000, location_lng=121.05000,
+    )
+    db.add(report)
+    db.commit()
+    report_id = report.id
+    db.close()
+    field = {"Authorization": f"Bearer {seeded_users_and_geo['field_worker']}"}
+    engineer = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
+
+    invalid = client.post("/api/gov/agents/location", json={
+        "latitude": 100, "longitude": 121.05, "status": "available",
+    }, headers=field)
+    assert invalid.status_code == 422
+    saved = client.post("/api/gov/agents/location", json={
+        "latitude": 14.75001, "longitude": 121.05001, "status": "available", "accuracy": 10,
+    }, headers=field)
+    assert saved.status_code == 200, saved.text
+    suggestions = client.get(f"/api/gov/dispatch/suggest-agent/{report_id}", headers=engineer)
+    assert suggestions.status_code == 200, suggestions.text
+    assert suggestions.json()[0]["agent_id"] == 503
+    assert suggestions.json()[0]["distance_km"] < 1
+
+    db = TestingSessionLocal()
+    location = db.query(gov_models.AgentLocation).filter_by(agent_id=503).one()
+    location.updated_at = datetime.datetime.now(timezone.utc) - datetime.timedelta(minutes=30)
+    db.commit()
+    db.close()
+    stale = client.get(f"/api/gov/dispatch/suggest-agent/{report_id}", headers=engineer)
+    assert stale.status_code == 200
+    assert stale.json() == []
 
 
 # =============================================================================

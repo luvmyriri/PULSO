@@ -273,8 +273,9 @@ def update_user(db: Session, user_id: int, user_update: schemas.UserUpdate):
     return None
 
 
-def get_report(db: Session, report_id: int):
-    return db.query(models.Report).filter(models.Report.id == report_id).first()
+def get_report(db: Session, report_id: int, for_update: bool = False):
+    query = db.query(models.Report).filter(models.Report.id == report_id)
+    return (query.with_for_update() if for_update else query).first()
 
 def get_reports(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Report).order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()

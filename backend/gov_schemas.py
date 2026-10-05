@@ -32,6 +32,7 @@ class WorkOrderCreate(BaseModel):
     estimated_cost: float = 0.0
     ai_plan_summary: Optional[str] = None
     notes: Optional[str] = None
+    asset_id: Optional[str] = None
 
 class WorkOrderUpdate(BaseModel):
     title: Optional[str] = None

@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import get_db
 from auth import get_current_user
@@ -1525,7 +1525,7 @@ def list_active_reports(
     current_user=Depends(get_current_user),
 ):
     """Active incoming citizen reports matching triage queue."""
-    _assert_role(current_user, *GOV_ROLES)
+    _assert_role(current_user, *DISPATCH_ROLES)
     q = db.query(models.Report)
     if status and status.strip().lower() != "all":
         if "," in status:
@@ -1579,7 +1579,7 @@ def list_reports_archive(
     current_user=Depends(get_current_user),
 ):
     """Archived and resolved citizen infrastructure reports with search support. Senior LGU staff only."""
-    _assert_role(current_user, *SENIOR_ROLES)
+    _assert_role(current_user, *DISPATCH_ROLES)
     
     # Use standardized CRUD
     items = gov_crud.list_reports_archive(db, skip, limit, status, category, search)
@@ -1651,12 +1651,12 @@ def get_document_archive(
 # ─────────────────────────────────────────────────────────────────────────────
 
 class AgentLocationUpdate(BaseModel):
-    latitude: float
-    longitude: float
-    status: Optional[str] = "available"
-    accuracy: Optional[float] = None
-    battery_level: Optional[int] = None
-    location_name: Optional[str] = None
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    status: str = Field(default="available", pattern="^(offline|available|en_route|on_site|returning)$")
+    accuracy: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    battery_level: Optional[int] = Field(default=None, ge=0, le=100)
+    location_name: Optional[str] = Field(default=None, max_length=255)
 
 
 @router.get("/agents/locations", response_model=List[dict])
@@ -1700,8 +1700,6 @@ def update_my_location(
     Agents can only update their own location.
     """
     _assert_role(current_user, *FIELD_ROLES)
-    if data.new_status or data.image_url:
-        raise HTTPException(status_code=422, detail="Use the governed field status or completion proof endpoint")
     loc = gov_crud.update_agent_location(
         db,
         agent_id=current_user.id,
@@ -1924,7 +1922,7 @@ def approve_report_for_work(
     reason = payload.reason.strip()
     if len(reason) < 10:
         raise HTTPException(status_code=422, detail="A decision reason of at least 10 characters is required")
-    report = db.query(models.Report).filter(models.Report.id == report_id).first()
+    report = db.query(models.Report).filter(models.Report.id == report_id).with_for_update().first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     if report.status != "pending_approval":
@@ -1950,7 +1948,7 @@ def get_report_project_mapping(
     Finds the ProjectRequest associated with a citizen report.
     Used by Dispatchers to check if a project is ready for FQA.
     """
-    _assert_role(current_user, *GOV_ROLES)
+    _assert_role(current_user, *DISPATCH_ROLES)
     report = db.query(models.Report).filter(models.Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -2304,7 +2302,7 @@ def request_citizen_info(
     - Dispatches resident Notification
     - Appends AuditLog
     """
-    _assert_role(current_user, *GOV_ROLES)
+    _assert_role(current_user, *DISPATCH_ROLES)
     return gov_crud.request_citizen_information(
         db, report_id, payload,
         actor_id=current_user.id,
@@ -2325,7 +2323,7 @@ def get_report_docket(
     - Linked work orders with inspections and blockers
     - Audit logs
     """
-    _assert_role(current_user, *GOV_ROLES)
+    _assert_role(current_user, *DISPATCH_ROLES)
     report = db.query(models.Report).filter(models.Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Citizen report not found")
@@ -2406,6 +2404,6 @@ def get_today_operations(
     - Dual-Sector Summary (North & South Caloocan)
     - Team Capacity and Blocker Breakdown
     """
-    _assert_role(current_user, *GOV_ROLES)
+    _assert_role(current_user, *DISPATCH_ROLES)
     return gov_crud.get_operations_today_hub(db)
 

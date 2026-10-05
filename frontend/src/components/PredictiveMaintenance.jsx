@@ -141,16 +141,6 @@ function HealthCard({ asset, onAIPlan, onConvertToWO, loadingAI, isExpanded, onT
         asset.failure_probability_30d >= 0.4 ? '#f97316' :
         '#22c55e';
 
-    const criticalDocTypes = [
-        { key: "materials_test", name: "Materials Test Report" },
-        { key: "design_plans", name: "Design Plans" },
-        { key: "ntp", name: "Notice to Proceed" }
-    ];
-
-    const missingCritical = criticalDocTypes.filter(
-        type => !asset.audit_compliance?.some(d => d.doc_type === type.key || d.name.toLowerCase().includes(type.name.toLowerCase()))
-    );
-
     return (
         <motion.div 
             layout
@@ -168,11 +158,6 @@ function HealthCard({ asset, onAIPlan, onConvertToWO, loadingAI, isExpanded, onT
                             {asset.rainy_season_warning && (
                                 <span className="text-[9px] font-black bg-blue-500 text-white px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                                     <CloudRain size={8} /> RAINY RISK
-                                </span>
-                            )}
-                            {missingCritical.length > 0 && asset.priority !== 'GOOD' && (
-                                <span className="text-[9px] font-black bg-red-600 text-white px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                                    <Shield size={8} /> COMPLIANCE RISK
                                 </span>
                             )}
                         </div>
@@ -198,7 +183,7 @@ function HealthCard({ asset, onAIPlan, onConvertToWO, loadingAI, isExpanded, onT
                         <div className="text-sm font-black" style={{ color: probColor }}>
                             {Math.round(asset.failure_probability_30d * 100)}%
                         </div>
-                        <div className="text-[9px] text-slate-400">30d Fail</div>
+                        <div className="text-[9px] text-slate-400">30d signal</div>
                     </div>
                     <div>
                         <div className="text-sm font-black text-slate-700 dark:text-slate-200">
@@ -234,9 +219,9 @@ function HealthCard({ asset, onAIPlan, onConvertToWO, loadingAI, isExpanded, onT
                         className="overflow-hidden"
                     >
                         <div className="p-4 border-t border-current/10 space-y-4 bg-white/60 dark:bg-slate-900/60">
-                            {/* Failure probabilities */}
+                            {/* Exploratory scores, pending model validation */}
                             <div className="space-y-1.5">
-                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Failure Probability</div>
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Exploratory risk signal · not a validated probability</div>
                                 <ProbabilityBar label="30d" value={asset.failure_probability_30d} color={probColor} />
                                 <ProbabilityBar label="60d" value={asset.failure_probability_60d} color={probColor} />
                                 <ProbabilityBar label="90d" value={asset.failure_probability_90d} color={probColor} />
@@ -252,7 +237,7 @@ function HealthCard({ asset, onAIPlan, onConvertToWO, loadingAI, isExpanded, onT
                                     <div className="font-bold text-slate-700 dark:text-slate-200">{asset.days_since_last_maintenance}d</div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-400 text-[10px]">Next Maintenance</div>
+                                    <div className="text-slate-400 text-[10px]">Suggested review date</div>
                                     <div className="font-bold text-slate-700 dark:text-slate-200">{asset.next_maintenance_date}</div>
                                 </div>
                                 <div>
@@ -292,21 +277,7 @@ function HealthCard({ asset, onAIPlan, onConvertToWO, loadingAI, isExpanded, onT
                                         </motion.div>
                                     ))}
 
-                                    {/* Show missing critical placeholders */}
-                                    {missingCritical.map((type, idx) => (
-                                        <div 
-                                            key={`missing-${idx}`}
-                                            className="flex items-center justify-between p-2 rounded-lg bg-red-50/30 dark:bg-red-950/20 border border-dashed border-red-200 dark:border-red-900/30"
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <AlertOctagon size={10} className="text-red-500" />
-                                                <span className="text-[11px] font-bold text-red-700/60 dark:text-red-400/60">{type.name}</span>
-                                            </div>
-                                            <span className="text-[8px] font-black text-red-500/50 uppercase tracking-widest">MISSING</span>
-                                        </div>
-                                    ))}
-
-                                    {(!asset.audit_compliance || asset.audit_compliance.length === 0) && missingCritical.length === 0 && (
+                                    {(!asset.audit_compliance || asset.audit_compliance.length === 0) && (
                                         <div className="text-[10px] text-slate-400 italic py-1 px-1">
                                             No verified audit documents linked to this asset lifecycle.
                                         </div>
@@ -381,6 +352,7 @@ function ScheduleView({ schedule }) {
 
     return (
         <div className="space-y-4">
+            <p className="text-xs text-slate-600 dark:text-slate-300" role="note">Suggested inspections only. No work is scheduled and no funds are approved by this view.</p>
             {/* Top stats */}
             <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm shadow-orange-100/40 dark:shadow-orange-900/10 text-center">
@@ -393,7 +365,7 @@ function ScheduleView({ schedule }) {
                 </div>
                 <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm shadow-orange-100/40 dark:shadow-orange-900/10 text-center">
                     <div className="text-xl font-black text-indigo-600">{total_cost_formatted}</div>
-                    <div className="text-[10px] text-slate-400 font-bold">Est. Budget</div>
+                    <div className="text-[10px] text-slate-400 font-bold">Illustrative cost</div>
                 </div>
             </div>
 
@@ -411,7 +383,7 @@ function ScheduleView({ schedule }) {
                                     </div>
                                     <div>
                                         <div className="font-bold text-slate-900 dark:text-white text-sm">{week.week_label}</div>
-                                        <div className="text-[10px] text-slate-400">{week.item_count} maintenance {week.item_count === 1 ? 'task' : 'tasks'}</div>
+                                        <div className="text-[10px] text-slate-400">{week.item_count} review {week.item_count === 1 ? 'candidate' : 'candidates'}</div>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -434,11 +406,11 @@ function ScheduleView({ schedule }) {
                                             <div className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">
                                                 {item.category.toUpperCase()} — Brgy. {item.barangay}
                                             </div>
-                                            <div className="text-[10px] text-slate-400">{item.maintenance_type} · {item.scheduled_date}</div>
+                                            <div className="text-[10px] text-slate-400">Suggested review: {item.scheduled_date}</div>
                                         </div>
                                         <div className="text-right shrink-0">
                                             <div className="font-bold text-sm text-slate-700 dark:text-slate-200">{item.estimated_cost_formatted}</div>
-                                            <div className="text-[10px] text-slate-400">{Math.round(item.failure_prob * 100)}% risk</div>
+                                            <div className="text-[10px] text-slate-400">{Math.round(item.failure_prob * 100)}% exploratory signal</div>
                                         </div>
                                     </div>
                                 ))}
@@ -605,7 +577,7 @@ function AIPlanModal({ plan, onClose, onConvertToWO, converting }) {
 const TABS = [
     { id: 'overview',  label: 'Overview',       icon: BarChart2 },
     { id: 'health',    label: 'Asset Health',   icon: Activity },
-    { id: 'schedule',  label: 'Schedule',       icon: Calendar },
+    { id: 'schedule',  label: 'Review candidates', icon: Calendar },
     { id: 'risk-map',  label: 'Risk Map',       icon: MapPin },
 ];
 
@@ -684,6 +656,8 @@ export default function PredictiveMaintenance() {
 
     const handleConvertPlanToWO = async (plan) => {
         if (!confirm(`Are you sure you want to convert this AI plan for ${plan.category} in Brgy. ${plan.barangay} into a formal Work Order?`)) return;
+        const reviewReason = window.prompt('Record the engineering reason for opening a preventive review work order:');
+        if (!reviewReason || reviewReason.trim().length < 10) return;
         
         setConvertingWO(true);
         try {
@@ -696,9 +670,10 @@ export default function PredictiveMaintenance() {
                     priority: plan.priority,
                     estimated_cost: plan.estimated_cost || 0,
                     asset_id: plan.asset_id,
+                    review_reason: reviewReason.trim(),
                 }),
             });
-            alert(`Success! Work Order #${wo.wo_number} has been created and dispatched.`);
+            alert(`Work Order #${wo.wo_number} was opened for review. No field team has been dispatched.`);
             setAiPlan(null);
             loadAll();
         } catch (e) {
@@ -740,7 +715,7 @@ export default function PredictiveMaintenance() {
                                 <h1 className="text-xl sm:text-2xl font-heading font-black text-slate-900 dark:text-white tracking-tight leading-none">
                                     Predictive Maintenance Engine
                                 </h1>
-                                <p className="text-xs text-slate-500 mt-0.5">AI-driven infrastructure failure forecasting · Caloocan City Engineering Office</p>
+                                <p className="text-xs text-slate-500 mt-0.5">Exploratory asset signals from recorded work and reports · Engineering review required</p>
                             </div>
                         </div>
                     </div>
@@ -802,7 +777,7 @@ export default function PredictiveMaintenance() {
                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center mx-auto mb-3 animate-pulse">
                                 <Cpu size={22} className="text-white" />
                             </div>
-                            <div className="text-sm font-bold text-slate-500">Running predictive analysis…</div>
+                            <div className="text-sm font-bold text-slate-500">Loading asset maintenance signals…</div>
                             <div className="text-xs text-slate-400 mt-1">Scanning {health?.length || '…'} infrastructure assets</div>
                         </div>
                     </div>
@@ -811,6 +786,7 @@ export default function PredictiveMaintenance() {
                         {/* ── OVERVIEW TAB ───────────────────────── */}
                         {activeTab === 'overview' && summary && (
                             <div className="space-y-6">
+                                <p className="text-xs text-slate-600 dark:text-slate-300" role="note">These are unvalidated heuristic scores and illustrative costs. Dates are suggested review dates. An engineer must inspect the source record before assigning work or approving funds.</p>
                                 {/* Rainy season banner */}
                                 {summary.rainy_season_active && (
                                     <div className="bg-blue-600 rounded-2xl p-4 flex items-center gap-4">
@@ -831,9 +807,9 @@ export default function PredictiveMaintenance() {
                                     <KPICard icon={Activity} label="Avg Health Score" value={`${summary.avg_health_score || 0}/100`} color="blue" />
                                     <KPICard icon={AlertOctagon} label="Critical Assets" value={summary.critical_count || 0} color="red" pulse={summary.critical_count > 0} />
                                     <KPICard icon={AlertTriangle} label="High Priority" value={summary.high_count || 0} color="orange" />
-                                    <KPICard icon={Clock} label="Urgent This Week" value={summary.urgent_this_week || 0} color="yellow" />
-                                    <KPICard icon={Zap} label="Immediate Action Needed" value={summary.assets_needing_immediate_action || 0} color="red" pulse={summary.assets_needing_immediate_action > 0} />
-                                    <KPICard icon={ClipboardList} label="90-Day Budget" value={summary.scheduled_90d_cost_formatted || '₱0'} color="purple" />
+                                    <KPICard icon={Clock} label="High heuristic signal" value={summary.urgent_this_week || 0} color="yellow" />
+                                    <KPICard icon={Zap} label="Inspection candidates" value={summary.assets_needing_immediate_action || 0} color="red" />
+                                    <KPICard icon={ClipboardList} label="Illustrative cost" value={summary.scheduled_90d_cost_formatted || '₱0'} color="purple" />
                                     <KPICard icon={CheckCircle} label="Good Condition" value={summary.good_count || 0} color="green" />
                                     {summary.total_active_reports > 0 && (
                                         <KPICard icon={BarChart2} label="Active Reports Analyzed" value={summary.total_active_reports} color="indigo"
@@ -862,7 +838,7 @@ export default function PredictiveMaintenance() {
                                                         <div className={`w-px self-stretch ${cfg.border} border-l shrink-0`} />
                                                         <div className="flex-1 min-w-0">
                                                             <div className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{asset.category.toUpperCase()}</div>
-                                                            <div className="text-xs text-slate-500 truncate">Brgy. {asset.barangay} · {Math.round(asset.failure_probability_30d * 100)}% fail risk</div>
+                                                            <div className="text-xs text-slate-500 truncate">Brgy. {asset.barangay} · {Math.round(asset.failure_probability_30d * 100)}% exploratory signal</div>
                                                             <HealthBar score={asset.health_score} size="sm" />
                                                         </div>
                                                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full text-white shrink-0 ${cfg.badge}`}>
