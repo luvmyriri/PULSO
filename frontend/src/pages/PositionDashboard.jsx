@@ -23,7 +23,6 @@ import {
 import GovSidebar from '../components/GovSidebar';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import GovSystemBanner from '../components/GovSystemBanner';
-import GovBiDashboard from '../components/GovBiDashboard';
 import ThemeToggle from '../components/ThemeToggle';
 import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
@@ -717,8 +716,9 @@ const PositionDashboard = () => {
                         {/* System-wide Stats */}
                         <StatsBar token={token} />
 
-                        {/* Executive Business Intelligence Graph Dashboard */}
-                        <GovBiDashboard token={token} currentUser={currentUser} />
+                        <Link to="/gov/analytics" className="block rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-800 hover:underline focus-visible:outline-3 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                            Open recorded operations analytics
+                        </Link>
 
                         <div className="gov-my-work__grid">
                             <section className="gov-action-queue" aria-labelledby="pending-actions-heading">

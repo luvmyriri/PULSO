@@ -19,7 +19,6 @@ import DispatcherDashboard from './pages/DispatcherDashboard';
 import GovProjectsPage   from './pages/GovProjectsPage';
 import GovAnalyticsPage  from './pages/GovAnalyticsPage';
 import GovReportsDashboard from './pages/GovReportsDashboard';
-import GovBiDashboard      from './pages/GovBiDashboard';
 import GovTodayPage        from './pages/GovTodayPage';
 import CitizenReportsPage  from './pages/CitizenReportsPage';
 import GovReportDetailPage from './pages/GovReportDetailPage';
@@ -96,10 +95,10 @@ function App() {
 
                         {/* ── GOVERNMENT — UNIVERSAL LANDING (First navbar menu) ── */}
                         <Route path="/gov/dashboard" element={
-                            <GovOnly><GovBiDashboard /></GovOnly>
+                            <GovOnly><Navigate to="/gov/today" replace /></GovOnly>
                         } />
                         <Route path="/gov/my-dashboard" element={
-                            <GovOnly><GovBiDashboard /></GovOnly>
+                            <GovOnly><Navigate to="/gov/today" replace /></GovOnly>
                         } />
                         <Route path="/gov/today" element={
                             <GovOnly><GovTodayPage /></GovOnly>
@@ -274,7 +273,7 @@ function App() {
                             <GovOnly><GovAnalyticsPage /></GovOnly>
                         } />
                         <Route path="/gov/bi" element={
-                            <GovOnly><GovBiDashboard /></GovOnly>
+                            <GovOnly><Navigate to="/gov/analytics" replace /></GovOnly>
                         } />
 
                         {/* Predictive Maintenance Engine — all gov staff */}

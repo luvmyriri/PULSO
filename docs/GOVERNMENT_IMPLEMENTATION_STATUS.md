@@ -22,6 +22,7 @@
 - The mounted predictive view now uses backend records rather than a fixed 2026 example. AI maintenance drafts require a registered asset, fail visibly when the provider is unavailable, and enter the canonical audited work-order command only after a human reason. The resulting order is **open for review**, not dispatched. Geographic/category similarity no longer counts unrelated resident reports against an asset.
 - Predictive scores and illustrative costs are labeled as unvalidated heuristic inspection prompts. Analytics report detail and exports have distinct server checks; CSV cells that could become spreadsheet formulas are neutralized.
 - The mounted delivery route now opens the server-backed project registry instead of a screen that substituted sample projects on fetch failure. The registry preserves last loaded records as visibly stale on refresh errors, distinguishes errors from empty results, maps its display groups from the recorded 13-state workflow, and reads district labels from registered district IDs instead of guessing from barangay names.
+- Dashboard and BI bookmarks now open the data-backed operations and analytics routes. The role-specific queue links to those analytics rather than embedding a chart drawn from fixed trajectory values.
 
 ## Deliberate blocks and decisions still needed
 
@@ -31,7 +32,7 @@
 - **Evidence and records:** report-image classification, legacy public image exposure, retention, legal hold, and disposition policy need owner approval and further implementation. Work-order proof and new government documents use private delivery.
 - **Reliability:** record version checks, idempotent consequential commands, transactional notification delivery, and an end-to-end deployment exercise remain to be implemented.
 - **PostGIS deployment:** migration `b72d4e_postgis_report_locations` creates the extension and indexed generated geography points for reports and field agents. The reachable local `pulso_db` is at revision `da48716fc54d`, but its PostgreSQL installation does not provide the PostGIS extension. The migration has **not** been applied or verified against PostGIS; install the extension on the target PostgreSQL instance and run/verify the migration before claiming indexed spatial operation.
-- **Predictive model:** heuristic formulas are deterministic but have not been calibrated or validated against historical failures. They must not be interpreted as probabilities, confirmed schedules, or approved costs. The retired fixed insights page is no longer routed, but other government routes and exports still need a full fake-data and provenance audit.
+- **Predictive model:** heuristic formulas are deterministic but have not been calibrated or validated against historical failures. They must not be interpreted as probabilities, confirmed schedules, or approved costs. The retired fixed insights, dashboard BI, and sample delivery pages are no longer routed, but other government routes and exports still need a full fake-data and provenance audit.
 
 ## Verification
 
