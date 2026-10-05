@@ -218,6 +218,15 @@ def test_project_cannot_skip_persisted_phases():
     assert project.status == "request_received"
     assert db.commits == 0
 
+    project.status = "milestone_inspections"
+    project.current_phase = 11
+    with pytest.raises(ValueError, match="governed evidence"):
+        gov_crud.advance_project_phase(
+            db, 15, "resolved", actor_id=7, actor_role="city_engineer",
+        )
+    assert project.status == "milestone_inspections"
+    assert db.commits == 0
+
 
 def test_budget_approval_shortcut_is_closed():
     with pytest.raises(HTTPException) as error:
@@ -229,6 +238,22 @@ def test_budget_approval_shortcut_is_closed():
             db=SimpleNamespace(), current_user=models.Official(id=7, role="dispatcher"),
         )
     assert error.value.status_code == 409
+
+
+def test_project_certificate_shortcuts_are_closed_until_evidence_review():
+    actor = models.Official(id=7, role="manager")
+    with pytest.raises(HTTPException) as direct_error:
+        gov_router.issue_certificate(
+            proj_id=15, payload=gov_schemas.CertificateOfCompletionIssue(notes="Final audit"),
+            db=SimpleNamespace(), current_user=actor,
+        )
+    assert direct_error.value.status_code == 409
+    with pytest.raises(HTTPException) as fqa_error:
+        gov_router.issue_fqa_certificate(
+            project_id=15, payload=gov_schemas.ProjectStatusUpdate(notes="Final audit"),
+            db=SimpleNamespace(), current_user=actor,
+        )
+    assert fqa_error.value.status_code == 409
 
 
 def test_generic_report_status_route_only_accepts_verification(monkeypatch):

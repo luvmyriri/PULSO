@@ -863,38 +863,9 @@ def issue_certificate(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """
-    Issue a Certificate of Completion for a finished project.
-    Restricted to: Assistant City Engineer and City Engineer.
-    (Phase 6 — Completion Phase)
-    """
+    """Certificate issuance awaits the governed project evidence and records contract."""
     _assert_role(current_user, "asst_city_engineer", "city_engineer", "manager", "system_admin")
-    proj = gov_crud.get_project_request(db, proj_id)
-    if not proj:
-        raise HTTPException(status_code=404, detail="Project not found")
-    if proj.status not in ("resolved", "milestone_inspections"):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot issue certificate for project with status '{proj.status}'. Must be 'resolved' or 'milestone_inspections'."
-        )
-    proj = gov_crud.issue_certificate_of_completion(
-        db, proj_id,
-        actor_id=current_user.id, actor_role=current_user.role,
-        notes=payload.notes,
-    )
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # [Section 4.6 - Final Turnover & Audit Trigger]
-    # ─────────────────────────────────────────────────────────────────────────
-    # When a certificate is issued, we trigger the FQA engine to reconcile 
-    # designs vs built, check citizen feedback, and migrate to Asset Registry.
-    fqa_results = fqa_engine.execute_fqa(db, proj_id)
-    
-    # Enrich the response with FQA results for the frontend to show feedback
-    enriched_proj = gov_crud.enrich_project(proj, db)
-    setattr(enriched_proj, 'fqa_results', fqa_results)
-    
-    return enriched_proj
+    raise HTTPException(status_code=409, detail="Project certificate issuance requires governed evidence review")
 
 @router.get("/reports/{report_id}/project-mapping")
 def get_project_mapping_by_report(
@@ -2004,29 +1975,9 @@ def issue_fqa_certificate(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """
-    Dispatcher triggers the Final Quality Audit (FQA) by certificates issuance.
-    This moves the project to 'closed_completion_certified' and triggers 
-    the Smart Gate FQA engine.
-    """
+    """Legacy certificate shortcut is closed pending a governed proof review."""
     _assert_role(current_user, "dispatcher", "manager", "system_admin")
-
-    try:
-        result = gov_crud.advance_project_phase(
-            db=db,
-            proj_id=project_id,
-            new_status="closed_completion_certified",
-            actor_id=current_user.id,
-            actor_role=current_user.role,
-            notes=payload.notes or "FQA triggered by Dispatcher dashboard."
-        )
-        return {
-            "success": True,
-            "message": "FQA Certificate issued. Project archived to Asset Registry.",
-            "audit_results": result.get("fqa_results")
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    raise HTTPException(status_code=409, detail="Project certificate issuance requires governed evidence review")
 
 
 @router.post("/reports/{report_id}/approve-with-budget")

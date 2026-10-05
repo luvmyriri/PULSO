@@ -1328,6 +1328,8 @@ def advance_project_phase(
         raise ValueError("Unknown project phase; manual lifecycle review is required")
     if requested_phase != current_phase + 1:
         raise ValueError("Project phases must advance one step at a time")
+    if new_status in {"resolved", "closed_completion_certified"}:
+        raise ValueError("Project completion requires a governed evidence and certificate decision")
 
     # ── Role-Based Sign-off Gating ──
     # Milestones requiring Lead/Chief sign-off for accountability
@@ -1497,42 +1499,6 @@ def update_project(
         )
     for k, v in update_data.items():
         setattr(proj, k, v)
-    db.commit()
-    db.refresh(proj)
-    return proj
-
-
-def issue_certificate_of_completion(
-    db: Session,
-    proj_id: int,
-    actor_id: int,
-    actor_role: str,
-    notes: Optional[str] = None,
-) -> Optional[gov_models.ProjectRequest]:
-    proj = db.query(gov_models.ProjectRequest).filter(
-        gov_models.ProjectRequest.id == proj_id
-    ).first()
-    if not proj:
-        return None
-    now = _now()
-    proj.certificate_issued = True
-    proj.certificate_issued_by_id = actor_id
-    proj.completed_at = now
-    proj.status = "closed_completion_certified"
-    proj.current_phase = 13
-
-    _append_timeline(
-        db, status="closed_completion_certified", previous_status=proj.status,
-        actor_id=actor_id, actor_role=actor_role,
-        note=notes or "Certificate of Completion issued.",
-        project_id=proj_id, is_public=True,
-    )
-    _append_audit(
-        db, trigger_type="maintenance",
-        action=f"Certificate of Completion issued for {proj.proj_number}",
-        actor_id=actor_id, actor_role=actor_role, project_id=proj_id,
-        details=notes,
-    )
     db.commit()
     db.refresh(proj)
     return proj
