@@ -57,9 +57,12 @@ class WorkOrderResponse(BaseModel):
     assigned_to_id: Optional[int] = None
     title: str
     description: Optional[str] = None
+    location_string: Optional[str] = None
+    barangay: Optional[str] = None
     wo_type: str
     status: str
     priority: str
+    is_emergency_assignment: bool = False
     scheduled_date: Optional[datetime] = None
     completed_date: Optional[datetime] = None
     

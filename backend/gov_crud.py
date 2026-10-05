@@ -9,6 +9,8 @@ from datetime import datetime, timezone, timedelta, date
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
 import secrets
+import os
+import logging
 
 import gov_models
 import gov_schemas
@@ -124,12 +126,14 @@ def _notify_role(db: Session, roles: List[str], title: str, message: str, priori
     db.flush()
 
     # Trigger SMS for Level 100 emergencies
-    if priority >= 100:
+    if priority >= 100 and os.getenv("PULSO_ENABLE_PRIORITY_SMS", "false").lower() == "true":
         try:
             from sms_utils import send_emergency_sms
             for o in officials:
                 if o.phone_number:
-                    send_emergency_sms(o.phone_number, title, message)
+                    result = send_emergency_sms(o.phone_number, title, message)
+                    if not result.accepted:
+                        logging.getLogger(__name__).warning("Priority staff SMS was not accepted by the provider")
         except ImportError:
             pass # sms_utils not yet created or failed
 
@@ -215,7 +219,56 @@ def find_smart_dispatch_suggestions(db: Session, report_id: int, limit: int = 3)
 # Work Orders
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: int, actor_role: str):
+_WORK_ORDER_TRANSITIONS = {
+    "open": {"assigned", "cancelled"},
+    "assigned": {"in_progress", "cancelled"},
+    "in_progress": {"completed_pending_review", "cancelled"},
+    "rework_required": {"in_progress"},
+}
+
+_ASSIGNEE_ROLES = {"field_worker", "foreman", "construction_foreman", "project_engineer", "building_inspector"}
+
+
+def _validate_work_order_evidence(image_url: Optional[str], wo_id: int):
+    if not image_url:
+        return
+    prefix = f"/api/gov/work-orders/{wo_id}/evidence/"
+    if not image_url.startswith(prefix):
+        raise HTTPException(status_code=422, detail="Evidence must belong to this work order")
+    filename = image_url[len(prefix):]
+    if not re.fullmatch(r"[a-f0-9]{32}\.jpg", filename):
+        raise HTTPException(status_code=422, detail="Invalid evidence reference")
+    if not os.path.isfile(os.path.join("uploads", "docs", "work_orders", str(wo_id), filename)):
+        raise HTTPException(status_code=422, detail="Evidence image was not found")
+
+
+def _validate_assignee(db: Session, assignee_id: Optional[int]):
+    if assignee_id is None:
+        return
+    person = db.query(models.Official).filter(models.Official.id == assignee_id).first()
+    if not person or not person.is_active or person.is_suspended or person.role not in _ASSIGNEE_ROLES:
+        raise HTTPException(status_code=409, detail="Assignee must be an active eligible field official")
+
+
+def _validate_work_order_transition(db: Session, wo, new_status: str, evidence_url: Optional[str] = None):
+    if new_status not in _WORK_ORDER_TRANSITIONS.get(wo.status, set()):
+        raise HTTPException(status_code=409, detail=f"Cannot transition work order from '{wo.status}' to '{new_status}'")
+    if new_status == "assigned" and not wo.assigned_to_id:
+        raise HTTPException(status_code=409, detail="An eligible assignee is required before assignment")
+    if new_status == "assigned" and wo.report_id:
+        report = db.query(models.Report).filter(models.Report.id == wo.report_id).first()
+        if not report or report.status != "approved_internal":
+            raise HTTPException(status_code=409, detail="Source report must be approved before assignment")
+    if new_status == "completed_pending_review":
+        prior_proof = db.query(gov_models.WorkOrderUpdate).filter(
+            gov_models.WorkOrderUpdate.work_order_id == wo.id,
+            gov_models.WorkOrderUpdate.image_url.isnot(None),
+        ).first()
+        if not (evidence_url or prior_proof):
+            raise HTTPException(status_code=409, detail="Completion evidence is required before review")
+
+
+def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: int, actor_role: str, note: Optional[str] = None):
     """Update the citizen report status + notify the citizen. Called by gov CRUD functions."""
     from datetime import datetime, timezone
     report = db.query(models.Report).filter(models.Report.id == report_id).first()
@@ -230,16 +283,17 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
         db, status=new_status, previous_status=previous,
         actor_id=actor_id, actor_role=actor_role,
         report_id=report_id, is_public=True,
-        note=f"Report status updated to {new_status}",
+        note=note or f"Report status updated to {new_status}",
     )
     _append_audit(
         db, trigger_type="status_change",
         action=f"Report {report.ticket_id} status → {new_status}",
         actor_id=actor_id, actor_role=actor_role,
         report_id=report_id,
+        details=note,
     )
 
-    # ────── Integration Hook: Automated Asset Resolution & Archival ──────
+    # Asset and records effects follow the independently verified resolution.
     if new_status == "resolved":
         # Find linked work orders to identify the asset
         work_orders = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.report_id == report_id).all()
@@ -255,24 +309,25 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
                 db.add(maintenance_log)
                 
                 # b) Archive to System Document Registry (Records & Registry Connection)
-                resolution_doc = gov_models.SystemDocument(
-                    document_type="survey_report",
-                    file_name=f"RESOLUTION_PROOF_{report.ticket_id}.jpg",
-                    file_path=report.resolution_image_url or "system_link",
-                    category="Infrastructure",
-                    target_model="WorkOrder",
-                    target_id=wo.id,
-                    uploader_id=actor_id,
-                    uploaded_at=datetime.now(timezone.utc),
-                    metadata_json={
-                        "report_ticket": report.ticket_id,
-                        "asset_id": wo.asset_id,
-                        "category": report.category,
-                        "resolution_status": "Finalized",
-                        "synced_from": "gov_command_center"
-                    }
-                )
-                db.add(resolution_doc)
+                if report.resolution_image_url:
+                    resolution_doc = gov_models.SystemDocument(
+                        document_type="survey_report",
+                        file_name=f"RESOLUTION_PROOF_{report.ticket_id}.jpg",
+                        file_path=report.resolution_image_url,
+                        category="Infrastructure",
+                        target_model="WorkOrder",
+                        target_id=wo.id,
+                        uploader_id=actor_id,
+                        uploaded_at=datetime.now(timezone.utc),
+                        metadata_json={
+                            "report_ticket": report.ticket_id,
+                            "asset_id": wo.asset_id,
+                            "category": report.category,
+                            "resolution_status": "Finalized",
+                            "synced_from": "gov_command_center"
+                        }
+                    )
+                    db.add(resolution_doc)
                 
                 # c) Log Asset-Specific Maintenance Audit
                 db.add(gov_models.AuditLog(
@@ -299,8 +354,9 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
     }
     if new_status in notif_map:
         title, msg = notif_map[new_status]
-        notif = models.Notification(resident_id=report.resident_id, title=title, message=msg)
-        db.add(notif)
+        if report.resident_id is not None:
+            notif = models.Notification(resident_id=report.resident_id, title=title, message=msg)
+            db.add(notif)
 
 
 def create_work_order(
@@ -311,23 +367,22 @@ def create_work_order(
 ) -> gov_models.WorkOrder:
     # 1. Territorial & Emergency Logic
     assignment_type = "territorial"
-    is_emergency = (data.priority == "critical")
-    priority_score = 100.0 if is_emergency else 0.0
+    # Critical work priority does not itself authorize emergency access or an alert.
+    priority_score = 100.0 if data.priority == "critical" else 0.0
     
     assigned_to_id = data.assigned_to_id
+    _validate_assignee(db, assigned_to_id)
 
     # Handle Jurisdictional Handover & Smart Dispatch
     if data.report_id:
         report = db.query(models.Report).filter(models.Report.id == data.report_id).first()
+        if not report:
+            raise HTTPException(status_code=404, detail="Source report not found")
+        if assigned_to_id and report.status != "approved_internal":
+            raise HTTPException(status_code=409, detail="Report must be approved before field assignment")
         if report:
-            # A. AUTO-ASSIGN for Critical / Emergencies
-            if is_emergency and not assigned_to_id:
-                suggestions = find_smart_dispatch_suggestions(db, data.report_id, limit=1)
-                if suggestions:
-                    assigned_to_id = suggestions[0]["agent_id"]
-                    assignment_type = "proximity_auto"
-            
-            # B. Territorial Validation
+            # Critical recommendations require an authorized human assignment.
+            # Territorial Validation
             if report.location_barangay:
                 territorial_lead = get_territorial_lead(db, report.location_barangay)
                 if territorial_lead and assigned_to_id and assigned_to_id != territorial_lead.id:
@@ -348,7 +403,7 @@ def create_work_order(
         wo_type=data.wo_type,
         priority=data.priority,
         priority_score=priority_score,
-        is_emergency_assignment=is_emergency,
+        is_emergency_assignment=False,
         assignment_type=assignment_type,
         scheduled_date=data.scheduled_date,
         category=data.category,
@@ -382,14 +437,8 @@ def create_work_order(
         work_order_id=wo.id, report_id=data.report_id, project_id=data.project_id,
     )
 
-    # 4. Emergency Escalation (SMS & Priority Notification)
-    if is_emergency:
-        msg = f"LEVEL 100 EMERGENCY: {data.title} at Report #{data.report_id}. Immediate response required."
-        _notify_engineering_dept(db, title="Level 100 Alert", message=msg, priority=100)
-        # SMS is handled within _notify_role called by _notify_engineering_dept
-
-    # 5. Lifecycle Link: auto-dispatch the linked citizen report
-    if data.report_id:
+    # A queued work order is not a dispatched field team.
+    if data.report_id and assigned_to_id:
         _sync_report_status(db, data.report_id, "dispatched", actor_id, actor_role)
 
     db.commit()
@@ -446,9 +495,8 @@ def update_work_order_status(
     if not wo:
         return None
     previous = wo.status
+    _validate_work_order_transition(db, wo, new_status)
     wo.status = new_status
-    if new_status == "completed":
-        wo.completed_date = _now()
 
     _append_timeline(
         db, status=new_status, previous_status=previous,
@@ -465,8 +513,7 @@ def update_work_order_status(
     # ── Lifecycle Link: propagate WO status back to citizen report ──
     if wo.report_id:
         report_status_map = {
-            "in_progress": "dispatched",   # Crew is actively working
-            "completed":   "resolved",     # Work done → report resolved
+            "in_progress": "in_progress",
             "cancelled":   "approved_internal",  # Cancelled → revert to pre-dispatch
         }
         if new_status in report_status_map:
@@ -505,29 +552,12 @@ def update_work_order(
     if not wo:
         return None
     update_data = data.dict(exclude_unset=True)
-    previous_status = wo.status
+    if {"status", "completed_date", "citizen_feedback"} & update_data.keys():
+        raise HTTPException(status_code=422, detail="Use the governed lifecycle or resident feedback endpoint")
+    if "assigned_to_id" in update_data:
+        _validate_assignee(db, update_data["assigned_to_id"])
     for k, v in update_data.items():
         setattr(wo, k, v)
-    if "status" in update_data and update_data["status"] != previous_status:
-        _append_timeline(
-            db, status=update_data["status"], previous_status=previous_status,
-            actor_id=actor_id, actor_role=actor_role, work_order_id=wo_id,
-        )
-        _append_audit(
-            db, trigger_type="status_change",
-            action=f"Work order {wo.wo_number} updated → status {update_data['status']}",
-            actor_id=actor_id, actor_role=actor_role, work_order_id=wo_id,
-        )
-        # ── Lifecycle Link: propagate WO status back to citizen report ──
-        if wo.report_id:
-            report_status_map = {
-                "in_progress": "dispatched",
-                "completed":   "resolved",
-                "cancelled":   "approved_internal",
-            }
-            new_st = update_data["status"]
-            if new_st in report_status_map:
-                _sync_report_status(db, wo.report_id, report_status_map[new_st], actor_id, actor_role)
     db.commit()
     db.refresh(wo)
     return wo
@@ -543,14 +573,15 @@ def create_work_order_update(
     if not wo:
         return None
 
+    _validate_work_order_evidence(data.image_url, wo_id)
+
     previous_status = wo.status
     new_status = data.new_status or previous_status
 
     # Update WO status if provided
     if data.new_status and data.new_status != previous_status:
+        _validate_work_order_transition(db, wo, data.new_status, data.image_url)
         wo.status = data.new_status
-        if data.new_status == "completed":
-            wo.completed_date = _now()
         
         # Timeline and Audit for status change
         _append_timeline(
@@ -566,8 +597,7 @@ def create_work_order_update(
         # Sync back to report if exists
         if wo.report_id:
             report_status_map = {
-                "in_progress": "dispatched",
-                "completed":   "resolved",
+                "in_progress": "in_progress",
                 "cancelled":   "approved_internal",
             }
             if data.new_status in report_status_map:
@@ -576,7 +606,7 @@ def create_work_order_update(
     # Create the update record
     update_entry = gov_models.WorkOrderUpdate(
         work_order_id=wo_id,
-        user_id=user_id,
+        official_id=user_id,
         previous_status=previous_status,
         new_status=new_status,
         comment=data.comment,
@@ -585,17 +615,23 @@ def create_work_order_update(
     db.add(update_entry)
     db.commit()
     db.refresh(update_entry)
+    update_entry.user_id = update_entry.official_id
+    update_entry.user_name = _name(db, update_entry.official_id)
     return update_entry
 
 
 def enrich_work_order(wo: gov_models.WorkOrder, db: Session) -> gov_models.WorkOrder:
     wo.assigned_by_name = wo.assigned_by.full_name if getattr(wo, 'assigned_by', None) else None
     wo.assigned_to_name = wo.assigned_to.full_name if getattr(wo, 'assigned_to', None) else None
+    source_report = db.query(models.Report).filter(models.Report.id == wo.report_id).first() if wo.report_id else None
+    wo.location_string = source_report.location_string if source_report else None
+    wo.barangay = source_report.location_barangay if source_report else None
     
     # Enrich updates
     if getattr(wo, 'updates', None):
         for up in wo.updates:
-            up.user_name = up.user.full_name if getattr(up, 'user', None) else None
+            up.user_id = up.official_id
+            up.user_name = up.official.full_name if getattr(up, 'official', None) else None
             
     return wo
 
@@ -622,9 +658,11 @@ def approve_work_order(
     )
     db.add(approval)
     
+    previous_status = wo.status
+    _validate_work_order_transition(db, wo, "assigned")
     wo.status = "assigned"
     _append_timeline(
-        db, status="assigned", previous_status=wo.status,
+        db, status="assigned", previous_status=previous_status,
         actor_id=approver_id, actor_role="approver",
         note=notes, work_order_id=wo_id,
     )
@@ -658,9 +696,12 @@ def reject_work_order(
     )
     db.add(approval)
     
+    previous_status = wo.status
+    if previous_status != "open":
+        raise HTTPException(status_code=409, detail="Only an open work order can be rejected")
     wo.status = "rejected"
     _append_timeline(
-        db, status="rejected", previous_status=wo.status,
+        db, status="rejected", previous_status=previous_status,
         actor_id=approver_id, actor_role="approver",
         note=notes, work_order_id=wo_id,
     )
@@ -1278,6 +1319,16 @@ def advance_project_phase(
         return None
     previous = proj.status
 
+    # Guard the currently persisted phase sequence; the final LGU lifecycle is
+    # still a product decision and may replace this sequence later.
+    phase_by_status = {status: phase for phase, status in PROJECT_PHASE_STATUSES.items()}
+    current_phase = phase_by_status.get(previous)
+    requested_phase = phase_by_status.get(new_status)
+    if current_phase is None or requested_phase is None:
+        raise ValueError("Unknown project phase; manual lifecycle review is required")
+    if requested_phase != current_phase + 1:
+        raise ValueError("Project phases must advance one step at a time")
+
     # ── Role-Based Sign-off Gating ──
     # Milestones requiring Lead/Chief sign-off for accountability
     senior_milestones = ["survey_complete", "boq_submitted", "budget_confirmed", "closed_completion_certified"]
@@ -1437,7 +1488,13 @@ def update_project(
     ).first()
     if not proj:
         return None
-    update_data = data.dict(exclude_unset=True)
+    update_data = data.model_dump(exclude_unset=True)
+    protected = {"status", "current_phase", "estimated_cost", "is_emergency", "procurement_modality"}
+    if protected & update_data.keys():
+        raise HTTPException(
+            status_code=422,
+            detail="Lifecycle, budget, procurement, and emergency fields require a governed decision endpoint",
+        )
     for k, v in update_data.items():
         setattr(proj, k, v)
     db.commit()
@@ -1488,99 +1545,6 @@ def enrich_project(proj: gov_models.ProjectRequest, db: Session):
     proj.project_engineer_name = proj.project_engineer.full_name if getattr(proj, 'project_engineer', None) else None
     return proj
 
-
-def approve_with_budget(
-    db: Session,
-    report_id: int,
-    data: gov_schemas.ApproveWithBudgetRequest,
-    actor_id: int,
-    actor_role: str,
-):
-    """
-    Transitions a citizen report to 'approved_internal' and creates a linked ProjectRequest
-    with initial Bill of Quantities (BoQ) items.
-    """
-    report = db.query(models.Report).filter(models.Report.id == report_id).first()
-    if not report:
-        raise ValueError(f"Report {report_id} not found.")
-
-    # 1. Update Report Status
-    previous_status = report.status
-    report.status = "approved_internal"
-    
-    # 2. Create Project Request
-    new_project = gov_models.ProjectRequest(
-        title=data.project_title,
-        description=data.description or report.description,
-        requesting_party="Citizen Report via PULSO",
-        barangay=report.reporter_resident.barangay if report.reporter_resident else None,
-        location_string=report.location_string,
-        location_lat=report.location_lat,
-        location_lng=report.location_lng,
-        estimated_cost=data.estimated_cost,
-        is_emergency=data.is_emergency,
-        procurement_modality=data.procurement_modality,
-        status="request_received",
-        current_phase=1,
-        created_by_id=actor_id,
-        source_report_id=report_id
-    )
-    db.add(new_project)
-    db.flush() # Get project ID
-
-    # 3. Create Procurement Request (Initial Draft)
-    new_pr = gov_models.ProcurementRequest(
-        project_id=new_project.id,
-        raised_by_id=actor_id,
-        title=f"Initial Procurement for {data.project_title}",
-        purpose=f"Infrastructure repair based on Report {report.ticket_id}",
-        status="draft"
-    )
-    db.add(new_pr)
-    db.flush()
-
-    # 4. Add BoQ Items
-    for item in data.items:
-        boq = gov_models.BoQItem(
-            procurement_request_id=new_pr.id,
-            item_name=item.item_name,
-            unit=item.unit,
-            quantity=item.quantity,
-            unit_cost=item.unit_cost,
-            total_cost=item.quantity * item.unit_cost,
-            specifications=item.specifications
-        )
-        db.add(boq)
-
-    # 5. Audit & Timeline
-    _append_timeline(
-        db, status="approved_internal", previous_status=previous_status,
-        actor_id=actor_id, actor_role=actor_role,
-        note=f"Report approved with initial budget of ₱{data.estimated_cost:,.2f}",
-        report_id=report_id, is_public=True
-    )
-    
-    _append_audit(
-        db, trigger_type="status_change",
-        action=f"Report {report.ticket_id} → approved_internal (Project Created)",
-        actor_id=actor_id, actor_role=actor_role, report_id=report_id,
-        details=f"Linked to new project {new_project.proj_number}"
-    )
-
-    db.commit()
-    db.refresh(new_project)
-    db.refresh(report)
-    
-    return {
-        "report": report,
-        "project": new_project,
-        "procurement_request": new_pr
-    }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# OBO Inspections  (Section 6.4)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def create_obo_inspection(
     db: Session,
@@ -2582,7 +2546,7 @@ def block_work_order(
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
 
-    if wo.status in ("completed", "cancelled"):
+    if wo.status not in ("assigned", "in_progress"):
         raise HTTPException(
             status_code=400,
             detail=f"Cannot block work order that is already '{wo.status}'."
@@ -2639,6 +2603,13 @@ def unblock_work_order(
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
 
+    if wo.status != "blocked":
+        raise HTTPException(status_code=409, detail="Work order is not blocked")
+    if data.next_status not in (None, "in_progress"):
+        raise HTTPException(status_code=422, detail="A resolved blocker can only resume in progress")
+    if not (data.resolution_notes or "").strip():
+        raise HTTPException(status_code=422, detail="Blocker resolution notes are required")
+
     open_blockers = db.query(gov_models.WorkOrderBlocker).filter(
         gov_models.WorkOrderBlocker.work_order_id == wo_id,
         gov_models.WorkOrderBlocker.is_resolved == False
@@ -2693,6 +2664,16 @@ def verify_work_order_inspection(
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
 
+    if wo.status != "completed_pending_review":
+        raise HTTPException(status_code=409, detail="Work order must await independent completion review")
+    if not (data.notes or "").strip():
+        raise HTTPException(status_code=422, detail="Inspection findings are required")
+    if data.passed:
+        checks = data.checklist_results or {}
+        required_checks = ("specifications", "siteCleared", "qualityTested", "photoVerified")
+        if not all(checks.get(key) is True for key in required_checks):
+            raise HTTPException(status_code=409, detail="All inspection checks must be completed before certification")
+
     # MANDATORY SEPARATION OF DUTIES ENFORCEMENT
     if wo.assigned_to_id is not None and inspector_id == wo.assigned_to_id:
         raise HTTPException(
@@ -2718,7 +2699,13 @@ def verify_work_order_inspection(
         wo.completed_date = datetime.now(timezone.utc)
         timeline_note = f"Independent inspection PASSED (Inspector #{inspector_id}). Work order verified."
         if wo.report_id:
-            _sync_report_status(db, wo.report_id, "resolved", inspector_id, inspector_role)
+            remaining = db.query(gov_models.WorkOrder).filter(
+                gov_models.WorkOrder.report_id == wo.report_id,
+                gov_models.WorkOrder.id != wo.id,
+                gov_models.WorkOrder.status.notin_(("completed", "cancelled", "rejected")),
+            ).count()
+            if remaining == 0:
+                _sync_report_status(db, wo.report_id, "resolved", inspector_id, inspector_role)
     else:
         wo.status = "rework_required"
         timeline_note = f"Independent inspection FAILED: Rework required. Notes: {data.notes or 'None'}"

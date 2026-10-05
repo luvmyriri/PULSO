@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import hashlib
+import hmac
 import logging
 import uvicorn
 import shutil
@@ -70,8 +71,17 @@ app = FastAPI(
 UPLOAD_DIR = "uploads/reports"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads_root")
+class PublicUploadFiles(StaticFiles):
+    """Keep government document bytes out of legacy public static mounts."""
+
+    async def get_response(self, path: str, scope):
+        if path.replace("\\", "/").lstrip("/").split("/", 1)[0].lower() == "docs":
+            raise HTTPException(status_code=404, detail="File not found")
+        return await super().get_response(path, scope)
+
+
+app.mount("/api/uploads", PublicUploadFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", PublicUploadFiles(directory="uploads"), name="uploads_root")
 
 from fastapi.responses import FileResponse
 @app.get("/api/download/agent-app")
@@ -211,8 +221,12 @@ async def get_thumbnail(src: str = Query(..., description="Relative path to uplo
         
         base_dir = os.path.abspath("uploads")
         full_path = os.path.abspath(clean_src if clean_src.startswith("uploads") else os.path.join("uploads", clean_src))
-        if not full_path.startswith(base_dir) or not os.path.exists(full_path):
+        if os.path.commonpath([base_dir, full_path]) != base_dir or not os.path.exists(full_path):
             raise HTTPException(status_code=404, detail="Image not found")
+        if os.path.relpath(full_path, base_dir).replace("\\", "/").split("/", 1)[0].lower() not in {"reports", "news"}:
+            raise HTTPException(status_code=404, detail="Image not found")
+        if size < 24 or size > 512:
+            raise HTTPException(status_code=400, detail="Thumbnail size must be between 24 and 512 pixels")
         
         file_hash = hashlib.md5(f"{clean_src}_{size}".encode('utf-8')).hexdigest()
         thumb_filename = f"thumb_{file_hash}_{size}x{size}.jpg"
@@ -259,26 +273,10 @@ class VerificationRequest(BaseModel):
 get_current_user = auth.get_current_user
 
 def require_role(*roles):
-    """Dependency factory: ensures current user has one of the given roles or is an executive/admin."""
+    """Dependency factory for explicitly listed active government roles."""
     def _check(current_user: Union[models.Official, models.Resident] = Depends(get_current_user)):
-        # Inherently grant system administrators and senior executives access to manager/dispatcher functions
-        expanded_roles = list(roles)
-        if "manager" in roles or "dispatcher" in roles:
-            expanded_roles.extend([
-                "system_admin", "city_engineer", "asst_city_engineer", 
-                "admin_officer", "division_chief", "admin_clerk",
-                "records_officer", "design_engineer", "cad_operator",
-                "project_engineer", "estimator", "foreman", "field_worker",
-                "building_inspector", "electrical_inspector", "mechanical_inspector",
-                "finance_officer", "architect", "staff"
-            ])
-            
-        # Verified Government Officials automatically satisfy manager/dispatcher operational queues
-        if isinstance(current_user, models.Official) and ("manager" in roles or "dispatcher" in roles):
-            return current_user
-
-        if current_user.role not in expanded_roles:
-            raise HTTPException(status_code=403, detail=f"Unauthorized. Requires active role clearance.")
+        if not isinstance(current_user, models.Official) or current_user.role not in roles:
+            raise HTTPException(status_code=403, detail="Government role required for this action.")
         return current_user
     return _check
 
@@ -1402,28 +1400,36 @@ async def send_phone_otp(req: SendPhoneOTPRequest, db: Session = Depends(get_db)
         )
 
     # 3. Optional reCAPTCHA verification if provided
-    if req.captcha_token and req.captcha_token not in ("mobile_bypass", "dev_bypass"):
+    if req.captcha_token:
         if not await verify_recaptcha(req.captcha_token):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid reCAPTCHA puzzle. Please try again."
             )
 
-    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-    ref_id = f"OTP-{random.randint(10000, 99999)}"
+    if not os.getenv("JWT_SECRET_KEY"):
+        raise HTTPException(status_code=503, detail="Phone verification is not configured.")
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    ref_id = f"OTP-{secrets.randbelow(90_000) + 10_000}"
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
-    # Store token in database with phone key
+    # A keyed hash prevents a database read from exposing a usable six-digit code.
     token_key = f"phone:{norm_phone}"
+    code_hash = hmac.new(
+        auth.SECRET_KEY.encode("utf-8"),
+        f"{token_key}:{code}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
     token_record = db.query(models.PasswordResetToken).filter(models.PasswordResetToken.email == token_key).first()
     if token_record:
-        token_record.token = code
+        token_record.token = code_hash
         token_record.expires_at = expires_at
         token_record.used = False
     else:
         token_record = models.PasswordResetToken(
             email=token_key,
-            token=code,
+            token=code_hash,
             expires_at=expires_at,
             used=False
         )
@@ -1431,17 +1437,20 @@ async def send_phone_otp(req: SendPhoneOTPRequest, db: Session = Depends(get_db)
 
     db.commit()
 
-    # Send SMS via Semaphore / Mock utility
-    sms_sent = sms_utils.send_login_otp_sms(norm_phone, code, ref_id=ref_id)
+    sms_result = sms_utils.send_login_otp_sms(norm_phone, code, ref_id=ref_id)
+    if not sms_result.accepted:
+        token_record.used = True
+        db.commit()
+        raise HTTPException(status_code=503, detail="The verification code could not be sent. Please try again later.")
+
     masked_phone = f"{norm_phone[:4]}****{norm_phone[-3:]}"
 
     return {
         "status": "success",
-        "message": f"Verification code sent to {masked_phone}.",
+        "message": f"Verification code requested for {masked_phone}. Please check your messages.",
         "phone_number": norm_phone,
         "masked_phone": masked_phone,
-        "reference_id": ref_id,
-        "dev_code": code
+        "reference_id": ref_id
     }
 
 @app.post("/api/auth/phone/verify-otp")
@@ -1455,37 +1464,30 @@ async def verify_phone_otp(req: VerifyPhoneOTPRequest, db: Session = Depends(get
         raise HTTPException(status_code=400, detail="Invalid mobile phone number format.")
 
     cleaned_code = req.code.replace(" ", "").strip()
+    if not cleaned_code.isdigit() or len(cleaned_code) != 6 or not os.getenv("JWT_SECRET_KEY"):
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
     token_key = f"phone:{norm_phone}"
 
-    # Master dev bypass code
-    is_master = cleaned_code == "123456"
+    token_record = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.email == token_key,
+        models.PasswordResetToken.used == False,
+    ).first()
+    code_hash = hmac.new(
+        auth.SECRET_KEY.encode("utf-8"),
+        f"{token_key}:{cleaned_code}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not token_record or not hmac.compare_digest(token_record.token, code_hash):
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
 
-    token_record = None
-    if not is_master:
-        token_record = db.query(models.PasswordResetToken).filter(
-            models.PasswordResetToken.email == token_key,
-            models.PasswordResetToken.token == cleaned_code,
-            models.PasswordResetToken.used == False
-        ).first()
+    current_time = datetime.now(timezone.utc)
+    db_expires_at = token_record.expires_at
+    if db_expires_at.tzinfo is None:
+        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
+    if db_expires_at < current_time:
+        raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new code.")
 
-        if not token_record:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired verification code. Please check your SMS and try again."
-            )
-
-        current_time = datetime.now(timezone.utc)
-        db_expires_at = token_record.expires_at
-        if db_expires_at.tzinfo is None:
-            db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
-
-        if db_expires_at < current_time:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Verification code has expired. Please request a new code."
-            )
-
-        token_record.used = True
+    token_record.used = True
 
     # Retrieve resident
     user = crud.get_resident_by_phone(db, norm_phone)
@@ -1587,6 +1589,10 @@ class ReportStatusUpdate(BaseModel):
     targetStatus: Optional[str] = None # Frontend sends both for compatibility
     budget: Optional[float] = None
     deployment_date: Optional[datetime] = None
+
+
+class ReportRejectionDecision(BaseModel):
+    reason: str
 
 
 @app.get("/api/reports/stats", response_model=schemas.ReportStats)
@@ -2329,8 +2335,15 @@ def update_report_status(
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
-    """Generic status update. Dispatchers/Managers and Admins only."""
+    """Legacy verification command; other transitions use their dedicated routes."""
     status = status_update.status or status_update.targetStatus
+    if status != "pending_approval" or status_update.budget is not None or status_update.deployment_date is not None:
+        raise HTTPException(status_code=422, detail="Use the governed report decision endpoint")
+    report = crud.get_report(db, report_id=report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if report.status not in ("pending", "unverified", "needs_information"):
+        raise HTTPException(status_code=409, detail="Report is not eligible for verification")
     updated_report = crud.update_report_status(
         db=db, 
         report_id=report_id, 
@@ -2346,14 +2359,20 @@ def update_report_status(
 @app.patch("/api/reports/{report_id}/reject", response_model=schemas.ReportResponse)
 def reject_report(
     report_id: int,
+    decision: ReportRejectionDecision,
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
-    """Reject a report (sets status to 'rejected' and notifies user)."""
-    updated = crud.reject_report(db, report_id=report_id, actor_id=current_user.id)
-    if not updated:
+    """Record a reasoned intake rejection before a report enters field work."""
+    reason = decision.reason.strip()
+    if len(reason) < 10:
+        raise HTTPException(status_code=422, detail="A rejection reason of at least 10 characters is required")
+    report = crud.get_report(db, report_id=report_id)
+    if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    return updated
+    if report.status not in ("pending", "unverified", "needs_information", "pending_approval"):
+        raise HTTPException(status_code=409, detail="Report cannot be rejected after approval or dispatch")
+    return crud.reject_report(db, report_id=report_id, actor_id=current_user.id, reason=reason)
 
 @app.patch("/api/reports/{report_id}/dispatch", response_model=schemas.ReportResponse)
 def dispatch_report(
@@ -2361,14 +2380,8 @@ def dispatch_report(
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
-    """Dispatch a report (approved_internal → dispatched)."""
-    db_report = crud.get_report(db, report_id=report_id)
-    if not db_report:
-        raise HTTPException(status_code=404, detail="Report not found")
-    if db_report.status != "approved_internal":
-        raise HTTPException(status_code=400, detail=f"Cannot dispatch report with status '{db_report.status}'. Must be 'approved_internal'.")
-    updated = crud.update_report_status(db, report_id=report_id, status="dispatched", actor_id=current_user.id)
-    return updated
+    """Dispatch is created through the governed work-order assignment command."""
+    raise HTTPException(status_code=409, detail="Assign an eligible field official through the government work-order endpoint")
 
 @app.post("/api/reports/{report_id}/cancel", response_model=schemas.ReportResponse)
 @app.patch("/api/reports/{report_id}/cancel", response_model=schemas.ReportResponse)
@@ -2404,39 +2417,8 @@ async def resolve_report(
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
-    """Mark a dispatched report as resolved and require a proof picture."""
-    db_report = crud.get_report(db, report_id=report_id)
-    if not db_report:
-        raise HTTPException(status_code=404, detail="Report not found")
-    if db_report.status != "dispatched":
-        raise HTTPException(status_code=400, detail=f"Cannot resolve report with status '{db_report.status}'. Must be 'dispatched'.")
-    
-    # Process Proof Image
-    image_bytes = await image.read()
-    file_extension = os.path.splitext(image.filename)[1] or ".jpg"
-    unique_filename = f"resolution_{report_id}_{secrets.token_hex(4)}{file_extension}"
-    file_path = os.path.join(UPLOAD_DIR, unique_filename)
-    
-    with open(file_path, "wb") as buffer:
-        buffer.write(image_bytes)
-        
-    image_url = f"/api/uploads/reports/{unique_filename}"
-    db_report.resolution_image_url = image_url
-    db.commit()
-
-    updated = crud.update_report_status(db, report_id=report_id, status="resolved", actor_id=current_user.id)
-    
-    # Notify Resident
-    ticket_id = updated.ticket_id or f"PUL-{datetime.now().year}-{updated.id:04d}"
-    db_notif = models.Notification(
-        resident_id=updated.resident_id,
-        title="Infrastructure Repaired",
-        message=f"Success! The issue {ticket_id} has been fully resolved by City Engineering. A proof picture of the finalized repair has been attached to your report for transparency."
-    )
-    db.add(db_notif)
-    db.commit()
-    
-    return updated
+    """Require independent work-order review for report resolution."""
+    raise HTTPException(status_code=409, detail="Submit work-order completion proof and complete independent inspection before resolution")
 
 @app.delete("/api/reports/{report_id}")
 def delete_report(
@@ -2444,11 +2426,8 @@ def delete_report(
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
-    """Hard-delete a report. Dispatcher and manager only."""
-    success = crud.delete_report(db, report_id=report_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Report not found")
-    return {"message": f"Report {report_id} deleted successfully"}
+    """Preserve civic history until a governed disposition flow is approved."""
+    raise HTTPException(status_code=409, detail="Permanent report deletion is disabled. Use an approved disposition process.")
 
 # ---------------------------------------------------------------------------
 # Advisories
@@ -2614,7 +2593,7 @@ def read_work_orders(
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "engineer"))
 ):
-    return crud.get_work_orders(db, skip=skip, limit=limit)
+    raise HTTPException(status_code=410, detail="Use /api/gov/work-orders for role-scoped work orders")
 
 @app.post("/api/work-orders", response_model=schemas.WorkOrderResponse)
 def create_new_work_order(
@@ -2622,12 +2601,8 @@ def create_new_work_order(
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
-    """
-    Creates a formal government work order.
-    If linked to a citizen report, this automatically initiates an AuditLog
-    and advances the ProcessTimeline process dynamically.
-    """
-    return crud.create_work_order(db=db, wo=wo, assigned_by_id=current_user.id)
+    """Legacy creation path is closed to prevent skipping approval and assignment gates."""
+    raise HTTPException(status_code=410, detail="Use /api/gov/work-orders for governed assignment")
 
 class ChangePasswordRequest(BaseModel):
     current_password: str

@@ -1,178 +1,109 @@
-import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, ShieldAlert, Truck, X } from 'lucide-react';
-import { formatTicketId } from '../../utils/reportWorkflow';
+import React, { useEffect, useState } from 'react';
+import { Truck, X } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiBase';
+import { getAuthToken } from '../../utils/authSession';
 import './modal-dialogs.css';
 
-const ELIGIBLE_TEAMS = [
-    { id: 'field_ops_a', name: 'Field Operations Team A (Road & Pothole Crew)', lead: 'Ana Reyes (Engineer II)', capacity: 'Available (2 active jobs)' },
-    { id: 'field_ops_b', name: 'Field Operations Team B (Drainage & Flood Crew)', lead: 'Miguel Santos (Foreman)', capacity: 'Available (1 active job)' },
-    { id: 'field_ops_c', name: 'Field Operations Team C (Electrical & Hazard Crew)', lead: 'Jose Dela Cruz (Technician)', capacity: 'Optimal (0 active jobs)' },
-    { id: 'design_team', name: 'Engineering Design & Survey Team', lead: 'Luis Morales (Senior Engineer)', capacity: 'Available (3 active jobs)' },
-    { id: 'obo_inspectors', name: 'OBO Building & Safety Inspection Unit', lead: 'Ramon Cruz (Inspector)', capacity: 'Available' },
-];
-
 export default function AssignWorkOrderModal({ isOpen, onClose, report, onSubmit }) {
-    const [directTitle, setDirectTitle] = useState('');
-    const [directLocation, setDirectLocation] = useState('North Caloocan');
-    const [team, setTeam] = useState('field_ops_a');
+    const [title, setTitle] = useState('');
+    const [assigneeId, setAssigneeId] = useState('');
+    const [assignees, setAssignees] = useState([]);
     const [priority, setPriority] = useState('normal');
-    const [reason, setReason] = useState('Public safety & city maintenance repair');
-    const [notifyOwner, setNotifyOwner] = useState(true);
+    const [reason, setReason] = useState('');
+    const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+    const [reload, setReload] = useState(0);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setTitle(report ? `Work order for ${report.ticket_id || `report #${report.id}`}` : '');
+        setAssigneeId('');
+        setReason('');
+        setError('');
+        setLoading(true);
+        const controller = new AbortController();
+        fetch(`${API_BASE_URL}/api/gov/dispatch/eligible-assignees`, {
+            headers: { Authorization: `Bearer ${getAuthToken()}` },
+            signal: controller.signal,
+        })
+            .then(async (response) => {
+                if (!response.ok) throw new Error(`Unable to load eligible staff (HTTP ${response.status})`);
+                const data = await response.json();
+                if (!Array.isArray(data)) throw new Error('Eligible staff response is invalid');
+                setAssignees(data);
+            })
+            .catch((cause) => {
+                if (cause.name !== 'AbortError') setError(cause.message || 'Unable to load eligible staff');
+            })
+            .finally(() => setLoading(false));
+        return () => controller.abort();
+    }, [isOpen, report?.id, report?.ticket_id, reload]);
 
     if (!isOpen) return null;
 
-    const reportIdentifier = report ? formatTicketId(report.ticket_id, report.id, true) : null;
-    const selectedTeamObj = ELIGIBLE_TEAMS.find((t) => t.id === team) || ELIGIBLE_TEAMS[0];
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        setError('');
+        if (!assigneeId) {
+            setError('Choose an eligible field official.');
+            return;
+        }
         setSubmitting(true);
         try {
             await onSubmit({
                 reportId: report?.id || null,
-                team: selectedTeamObj.name,
-                lead: selectedTeamObj.lead,
+                title: title.trim(),
+                assigned_to_id: Number(assigneeId),
                 priority,
-                reason,
-                notifyOwner,
-                location: report ? (report.address || `Brgy. ${report.barangay || 'North Caloocan'}`) : directLocation,
-                title: report
-                    ? `Work Order for ${reportIdentifier}: ${report.issue_category || report.title || 'City Maintenance'}`
-                    : (directTitle || 'Civil engineering maintenance order'),
-                description: reason,
+                reason: reason.trim(),
             });
             onClose();
-        } catch (err) {
-            console.error('Failed to assign work order', err);
+        } catch (cause) {
+            setError(cause.message || 'Could not create the work order. Retry after checking the record.');
         } finally {
             setSubmitting(false);
         }
     };
 
     return (
-        <div className="gov-sheet-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="assign-wo-title">
-            <div className="gov-sheet-drawer" onClick={(e) => e.stopPropagation()}>
+        <div className="gov-sheet-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+            <div className="gov-sheet-drawer" role="dialog" aria-modal="true" aria-labelledby="assign-wo-title">
                 <div className="gov-sheet-header">
                     <div className="gov-sheet-title-row">
-                        <Truck size={18} className="gov-modal-icon-blue" />
-                        <h3 id="assign-wo-title">{report ? 'Assign work order' : 'Create new work order'}</h3>
+                        <Truck size={18} className="gov-modal-icon-blue" aria-hidden="true" />
+                        <h3 id="assign-wo-title">{report ? 'Assign work order' : 'Create work order'}</h3>
                     </div>
-                    <button type="button" className="gov-modal-close" onClick={onClose} aria-label="Close sheet">
-                        <X size={18} />
-                    </button>
+                    <button type="button" className="gov-modal-close" onClick={onClose} aria-label="Close dialog"><X size={18} /></button>
                 </div>
-
                 <form onSubmit={handleSubmit} className="gov-sheet-form">
-                    {report ? (
-                        <div className="gov-sheet-field-group">
-                            <label className="gov-modal-label">Source report</label>
-                            <div className="gov-modal-read-box">
-                                <strong>{reportIdentifier}</strong> — {report.issue_category || report.title || 'Reported city issue'}
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="gov-sheet-field-group">
-                                <label htmlFor="assign-wo-name" className="gov-modal-label">Work Order Title (required)</label>
-                                <input
-                                    id="assign-wo-name"
-                                    type="text"
-                                    className="gov-modal-input"
-                                    value={directTitle}
-                                    onChange={(e) => setDirectTitle(e.target.value)}
-                                    placeholder="e.g., Road repair and asphalt repatching"
-                                    required
-                                />
-                            </div>
-                            <div className="gov-sheet-field-group">
-                                <label htmlFor="assign-wo-loc" className="gov-modal-label">Location / Barangay</label>
-                                <input
-                                    id="assign-wo-loc"
-                                    type="text"
-                                    className="gov-modal-input"
-                                    value={directLocation}
-                                    onChange={(e) => setDirectLocation(e.target.value)}
-                                    placeholder="e.g., Barangay 178, Camarin Road"
-                                />
-                            </div>
-                        </>
-                    )}
-
+                    {report && <div className="gov-sheet-field-group"><span className="gov-modal-label">Source report</span><div className="gov-modal-read-box">{report.ticket_id || `Report #${report.id}`}</div></div>}
                     <div className="gov-sheet-field-group">
-                        <label htmlFor="assign-team" className="gov-modal-label">Eligible team (required)</label>
-                        <select
-                            id="assign-team"
-                            className="gov-modal-select"
-                            value={team}
-                            onChange={(e) => setTeam(e.target.value)}
-                            required
-                        >
-                            {ELIGIBLE_TEAMS.map((t) => (
-                                <option key={t.id} value={t.id}>
-                                    {t.name} — {t.capacity}
-                                </option>
-                            ))}
+                        <label htmlFor="assign-wo-name" className="gov-modal-label">Work order title</label>
+                        <input id="assign-wo-name" className="gov-modal-input" value={title} onChange={(event) => setTitle(event.target.value)} required />
+                    </div>
+                    <div className="gov-sheet-field-group">
+                        <label htmlFor="assign-team" className="gov-modal-label">Assigned field official</label>
+                        <select id="assign-team" className="gov-modal-select" value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} required disabled={loading || assignees.length === 0}>
+                            <option value="">{loading ? 'Loading eligible staff…' : 'Choose an official'}</option>
+                            {assignees.map((person) => <option key={person.id} value={person.id}>{person.full_name} · {person.role.replaceAll('_', ' ')}</option>)}
+                        </select>
+                        {!loading && !error && assignees.length === 0 && <p>No active eligible field official is available. Contact an administrator.</p>}
+                    </div>
+                    <div className="gov-sheet-field-group">
+                        <label htmlFor="assign-priority" className="gov-modal-label">Priority</label>
+                        <select id="assign-priority" className="gov-modal-select" value={priority} onChange={(event) => setPriority(event.target.value)}>
+                            <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option>
                         </select>
                     </div>
-
                     <div className="gov-sheet-field-group">
-                        <label htmlFor="assign-priority" className="gov-modal-label">Priority (required)</label>
-                        <select
-                            id="assign-priority"
-                            className="gov-modal-select"
-                            value={priority}
-                            onChange={(e) => setPriority(e.target.value)}
-                            required
-                        >
-                            <option value="low">Low (Standard SLA 72h)</option>
-                            <option value="normal">Normal (Standard SLA 48h)</option>
-                            <option value="high">High (Urgent SLA 24h)</option>
-                            <option value="critical">Critical (Immediate response &lt; 4h)</option>
-                        </select>
+                        <label htmlFor="assign-reason" className="gov-modal-label">Assignment reason</label>
+                        <textarea id="assign-reason" className="gov-modal-textarea" value={reason} onChange={(event) => setReason(event.target.value)} required rows={3} />
                     </div>
-
-                    <div className="gov-sheet-field-group">
-                        <label htmlFor="assign-reason" className="gov-modal-label">Reason / Justification</label>
-                        <input
-                            id="assign-reason"
-                            type="text"
-                            className="gov-modal-input"
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            placeholder="Operational reason for assignment..."
-                            required
-                        />
-                    </div>
-
-                    <div className="gov-sheet-field-group">
-                        <label className="gov-modal-label">Next owner</label>
-                        <div className="gov-modal-read-box">
-                            <strong>{selectedTeamObj.name}</strong>
-                            <span className="gov-modal-subtext">Team Lead: {selectedTeamObj.lead}</span>
-                        </div>
-                    </div>
-
-                    <div className="gov-checkbox-row">
-                        <input
-                            type="checkbox"
-                            id="notify-owner"
-                            checked={notifyOwner}
-                            onChange={(e) => setNotifyOwner(e.target.checked)}
-                        />
-                        <label htmlFor="notify-owner" className="gov-checkbox-label">
-                            <strong>Send assignment notification</strong>
-                            <span>Message will include report summary, coordinates, and photo evidence.</span>
-                        </label>
-                    </div>
-
+                    {error && <p role="alert">{error} {assignees.length === 0 && <button type="button" onClick={() => setReload((count) => count + 1)}>Retry</button>}</p>}
                     <div className="gov-sheet-footer">
-                        <button type="button" className="gov-btn-secondary" onClick={onClose} disabled={submitting}>
-                            Cancel
-                        </button>
-                        <button type="submit" className="gov-btn-primary" disabled={submitting}>
-                            {submitting ? 'Dispatching...' : 'Dispatch work order'}
-                        </button>
+                        <button type="button" className="gov-btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
+                        <button type="submit" className="gov-btn-primary" disabled={submitting || loading || assignees.length === 0}>{submitting ? 'Creating…' : 'Create work order'}</button>
                     </div>
                 </form>
             </div>

@@ -32,8 +32,9 @@ import GovBreadcrumb from '../components/GovBreadcrumb';
 import GovInspectionModal from '../components/modals/GovInspectionModal';
 import GovBlockerModal from '../components/modals/GovBlockerModal';
 import AssignWorkOrderModal from '../components/modals/AssignWorkOrderModal';
+import WorkOrderCompletionModal from '../components/modals/WorkOrderCompletionModal';
+import WorkOrderEvidence from '../components/WorkOrderEvidence';
 import { API_BASE_URL } from '../utils/apiBase';
-import { checkPermission } from '../utils/rbac_utils';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import './work-orders.css';
 import './citizen-reports.css';
@@ -45,14 +46,14 @@ const WO_TABS = [
     { key: 'assigned', label: 'Assigned' },
     { key: 'active', label: 'Active' },
     { key: 'blocked', label: 'Blocked' },
-    { key: 'awaiting_verification', label: 'Awaiting verification' },
+    { key: 'completed_pending_review', label: 'Awaiting review' },
     { key: 'completed', label: 'Completed' },
 ];
 
 const PULSELINE_WO_STEPS = [
     { key: 'assigned', label: 'Assigned' },
     { key: 'in_progress', label: 'In progress' },
-    { key: 'awaiting_verification', label: 'Inspection' },
+    { key: 'completed_pending_review', label: 'Inspection' },
     { key: 'completed', label: 'Completed' },
 ];
 
@@ -101,7 +102,7 @@ const statusTone = (status) => {
     const s = String(status || '').toLowerCase();
     if (s === 'completed' || s === 'resolved') return 'resolved';
     if (s === 'blocked') return 'critical';
-    if (s === 'awaiting_verification' || s === 'for_review') return 'attention';
+    if (s === 'completed_pending_review' || s === 'awaiting_verification') return 'attention';
     if (s === 'in_progress') return 'progress';
     return 'neutral';
 };
@@ -113,6 +114,7 @@ export default function WorkOrdersPage({ workspace }) {
     const [workOrders, setWorkOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [actionError, setActionError] = useState(null);
     const [refreshTime, setRefreshTime] = useState(new Date().toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }));
     const [toastMessage, setToastMessage] = useState(null);
 
@@ -121,6 +123,7 @@ export default function WorkOrdersPage({ workspace }) {
     const [blockerModalOpen, setBlockerModalOpen] = useState(false);
     const [isResolvingBlocker, setIsResolvingBlocker] = useState(false);
     const [assignModalOpen, setAssignModalOpen] = useState(false);
+    const [completionModalOpen, setCompletionModalOpen] = useState(false);
 
     const activeTab = params.get('tab') || 'all';
     const searchQuery = params.get('search') || '';
@@ -143,11 +146,8 @@ export default function WorkOrdersPage({ workspace }) {
                 throw new Error(`Failed to load work orders from server (HTTP ${res.status})`);
             }
             const data = await res.json();
-            if (Array.isArray(data)) {
-                setWorkOrders(data);
-            } else {
-                setWorkOrders([]);
-            }
+            if (!Array.isArray(data)) throw new Error('Work order response is invalid');
+            setWorkOrders(data);
             setRefreshTime(new Date().toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }));
         } catch (err) {
             setError(err.message || 'Unable to connect to Work Orders service.');
@@ -176,12 +176,12 @@ export default function WorkOrdersPage({ workspace }) {
             if (activeTab === 'assigned' && wo.status !== 'assigned') return false;
             if (activeTab === 'active' && wo.status !== 'in_progress') return false;
             if (activeTab === 'blocked' && wo.status !== 'blocked') return false;
-            if (activeTab === 'awaiting_verification' && wo.status !== 'awaiting_verification' && wo.status !== 'for_review') return false;
+            if (activeTab === 'completed_pending_review' && wo.status !== 'completed_pending_review' && wo.status !== 'awaiting_verification') return false;
             if (activeTab === 'completed' && wo.status !== 'completed' && wo.status !== 'resolved') return false;
 
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                const woNum = (wo.wo_number || `WO-2026-${String(wo.id).padStart(4, '0')}`).toLowerCase();
+                const woNum = (wo.wo_number || `Order #${wo.id}`).toLowerCase();
                 const title = (wo.title || '').toLowerCase();
                 const brgy = (wo.barangay || wo.location_string || '').toLowerCase();
                 const team = (wo.assigned_team || wo.assigned_to_name || '').toLowerCase();
@@ -195,6 +195,10 @@ export default function WorkOrdersPage({ workspace }) {
         if (!selectedWoId) return null;
         return workOrders.find((w) => w.id === selectedWoId) || null;
     }, [workOrders, selectedWoId]);
+    const canManageFieldWork = ['project_engineer', 'dispatcher', 'building_inspector', 'asst_city_engineer', 'city_engineer', 'manager', 'system_admin', 'foreman', 'construction_foreman', 'field_worker'].includes(currentUser?.role);
+    const canDispatch = ['dispatcher', 'project_engineer', 'asst_city_engineer', 'city_engineer', 'manager', 'system_admin'].includes(currentUser?.role);
+    const canInspect = ['building_inspector', 'architect', 'project_engineer', 'asst_city_engineer', 'city_engineer', 'manager', 'system_admin', 'electrical_inspector', 'mechanical_inspector'].includes(currentUser?.role);
+    const completionEvidence = selectedWo?.updates?.find((update) => update.image_url)?.image_url;
 
     // Handle inspection verified callback
     const handleInspectionComplete = (data) => {
@@ -208,12 +212,31 @@ export default function WorkOrdersPage({ workspace }) {
         fetchWorkOrders();
     };
 
+    const startAssignedWork = async (wo) => {
+        setActionError(null);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/gov/agents/work-orders/${wo.id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
+                body: JSON.stringify({ status: 'in_progress' }),
+            });
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                throw new Error(body.detail || `Could not start work (HTTP ${response.status})`);
+            }
+            showToast('Work order started.');
+            fetchWorkOrders();
+        } catch (cause) {
+            setActionError(cause.message || 'Could not start work');
+        }
+    };
+
     const getStepIndex = (wo) => {
         if (!wo) return 0;
         const st = wo.status;
         if (st === 'assigned' || st === 'open') return 0;
         if (st === 'in_progress' || st === 'blocked') return 1;
-        if (st === 'awaiting_verification' || st === 'for_review' || st === 'rework_required') return 2;
+        if (st === 'completed_pending_review' || st === 'awaiting_verification' || st === 'rework_required') return 2;
         if (st === 'completed' || st === 'resolved') return 3;
         return 1;
     };
@@ -241,7 +264,7 @@ export default function WorkOrdersPage({ workspace }) {
                                 <span>{toastMessage}</span>
                             </div>
                         )}
-                        <span className="text-xs text-slate-400 dark:text-slate-500 hidden md:inline">Updated today {refreshTime}</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 hidden md:inline">Last loaded {refreshTime}</span>
                         <ThemeToggle />
                         <button
                             type="button"
@@ -268,7 +291,7 @@ export default function WorkOrdersPage({ workspace }) {
                                     ? workOrders.length
                                     : workOrders.filter((w) => {
                                           if (tab.key === 'active') return w.status === 'in_progress';
-                                          if (tab.key === 'awaiting_verification') return w.status === 'awaiting_verification' || w.status === 'for_review';
+                                          if (tab.key === 'completed_pending_review') return w.status === 'completed_pending_review' || w.status === 'awaiting_verification';
                                           if (tab.key === 'completed') return w.status === 'completed' || w.status === 'resolved';
                                           return w.status === tab.key;
                                       }).length;
@@ -301,13 +324,13 @@ export default function WorkOrdersPage({ workspace }) {
                             );
                         })}
                     </div>
-                    <button
+                    {canDispatch && <button
                         type="button"
                         className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-[#ff6b00] hover:bg-[#e65c00] rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0"
                         onClick={() => setAssignModalOpen(true)}
                     >
                         <Plus size={15} /> <span>Create work order</span>
-                    </button>
+                    </button>}
                 </div>
 
                 {/* Main Split Area */}
@@ -341,6 +364,7 @@ export default function WorkOrdersPage({ workspace }) {
                                 </div>
                             </div>
                         )}
+                        {actionError && <div className="citizen-reports-state is-error" role="alert"><AlertCircle size={20} /><div><strong>Action could not be completed</strong><p>{actionError}</p></div></div>}
 
                         {/* Loading State */}
                         {loading && (
@@ -370,7 +394,7 @@ export default function WorkOrdersPage({ workspace }) {
                         {!loading && !error && filteredOrders.length > 0 && (
                             <div className="citizen-reports-list">
                                 {filteredOrders.map((wo) => {
-                                    const woNum = wo.wo_number || `WO-2026-${String(wo.id).padStart(4, '0')}`;
+                                    const woNum = wo.wo_number || `Order #${wo.id}`;
                                     const isSelected = selectedWoId === wo.id;
                                     const sTone = statusTone(wo.status);
 
@@ -389,7 +413,7 @@ export default function WorkOrdersPage({ workspace }) {
                                                 <strong>{wo.title}</strong>
                                                 <small className="flex items-center gap-1">
                                                     <MapPin size={11} className="shrink-0 text-slate-400" />
-                                                    <span>{wo.location_string || wo.barangay || 'Caloocan City'}</span>
+                                                    <span>{wo.location_string || wo.barangay || 'Location unavailable'}</span>
                                                 </small>
                                             </div>
                                             <span className={`citizen-reports-status is-${sTone}`}>
@@ -425,7 +449,7 @@ export default function WorkOrdersPage({ workspace }) {
                                             <div className="records-docket-signal-cut shrink-0" />
                                             <div className="min-w-0">
                                                 <span className="citizen-report-docket__id block">
-                                                    {selectedWo.wo_number || `WO-2026-${String(selectedWo.id).padStart(4, '0')}`}
+                                                    {selectedWo.wo_number || `Order #${selectedWo.id}`}
                                                 </span>
                                                 <h3 className="truncate m-0 text-[15px] font-bold text-slate-900 dark:text-white leading-tight">
                                                     {selectedWo.title}
@@ -505,7 +529,7 @@ export default function WorkOrdersPage({ workspace }) {
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <button
+                                                {(canDispatch || selectedWo.assigned_to_id === currentUser?.id) && <button
                                                     type="button"
                                                     onClick={() => {
                                                         setIsResolvingBlocker(true);
@@ -524,7 +548,7 @@ export default function WorkOrdersPage({ workspace }) {
                                                     }}
                                                 >
                                                     Clear Blocker
-                                                </button>
+                                                </button>}
                                             </div>
                                         )}
 
@@ -534,8 +558,8 @@ export default function WorkOrdersPage({ workspace }) {
                                             <div>
                                                 <MapPin size={16} />
                                                 <span>
-                                                    <strong>{selectedWo.location_string || selectedWo.barangay || 'Caloocan City'}</strong>
-                                                    <small>{selectedWo.barangay || 'North Caloocan'}</small>
+                                                    <strong>{selectedWo.location_string || selectedWo.barangay || 'Location unavailable'}</strong>
+                                                    {selectedWo.barangay && <small>{selectedWo.barangay}</small>}
                                                 </span>
                                             </div>
                                             {selectedWo.location_lat && selectedWo.location_lng && (
@@ -569,28 +593,22 @@ export default function WorkOrdersPage({ workspace }) {
                                         {/* Field Evidence Photo */}
                                         <div className="citizen-report-docket__section">
                                             <h3>Field Completion Evidence</h3>
-                                            {selectedWo.completion_photo_url || selectedWo.image_url ? (
-                                                <figure className="citizen-report-evidence">
-                                                    <img
-                                                        src={selectedWo.completion_photo_url || selectedWo.image_url}
-                                                        alt={`Evidence for ${selectedWo.title}`}
-                                                    />
-                                                    <figcaption>
-                                                        <CheckCircle2 size={14} style={{ color: 'var(--gov-resolved, #0f766e)' }} />
-                                                        <span>Field completion photo recorded</span>
-                                                    </figcaption>
-                                                </figure>
-                                            ) : (
-                                                <div className="citizen-report-empty-evidence">
-                                                    <FileImage size={18} />
-                                                    <span>No field completion photo uploaded yet</span>
-                                                </div>
-                                            )}
+                                            <WorkOrderEvidence url={completionEvidence} title={selectedWo.title} />
                                         </div>
 
                                         {/* Action Bar */}
                                         <div className="citizen-report-docket__actions" style={{ position: 'relative', bottom: 'auto', margin: '12px 0 0', padding: '14px 0 0', borderTop: '1px solid var(--gov-rule)' }}>
-                                            {selectedWo.status !== 'blocked' && (
+                                            {selectedWo.status === 'assigned' && selectedWo.assigned_to_id === currentUser?.id && (
+                                                <button type="button" className="citizen-report-primary-action" onClick={() => startAssignedWork(selectedWo)}>
+                                                    <Wrench size={14} /> Start work
+                                                </button>
+                                            )}
+                                            {selectedWo.status === 'in_progress' && selectedWo.assigned_to_id === currentUser?.id && (
+                                                <button type="button" className="citizen-report-primary-action" onClick={() => setCompletionModalOpen(true)}>
+                                                    <FileImage size={14} /> Submit completion proof
+                                                </button>
+                                            )}
+                                            {canManageFieldWork && (canDispatch || selectedWo.assigned_to_id === currentUser?.id) && ['assigned', 'in_progress'].includes(selectedWo.status) && (
                                                 <button
                                                     type="button"
                                                     className="citizen-report-secondary-action"
@@ -604,14 +622,14 @@ export default function WorkOrdersPage({ workspace }) {
                                                 </button>
                                             )}
 
-                                            <button
+                                            {canInspect && selectedWo.status === 'completed_pending_review' && currentUser?.id !== selectedWo.assigned_to_id && <button
                                                 type="button"
                                                 className="citizen-report-primary-action"
                                                 onClick={() => setInspectionModalOpen(true)}
                                             >
                                                 <ShieldCheck size={14} />
                                                 Independent Inspection
-                                            </button>
+                                            </button>}
                                         </div>
                                     </motion.div>
                                 </div>
@@ -624,6 +642,11 @@ export default function WorkOrdersPage({ workspace }) {
             {/* Modals */}
             {selectedWo && (
                 <>
+                    {completionModalOpen && <WorkOrderCompletionModal
+                        workOrder={selectedWo}
+                        onClose={() => setCompletionModalOpen(false)}
+                        onSubmitted={() => { showToast('Completion proof submitted for independent review.'); fetchWorkOrders(); }}
+                    />}
                     <GovInspectionModal
                         isOpen={inspectionModalOpen}
                         onClose={() => setInspectionModalOpen(false)}
@@ -646,7 +669,6 @@ export default function WorkOrdersPage({ workspace }) {
                 onClose={() => setAssignModalOpen(false)}
                 report={null}
                 onSubmit={async (assignedData) => {
-                    try {
                         const res = await fetch(`${API_BASE_URL}/api/gov/work-orders`, {
                             method: 'POST',
                             headers: {
@@ -654,21 +676,19 @@ export default function WorkOrdersPage({ workspace }) {
                                 Authorization: `Bearer ${token}`,
                             },
                             body: JSON.stringify({
-                                title: assignedData.title || 'Civil engineering field order',
-                                wo_type: 'standard',
-                                assigned_to_id: assignedData.assigned_to_id || currentUser?.id,
-                                description: assignedData.description || 'Standard maintenance order',
-                                priority: assignedData.priority || 'normal',
+                                title: assignedData.title,
+                                wo_type: 'preemptive',
+                                assigned_to_id: assignedData.assigned_to_id,
+                                description: assignedData.reason,
+                                priority: assignedData.priority,
                             }),
                         });
-                        if (res.ok) {
-                            showToast('New work order created successfully.');
-                            fetchWorkOrders();
+                        if (!res.ok) {
+                            const body = await res.json().catch(() => ({}));
+                            throw new Error(body.detail || `Work order creation failed (HTTP ${res.status})`);
                         }
-                    } catch {
-                        showToast('Failed to create work order.');
-                    }
-                    setAssignModalOpen(false);
+                        showToast('Work order assigned to the selected field official.');
+                        fetchWorkOrders();
                 }}
             />
         </div>

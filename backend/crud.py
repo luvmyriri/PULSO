@@ -389,7 +389,7 @@ def _create_notification(db: Session, title: str, message: str, resident_id: int
     db.add(db_notification)
     db.commit()
 
-def update_report_status(db: Session, report_id: int, status: str, actor_id: int = None, budget: float = None, deployment_date: datetime = None):
+def update_report_status(db: Session, report_id: int, status: str, actor_id: int = None, budget: float = None, deployment_date: datetime = None, reason: str = None):
     db_report = db.query(models.Report).filter(models.Report.id == report_id).first()
     if db_report:
         previous_status = db_report.status
@@ -398,9 +398,6 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
             db_report.budget = budget
         if deployment_date is not None:
             db_report.deployment_date = deployment_date
-        db.commit()
-        db.refresh(db_report)
-        
         # 1. Process Timeline Log
         timeline_entry = gov_models.ProcessTimeline(
             report_id=db_report.id,
@@ -408,6 +405,7 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
             previous_status=previous_status,
             actor_id=actor_id,
             actor_role="dispatcher" if actor_id else "system",
+            note=reason,
             created_at=datetime.now(timezone.utc)
         )
         db.add(timeline_entry)
@@ -418,6 +416,8 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
             audit_msg += f" Budget Allocated: PHP {budget:,.2f}."
         if deployment_date is not None:
             audit_msg += f" Scheduled Deployment: {deployment_date.strftime('%Y-%m-%d')}."
+        if reason:
+            audit_msg += f" Reason: {reason}"
 
         audit_entry = gov_models.AuditLog(
             trigger_type="status_change",
@@ -441,16 +441,12 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
                     user.trust_score += 2
                 elif status == "resolved" and previous_status != "resolved":
                     user.trust_score += 3
-                elif status == "rejected" and previous_status != "rejected":
-                    user.trust_score -= 10
                 elif status == "cancelled" and previous_status != "cancelled":
                     user.trust_score -= 1
                 
                 # Clamp between 0 and 100
                 user.trust_score = max(0, min(100, user.trust_score))
                 db.add(user)
-        
-        db.commit()
         
         # Notification messages for each status transition
         ticket = db_report.ticket_id or f"PUL-{datetime.now().year}-{db_report.id:04d}"
@@ -479,7 +475,8 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
         
         if status in status_messages:
             title, message = status_messages[status]
-            _create_notification(db, title, message, resident_id=db_report.resident_id)
+            if db_report.resident_id is not None:
+                db.add(models.Notification(resident_id=db_report.resident_id, title=title, message=message))
 
         # 4. Integration Hook: Automated Asset Resolution & Archival
         if status == "resolved":
@@ -498,23 +495,24 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
                     
                     # b) Archive to System Document Registry (Evidence Fingerprinting)
                     # We treat the resolution proof as a 'Survey Report' or 'Final Audit' context
-                    resolution_doc = gov_models.SystemDocument(
-                        document_type="survey_report",
-                        file_name=f"RESOLUTION_PROOF_{db_report.ticket_id}.jpg",
-                        file_path=db_report.resolution_image_url or "system_link",
-                        category="Infrastructure",
-                        target_model="WorkOrder",
-                        target_id=wo.id,
-                        uploader_id=actor_id,
-                        uploaded_at=datetime.now(timezone.utc),
-                        metadata_json={
-                            "report_ticket": db_report.ticket_id,
-                            "asset_id": wo.asset_id,
-                            "category": db_report.category,
-                            "resolution_status": "Finalized"
-                        }
-                    )
-                    db.add(resolution_doc)
+                    if db_report.resolution_image_url:
+                        resolution_doc = gov_models.SystemDocument(
+                            document_type="survey_report",
+                            file_name=f"RESOLUTION_PROOF_{db_report.ticket_id}.jpg",
+                            file_path=db_report.resolution_image_url,
+                            category="Infrastructure",
+                            target_model="WorkOrder",
+                            target_id=wo.id,
+                            uploader_id=actor_id,
+                            uploaded_at=datetime.now(timezone.utc),
+                            metadata_json={
+                                "report_ticket": db_report.ticket_id,
+                                "asset_id": wo.asset_id,
+                                "category": db_report.category,
+                                "resolution_status": "Finalized"
+                            }
+                        )
+                        db.add(resolution_doc)
                     
                     # c) Log Asset-Specific Maintenance Audit
                     asset_audit = gov_models.AuditLog(
@@ -527,7 +525,8 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
                     )
                     db.add(asset_audit)
 
-            db.commit() # Commit all side effects
+        db.commit()
+        db.refresh(db_report)
 
     return db_report
 
@@ -643,97 +642,8 @@ def _append_audit(db: Session, trigger_type: str, action: str, actor_id: int, re
     db.add(audit)
     # commit deferred
 
-def reject_report(db: Session, report_id: int, actor_id: int = None):
-    return update_report_status(db, report_id, "rejected", actor_id=actor_id)
-
-def delete_report(db: Session, report_id: int) -> bool:
-    """
-    Surgically purges a report using raw SQL in strict bottom-up FK order.
-    Bypasses the ORM entirely to avoid attribute resolution issues.
-    """
-    from sqlalchemy import text
-
-    # First confirm the report exists
-    exists = db.execute(text("SELECT id FROM reports WHERE id = :rid"), {"rid": report_id}).fetchone()
-    if not exists:
-        return False
-
-    try:
-        # Step 1: Find all work_order IDs linked to this report
-        wo_rows = db.execute(text("SELECT id FROM work_orders WHERE report_id = :rid"), {"rid": report_id}).fetchall()
-        wo_ids = [row[0] for row in wo_rows]
-
-        # Step 2: Find all procurement_request IDs linked to those work orders
-        prq_ids = []
-        if wo_ids:
-            placeholders = ", ".join(str(i) for i in wo_ids)
-            prq_rows = db.execute(text(f"SELECT id FROM procurement_requests WHERE work_order_id IN ({placeholders})")).fetchall()
-            prq_ids = [row[0] for row in prq_rows]
-
-        # Step 3: Delete BoQ Items (deepest level, depends on procurement_requests)
-        if prq_ids:
-            placeholders = ", ".join(str(i) for i in prq_ids)
-            db.execute(text(f"DELETE FROM boq_items WHERE procurement_request_id IN ({placeholders})"))
-
-        # Step 4: Delete Procurement Requests
-        if prq_ids:
-            placeholders = ", ".join(str(i) for i in prq_ids)
-            db.execute(text(f"DELETE FROM procurement_requests WHERE id IN ({placeholders})"))
-
-        # Step 5: Delete Audit Logs tied to the report or its work orders
-        db.execute(text("DELETE FROM audit_logs WHERE report_id = :rid"), {"rid": report_id})
-        if wo_ids:
-            placeholders = ", ".join(str(i) for i in wo_ids)
-            db.execute(text(f"DELETE FROM audit_logs WHERE work_order_id IN ({placeholders})"))
-
-        # Step 6: Delete Process Timelines tied to the report or its work orders
-        db.execute(text("DELETE FROM process_timelines WHERE report_id = :rid"), {"rid": report_id})
-        if wo_ids:
-            placeholders = ", ".join(str(i) for i in wo_ids)
-            db.execute(text(f"DELETE FROM process_timelines WHERE work_order_id IN ({placeholders})"))
-
-        # Step 7: Delete Work Orders
-        if wo_ids:
-            placeholders = ", ".join(str(i) for i in wo_ids)
-            db.execute(text(f"DELETE FROM work_orders WHERE id IN ({placeholders})"))
-
-        # Step 8: Delete OBO Inspections — use SAVEPOINT so a failure doesn't abort the transaction
-        try:
-            db.execute(text("SAVEPOINT obo_cleanup"))
-            db.execute(text("DELETE FROM obo_inspections WHERE source_report_id = :rid"), {"rid": report_id})
-            db.execute(text("RELEASE SAVEPOINT obo_cleanup"))
-        except Exception as e:
-            db.execute(text("ROLLBACK TO SAVEPOINT obo_cleanup"))
-            db.execute(text("RELEASE SAVEPOINT obo_cleanup"))
-            import logging
-            logging.getLogger(__name__).debug(f"obo_inspections skipped (safe): {e}")
-
-        # Step 9: Silently clean up optional/external tables using SAVEPOINTs
-        optional_cleanups = [
-            "DELETE FROM dispatch_incidents WHERE report_id = :rid",
-        ]
-        for sql in optional_cleanups:
-            try:
-                db.execute(text("SAVEPOINT opt_cleanup"))
-                db.execute(text(sql), {"rid": report_id})
-                db.execute(text("RELEASE SAVEPOINT opt_cleanup"))
-            except Exception as e:
-                db.execute(text("ROLLBACK TO SAVEPOINT opt_cleanup"))
-                db.execute(text("RELEASE SAVEPOINT opt_cleanup"))
-                import logging
-                logging.getLogger(__name__).debug(f"Optional cleanup skipped: {e}")
-
-        # Step 10: Finally, delete the report itself
-        db.execute(text("DELETE FROM reports WHERE id = :rid"), {"rid": report_id})
-
-        db.commit()
-        print(f"[SUCCESS] Report {report_id} purged via raw SQL.")
-        return True
-
-    except Exception as e:
-        db.rollback()
-        print(f"[ERROR] Raw SQL Purge Failed for Report {report_id}: {e}")
-        return False
+def reject_report(db: Session, report_id: int, actor_id: int, reason: str):
+    return update_report_status(db, report_id, "rejected", actor_id=actor_id, reason=reason)
 
 def get_report_stats(db: Session) -> dict:
     """Get aggregated report counts by status for KPI dashboard."""

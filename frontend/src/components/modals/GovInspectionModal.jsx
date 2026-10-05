@@ -4,7 +4,6 @@ import {
     AlertTriangle,
     CheckCircle2,
     XCircle,
-    Camera,
     FileText,
     X,
     Clock,
@@ -17,12 +16,11 @@ import './modal-dialogs.css';
 export default function GovInspectionModal({ isOpen, onClose, workOrder, currentUser, onVerified }) {
     const [passed, setPassed] = useState(true);
     const [notes, setNotes] = useState('');
-    const [photoUrl, setPhotoUrl] = useState('');
     const [checklist, setChecklist] = useState({
-        specifications: true,
-        siteCleared: true,
-        qualityTested: true,
-        photoVerified: true,
+        specifications: false,
+        siteCleared: false,
+        qualityTested: false,
+        photoVerified: false,
     });
     const [submitting, setSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -48,6 +46,14 @@ export default function GovInspectionModal({ isOpen, onClose, workOrder, current
             setErrorMessage('Separation of duties violation: You cannot verify a work order assigned to yourself.');
             return;
         }
+        if (!notes.trim()) {
+            setErrorMessage('Enter your inspection findings.');
+            return;
+        }
+        if (passed && !Object.values(checklist).every(Boolean)) {
+            setErrorMessage('Complete every inspection check before certification.');
+            return;
+        }
 
         setSubmitting(true);
         try {
@@ -59,8 +65,7 @@ export default function GovInspectionModal({ isOpen, onClose, workOrder, current
                 },
                 body: JSON.stringify({
                     passed,
-                    notes: notes.trim() || (passed ? 'Quality inspection passed standards.' : 'Inspection failed standards; rework requested.'),
-                    evidence_photo_url: photoUrl.trim() || null,
+                    notes: notes.trim(),
                     checklist_results: checklist,
                 }),
             });
@@ -143,7 +148,7 @@ export default function GovInspectionModal({ isOpen, onClose, workOrder, current
                                 {workOrder.title}
                             </div>
                             <div style={{ fontSize: '12px', color: 'var(--gov-text-secondary)', marginTop: '4px' }}>
-                                Location: {workOrder.location_string || workOrder.barangay || 'Caloocan City'}
+                                Location: {workOrder.location_string || workOrder.barangay || 'Location unavailable'}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--gov-text-secondary)', marginTop: '2px' }}>
                                 Assigned to: {workOrder.assigned_team || workOrder.assigned_to_name || `Worker ID #${workOrder.assigned_to_id || 'N/A'}`}
@@ -205,7 +210,7 @@ export default function GovInspectionModal({ isOpen, onClose, workOrder, current
                         </div>
                     </div>
 
-                    {/* Standard DPWH / City Engineering Checklist */}
+                    {/* Explicit review checks */}
                     <div className="gov-sheet-field-group">
                         <label className="gov-modal-label">Independent Compliance Checklist</label>
                         <div style={{
@@ -257,22 +262,6 @@ export default function GovInspectionModal({ isOpen, onClose, workOrder, current
                         </div>
                     </div>
 
-                    {/* Evidence Photo URL */}
-                    <div className="gov-sheet-field-group">
-                        <label htmlFor="inspect-photo" className="gov-modal-label">
-                            <Camera size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                            Verification Photo URL / Evidence
-                        </label>
-                        <input
-                            id="inspect-photo"
-                            type="url"
-                            className="gov-modal-input"
-                            placeholder="https://... or upload link"
-                            value={photoUrl}
-                            onChange={(e) => setPhotoUrl(e.target.value)}
-                        />
-                    </div>
-
                     {/* Inspection Notes */}
                     <div className="gov-sheet-field-group">
                         <label htmlFor="inspect-notes" className="gov-modal-label">
@@ -286,7 +275,7 @@ export default function GovInspectionModal({ isOpen, onClose, workOrder, current
                             placeholder={passed ? "Detail the acceptance inspection results..." : "Describe required remedial works and punch list items..."}
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            required={!passed}
+                            required
                         />
                     </div>
 

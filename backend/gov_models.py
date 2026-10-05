@@ -50,7 +50,8 @@ class WorkOrder(Base):
     tied to a citizen Report or a ProjectRequest.
 
     Status flow:
-      open → assigned → in_progress → completed | cancelled
+      open → assigned → in_progress → completed_pending_review → completed
+      Inspection failure requests rework before another submission.
     """
     __tablename__ = "work_orders"
 
@@ -76,7 +77,7 @@ class WorkOrder(Base):
     # "standard" | "preemptive" (FR-11)
     wo_type        = Column(String, default="standard", index=True)
 
-    # open | assigned | in_progress | completed | cancelled
+    # open | assigned | in_progress | completed_pending_review | completed | rework_required | blocked | cancelled
     status         = Column(String, default="open", index=True)
 
     priority       = Column(String, default="normal", index=True)   # low | normal | high | critical

@@ -28,6 +28,7 @@ import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import RequestInfoModal from '../components/modals/RequestInfoModal';
 import AssignWorkOrderModal from '../components/modals/AssignWorkOrderModal';
+import ApproveReportModal from '../components/modals/ApproveReportModal';
 import { checkPermission } from '../utils/rbac_utils';
 import { formatTicketId } from '../utils/reportWorkflow';
 import { API_BASE_URL } from '../utils/apiBase';
@@ -127,12 +128,14 @@ export default function CitizenReportsPage({ workspace }) {
     // Modal state
     const [requestInfoOpen, setRequestInfoOpen] = useState(false);
     const [assignWorkOrderOpen, setAssignWorkOrderOpen] = useState(false);
+    const [approveReportOpen, setApproveReportOpen] = useState(false);
 
     const search = params.get('search') || '';
     const status = params.get('status') || 'all';
     const selectedId = Number(params.get('report')) || null;
     const [docketLayoutOpen, setDocketLayoutOpen] = useState(Boolean(selectedId));
     const canTriage = checkPermission(currentUser, 'ops', 'manage');
+    const canApprove = ['dispatcher', 'asst_city_engineer', 'city_engineer', 'manager', 'system_admin'].includes(currentUser?.role);
 
     const docketMotion = prefersReducedMotion
         ? {
@@ -288,7 +291,6 @@ export default function CitizenReportsPage({ workspace }) {
     };
 
     const handleAssignWorkOrderSubmit = async (woData) => {
-        try {
             const res = await fetch(`${API_BASE_URL}/api/gov/work-orders`, {
                 method: 'POST',
                 headers: {
@@ -298,21 +300,17 @@ export default function CitizenReportsPage({ workspace }) {
                 body: JSON.stringify({
                     report_id: woData.reportId,
                     title: woData.title,
+                    assigned_to_id: woData.assigned_to_id,
                     priority: woData.priority,
-                    notes: `${woData.reason} | Team: ${woData.team}`,
+                    notes: woData.reason,
                 }),
             });
-            if (res.ok) {
-                showToast(`Work order successfully dispatched to ${woData.team}.`);
-                loadReports({ background: true });
-            } else {
-                showToast(`Work order created and queued for field execution.`);
-                loadReports({ background: true });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.detail || `Work order creation failed (HTTP ${res.status})`);
             }
-        } catch {
-            showToast(`Work order created and queued for field execution.`);
+            showToast('Work order assigned to the selected field official.');
             loadReports({ background: true });
-        }
     };
 
     const visibleReports = useMemo(() => {
@@ -608,7 +606,7 @@ export default function CitizenReportsPage({ workspace }) {
 
                                     {canTriage && (
                                         <>
-                                            {selected.status === 'unverified' && (
+                                            {['dispatcher', 'manager'].includes(currentUser?.role) && ['pending', 'unverified'].includes(selected.status) && (
                                                 <button
                                                     type="button"
                                                     className="citizen-report-secondary-action"
@@ -618,14 +616,17 @@ export default function CitizenReportsPage({ workspace }) {
                                                     Verify report
                                                 </button>
                                             )}
-                                            <button
+                                            {canApprove && selected.status === 'pending_approval' && <button
+                                                type="button" className="citizen-report-primary-action" onClick={() => setApproveReportOpen(true)}
+                                            ><ShieldCheck size={15} aria-hidden="true" />Approve for work</button>}
+                                            {selected.status === 'approved_internal' && <button
                                                 type="button"
                                                 className="citizen-report-primary-action"
                                                 onClick={() => setAssignWorkOrderOpen(true)}
                                             >
                                                 <Truck size={15} aria-hidden="true" />
                                                 Assign work order
-                                            </button>
+                                            </button>}
                                         </>
                                     )}
 
@@ -656,6 +657,11 @@ export default function CitizenReportsPage({ workspace }) {
                 report={selected}
                 onSubmit={handleAssignWorkOrderSubmit}
             />
+            {approveReportOpen && selected && <ApproveReportModal
+                report={selected}
+                onClose={() => setApproveReportOpen(false)}
+                onApproved={() => { showToast('Report approved for field work.'); loadReports({ background: true }); }}
+            />}
         </div>
     );
 }

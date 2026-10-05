@@ -30,282 +30,21 @@ import {
     buildReportWorkflowSteps
 } from '../utils/reportWorkflow';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// REFERENCE INITIAL DATA (Exact Parity with media_1788468315863.png)
-// ─────────────────────────────────────────────────────────────────────────────
-const INITIAL_REPORTS = [
-    {
-        id: 1,
-        ticket_id: 'PUL-2026-0822',
-        issue: 'Exposed electrical wire',
-        barangay: 'Barangay 176',
-        district: 'North Caloocan',
-        severity: 'Critical',
-        status: 'Verified',
-        updated: '14 min ago',
-        report_type: 'Hazard',
-        reporter: {
-            name: 'Name withheld',
-            is_private: true,
-            contact_method: 'Contact via Pulseline'
-        },
-        location: {
-            address: '176 Deparo St., Brgy. 176, North Caloocan City',
-            lat: 14.720712,
-            lng: 120.985134,
-            landmark: 'Near Camarin Rd. junction'
-        },
-        evidence: [
-            'https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?auto=format&fit=crop&w=600&q=80'
-        ],
-        steps: buildReportWorkflowSteps('Verified', {
-            received: '8:12 AM Today',
-            verified: '8:27 AM Today'
-        }),
-        activity: [
-            {
-                id: 1,
-                icon: ShieldCheck,
-                color: 'text-[#ff6b00]',
-                title: 'Verified by Ana Reyes (Dispatcher)',
-                time: '8:27 AM',
-                desc: 'Confirmed hazard. Exposed live wire near utility pole.'
-            },
-            {
-                id: 2,
-                icon: Users,
-                color: 'text-emerald-500',
-                title: 'Assigned to Electrical Maintenance Team',
-                time: '8:35 AM',
-                desc: 'Work order WO-2026-1197 created.'
-            },
-            {
-                id: 3,
-                icon: MessageSquare,
-                color: 'text-slate-400',
-                title: 'Note added by Ana Reyes (Dispatcher)',
-                time: '8:37 AM',
-                desc: 'Coordinated with Meralco. On-site inspection scheduled.'
-            }
-        ]
-    },
-    {
-        id: 2,
-        ticket_id: 'PUL-2026-0821',
-        issue: 'Pothole on road',
-        barangay: 'Barangay 165',
-        district: 'North Caloocan',
-        severity: 'High',
-        status: 'Assigned',
-        updated: '32 min ago',
-        report_type: 'Road',
-        reporter: {
-            name: 'Name withheld',
-            is_private: true,
-            contact_method: 'Contact via Pulseline'
-        },
-        location: {
-            address: '42 Bagumbong Rd., Brgy. 165, North Caloocan City',
-            lat: 14.741200,
-            lng: 121.034500,
-            landmark: 'Near Bagumbong Elementary School'
-        },
-        evidence: [
-            'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80'
-        ],
-        steps: buildReportWorkflowSteps('Assigned', {
-            received: '7:40 AM Today',
-            verified: '8:05 AM Today',
-            assigned: '8:15 AM Today'
-        }),
-        activity: [
-            {
-                id: 1,
-                icon: ShieldCheck,
-                color: 'text-[#ff6b00]',
-                title: 'Verified by Ana Reyes (Dispatcher)',
-                time: '8:05 AM',
-                desc: 'Confirmed deep road crater measuring approx 1.2m across.'
-            },
-            {
-                id: 2,
-                icon: Users,
-                color: 'text-emerald-500',
-                title: 'Assigned to Road Asphalt Crew 3',
-                time: '8:15 AM',
-                desc: 'Work order WO-2026-1196 created for cold-mix patching.'
-            }
-        ]
-    },
-    {
-        id: 3,
-        ticket_id: 'PUL-2026-0820',
-        issue: 'Flooded street',
-        barangay: 'Barangay 162',
-        district: 'North Caloocan',
-        severity: 'High',
-        status: 'In progress',
-        updated: '1 hr ago',
-        report_type: 'Drainage',
-        reporter: {
-            name: 'Name withheld',
-            is_private: true,
-            contact_method: 'Contact via Pulseline'
-        },
-        location: {
-            address: 'Corner Malanting St., Brgy. 162, North Caloocan City',
-            lat: 14.718900,
-            lng: 121.012300,
-            landmark: 'Near Caloocan North Floodway'
-        },
-        evidence: [
-            'https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=600&q=80'
-        ],
-        steps: buildReportWorkflowSteps('In progress', {
-            received: '6:30 AM Today',
-            verified: '6:50 AM Today',
-            assigned: '7:10 AM Today',
-            in_progress: '7:30 AM Today'
-        }),
-        activity: [
-            {
-                id: 1,
-                icon: ShieldCheck,
-                color: 'text-[#ff6b00]',
-                title: 'Verified by Carlos D. (Admin Clerk)',
-                time: '6:50 AM',
-                desc: 'Knee-deep flooding due to obstructed drainage culvert.'
-            },
-            {
-                id: 2,
-                icon: Wrench,
-                color: 'text-sky-500',
-                title: 'Suction Dredging Crew Dispatched',
-                time: '7:30 AM',
-                desc: 'Vactor truck on site clearing debris.'
-            }
-        ]
-    },
-    {
-        id: 4,
-        ticket_id: 'PUL-2026-0819',
-        issue: 'Broken streetlight',
-        barangay: 'Barangay 170',
-        district: 'North Caloocan',
-        severity: 'Medium',
-        status: 'Received',
-        updated: '2 hr ago',
-        report_type: 'Lighting',
-        reporter: {
-            name: 'Name withheld',
-            is_private: true,
-            contact_method: 'Contact via Pulseline'
-        },
-        location: {
-            address: 'Phase 4, Package 2, Brgy. 170, North Caloocan City',
-            lat: 14.735600,
-            lng: 121.028900,
-            landmark: 'Opposite Community Chapel'
-        },
-        evidence: [
-            'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80'
-        ],
-        steps: buildReportWorkflowSteps('Received', {
-            received: '5:45 AM Today'
-        }),
-        activity: [
-            {
-                id: 1,
-                icon: Clock,
-                color: 'text-slate-400',
-                title: 'Report Received via PULSO Mobile App',
-                time: '5:45 AM',
-                desc: 'Pending dispatcher triage and verification.'
-            }
-        ]
-    },
-    {
-        id: 5,
-        ticket_id: 'PUL-2026-0818',
-        issue: 'Garbage collection missed',
-        barangay: 'Barangay 183',
-        district: 'North Caloocan',
-        severity: 'Medium',
-        status: 'Resolved',
-        updated: '3 hr ago',
-        report_type: 'Sanitation',
-        reporter: {
-            name: 'Name withheld',
-            is_private: true,
-            contact_method: 'Contact via Pulseline'
-        },
-        location: {
-            address: 'Block 12 Lot 5, Tala, Brgy. 183, North Caloocan City',
-            lat: 14.764500,
-            lng: 121.056700,
-            landmark: 'Near Tala Market'
-        },
-        evidence: [
-            'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&w=600&q=80'
-        ],
-        steps: buildReportWorkflowSteps('Resolved', {
-            received: 'Yesterday 4:00 PM',
-            verified: 'Yesterday 4:20 PM',
-            assigned: 'Yesterday 5:00 PM',
-            in_progress: 'Yesterday 6:00 PM',
-            resolved: 'Today 5:30 AM'
-        }),
-        activity: [
-            {
-                id: 1,
-                icon: Check,
-                color: 'text-emerald-500',
-                title: 'Resolved by Sanitation Task Force',
-                time: '5:30 AM',
-                desc: 'Special collection completed. Area cleared and sanitized.'
-            }
-        ]
-    }
-];
-
-const DISPATCH_FLEET_OPTIONS = [
-    {
-        value: 3,
-        label: 'Team Beta — Engr. Bautista',
-        description: 'Roads, Bridges & Civil Infrastructure (Heavy Equipment)'
-    },
-    {
-        value: 2,
-        label: 'Team Alpha — Engr. Dela Cruz',
-        description: 'Electrical, Power & Municipal Street Lighting Crew'
-    },
-    {
-        value: 4,
-        label: 'Team Gamma — Engr. Reyes',
-        description: 'Drainage, Culverts & Flood Mitigation Operations'
-    },
-    {
-        value: 5,
-        label: 'Team Delta — Sanitation Task Force',
-        description: 'Solid Waste, Debris & Environmental Sanitation'
-    }
-];
-
 const DISPATCH_PRIORITY_OPTIONS = [
     {
         value: 'critical',
-        label: 'Critical (Immediate Hazard)',
-        description: 'Urgent Safety Threat · Immediate Field Dispatch SLA'
+        label: 'Critical work priority',
+        description: 'Priority does not grant emergency access'
     },
     {
         value: 'high',
         label: 'High (Urgent Infrastructure Repair)',
-        description: 'Active Structural Defect · 24-48h Expedited SLA'
+        description: 'Urgent engineering review'
     },
     {
         value: 'normal',
-        label: 'Normal (Standard Dispatch SLA)',
-        description: 'Standard Field Maintenance Dispatch (48-72h SLA)'
+        label: 'Normal',
+        description: 'Routine field assignment'
     },
     {
         value: 'low',
@@ -333,21 +72,13 @@ export default function GovReportsDashboard() {
     }, []);
 
     // ── Reports & Selection state (Hidden initially until clicked) ──
-    const [reports, setReports] = useState(INITIAL_REPORTS);
-    const [selectedReportId, setSelectedReportId] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const p = new URLSearchParams(window.location.search).get('reportId');
-            if (p) {
-                const found = INITIAL_REPORTS.find(r => r.id?.toString() === p || r.ticket_id === p);
-                return found ? found.id : null;
-            }
-        }
-        return null;
-    });
+    const [reports, setReports] = useState([]);
+    const [selectedReportId, setSelectedReportId] = useState(null);
     const [selectedRowIds, setSelectedRowIds] = useState([]);
     const [isPinned, setIsPinned] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastSynced, setLastSynced] = useState(null);
+    const [reportLoadError, setReportLoadError] = useState('');
 
     // ── Filters & Search state ──
     const [searchQuery, setSearchQuery] = useState('');
@@ -363,14 +94,7 @@ export default function GovReportsDashboard() {
     const [currentPage, setCurrentPage] = useState(1);
 
     // ── Modals & Action States ──
-    const [activeModal, setActiveModal] = useState(null); // 'work_order' | 'escalate' | 'note' | 'photo' | null
     const [selectedPhoto, setSelectedPhoto] = useState(null);
-    const [newNoteText, setNewNoteText] = useState('');
-    const [escalateReason, setEscalateReason] = useState('High risk to public pedestrian safety');
-    const [isRequestChangesModalOpen, setIsRequestChangesModalOpen] = useState(false);
-    const [requestChangesText, setRequestChangesText] = useState('');
-    const [requestTarget, setRequestTarget] = useState('field_crew');
-    const [isEscalateModalOpen, setIsEscalateModalOpen] = useState(false);
     
     // ── Unified Work Order Dispatch Modal State ──
     const [isWorkOrderModalOpen, setIsWorkOrderModalOpen] = useState(false);
@@ -378,10 +102,26 @@ export default function GovReportsDashboard() {
         title: '',
         description: '',
         priority: 'high',
-        team: 'Team Beta — Engr. Bautista (Roads & Bridges)',
-        assigned_to_id: 3
+        assigned_to_id: ''
     });
     const [isSubmittingWo, setIsSubmittingWo] = useState(false);
+    const [eligibleAssignees, setEligibleAssignees] = useState([]);
+    const [assigneeError, setAssigneeError] = useState('');
+    useEffect(() => {
+        if (!isWorkOrderModalOpen) return;
+        const controller = new AbortController();
+        setEligibleAssignees([]);
+        setAssigneeError('');
+        fetch(`${API_BASE_URL}/api/gov/dispatch/eligible-assignees`, {
+            headers: { Authorization: `Bearer ${getAuthToken()}` }, signal: controller.signal,
+        }).then(async (response) => {
+            if (!response.ok) throw new Error(`Eligible staff unavailable (HTTP ${response.status})`);
+            const data = await response.json();
+            if (!Array.isArray(data)) throw new Error('Eligible staff response is invalid');
+            setEligibleAssignees(data);
+        }).catch((cause) => { if (cause.name !== 'AbortError') setAssigneeError(cause.message); });
+        return () => controller.abort();
+    }, [isWorkOrderModalOpen]);
 
     const searchInputRef = useRef(null);
     const mobileNavRef = useRef(null);
@@ -390,10 +130,10 @@ export default function GovReportsDashboard() {
 
     // ── Current User Profile ──
     const [currentUser, setCurrentUser] = useState({
-        name: 'Ana Reyes',
-        role: 'dispatcher',
-        roleLabel: 'Dispatcher',
-        email: 'ana.reyes@caloocan.gov.ph'
+        name: 'Staff member',
+        role: '',
+        roleLabel: 'Staff',
+        email: ''
     });
 
     // ── Read user from session ──
@@ -402,10 +142,10 @@ export default function GovReportsDashboard() {
             const u = getAuthUser();
             if (u && (u.name || u.username || u.full_name)) {
                 setCurrentUser({
-                    name: u.full_name || u.name || 'Ana Reyes',
-                    role: u.role || 'dispatcher',
-                    roleLabel: (u.role || 'dispatcher').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                    email: u.email || 'dispatcher@caloocan.gov.ph'
+                    name: u.full_name || u.name || 'Staff member',
+                    role: u.role || '',
+                    roleLabel: (u.role || 'staff').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    email: u.email || ''
                 });
             }
         } catch { /* fallback */ }
@@ -479,75 +219,85 @@ export default function GovReportsDashboard() {
     // ── Live API Fetch & Real-time Database Synchronization ──
     const fetchLiveReports = async () => {
         const token = getAuthToken();
-        if (!token) return;
+        if (!token) {
+            setReportLoadError('Staff session is unavailable. Sign in again to load reports.');
+            return;
+        }
         setIsSyncing(true);
         try {
             const res = await fetch(`${API_BASE_URL}/api/reports?limit=100&t=${Date.now()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (res.ok) {
+            if (!res.ok) throw new Error(`Reports could not be loaded (HTTP ${res.status}). Retry to check the current queue.`);
+            {
                 const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    const mapped = data.map((r, index) => {
+                if (!Array.isArray(data)) throw new Error('Report response was invalid. Retry to check the current queue.');
+                {
+                    const mapped = data.filter(r => Number.isInteger(r.id)).map((r) => {
                         const rawBrgy = (r.barangay || r.location_barangay || '').toString().trim();
                         const brgyDigits = rawBrgy.replace(/\D/g, '');
-                        const barangay = brgyDigits ? `Barangay ${brgyDigits}` : (rawBrgy || 'Barangay 176');
+                        const barangay = brgyDigits ? `Barangay ${brgyDigits}` : (rawBrgy || 'Not recorded');
 
                         const lat = parseFloat(r.location_lat);
                         const lng = parseFloat(r.location_lng);
-                        const dist = getCaloocanDistrict(lat, lng);
-                        const district = dist === 'south' ? 'South Caloocan' : dist === 'north' ? 'North Caloocan' : (r.district || 'North Caloocan');
+                        const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lng);
+                        const dist = hasCoordinates ? getCaloocanDistrict(lat, lng) : null;
+                        const district = dist === 'south' ? 'South Caloocan' : dist === 'north' ? 'North Caloocan' : (r.district || 'Not recorded');
 
                         const rawUrg = (r.urgency || r.ai_urgency || '').toLowerCase();
-                        const severityScore = typeof r.severity_score === 'number' ? r.severity_score : 0;
-                        const severity = rawUrg === 'critical' || severityScore >= 80 ? 'Critical' :
-                                         rawUrg === 'high' || severityScore >= 60 ? 'High' :
-                                         rawUrg === 'low' || (severityScore > 0 && severityScore < 40) ? 'Low' : 'Medium';
+                        const severity = rawUrg === 'critical' ? 'Critical' :
+                                         rawUrg === 'high' ? 'High' :
+                                         rawUrg === 'medium' || rawUrg === 'normal' ? 'Medium' :
+                                         rawUrg === 'low' ? 'Low' : 'Not assessed';
 
                         const rawStatus = (r.status || '').toLowerCase().trim();
-                        const status = rawStatus === 'verified' ? 'Verified' :
-                                       ['assigned', 'approved_internal'].includes(rawStatus) ? 'Assigned' :
-                                       ['in_progress', 'dispatched'].includes(rawStatus) ? 'In Progress' :
+                        const status = ['verified', 'pending_approval'].includes(rawStatus) ? 'Verified' :
+                                       rawStatus === 'approved_internal' ? 'Approved' :
+                                       ['assigned', 'dispatched'].includes(rawStatus) ? 'Assigned' :
+                                       rawStatus === 'in_progress' ? 'In Progress' :
                                        rawStatus === 'resolved' ? 'Resolved' : 
-                                       rawStatus === 'rejected' ? 'Rejected' : 'Received';
+                                       rawStatus === 'rejected' ? 'Rejected' :
+                                       rawStatus === 'cancelled' ? 'Cancelled' :
+                                       rawStatus === 'needs_information' ? 'Needs information' :
+                                       rawStatus === 'unverified' ? 'Unverified' :
+                                       rawStatus === 'pending' ? 'Received' : (r.status || 'Status unavailable');
 
                         const hasReporterName = Boolean(r.reporter_name && r.reporter_name.trim() && !r.is_anonymous);
 
                         return {
-                            id: r.id || index + 10,
-                            ticket_id: formatTicketId(r.ticket_id, r.id, false),
+                            id: r.id,
+                            ticket_id: r.ticket_id || 'Ticket unavailable',
                             issue: getReportPlainTitle(r),
                             barangay,
                             district,
                             severity,
                             status,
-                            updated: r.updated_at ? new Date(r.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
+                            raw_status: rawStatus,
+                            updated: r.updated_at ? new Date(r.updated_at).toLocaleString() : 'Time unavailable',
+                            updated_at: r.updated_at || null,
                             report_type: r.ai_category || r.category || 'General',
                             reporter: {
                                 name: hasReporterName ? r.reporter_name.trim() : (r.is_anonymous ? 'Anonymous Citizen' : 'Citizen Reporter'),
                                 is_private: Boolean(r.is_anonymous),
-                                contact_method: r.reporter_contact || 'Contact via Pulseline'
+                                contact_method: r.reporter_contact || 'Contact unavailable'
                             },
                             location: {
-                                address: r.location_string || `${barangay}, ${district}, Caloocan City`,
-                                lat: lat || 14.7566,
-                                lng: lng || 121.0450,
-                                landmark: r.landmark || 'Reported location'
+                                address: r.location_string || 'Address not recorded',
+                                lat: hasCoordinates ? lat : null,
+                                lng: hasCoordinates ? lng : null,
+                                landmark: r.landmark || null
                             },
                             evidence: r.image_url ? [
                                 r.image_url.startsWith('http') ? r.image_url : `${API_BASE_URL}${r.image_url}`
-                            ] : INITIAL_REPORTS[0].evidence,
-                            steps: buildReportWorkflowSteps(status, {
-                                received: 'Today',
-                                verified: ['Verified', 'Assigned', 'In Progress', 'Resolved'].includes(status) ? 'Today' : '—',
-                                assigned: ['Assigned', 'In Progress', 'Resolved'].includes(status) ? 'Today' : '—',
-                                in_progress: ['In Progress', 'Resolved'].includes(status) ? 'Today' : '—',
-                                resolved: status === 'Resolved' ? 'Today' : '—'
+                            ] : [],
+                            steps: buildReportWorkflowSteps(rawStatus, {
+                                received: r.created_at ? new Date(r.created_at).toLocaleString() : undefined,
                             }),
-                            activity: INITIAL_REPORTS[0].activity
+                            activity: []
                         };
                     });
                     setReports(mapped);
+                    setReportLoadError('');
                     setLastSynced(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
                     
                     // If deep-linked report is in dataset, keep it selected
@@ -563,6 +313,7 @@ export default function GovReportsDashboard() {
             }
         } catch (err) {
             console.error("Live fetch failed:", err);
+            setReportLoadError(err.message || 'Reports could not be loaded. Retry to check the current queue.');
         } finally {
             setIsSyncing(false);
         }
@@ -580,7 +331,6 @@ export default function GovReportsDashboard() {
         reports.forEach(r => {
             if (r.barangay) set.add(r.barangay);
         });
-        ['Barangay 176', 'Barangay 165', 'Barangay 162', 'Barangay 170', 'Barangay 183'].forEach(b => set.add(b));
         const sorted = Array.from(set).sort((a, b) => {
             const numA = parseInt(a.replace(/\D/g, ''), 10) || 0;
             const numB = parseInt(b.replace(/\D/g, ''), 10) || 0;
@@ -627,9 +377,24 @@ export default function GovReportsDashboard() {
                 if (b1 !== b2) return false;
             }
             if (districtFilter !== 'All Districts' && r.district !== districtFilter) return false;
+            if (dateFilter !== 'All') {
+                const updated = r.updated_at ? new Date(r.updated_at).getTime() : NaN;
+                if (!Number.isFinite(updated)) return false;
+                const now = Date.now();
+                const startOfToday = new Date().setHours(0, 0, 0, 0);
+                if (dateFilter === 'Today' && updated < startOfToday) return false;
+                if (dateFilter === 'Past 24h' && updated < now - 24 * 60 * 60 * 1000) return false;
+                if (dateFilter === 'Past 7 days' && updated < now - 7 * 24 * 60 * 60 * 1000) return false;
+            }
             return true;
         });
-    }, [reports, searchQuery, statusFilter, severityFilter, barangayFilter, districtFilter]);
+    }, [reports, searchQuery, statusFilter, severityFilter, barangayFilter, districtFilter, dateFilter]);
+
+    const pageCount = Math.max(1, Math.ceil(filteredReports.length / pageSize));
+    const visibleReports = filteredReports.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    useEffect(() => {
+        if (currentPage > pageCount) setCurrentPage(pageCount);
+    }, [currentPage, pageCount]);
 
     // Currently selected report object (null when nothing is selected)
     const selectedReport = useMemo(() => {
@@ -684,10 +449,9 @@ export default function GovReportsDashboard() {
         if (!selectedReport) return;
         setWorkOrderForm({
             title: `Repair ${selectedReport.issue || selectedReport.report_type || 'Infrastructure Issue'}`,
-            description: `Field repair work order created via Citizen Reports. Location: ${selectedReport.location?.address || 'Caloocan City'}`,
+            description: '',
             priority: selectedReport.severity === 'Critical' ? 'critical' : selectedReport.severity === 'High' ? 'high' : 'normal',
-            team: 'Team Beta — Engr. Bautista (Roads & Bridges)',
-            assigned_to_id: 3
+            assigned_to_id: ''
         });
         setIsWorkOrderModalOpen(true);
     };
@@ -695,20 +459,23 @@ export default function GovReportsDashboard() {
     const handleExecuteWorkOrder = async (e) => {
         if (e) e.preventDefault();
         if (!selectedReport) return;
+        if (!workOrderForm.assigned_to_id || !workOrderForm.description.trim()) {
+            Swal.fire({ icon: 'error', title: 'Assignment incomplete', text: 'Choose an eligible official and enter field instructions.' });
+            return;
+        }
         setIsSubmittingWo(true);
         const token = getAuthToken();
         try {
             const payload = {
                 title: workOrderForm.title || `Repair ${selectedReport.issue || 'Infrastructure Issue'}`,
-                description: workOrderForm.description || 'Dispatched via Citizen Reports processing desk.',
+                description: workOrderForm.description,
                 wo_type: 'standard',
-                status: 'open',
                 priority: workOrderForm.priority,
                 assigned_to_id: parseInt(workOrderForm.assigned_to_id, 10),
                 report_id: selectedReport.id
             };
 
-            const res = await fetch(`${API_BASE_URL}/api/work-orders`, {
+            const res = await fetch(`${API_BASE_URL}/api/gov/work-orders`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -721,33 +488,10 @@ export default function GovReportsDashboard() {
                 const newWo = await res.json();
                 setIsWorkOrderModalOpen(false);
 
-                // Update report status to In Progress (since backend sets dispatched)
-                setReports(prev => prev.map(r => {
-                    if (r.id === selectedReport.id) {
-                        return {
-                            ...r,
-                            status: 'In Progress',
-                            updated: 'Just now',
-                            activity: [
-                                {
-                                    id: Date.now(),
-                                    icon: Users,
-                                    color: 'text-indigo-500',
-                                    title: `Work Order ${newWo.wo_number || ''} Dispatched (${workOrderForm.team})`,
-                                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                    desc: `Official work order created and dispatched with ${workOrderForm.priority.toUpperCase()} priority.`
-                                },
-                                ...r.activity
-                            ]
-                        };
-                    }
-                    return r;
-                }));
-
                 Swal.fire({
                     icon: 'success',
                     title: 'Work Order Dispatched!',
-                    text: `Work order ${newWo.wo_number || ''} created for ${selectedReport.ticket_id}. Shared database and Command Center map are synchronized.`,
+                    text: `Work order ${newWo.wo_number || ''} was assigned to the selected field official.`,
                     confirmButtonColor: '#ff6b00'
                 });
                 fetchLiveReports();
@@ -771,104 +515,6 @@ export default function GovReportsDashboard() {
         } finally {
             setIsSubmittingWo(false);
         }
-    };
-
-    const handleExecuteEscalation = (e) => {
-        if (e) e.preventDefault();
-        if (!escalateReason.trim() || !selectedReport) return;
-        setReports(prev => prev.map(r => {
-            if (r.id === selectedReport.id) {
-                return {
-                    ...r,
-                    severity: 'Critical',
-                    updated: 'Just now',
-                    activity: [
-                        {
-                            id: Date.now(),
-                            icon: Flag,
-                            color: 'text-red-500',
-                            title: 'Escalated by Dispatcher to City Engineer Desk',
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            desc: escalateReason.trim()
-                        },
-                        ...r.activity
-                    ]
-                };
-            }
-            return r;
-        }));
-        setIsEscalateModalOpen(false);
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'warning',
-            title: 'Report Escalated',
-            text: `Executive alert sent for ${selectedReport.ticket_id}`,
-            showConfirmButton: false,
-            timer: 3000
-        });
-    };
-
-    const handleExecuteRequestChanges = (e) => {
-        if (e) e.preventDefault();
-        if (!requestChangesText.trim() || !selectedReport) return;
-        const targetLabel = requestTarget === 'citizen' ? 'Citizen Reporter' : 'Field Inspection Crew';
-        setReports(prev => prev.map(r => {
-            if (r.id === selectedReport.id) {
-                return {
-                    ...r,
-                    updated: 'Just now',
-                    activity: [
-                        {
-                            id: Date.now(),
-                            icon: MessageSquare,
-                            color: 'text-amber-500',
-                            title: `Modification requested (${targetLabel})`,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            desc: requestChangesText.trim()
-                        },
-                        ...r.activity
-                    ]
-                };
-            }
-            return r;
-        }));
-        setIsRequestChangesModalOpen(false);
-        setRequestChangesText('');
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'success',
-            title: 'Modification Request Sent',
-            text: `Dispatched revision notice to ${targetLabel} for ${selectedReport.ticket_id}`,
-            showConfirmButton: false,
-            timer: 3000
-        });
-    };
-
-    const handleAddNote = (e) => {
-        e.preventDefault();
-        if (!newNoteText.trim()) return;
-        setReports(prev => prev.map(r => {
-            if (r.id === selectedReport.id) {
-                return {
-                    ...r,
-                    activity: [
-                        {
-                            id: Date.now(),
-                            icon: MessageSquare,
-                            color: 'text-slate-400',
-                            title: `Note added by ${currentUser.name} (${currentUser.roleLabel})`,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            desc: newNoteText.trim()
-                        },
-                        ...r.activity
-                    ]
-                };
-            }
-            return r;
-        }));
-        setNewNoteText('');
     };
 
     return (
@@ -1143,6 +789,22 @@ export default function GovReportsDashboard() {
                 {/* ─────────────────────────────────────────────────────────────
                     4. CONTENT WORKSPACE: REPORTS TABLE (LEFT) + DETAIL PANEL (RIGHT)
                 ────────────────────────────────────────────────────────────── */}
+                <div className="px-3 sm:px-4 lg:px-6">
+                    <div className="sr-only" role="status" aria-live="polite">{isSyncing && !lastSynced ? 'Loading reports' : reportLoadError || ''}</div>
+                    {reportLoadError && (
+                        <div role="alert" className="w-full rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100">
+                            <p>{reportLoadError}</p>
+                            {lastSynced && <p className="mt-1">Showing the last loaded queue from {lastSynced}. It may be stale.</p>}
+                            <button type="button" onClick={fetchLiveReports} className="mt-2 rounded-lg border border-current px-3 py-2 font-semibold focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600">Retry loading reports</button>
+                        </div>
+                    )}
+                    {!reportLoadError && !isSyncing && reports.length === 0 && (
+                        <div role="status" className="w-full rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">No reports are in this queue.</div>
+                    )}
+                    {!reportLoadError && isSyncing && !lastSynced && (
+                        <div role="status" className="w-full rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Loading reports…</div>
+                    )}
+                </div>
                 <div className="flex-1 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden p-3 sm:p-4 lg:p-6 gap-0">
 
                     <div
@@ -1150,7 +812,7 @@ export default function GovReportsDashboard() {
                         role="listbox"
                         aria-label="Citizen reports"
                     >
-                        {filteredReports.map((report) => {
+                        {visibleReports.map((report) => {
                             const isSelected = selectedReport?.id === report.id;
                             return (
                                 <button
@@ -1211,7 +873,10 @@ export default function GovReportsDashboard() {
                                 </thead>
 
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                                    {filteredReports.map((report) => {
+                                    {!reportLoadError && !isSyncing && reports.length > 0 && filteredReports.length === 0 && (
+                                        <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-slate-600 dark:text-slate-300">No reports match these filters. Clear filters to return to the full queue.</td></tr>
+                                    )}
+                                    {visibleReports.map((report) => {
                                         const isSelected = selectedReport?.id === report.id;
                                         const isChecked = selectedRowIds.includes(report.id);
 
@@ -1320,7 +985,7 @@ export default function GovReportsDashboard() {
                         {/* Pagination Footer */}
                         <div className="h-14 shrink-0 border-t border-slate-200 dark:border-slate-800 px-5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                             <div>
-                                Showing 1 to {filteredReports.length} of {filteredReports.length} reports
+                                Showing {filteredReports.length ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredReports.length)} of {filteredReports.length} reports
                             </div>
 
                             <div className="flex items-center gap-4">
@@ -1339,11 +1004,12 @@ export default function GovReportsDashboard() {
                                         type="button"
                                         className="w-7 h-7 flex items-center justify-center font-bold text-xs bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-[#ff6b00] rounded-full shadow-xs cursor-pointer"
                                     >
-                                        1
+                                        {currentPage}
                                     </button>
                                     <button
                                         type="button"
-                                        disabled
+                                        onClick={() => setCurrentPage(p => Math.min(pageCount, p + 1))}
+                                        disabled={currentPage >= pageCount}
                                         className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed transition-all text-slate-500 dark:text-slate-400"
                                         title="Next page"
                                     >
@@ -1437,19 +1103,12 @@ export default function GovReportsDashboard() {
                                         <div className="text-[11px] font-heading font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                                             Evidence
                                         </div>
-                                        <div
-                                            onClick={() => setSelectedPhoto(selectedReport.evidence[0])}
-                                            className="relative h-28 w-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer group shadow-2xs"
-                                        >
-                                            <img
-                                                src={selectedReport.evidence[0]}
-                                                alt="Report Evidence"
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                            />
-                                            <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                                                <Eye size={18} />
-                                            </div>
-                                        </div>
+                                        {selectedReport.evidence.length ? (
+                                            <button type="button" onClick={() => setSelectedPhoto(selectedReport.evidence[0])}
+                                                className="relative h-28 w-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600">
+                                                <img src={selectedReport.evidence[0]} alt={`Evidence submitted for ${selectedReport.ticket_id}`} className="w-full h-full object-cover" />
+                                            </button>
+                                        ) : <p className="text-xs text-slate-600 dark:text-slate-300">No evidence image is attached to this report.</p>}
                                     </div>
 
                                     {/* Reporter (Privacy Protected) & Type */}
@@ -1462,19 +1121,10 @@ export default function GovReportsDashboard() {
                                                 <Users size={14} className="text-slate-400 shrink-0" />
                                                 <span>{selectedReport.reporter.name}</span>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => Swal.fire({
-                                                    title: 'Pulseline Secure Contact',
-                                                    text: 'Direct messaging resident through PULSO platform messenger (phone numbers protected under RA 10173).',
-                                                    icon: 'info',
-                                                    confirmButtonColor: '#ff6b00'
-                                                })}
-                                                className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-[#ff6b00] mt-1.5 transition-colors cursor-pointer"
-                                            >
+                                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 mt-1.5">
                                                 <Phone size={12} className="text-[#ff6b00] shrink-0" />
                                                 <span>{selectedReport.reporter.contact_method}</span>
-                                            </button>
+                                            </div>
                                         </div>
 
                                         <div>
@@ -1500,7 +1150,7 @@ export default function GovReportsDashboard() {
                                             <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
                                                 {selectedReport.location.address}
                                             </p>
-                                            <div className="flex items-center gap-1.5 text-[11px] font-mono-data text-slate-500 dark:text-slate-400">
+                                            {selectedReport.location.lat !== null && selectedReport.location.lng !== null ? <div className="flex items-center gap-1.5 text-[11px] font-mono-data text-slate-500 dark:text-slate-400">
                                                 <span>{selectedReport.location.lat}, {selectedReport.location.lng}</span>
                                                 <button
                                                     type="button"
@@ -1510,7 +1160,7 @@ export default function GovReportsDashboard() {
                                                 >
                                                     <Copy size={12} />
                                                 </button>
-                                            </div>
+                                            </div> : <p className="text-xs text-slate-600 dark:text-slate-300">Coordinates not recorded.</p>}
                                             {/* Tactical Map Deep-link Button */}
                                             <button
                                                 type="button"
@@ -1525,42 +1175,10 @@ export default function GovReportsDashboard() {
                                             </button>
                                         </div>
 
-                                        {/* Embedded Map Preview with Pin */}
-                                        <div className="relative h-24 w-full bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
-                                            {/* Stylized Street Grid Background */}
-                                            <svg className="w-full h-full opacity-60 dark:opacity-30" xmlns="http://www.w3.org/2000/svg">
-                                                <defs>
-                                                    <pattern id="street-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-                                                        <path d="M 24 0 L 0 0 0 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-slate-300 dark:text-slate-600" />
-                                                    </pattern>
-                                                </defs>
-                                                <rect width="100%" height="100%" fill="url(#street-grid)" />
-                                                <path d="M 0 30 Q 50 20 120 70 T 200 90" fill="none" stroke="#94a3b8" strokeWidth="4" />
-                                                <path d="M 60 0 L 140 100" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                                            </svg>
-
-                                            {/* Map Labels */}
-                                            <div className="absolute top-1 left-2 text-[9px] font-mono-data text-slate-500">Camarin Rd.</div>
-                                            <div className="absolute top-1 right-2 text-[9px] font-mono-data text-slate-500">Deparo St.</div>
-                                            <div className="absolute bottom-1 right-2 text-[9px] font-mono-data text-slate-500">10th Ave.</div>
-
-                                            {/* Location Pin */}
-                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                                                <div className="w-7 h-7 bg-[#0a1324] dark:bg-slate-950 text-[#ff6b00] rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-800 animate-bounce">
-                                                    <MapPin size={15} />
-                                                </div>
-                                            </div>
-
-                                            {/* Locate button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate(`/dispatcher?reportId=${selectedReport.id}`)}
-                                                title={`Locate ${selectedReport.ticket_id} on Tactical GIS Command Map`}
-                                                aria-label={`Locate ${selectedReport.ticket_id} on Tactical GIS Command Map`}
-                                                className="absolute bottom-1.5 right-1.5 p-1.5 bg-white/95 dark:bg-slate-900/95 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 hover:text-[#ff6b00] shadow-xs cursor-pointer flex items-center gap-1 text-[10px] font-bold"
-                                            >
-                                                <ArrowUpRight size={13} />
-                                            </button>
+                                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                            <MapPin size={16} aria-hidden="true" className="mb-2" />
+                                            <p>{selectedReport.location.address}</p>
+                                            <p className="mt-1">Use the report map for geographic context.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1622,6 +1240,7 @@ export default function GovReportsDashboard() {
                                     </div>
 
                                     <div className="space-y-3">
+                                        {selectedReport.activity.length === 0 && <p className="text-xs text-slate-600 dark:text-slate-300">Open the report history to review recorded events.</p>}
                                         {selectedReport.activity.map((act) => {
                                             const Icon = act.icon;
                                             return (
@@ -1647,57 +1266,20 @@ export default function GovReportsDashboard() {
                                         })}
                                     </div>
 
-                                    {/* Quick Note Input */}
-                                    <form onSubmit={handleAddNote} className="mt-3 flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={newNoteText}
-                                            onChange={(e) => setNewNoteText(e.target.value)}
-                                            placeholder="Add internal dispatcher note..."
-                                            className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#ff6b00]"
-                                        />
-                                        <button
-                                            type="submit"
-                                            disabled={!newNoteText.trim()}
-                                            className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-[#ff6b00] hover:text-white rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
-                                        >
-                                            Post
-                                        </button>
-                                    </form>
                                 </div>
                             </div>
 
                             {/* ── Detail Panel Action Bar (Bottom) ── */}
                             <div className="grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50/50 p-3.5 sm:flex sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900/50">
-                                {/* 1. Request Changes (Outline) */}
-                                <button
-                                    type="button"
-                                    onClick={() => setIsRequestChangesModalOpen(true)}
-                                    className="order-2 inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-heading text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] sm:order-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
-                                >
-                                    <MessageSquare size={14} />
-                                    <span>Request changes</span>
-                                </button>
-
-                                {/* 2. Assign Work Order (PULSO Orange Primary) */}
-                                <button
+                                {selectedReport.raw_status === 'approved_internal' ? <button
                                     type="button"
                                     onClick={handleOpenWorkOrderModal}
                                     className="order-1 col-span-2 inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#ff6b00] px-3 py-2.5 font-heading text-xs font-bold text-white shadow-md shadow-orange-500/20 transition-all hover:bg-[#e65c00] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff6b00] active:scale-[0.98] cursor-pointer sm:order-none dark:bg-[#ff6b00] dark:hover:bg-[#e65c00] dark:text-white"
                                 >
                                     <Wrench size={14} />
                                     <span>Assign work order</span>
-                                </button>
+                                </button> : <Link to={`/gov/reports/${selectedReport.id}`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-bold text-slate-700 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 dark:border-slate-700 dark:text-slate-200">Review report before assignment</Link>}
 
-                                {/* 3. Escalate (Red/Destructive Outline) */}
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEscalateModalOpen(true)}
-                                    className="order-3 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-300 bg-red-50/50 px-3 py-2.5 font-heading text-xs font-bold text-red-600 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] sm:order-none dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-900/40 cursor-pointer"
-                                >
-                                    <Flag size={14} />
-                                    <span>Escalate</span>
-                                </button>
                             </div>
                         </motion.div>
                     </div>
@@ -1832,7 +1414,7 @@ export default function GovReportsDashboard() {
                                                     Field Operations Site
                                                 </div>
                                                 <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug break-words">
-                                                    {selectedReport.location?.address || selectedReport.location_string || `${selectedReport.location?.lat || selectedReport.location_lat || 14.7566}°N, ${selectedReport.location?.lng || selectedReport.location_lng || 121.0450}°E (Caloocan)`}
+                                                    {selectedReport.location?.address || 'Address not recorded'}
                                                 </div>
                                                 {selectedReport.barangay && (
                                                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
@@ -1846,7 +1428,7 @@ export default function GovReportsDashboard() {
                                         <div className="p-3.5 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-slate-700 dark:text-slate-300 text-[11px] flex items-start gap-2.5">
                                             <Sparkles size={15} className="text-[#ff6b00] shrink-0 mt-0.5" />
                                             <div className="leading-relaxed">
-                                                Executing dispatch sets report status to <strong className="text-orange-600 dark:text-orange-400 font-bold">In Progress</strong>, logs an audit trail event, and synchronizes telemetry across the Tactical GIS Command Map and field crew tablets.
+                                                Assignment records the work order and moves an approved report to <strong className="text-orange-600 dark:text-orange-400 font-bold">dispatched</strong>. Field work begins when the assigned official starts the order.
                                             </div>
                                         </div>
                                     </div>
@@ -1859,24 +1441,22 @@ export default function GovReportsDashboard() {
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                                                     <Truck size={13} className="text-[#ff6b00]" />
-                                                    <span>Assign To Fleet / Lead</span>
+                                                    <span>Assign to field official</span>
                                                 </label>
                                                 <OrangeSelect 
-                                                    value={Number(workOrderForm.assigned_to_id) || 3}
+                                                    value={workOrderForm.assigned_to_id}
                                                     onChange={(val) => {
-                                                        const teamId = Number(val);
-                                                        const found = DISPATCH_FLEET_OPTIONS.find(f => f.value === teamId);
                                                         setWorkOrderForm(prev => ({
                                                             ...prev,
-                                                            assigned_to_id: teamId,
-                                                            team: found ? found.label : 'Team Beta — Engr. Bautista'
+                                                            assigned_to_id: Number(val)
                                                         }));
                                                     }}
-                                                    options={DISPATCH_FLEET_OPTIONS}
+                                                    options={eligibleAssignees.map((person) => ({ value: person.id, label: `${person.full_name} · ${person.role.replaceAll('_', ' ')}` }))}
                                                     searchable={false}
                                                     icon={Truck}
                                                     className="w-full"
                                                 />
+                                                {assigneeError && <p role="alert" className="text-red-600 text-xs mt-1">{assigneeError}</p>}
                                             </div>
 
                                             {/* Priority Level */}
@@ -1946,7 +1526,7 @@ export default function GovReportsDashboard() {
                                         </button>
                                         <button 
                                             type="submit"
-                                            disabled={isSubmittingWo}
+                                            disabled={isSubmittingWo || eligibleAssignees.length === 0}
                                             className="px-6 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-white text-xs font-bold shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
                                         >
                                             {isSubmittingWo ? (
@@ -1962,340 +1542,6 @@ export default function GovReportsDashboard() {
                                             )}
                                         </button>
                                     </div>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* ═══════════════════════════════════════════════════════════════════
-                MODAL: REQUEST CHANGES / REQUIRED MODIFICATIONS
-            ══════════════════════════════════════════════════════════════════════ */}
-            <AnimatePresence>
-                {isRequestChangesModalOpen && selectedReport && (
-                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 16 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                            transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-                            className="bg-white dark:bg-[#090e1a] rounded-3xl shadow-2xl overflow-hidden max-w-4xl w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh]"
-                            role="dialog"
-                            aria-modal="true"
-                            aria-labelledby="rc-modal-title"
-                        >
-                            {/* Top Accent Gradient Strip */}
-                            <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 shrink-0" />
-
-                            {/* Modal Header */}
-                            <div className="px-6 py-4.5 sm:px-7 sm:py-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40 shrink-0">
-                                <div className="flex items-center justify-between gap-3 mb-2">
-                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                                        <MessageSquare size={13} className="text-amber-500" />
-                                        <span>REVISION & CLARIFICATION DISPATCH</span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsRequestChangesModalOpen(false)}
-                                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                        aria-label="Close dialog"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                </div>
-
-                                <h2 id="rc-modal-title" className="text-xl sm:text-2xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-                                    Request Modifications
-                                </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                                    Specify required modifications, supplementary evidence, or clarifications.
-                                </p>
-                            </div>
-
-                            {/* Modal Landscape Form Body */}
-                            <form onSubmit={handleExecuteRequestChanges} className="flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-between">
-                                <div className="p-6 sm:p-7 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                                    {/* ── LEFT COLUMN: Incident Target & Dispatch Channel (5 cols) ── */}
-                                    <div className="lg:col-span-5 flex flex-col gap-4">
-                                        {/* Target Incident Summary Card */}
-                                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#030712]/60 border border-slate-200/80 dark:border-slate-800/80 flex flex-col gap-2.5 shadow-xs">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="font-mono text-xs font-extrabold text-amber-500">
-                                                        {formatTicketId(selectedReport.ticket_id, selectedReport.id)}
-                                                    </span>
-                                                    {selectedReport.barangay && (
-                                                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                                            <span>•</span>
-                                                            <MapPin size={10} className="text-slate-400 shrink-0" />
-                                                            <span>{selectedReport.barangay.startsWith('Barangay') ? selectedReport.barangay : `Brgy. ${selectedReport.barangay}`}</span>
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {(() => {
-                                                    const desc = getStatusDescriptor(selectedReport.status);
-                                                    const StatusIcon = desc?.icon || Clock;
-                                                    return (
-                                                        <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${desc?.badgeClass || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-                                                            <StatusIcon size={11} className="shrink-0" />
-                                                            <span>{desc?.label || selectedReport.status}</span>
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
-                                            <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
-                                                {getReportPlainTitle(selectedReport)}
-                                            </h4>
-                                            {selectedReport.description && (
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                                                    {selectedReport.description}
-                                                </p>
-                                            )}
-                                        </div>
-
-                                        {/* Target Recipient Selection Cards */}
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                                                Send Request To:
-                                            </label>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setRequestTarget('field_crew')}
-                                                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
-                                                        requestTarget === 'field_crew'
-                                                            ? 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 shadow-xs ring-1 ring-amber-500/30 font-bold'
-                                                            : 'bg-slate-50 dark:bg-[#030712]/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 font-medium'
-                                                    }`}
-                                                >
-                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${requestTarget === 'field_crew' ? 'bg-amber-500 text-white' : 'bg-slate-200/60 dark:bg-slate-800 text-slate-500'}`}>
-                                                        <Truck size={17} />
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="text-xs font-bold leading-snug">Field Crew / Lead</div>
-                                                        <div className="text-[11px] opacity-75 truncate mt-0.5">Work order inspection team</div>
-                                                    </div>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setRequestTarget('citizen')}
-                                                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
-                                                        requestTarget === 'citizen'
-                                                            ? 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 shadow-xs ring-1 ring-amber-500/30 font-bold'
-                                                            : 'bg-slate-50 dark:bg-[#030712]/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 font-medium'
-                                                    }`}
-                                                >
-                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${requestTarget === 'citizen' ? 'bg-amber-500 text-white' : 'bg-slate-200/60 dark:bg-slate-800 text-slate-500'}`}>
-                                                        <Users size={17} />
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="text-xs font-bold leading-snug">Citizen Reporter</div>
-                                                        <div className="text-[11px] opacity-75 truncate mt-0.5">Via Pulseline mobile notification</div>
-                                                    </div>
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Regulatory Audit Notice */}
-                                        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-slate-700 dark:text-slate-300 text-[11px] flex items-start gap-2.5">
-                                            <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
-                                            <div className="leading-relaxed">
-                                                Dispatching revisions notifies the target recipient immediately and logs a permanent entry in the civic audit history.
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* ── RIGHT COLUMN: Clarification Directives & Presets (7 cols) ── */}
-                                    <div className="lg:col-span-7 flex flex-col gap-4">
-                                        {/* Quick Clarification Presets */}
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                                                Quick Clarification Presets:
-                                            </label>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {[
-                                                    'Need clearer defect photos from multiple angles',
-                                                    'Exact street landmark or pole number missing',
-                                                    'Verify barangay jurisdiction boundary',
-                                                    'Requires physical on-site re-inspection',
-                                                    'Structural dimension / pothole depth measurements needed'
-                                                ].map((preset, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        type="button"
-                                                        onClick={() => setRequestChangesText(prev => prev ? `${prev}. ${preset}` : preset)}
-                                                        className="px-3 py-1.5 rounded-xl text-[11.5px] font-medium bg-slate-100 hover:bg-amber-100 dark:bg-slate-800/80 dark:hover:bg-amber-950/40 text-slate-700 hover:text-amber-700 dark:text-slate-300 dark:hover:text-amber-300 border border-slate-200/80 dark:border-slate-700 transition-colors cursor-pointer"
-                                                    >
-                                                        + {preset}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Revision Details Textarea */}
-                                        <div>
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <label htmlFor="rc-textarea" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                                    Specific Instructions & Modifications *
-                                                </label>
-                                                <span className="text-[11px] text-slate-400 font-mono">
-                                                    {requestChangesText.length} chars
-                                                </span>
-                                            </div>
-                                            <textarea
-                                                id="rc-textarea"
-                                                required
-                                                rows={6}
-                                                value={requestChangesText}
-                                                onChange={(e) => setRequestChangesText(e.target.value)}
-                                                placeholder="Detail the exact corrections, supplementary photographs, or technical clarifications needed before proceeding..."
-                                                className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#030712] text-slate-800 dark:text-slate-100 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all resize-none shadow-xs leading-relaxed"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Modal Actions Footer */}
-                                <div className="px-6 py-4 sm:px-7 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between gap-3 shrink-0">
-                                    <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">
-                                        PULSO Civic Records Oversight • Quality Assurance Desk
-                                    </span>
-                                    <div className="flex items-center gap-3 ml-auto">
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsRequestChangesModalOpen(false)}
-                                            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            disabled={!requestChangesText.trim()}
-                                            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-xs font-bold text-white shadow-md shadow-orange-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-98"
-                                        >
-                                            <MessageSquare size={14} />
-                                            <span>Submit Revision Request</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* ═══════════════════════════════════════════════════════════════════
-                MODAL: ESCALATE REPORT TO CITY ENGINEER
-            ══════════════════════════════════════════════════════════════════════ */}
-            <AnimatePresence>
-                {isEscalateModalOpen && selectedReport && (
-                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.94, y: 16 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.94, y: 16 }}
-                            transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-                            className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden max-w-lg w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]"
-                            role="dialog"
-                            aria-modal="true"
-                            aria-labelledby="esc-modal-title"
-                        >
-                            {/* Top Accent Gradient Strip */}
-                            <div className="h-1.5 w-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-600 shrink-0" />
-
-                            {/* Modal Header */}
-                            <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                                <div className="flex items-center justify-between gap-3 mb-2.5">
-                                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-[11px] font-bold text-red-600 dark:text-red-400">
-                                        <ShieldAlert size={13} className="text-red-500" />
-                                        <span>EXECUTIVE ESCALATION DISPATCH</span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsEscalateModalOpen(false)}
-                                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                                        aria-label="Close dialog"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                </div>
-
-                                <h2 id="esc-modal-title" className="text-xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-                                    Escalate Incident Docket
-                                </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
-                                    Directly alert the City Engineer Executive Desk for emergency review and priority dispatch.
-                                </p>
-
-                                {/* Warning Callout */}
-                                <div className="mt-3.5 p-3 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200/80 dark:border-red-900/40 flex items-start gap-2.5">
-                                    <AlertTriangle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                                    <div className="text-[11.5px] leading-relaxed text-red-700 dark:text-red-300">
-                                        <strong>Emergency SLA Escalation:</strong> This upgrades {formatTicketId(selectedReport.ticket_id, selectedReport.id)} to <strong>Critical Severity</strong> and issues high-priority notification to on-duty city engineers.
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Modal Body */}
-                            <form onSubmit={handleExecuteEscalation} className="p-6 overflow-y-auto space-y-4 text-xs">
-                                {/* Quick Justification Presets */}
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                                        Urgent Justification Presets:
-                                    </label>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {[
-                                            'Imminent public pedestrian/vehicular safety hazard',
-                                            'Major arterial road blocked / structural erosion',
-                                            'High-pressure watermain burst or electrical hazard',
-                                            'Severe canal embankment collapse risking flood'
-                                        ].map((preset, idx) => (
-                                            <button
-                                                key={idx}
-                                                type="button"
-                                                onClick={() => setEscalateReason(preset)}
-                                                className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-red-100 dark:bg-slate-800 dark:hover:bg-red-950/40 text-slate-700 hover:text-red-700 dark:text-slate-300 dark:hover:text-red-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
-                                            >
-                                                {preset}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Textarea */}
-                                <div>
-                                    <label htmlFor="esc-textarea" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                                        Escalation Justification & Executive Notes *
-                                    </label>
-                                    <textarea
-                                        id="esc-textarea"
-                                        required
-                                        rows={4}
-                                        value={escalateReason}
-                                        onChange={(e) => setEscalateReason(e.target.value)}
-                                        placeholder="Explain why this requires expedited executive intervention..."
-                                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all resize-y"
-                                    />
-                                </div>
-
-                                {/* Modal Actions Footer */}
-                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsEscalateModalOpen(false)}
-                                        className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={!escalateReason.trim()}
-                                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-xs font-bold text-white shadow-md shadow-red-600/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                                    >
-                                        <Flag size={14} />
-                                        <span>Confirm Executive Escalation</span>
-                                    </button>
                                 </div>
                             </form>
                         </motion.div>

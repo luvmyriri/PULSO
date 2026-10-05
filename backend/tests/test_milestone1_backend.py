@@ -587,12 +587,17 @@ def test_separation_of_duties_strictly_enforced(client, seeded_users_and_geo):
     wo = gov_models.WorkOrder(
         title="Pothole Patching Task",
         wo_type="standard",
-        status="awaiting_verification",
+        status="completed_pending_review",
         report_id=rep.id,
         assigned_by_id=501,
         assigned_to_id=503  # assigned to field worker
     )
     db.add(wo)
+    db.flush()
+    db.add(gov_models.WorkOrderUpdate(
+        work_order_id=wo.id, official_id=503, previous_status="in_progress",
+        new_status="completed_pending_review", image_url="/api/uploads/reports/initial-proof.jpg",
+    ))
     db.commit()
     db.refresh(wo)
     wo_id = wo.id
@@ -621,10 +626,25 @@ def test_separation_of_duties_strictly_enforced(client, seeded_users_and_geo):
     assert r_check.status == "in_progress"
     db.close()
 
+    # Rework needs a fresh submission before another independent review.
+    db = TestingSessionLocal()
+    reworked = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    reworked.status = "completed_pending_review"
+    db.add(gov_models.WorkOrderUpdate(
+        work_order_id=wo_id, official_id=503, previous_status="rework_required",
+        new_status="completed_pending_review", image_url="/api/uploads/reports/rework-proof.jpg",
+    ))
+    db.commit()
+    db.close()
+
     # 3. Independent inspector verifies with passed=True -> completed & report resolved
     pass_verify_res = client.post(f"/api/gov/work-orders/{wo_id}/verify", json={
         "passed": True,
-        "notes": "Rework verified, asphalt compaction passed test."
+        "notes": "Rework verified, asphalt compaction passed test.",
+        "checklist_results": {
+            "specifications": True, "siteCleared": True,
+            "qualityTested": True, "photoVerified": True,
+        },
     }, headers=inspector_hdr)
     assert pass_verify_res.status_code == 200
     assert pass_verify_res.json()["work_order"]["status"] == "completed"
@@ -634,6 +654,151 @@ def test_separation_of_duties_strictly_enforced(client, seeded_users_and_geo):
     r_check = db.query(models.Report).filter(models.Report.id == rep_id).first()
     assert r_check.status == "resolved"
     db.close()
+
+
+def test_report_work_approval_requires_reason_and_eligible_state(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    report = models.Report(ticket_id="PUL-APPROVAL-01", category="Roads", description="Road repair", status="pending_approval")
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    report_id = report.id
+    db.close()
+
+    headers = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
+    short = client.post(f"/api/gov/reports/{report_id}/approve-for-work", json={"reason": "ok"}, headers=headers)
+    assert short.status_code == 422
+    approved = client.post(f"/api/gov/reports/{report_id}/approve-for-work", json={
+        "reason": "Field repair is warranted after engineering review",
+    }, headers=headers)
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["status"] == "approved_internal"
+    repeat = client.post(f"/api/gov/reports/{report_id}/approve-for-work", json={
+        "reason": "Second approval attempt must be rejected",
+    }, headers=headers)
+    assert repeat.status_code == 409
+    assigned = client.post("/api/gov/work-orders", json={
+        "title": "Repair approved road report", "report_id": report_id,
+        "assigned_to_id": 503, "priority": "critical", "notes": "Assign field repair",
+    }, headers=headers)
+    assert assigned.status_code == 200, assigned.text
+    assert assigned.json()["status"] == "assigned"
+    assert assigned.json()["is_emergency_assignment"] is False
+    db = TestingSessionLocal()
+    assert db.query(models.Report).filter(models.Report.id == report_id).first().status == "dispatched"
+    db.close()
+
+
+def test_report_rejection_records_reason_without_penalizing_resident(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    report = models.Report(
+        ticket_id="PUL-REJECT-01", category="Roads", description="Unclear road report",
+        status="pending", resident_id=901,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    report_id = report.id
+    original_score = db.query(models.Resident).filter(models.Resident.id == 901).first().trust_score
+    db.close()
+
+    headers = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
+    response = client.patch(f"/api/reports/{report_id}/reject", json={
+        "reason": "Location and evidence require a new submission",
+    }, headers=headers)
+    # City Engineer may inspect the decision, but only intake roles can reject it.
+    assert response.status_code == 403
+
+    db = TestingSessionLocal()
+    dispatcher = models.Official(
+        id=505, full_name="Intake Dispatcher", email="dispatcher@caloocan.gov.ph",
+        role="dispatcher", password_hash=auth.get_password_hash("Dispatch123!"), is_active=True,
+    )
+    db.add(dispatcher)
+    db.commit()
+    db.close()
+    dispatcher_token = auth.create_access_token({"sub": "dispatcher@caloocan.gov.ph"})
+    response = client.patch(f"/api/reports/{report_id}/reject", json={
+        "reason": "Location and evidence require a new submission",
+    }, headers={"Authorization": f"Bearer {dispatcher_token}"})
+    assert response.status_code == 200, response.text
+
+    db = TestingSessionLocal()
+    assert db.query(models.Report).filter(models.Report.id == report_id).first().status == "rejected"
+    assert db.query(models.Resident).filter(models.Resident.id == 901).first().trust_score == original_score
+    timeline = db.query(gov_models.ProcessTimeline).filter(gov_models.ProcessTimeline.report_id == report_id).order_by(gov_models.ProcessTimeline.id.desc()).first()
+    assert "new submission" in timeline.note
+    db.close()
+
+
+def test_project_route_advances_one_phase_and_returns_project(client, seeded_users_and_geo):
+    headers = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
+    created = client.post("/api/gov/projects", json={
+        "title": "Drainage survey", "description": "Survey blocked drainage",
+        "requesting_party": "City Engineering Department",
+    }, headers=headers)
+    assert created.status_code == 200, created.text
+    project_id = created.json()["id"]
+
+    skipped = client.patch(f"/api/gov/projects/{project_id}/advance", json={
+        "status": "resolved",
+    }, headers=headers)
+    assert skipped.status_code == 400
+
+    advanced = client.patch(f"/api/gov/projects/{project_id}/advance", json={
+        "status": "survey_in_progress",
+    }, headers=headers)
+    assert advanced.status_code == 200, advanced.text
+    assert advanced.json()["id"] == project_id
+    assert advanced.json()["current_phase"] == 2
+
+
+def test_completion_proof_is_private_and_requires_independent_review(client, seeded_users_and_geo):
+    from PIL import Image
+
+    db = TestingSessionLocal()
+    wo = gov_models.WorkOrder(
+        title="Drainage repair", wo_type="standard", status="in_progress",
+        assigned_by_id=501, assigned_to_id=503,
+    )
+    db.add(wo)
+    db.commit()
+    db.refresh(wo)
+    wo_id = wo.id
+    db.close()
+
+    proof = io.BytesIO()
+    Image.new("RGB", (8, 8), color="blue").save(proof, format="JPEG")
+    field_headers = {"Authorization": f"Bearer {seeded_users_and_geo['field_worker']}"}
+    inspector_headers = {"Authorization": f"Bearer {seeded_users_and_geo['inspector']}"}
+    response = client.post(
+        f"/api/gov/work-orders/{wo_id}/completion-evidence",
+        files={"image": ("proof.jpg", proof.getvalue(), "image/jpeg")},
+        data={"notes": "Drainage cleared and flow checked"}, headers=field_headers,
+    )
+    assert response.status_code == 200, response.text
+    evidence_url = response.json()["image_url"]
+    assert client.get(evidence_url).status_code == 401
+    assert client.get(evidence_url, headers=inspector_headers).status_code == 200
+    assert client.get(evidence_url.replace("/api/gov/work-orders/", "/api/uploads/docs/work_orders/")).status_code == 404
+
+    db = TestingSessionLocal()
+    assert db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first().status == "completed_pending_review"
+    db.close()
+
+    review = client.post(f"/api/gov/work-orders/{wo_id}/verify", json={
+        "passed": True,
+        "notes": "Independent inspection passed",
+        "checklist_results": {
+            "specifications": True, "siteCleared": True,
+            "qualityTested": True, "photoVerified": True,
+        },
+    }, headers=inspector_headers)
+    assert review.status_code == 200, review.text
+    assert review.json()["work_order"]["status"] == "completed"
+
+    filename = evidence_url.rsplit("/", 1)[-1]
+    os.remove(os.path.join("uploads", "docs", "work_orders", str(wo_id), filename))
 
 
 # =============================================================================

@@ -97,13 +97,15 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     # 1. Try Official table first
     user = db.query(models.Official).filter(models.Official.email == email).first()
     if user:
-        # print(f"DEBUG: Found official {email}")
+        if not user.is_active or user.is_suspended:
+            raise HTTPException(status_code=403, detail="Account is inactive or suspended.")
         return user
         
     # 2. Try Resident table
     user = db.query(models.Resident).filter(models.Resident.email == email).first()
     if user:
-        # print(f"DEBUG: Found resident {email}")
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Account is inactive.")
         if not user.is_verified:
             raise unverified_exception
         return user
@@ -141,11 +143,11 @@ def get_optional_current_user(
     # 1. Probe Official table first
     official = db.query(models.Official).filter(models.Official.email == email).first()
     if official:
-        return official
+        return official if official.is_active and not official.is_suspended else None
         
     # 2. Probe Resident table
     resident = db.query(models.Resident).filter(models.Resident.email == email).first()
-    if resident and resident.is_verified:
+    if resident and resident.is_active and resident.is_verified:
         return resident
 
     return None

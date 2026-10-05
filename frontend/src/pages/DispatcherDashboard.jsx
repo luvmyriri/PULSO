@@ -31,7 +31,6 @@ import {
     Flame,
     Activity,
     X,
-    Trash2,
     Image as ImageIcon,
     Building2,
     HelpCircle,
@@ -514,9 +513,6 @@ const DispatcherDashboard = () => {
     const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
     const [selectedCategory, setSelectedCategory] = useState('All Categories');
     const [selectedStatus, setSelectedStatus] = useState('All Statuses');
-    const [reportToDelete, setReportToDelete] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [deleteError, setDeleteError] = useState(null);
     const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
     const [showLegend, setShowLegend] = useState(false); // Collapsible status/priority legend
     const [showAiHelp, setShowAiHelp] = useState(false); // Expandable Gemini AI helper in triage queue
@@ -893,11 +889,28 @@ const DispatcherDashboard = () => {
         }
     }, [map, panorama]);
     const [dispatchForm, setDispatchForm] = useState({
-        assigned_to_id: 2, // Dummy ID for field engineer
+        assigned_to_id: '',
         priority: 'normal',
         title: '',
         description: ''
     });
+    const [eligibleAssignees, setEligibleAssignees] = useState([]);
+    const [assigneeError, setAssigneeError] = useState('');
+    useEffect(() => {
+        if (!isDispatchModalOpen) return;
+        const controller = new AbortController();
+        setEligibleAssignees([]);
+        setAssigneeError('');
+        fetch(`${API_BASE_URL}/api/gov/dispatch/eligible-assignees`, {
+            headers: { Authorization: `Bearer ${getAuthToken()}` }, signal: controller.signal,
+        }).then(async (response) => {
+            if (!response.ok) throw new Error(`Eligible staff unavailable (HTTP ${response.status})`);
+            const data = await response.json();
+            if (!Array.isArray(data)) throw new Error('Eligible staff response is invalid');
+            setEligibleAssignees(data);
+        }).catch((cause) => { if (cause.name !== 'AbortError') setAssigneeError(cause.message); });
+        return () => controller.abort();
+    }, [isDispatchModalOpen]);
 
     const isDarkMode = theme === 'system' 
         ? window.matchMedia('(prefers-color-scheme: dark)').matches 
@@ -1050,133 +1063,78 @@ const DispatcherDashboard = () => {
         }
     };
 
-    const handleDeleteReport = async () => {
-        if (!reportToDelete) return;
-        setIsDeleting(true);
-        setDeleteError(null);
-        const targetId = reportToDelete.id;
-        const ticketId = formatTicketId(reportToDelete.ticket_id, targetId);
-        
-        try {
-            const url = `${API_BASE_URL}/api/reports/${targetId}`;
-            console.log(`[DELETE] Purging: ${url}`);
-            
-            const response = await fetch(url, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (response.ok) {
-                setNotification({
-                    type: 'success',
-                    message: `TASK FINALIZED: Report ${ticketId} has been professionally purged from all systems.`
-                });
-                
-                fetchReports();
-                if (selectedReport?.id === targetId) setSelectedReport(null);
-                if (selectedMarker?.id === targetId) setSelectedMarker(null);
-                setReportToDelete(null);
-                setTimeout(() => setNotification(null), 6000);
-            } else if (response.status === 404) {
-                setNotification({
-                    type: 'success',
-                    message: `SYNC NOTICE: Report ${ticketId} was already removed. Synchronizing UI...`
-                });
-                fetchReports();
-                setReportToDelete(null);
-                setTimeout(() => setNotification(null), 4000);
-            } else {
-                const err = await response.json();
-                const msg = err.detail || "The server rejected the deletion request.";
-                setDeleteError(msg);
-                setNotification({ type: 'error', message: `Deletion Failed: ${msg}` });
-            }
-        } catch (error) {
-            console.error("Critical Deletion Error:", error);
-            const msg = "Network error: The PULSO backend is unreachable. Please verify the server is running.";
-            setDeleteError(msg);
-            setNotification({ type: 'error', message: msg });
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
     const handleVerifyReport  = (id) => handleStatusAction(id, '/status', 'Report moved to verified queue.', null, 'pending_approval');
-    const handleApproveReport = (id) => handleStatusAction(id, '/status', 'Budgeting finalized and report approved.', "Finalize Budget & Approve Report?", 'approved_internal');
-    const handleRejectReport  = (id) => handleStatusAction(id, '/reject', 'Report rejected and resident penalized.', "Reject this report?");
-    const handleResolveReport = async (reportId) => {
-        const report = allReports.find(r => r.id === reportId);
-        const ticketId = report ? formatTicketId(report.ticket_id, reportId) : `Report #${reportId}`;
-        
-        const { value: file } = await Swal.fire({
-            title: 'Upload Completion Proof',
-            html: `
-                <div class="text-left px-2">
-                    <p class="text-sm text-slate-400 mb-4">You are about to resolve <strong class="text-white">${ticketId}</strong>. A proof picture of the fixed infrastructure is required to finalize this phase and automatically notify the citizen.</p>
-                    <input type="file" id="proof-image" accept="image/*" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer border border-slate-700/50 rounded-lg bg-slate-800/30 p-2"/>
-                </div>
-            `,
-            background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
-            color: document.documentElement.classList.contains('dark') ? '#fff' : '#000',
+    const handleApproveReport = async (id) => {
+        const { value: reason } = await Swal.fire({
+            title: 'Approve for field work',
+            input: 'textarea',
+            inputLabel: 'Decision reason',
+            inputPlaceholder: 'Record why this report is ready for field work',
+            inputValidator: (value) => value?.trim().length >= 10 ? undefined : 'Enter at least 10 characters.',
             showCancelButton: true,
-            confirmButtonText: 'Resolve & Notify Citizen',
-            confirmButtonColor: '#10b981',
-            cancelButtonColor: '#475569',
-            preConfirm: () => {
-                const fileInput = Swal.getPopup().querySelector('#proof-image');
-                if (!fileInput.files || fileInput.files.length === 0) {
-                    Swal.showValidationMessage('A proof image is mandatory for compliance.');
-                    return false;
-                }
-                return fileInput.files[0];
-            }
+            confirmButtonText: 'Approve for work',
         });
-
-        if (!file) return;
-        setActionLoading(reportId);
-        
+        if (!reason) return;
+        setActionLoading(id);
         try {
-            const formData = new FormData();
-            formData.append('image', file);
-
-            const response = await fetch(`${API_BASE_URL}/api/reports/${reportId}/resolve`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
+            const response = await fetch(`${API_BASE_URL}/api/gov/reports/${id}/approve-for-work`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ reason: reason.trim() }),
             });
-
-            if (response.ok) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Resolution Successful',
-                    text: 'The incident is closed and the resident has been notified with the proof picture attached.',
-                    timer: 3000,
-                    showConfirmButton: false,
-                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
-                });
-                fetchReports();
-                setSelectedReport(null);
-            } else {
-                const err = await response.json();
-                Swal.fire({ 
-                    icon: 'error', 
-                    title: 'Action Failed', 
-                    text: err.detail || 'Could not resolve report.', 
-                    background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
-                });
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                throw new Error(body.detail || `Approval failed (HTTP ${response.status})`);
             }
-        } catch (error) {
-            console.error('Resolution Error:', error);
+            await Swal.fire({ icon: 'success', title: 'Approved for field work', text: 'The report can now be assigned to an eligible field official.' });
+            fetchReports();
+            setSelectedReport(null);
+        } catch (cause) {
+            Swal.fire({ icon: 'error', title: 'Approval failed', text: cause.message || 'Unable to approve this report.' });
         } finally {
             setActionLoading(null);
         }
     };
+    const handleRejectReport = async (id) => {
+        const { value: reason } = await Swal.fire({
+            title: 'Reject report',
+            input: 'textarea',
+            inputLabel: 'Decision reason',
+            inputPlaceholder: 'Explain why this report cannot proceed',
+            inputValidator: (value) => value?.trim().length >= 10 ? undefined : 'Enter at least 10 characters.',
+            showCancelButton: true,
+            confirmButtonText: 'Record rejection',
+        });
+        if (!reason) return;
+        setActionLoading(id);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/reports/${id}/reject`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ reason: reason.trim() }),
+            });
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                throw new Error(body.detail || `Rejection failed (HTTP ${response.status})`);
+            }
+            await Swal.fire({ icon: 'success', title: 'Rejection recorded', text: 'The decision reason was saved with the report history.' });
+            fetchReports();
+            setSelectedReport(null);
+        } catch (cause) {
+            Swal.fire({ icon: 'error', title: 'Rejection failed', text: cause.message || 'Unable to reject this report.' });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+    const handleResolveReport = () => navigate('/gov/work-orders');
 
     // Replaces the generic handleStatusAction('/dispatch') with actual Work Order creation
     const handleCreateWorkOrder = async (e) => {
         e.preventDefault();
+        if (!dispatchForm.assigned_to_id || !dispatchForm.description.trim()) {
+            Swal.fire({ icon: 'error', title: 'Assignment incomplete', text: 'Choose an eligible official and enter field instructions.' });
+            return;
+        }
         setActionLoading(selectedReport.id);
         
         try {
@@ -1184,13 +1142,12 @@ const DispatcherDashboard = () => {
                 title: dispatchForm.title || `Fix ${selectedReport.ai_category || selectedReport.category}`,
                 description: dispatchForm.description || selectedReport.ai_summary || "Please address the reported issue.",
                 wo_type: "standard",
-                status: "open",
                 priority: dispatchForm.priority,
                 assigned_to_id: parseInt(dispatchForm.assigned_to_id, 10),
                 report_id: selectedReport.id
             };
 
-            const response = await fetch(`${API_BASE_URL}/api/work-orders`, {
+            const response = await fetch(`${API_BASE_URL}/api/gov/work-orders`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -1207,7 +1164,7 @@ const DispatcherDashboard = () => {
                 Swal.fire({
                     icon: 'success',
                     title: 'Work Order Dispatched!',
-                    text: `Work order ${newWo.wo_number || ''} created and field team deployed. Status updated to Dispatched.`,
+                    text: `Work order ${newWo.wo_number || ''} was assigned to the selected field official.`,
                     timer: 3500,
                     showConfirmButton: false,
                     background: document.documentElement.classList.contains('dark') ? '#0f172a' : '#fff',
@@ -2255,22 +2212,13 @@ const DispatcherDashboard = () => {
                                                         </span>
                                                     )}
                                                     {report.status === 'dispatched' && (
-                                                        <span 
+                                                        <button type="button"
                                                             onClick={(e) => { e.stopPropagation(); handleResolveReport(report.id); }}
                                                             className="text-[10px] bg-secondary-light text-secondary border border-secondary/20 px-2 py-1 rounded-lg uppercase font-bold tracking-wider hover:bg-secondary hover:text-white transition-colors cursor-pointer"
                                                         >
-                                                            {actionLoading === report.id ? '...' : 'Resolve'}
-                                                        </span>
+                                                            View work orders
+                                                        </button>
                                                     )}
-                                                    <div className="h-3 w-px bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
-                                                    <button 
-                                                        onClick={(e) => { e.stopPropagation(); setReportToDelete(report); }}
-                                                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-500 transition-all cursor-pointer shadow-sm active:scale-95"
-                                                        title={`Permanently delete ${report.ticket_id || `Report #${report.id}`}`}
-                                                        aria-label={`Permanently delete ${report.ticket_id || `Report #${report.id}`}`}
-                                                    >
-                                                        <Trash2 size={13} />
-                                                    </button>
                                                 </div>
                                             </div>
                                         </button>
@@ -2545,15 +2493,6 @@ const DispatcherDashboard = () => {
                                                     </div>
 
                                                     <div className="flex items-center gap-1 shrink-0">
-                                                        {/* Subtle delete button */}
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setReportToDelete(selectedMarker); }}
-                                                            className="w-7 h-7 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 flex items-center justify-center transition-colors cursor-pointer"
-                                                            title={`Delete report #${selectedMarker.ticket_id || selectedMarker.id}`}
-                                                            aria-label="Delete report"
-                                                        >
-                                                            <Trash2 size={13} />
-                                                        </button>
                                                         {/* Clean close button */}
                                                         <button 
                                                             onClick={() => setSelectedMarker(null)} 
@@ -3449,7 +3388,7 @@ const DispatcherDashboard = () => {
                                                             {actionLoading === selectedReport.id ? 'Approving...' : 'Approve for Work Order'}
                                                         </button>
                                                         <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center leading-tight">
-                                                            Finalizes budgeting and moves project into active crew dispatch queue.
+                                                            Records a reason and makes this report eligible for field assignment.
                                                         </p>
                                                     </div>
                                                 )}
@@ -3459,7 +3398,7 @@ const DispatcherDashboard = () => {
                                                         <button 
                                                             onClick={() => {
                                                                 setDispatchForm({
-                                                                    assigned_to_id: 2,
+                                                                    assigned_to_id: '',
                                                                     priority: selectedReport.urgency === 'critical' ? 'critical' : selectedReport.urgency === 'high' ? 'high' : 'normal',
                                                                     title: `Repair ${selectedReport.ai_category || selectedReport.category || 'Infrastructure Issue'}`,
                                                                     description: selectedReport.description || selectedReport.ai_summary || ''
@@ -3471,7 +3410,7 @@ const DispatcherDashboard = () => {
                                                             <Briefcase size={14} /> Generate Work Order
                                                         </button>
                                                         <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center leading-tight">
-                                                            Assigns personnel, vehicles, and schedules field repair deployment.
+                                                            Assigns an eligible field official and records the dispatch.
                                                         </p>
                                                     </div>
                                                 )}
@@ -3484,15 +3423,15 @@ const DispatcherDashboard = () => {
                                                             className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow disabled:opacity-50 flex items-center justify-center gap-2 active:scale-98"
                                                         >
                                                             <CheckCircle size={14} />
-                                                            {actionLoading === selectedReport.id ? 'Updating...' : 'Mark Resolved'}
+                                                            View work orders
                                                         </button>
                                                         <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center leading-tight">
-                                                            Uploads completion photo proof and notifies citizen of resolved issue.
+                                                            Completion proof and independent inspection are handled on the work order.
                                                         </p>
                                                     </div>
                                                 )}
 
-                                                {/* Secondary Actions Row: Process Audit & Reject Spam */}
+                                                {/* Secondary Actions Row: Process Audit & Intake Decision */}
                                                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
                                                     <button 
                                                         type="button"
@@ -3505,12 +3444,12 @@ const DispatcherDashboard = () => {
 
                                                     <button 
                                                         onClick={() => handleRejectReport(selectedReport.id)}
-                                                        disabled={actionLoading === selectedReport.id}
+                                                        disabled={actionLoading === selectedReport.id || !['pending', 'unverified', 'needs_information', 'pending_approval'].includes(selectedReport.status)}
                                                         className="bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 py-2 rounded-xl text-[11px] font-bold transition-colors border border-red-200 dark:border-red-800/60 disabled:opacity-50 flex items-center justify-center gap-1.5 active:scale-95"
-                                                        title="Flag report as spam or invalid"
+                                                        title="Record a reasoned report rejection"
                                                     >
                                                         <X size={13} />
-                                                        {actionLoading === selectedReport.id ? '...' : 'Reject Spam'}
+                                                        {actionLoading === selectedReport.id ? '...' : 'Reject report'}
                                                     </button>
                                                 </div>
                                             </div>
@@ -3624,7 +3563,7 @@ const DispatcherDashboard = () => {
                                         <div>
                                             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                                                 <Truck size={13} className="text-orange-500" />
-                                                <span>Assign To Fleet / Lead</span>
+                                                <span>Assign to field official</span>
                                             </label>
                                             <select 
                                                 required
@@ -3632,11 +3571,10 @@ const DispatcherDashboard = () => {
                                                 onChange={(e) => setDispatchForm({...dispatchForm, assigned_to_id: e.target.value})}
                                                 className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all cursor-pointer shadow-xs"
                                             >
-                                                <option value="2">Team Alpha — Engr. Dela Cruz (Electrical & Lighting)</option>
-                                                <option value="3">Team Beta — Engr. Bautista (Roads & Bridges)</option>
-                                                <option value="4">Team Gamma — Engr. Reyes (Drainage & Waterworks)</option>
-                                                <option value="5">Team Delta — Environmental Sanitation Task Force</option>
+                                                <option value="">Choose an eligible official</option>
+                                                {eligibleAssignees.map((person) => <option key={person.id} value={person.id}>{person.full_name} · {person.role.replaceAll('_', ' ')}</option>)}
                                             </select>
+                                            {assigneeError && <p role="alert" className="text-red-600 text-xs mt-1">{assigneeError}</p>}
                                         </div>
 
                                         {/* Priority Level */}
@@ -3693,7 +3631,7 @@ const DispatcherDashboard = () => {
                                     <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-slate-700 dark:text-slate-300 text-[11px] flex items-start gap-2.5">
                                         <Sparkles size={14} className="text-orange-500 shrink-0 mt-0.5" />
                                         <div className="leading-relaxed">
-                                            Executing dispatch advances the report to <strong className="text-orange-600 dark:text-orange-400 font-bold">Dispatched</strong>, locks engineering resources, logs an immutable audit event, and syncs across the Command Center map.
+                                            Assignment advances an approved report to dispatched and records the decision in the timeline and audit history.
                                         </div>
                                     </div>
 
@@ -3709,7 +3647,7 @@ const DispatcherDashboard = () => {
                                         </button>
                                         <button 
                                             type="submit"
-                                            disabled={actionLoading === selectedReport.id}
+                                            disabled={actionLoading === selectedReport.id || eligibleAssignees.length === 0}
                                             className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
                                         >
                                             {actionLoading === selectedReport.id ? (
@@ -4058,79 +3996,6 @@ const DispatcherDashboard = () => {
                     </motion.div>
                 )}
 
-                {reportToDelete && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[1100] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4"
-                        onClick={() => !isDeleting && setReportToDelete(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden"
-                        >
-                            <div className="p-8 text-center">
-                                <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-red-600 dark:text-red-400 animate-pulse">
-                                    <AlertTriangle size={40} />
-                                </div>
-                                <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
-                                    Confirm Permanent Deletion
-                                </h3>
-                                <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                                    Are you sure you want to permanently remove <strong className="text-slate-900 dark:text-white">"{getReportPlainTitle(reportToDelete)}"</strong> (<span className="font-mono text-red-500 font-bold">{formatTicketId(reportToDelete.ticket_id, reportToDelete.id)}</span>)? 
-                                    This action is irreversible and will remove all associated logs and work orders.
-                                </p>
-                                
-                                {deleteError && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-3 text-left"
-                                    >
-                                        <div className="shrink-0 p-1 bg-red-100 dark:bg-red-500/20 rounded-full">
-                                            <X size={14} />
-                                        </div>
-                                        {deleteError}
-                                    </motion.div>
-                                )}
-
-                                <div className="flex gap-4">
-                                    <button
-                                        disabled={isDeleting}
-                                        onClick={() => { setReportToDelete(null); setDeleteError(null); }}
-                                        className="flex-1 px-6 py-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50 active:scale-95"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        disabled={isDeleting}
-                                        onClick={handleDeleteReport}
-                                        className="flex-1 px-6 py-3.5 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
-                                    >
-                                        {isDeleting ? (
-                                            <>
-                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                Deleting...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Trash2 size={18} />
-                                                Delete Report
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            {/* Bottom aesthetic bar */}
-                            <div className="h-1.5 w-full bg-red-600" />
-                        </motion.div>
-                    </motion.div>
-                )}
                 {/* ── Milestone Progress & Audit Lifecycle Modal ── */}
                 {isAuditModalOpen && selectedReport && (
                     <motion.div

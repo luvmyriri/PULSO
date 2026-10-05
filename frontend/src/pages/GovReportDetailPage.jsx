@@ -27,6 +27,7 @@ import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import RequestInfoModal from '../components/modals/RequestInfoModal';
 import AssignWorkOrderModal from '../components/modals/AssignWorkOrderModal';
+import ApproveReportModal from '../components/modals/ApproveReportModal';
 import { checkPermission } from '../utils/rbac_utils';
 import { formatTicketId } from '../utils/reportWorkflow';
 import { API_BASE_URL } from '../utils/apiBase';
@@ -73,9 +74,11 @@ export default function GovReportDetailPage() {
 
     const [requestModalOpen, setRequestModalOpen] = useState(false);
     const [assignModalOpen, setAssignModalOpen] = useState(false);
+    const [approveModalOpen, setApproveModalOpen] = useState(false);
 
-    const canVerify = checkPermission(user, 'verify_report');
-    const canAssign = checkPermission(user, 'assign_work_order');
+    const canVerify = ['dispatcher', 'manager'].includes(user?.role);
+    const canApprove = ['dispatcher', 'asst_city_engineer', 'city_engineer', 'manager', 'system_admin'].includes(user?.role);
+    const canAssign = ['dispatcher', 'project_engineer', 'asst_city_engineer', 'city_engineer', 'manager', 'system_admin'].includes(user?.role);
     const canRequestInfo = checkPermission(user, 'request_info');
 
     const showToast = (msg) => {
@@ -165,7 +168,6 @@ export default function GovReportDetailPage() {
     };
 
     const handleAssignWorkOrderSubmit = async (woData) => {
-        try {
             const res = await fetch(`${API_BASE_URL}/api/gov/work-orders`, {
                 method: 'POST',
                 headers: {
@@ -175,20 +177,17 @@ export default function GovReportDetailPage() {
                 body: JSON.stringify({
                     report_id: report.id,
                     title: woData.title,
+                    assigned_to_id: woData.assigned_to_id,
                     priority: woData.priority,
-                    notes: `${woData.reason} | Team: ${woData.team}`,
+                    notes: woData.reason,
                 }),
             });
-            if (res.ok) {
-                showToast(`Work order successfully dispatched to ${woData.team}.`);
-                loadReportDetails();
-            } else {
+            if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                showToast(err.detail || 'Failed to dispatch work order.');
+                throw new Error(err.detail || `Work order creation failed (HTTP ${res.status})`);
             }
-        } catch {
-            showToast('Network error while assigning work order.');
-        }
+            showToast('Work order assigned to the selected field official.');
+            loadReportDetails();
     };
 
     const currentStepIndex = (() => {
@@ -463,7 +462,7 @@ export default function GovReportDetailPage() {
                                     Authorized Actions
                                 </h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-                                    {canVerify && (report.status === 'unverified' || report.status === 'unvalidated') && (
+                                    {canVerify && ['pending', 'unverified'].includes(report.status) && (
                                         <button
                                             type="button"
                                             onClick={handleVerifyReport}
@@ -486,7 +485,13 @@ export default function GovReportDetailPage() {
                                         </button>
                                     )}
 
-                                    {canAssign && (
+                                    {canApprove && report.status === 'pending_approval' && (
+                                        <button type="button" onClick={() => setApproveModalOpen(true)} className="citizen-report-primary-action">
+                                            <ShieldCheck size={16} /> Approve for work
+                                        </button>
+                                    )}
+
+                                    {canAssign && report.status === 'approved_internal' && (
                                         <button
                                             type="button"
                                             onClick={() => setAssignModalOpen(true)}
@@ -603,6 +608,11 @@ export default function GovReportDetailPage() {
                     onSubmit={handleAssignWorkOrderSubmit}
                     report={report}
                 />
+                {approveModalOpen && <ApproveReportModal
+                    report={report}
+                    onClose={() => setApproveModalOpen(false)}
+                    onApproved={() => { showToast('Report approved for field work.'); loadReportDetails(); }}
+                />}
             </main>
         </div>
     );

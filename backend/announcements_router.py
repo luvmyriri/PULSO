@@ -129,8 +129,8 @@ def _format_announcement_response(db: Session, item: gov_models.Announcement) ->
 
 def _execute_channel_deliveries(db: Session, item: gov_models.Announcement):
     """
-    Executes delivery dispatches across configured channels.
-    Updates AnnouncementDelivery status, counts, and error tracking.
+    Record web publication. SMS/email require an approved recipient selection and
+    a separate delivery worker; publication itself must not claim they were sent.
     """
     now = datetime.now(timezone.utc)
     channels = item.channels or ["web"]
@@ -147,21 +147,20 @@ def _execute_channel_deliveries(db: Session, item: gov_models.Announcement):
             )
             db.add(delivery)
 
-        delivery.last_attempted_at = now
-        delivery.status = "delivered"
-        delivery.delivered_at = now
-
         if channel == "web":
+            delivery.last_attempted_at = now
+            delivery.status = "delivered"
+            delivery.delivered_at = now
             delivery.recipient_count = 1
             delivery.delivered_count = 1
-        elif channel == "sms":
-            est_recipients = 250 if item.target_audience == "public" else 50
-            delivery.recipient_count = est_recipients
-            delivery.delivered_count = est_recipients
-        elif channel == "email":
-            est_emails = 120 if item.target_audience == "public" else 25
-            delivery.recipient_count = est_emails
-            delivery.delivered_count = est_emails
+        else:
+            delivery.status = "pending"
+            delivery.last_attempted_at = None
+            delivery.delivered_at = None
+            delivery.recipient_count = 0
+            delivery.delivered_count = 0
+            delivery.failed_count = 0
+            delivery.error_message = "Recipient selection and channel delivery are not configured."
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -9,10 +9,18 @@ import hashlib
 import uuid
 import json
 import roles_service
+import models
 from datetime import datetime, timedelta
 from fastapi.responses import FileResponse
 
 router = APIRouter()
+
+
+def _require_records_view(db: Session, current_user: Any):
+    """The document registry and file bytes are staff-only until scoped release exists."""
+    if not isinstance(current_user, models.Official):
+        raise HTTPException(status_code=403, detail="Government records access required.")
+    roles_service.assert_permission(db, current_user, "records", "view")
 
 UPLOAD_DIR = "uploads/docs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -191,6 +199,7 @@ async def get_document_file(
     Serves the physical file with strict session-based Gating.
     Enforces RBAC based on document confidentiality.
     """
+    _require_records_view(db, current_user)
     doc = db.query(SystemDocument).filter(SystemDocument.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -238,6 +247,7 @@ def get_documents_by_target(
     """
     Fetch all uploaded documents for a specific entity (e.g. ProjectRequest #12).
     """
+    _require_records_view(db, current_user)
     docs = db.query(SystemDocument).filter(
         SystemDocument.target_model == model,
         SystemDocument.target_id == target_id
@@ -261,11 +271,7 @@ def get_document_registry(
     Fetch all documents in the central registry with optional filters.
     Supports filtering by target_model, target_id, document_type, and search (by hash or filename).
     """
-    # Gating: Registry visibility check
-    # Only staff with records:view can browse the registry (as requested: Admin and Engineers)
-    if current_user.role != "resident":
-        if not roles_service.has_permission(db, current_user, "records", "view"):
-             raise HTTPException(status_code=403, detail="Access Denied: Registry view requires Records capability.")
+    _require_records_view(db, current_user)
 
     query = db.query(SystemDocument)
 
@@ -313,6 +319,7 @@ def get_document_counts(
     """
     Get document counts by target_model for the registry dashboard.
     """
+    _require_records_view(db, current_user)
     counts = {}
     target_models = ["ProjectRequest", "WorkOrder", "ProcurementRequest", "OBOInspection"]
     for model in target_models:
@@ -341,14 +348,25 @@ def toggle_legal_hold(
     """
     Toggle legal hold status. Only for Admin/Chief.
     """
-    if current_user.role not in ["Admin", "Chief", "CityEngineer"]:
-        raise HTTPException(status_code=403, detail="Unauthorized to modify legal hold.")
+    if not isinstance(current_user, models.Official):
+        raise HTTPException(status_code=403, detail="Government records access required.")
+    roles_service.assert_permission(db, current_user, "records", "manage")
+    if not isinstance(payload.get("legal_hold"), bool) or not (payload.get("reason") or "").strip():
+        raise HTTPException(status_code=400, detail="Legal-hold value and reason are required.")
     
     doc = db.query(SystemDocument).filter(SystemDocument.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    doc.legal_hold = payload.get("legal_hold", False)
+    doc.legal_hold = payload["legal_hold"]
+    from gov_models import AuditLog
+    db.add(AuditLog(
+        trigger_type="document_legal_hold",
+        actor_id=current_user.id,
+        actor_role=current_user.role,
+        action="Applied legal hold" if doc.legal_hold else "Removed legal hold",
+        details=f"Document ID: {document_id}; reason: {payload['reason'].strip()}",
+    ))
     db.commit()
     db.refresh(doc)
     return doc
@@ -359,27 +377,7 @@ def delete_document(
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_user)
 ):
-    """
-    Delete a document by ID. Removes the file from storage and database record.
-    Blocked if legal_hold is active.
-    """
-    doc = db.query(SystemDocument).filter(SystemDocument.id == document_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found.")
-
-    if doc.legal_hold:
-        raise HTTPException(status_code=403, detail="Cannot delete document under Legal Hold.")
-
-    # Remove the file from storage if it exists
-    if doc.file_path and os.path.exists(doc.file_path):
-        try:
-            os.remove(doc.file_path)
-        except OSError as e:
-            print(f"Failed to delete file {doc.file_path}: {e}")
-
-    # Delete the database record
-    db.delete(doc)
-    db.commit()
-
-    return {"message": "Document deleted successfully."}
+    """Permanent deletion is unavailable until retention/disposition is governed."""
+    roles_service.assert_permission(db, current_user, "records", "manage")
+    raise HTTPException(status_code=409, detail="Permanent document deletion is disabled. Use an approved disposition process.")
 
