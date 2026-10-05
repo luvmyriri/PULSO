@@ -18,8 +18,18 @@ import models
 import gov_models
 import gov_schemas
 
+
+def require_announcement_staff(current_user=Depends(get_current_user)):
+    if not isinstance(current_user, models.Official):
+        raise HTTPException(status_code=403, detail="Government announcement access required")
+    return current_user
+
+
 # Staff router for Government Operations Workspace
-router = APIRouter(prefix="/api/gov/announcements", tags=["Government Announcements"])
+router = APIRouter(
+    prefix="/api/gov/announcements", tags=["Government Announcements"],
+    dependencies=[Depends(require_announcement_staff)],
+)
 
 # Public router for resident updates portal
 public_router = APIRouter(prefix="/api/announcements", tags=["Public Announcements"])

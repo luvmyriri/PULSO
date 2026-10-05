@@ -799,6 +799,12 @@ def test_document_upload_requires_staff_permission_and_existing_target(client, s
     assert client.get(f"/api/gov/documents/get/{document_id}", headers=staff_headers).status_code == 404
 
 
+def test_resident_cannot_read_government_announcement_workspace(client, seeded_users_and_geo):
+    headers = {"Authorization": f"Bearer {seeded_users_and_geo['resident']}"}
+    response = client.get("/api/gov/announcements", headers=headers)
+    assert response.status_code == 403
+
+
 def test_completion_proof_is_private_and_requires_independent_review(client, seeded_users_and_geo):
     from PIL import Image
 
