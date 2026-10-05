@@ -475,7 +475,7 @@
     "track": {
       "header": {
         "title": "Track Public Infrastructure Report",
-        "subtitle": "Follow the live engineering progress and milestone timeline for any Caloocan City ticket.",
+        "subtitle": "Read the latest recorded status and public timeline for your Caloocan City ticket.",
         "badge": "Civic Aperture · Transparent Public Works"
       },
       "lookup": {
@@ -487,10 +487,35 @@
         "tokenPlaceholder": "TRK-XXXX-XXXX-XXXX-XXXX",
         "submitBtn": "Track Report",
         "searching": "Searching Civic Registry...",
-        "errorNotFound": "Report not found or invalid tracking credentials. Please check your Ticket ID and Token."
+        "errorNotFound": "Report not found or invalid tracking credentials. Please check your Ticket ID and Token.",
+        "networkError": "Could not reach the civic registry. Check your connection and try again."
+      },
+      "reply": {
+        "title": "Additional information requested",
+        "instructions": "Read the latest request below. Add the details staff asked for. Sign in as the report owner or use your secret tracking token.",
+        "label": "Your response",
+        "send": "Send information",
+        "sending": "Sending…",
+        "success": "Your information was recorded for engineering review.",
+        "credentialsError": "Sign in as the report owner or enter the secret tracking token to send information.",
+        "sendError": "Your information was not recorded. Review the report status and try again.",
+        "networkError": "Could not send your information. Check your connection and try again."
+      },
+      "status": {
+        "pending": "Pending review",
+        "unverified": "Pending verification",
+        "needs_information": "Additional information needed",
+        "pending_approval": "Awaiting engineering approval",
+        "approved_internal": "Approved for field work",
+        "dispatched": "Field team assigned",
+        "in_progress": "Work in progress",
+        "resolved": "Resolved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
       },
       "result": {
         "ticketHeader": "Ticket Details",
+        "statusLabel": "Recorded status",
         "categoryLabel": "Category",
         "barangayLabel": "Barangay / Area",
         "submittedOn": "Reported On",

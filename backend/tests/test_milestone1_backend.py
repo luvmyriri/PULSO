@@ -993,6 +993,60 @@ def test_report_docket_scope_and_one_information_request(client, seeded_users_an
     db.close()
 
 
+def test_guest_clarification_returns_ticket_to_triage_without_public_message_leak(
+    client, seeded_users_and_geo, monkeypatch
+):
+    import main
+
+    monkeypatch.setattr(main.claim_limiter, "check", lambda _request: None)
+    token = auth.generate_tracking_token()
+    db = TestingSessionLocal()
+    report = models.Report(
+        ticket_id="PUL-2026-REPLY", category="Roads", description="Damaged road edge",
+        status="needs_information", reporter_type="guest",
+        location_lat=14.70, location_lng=120.98,
+        tracking_token_hash=auth.hash_tracking_token(token),
+    )
+    db.add(report)
+    db.flush()
+    db.add(gov_models.ProcessTimeline(
+        report_id=report.id, status="needs_information", previous_status="pending",
+        actor_id=501, actor_role="city_engineer", is_public=True,
+        note="Please provide the nearest landmark.",
+    ))
+    db.commit()
+    db.close()
+    url = "/api/reports/information-reply"
+    body = {"ticket_id": "PUL-2026-REPLY", "message": "The damaged edge is beside the barangay hall gate."}
+    assert client.post(url, json=body).status_code == 404
+    tracked = client.post("/api/reports/track", json={
+        "ticket_id": body["ticket_id"], "tracking_token": token,
+    })
+    assert tracked.status_code == 200, tracked.text
+    assert tracked.json()["district_code"] is None
+    db = TestingSessionLocal()
+    db.query(models.Report).filter_by(ticket_id=body["ticket_id"]).update({"barangay_id": 171})
+    db.commit()
+    db.close()
+    tracked = client.post("/api/reports/track", json={
+        "ticket_id": body["ticket_id"], "tracking_token": token,
+    })
+    assert tracked.json()["district_code"] == "D3"
+    saved = client.post(url, json={**body, "tracking_token": token})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["status"] == "pending"
+    assert client.post(url, json={**body, "tracking_token": token}).status_code == 409
+    db = TestingSessionLocal()
+    report = db.query(models.Report).filter_by(ticket_id="PUL-2026-REPLY").one()
+    public_notes = [row.note for row in db.query(gov_models.ProcessTimeline).filter_by(
+        report_id=report.id, is_public=True
+    ).all()]
+    assert all(body["message"] not in (note or "") for note in public_notes)
+    assert db.query(gov_models.AuditLog).filter_by(report_id=report.id, trigger_type="information_reply").count() == 1
+    assert db.query(models.Notification).filter_by(official_id=501).count() == 1
+    db.close()
+
+
 def test_report_location_proximity_uses_active_tickets(client, seeded_users_and_geo):
     from spatial_queries import nearby_active_report
 

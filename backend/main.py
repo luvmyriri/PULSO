@@ -2040,7 +2040,10 @@ def track_report_status(
     ]
 
     # 4. Synthesize Public Projections
-    district_code = "D3" if (report.location_lat and report.location_lat >= 14.69) else ("D1" if report.location_lat else None)
+    district_code = (
+        report.barangay_ref.district.code
+        if report.barangay_ref and report.barangay_ref.district else None
+    )
     public_status_label = report.status.replace("_", " ").title()
     
     location_summary = None
@@ -2069,6 +2072,67 @@ def track_report_status(
         public_timeline=public_timeline,
         timeline=public_timeline
     )
+
+
+@app.post("/api/reports/information-reply")
+def provide_report_information(
+    payload: schemas.ReportInformationReply,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user),
+):
+    """Return a resident or token holder's clarification to the staff triage queue."""
+    claim_limiter.check(request)
+    ticket_id = payload.ticket_id.strip().upper()
+    message = payload.message.strip()
+    if len(message) < 10:
+        raise HTTPException(status_code=422, detail="Please provide at least 10 characters of additional information")
+    report = db.query(models.Report).filter(
+        func.upper(models.Report.ticket_id) == ticket_id
+    ).with_for_update().first()
+    token = (payload.tracking_token or "").strip().upper()
+    owns_account = isinstance(current_user, models.Resident) and (
+        report is not None and current_user.id in (report.resident_id, report.claimed_by_user_id)
+    )
+    token_hash = report.tracking_token_hash if report and report.tracking_token_hash else DUMMY_SALTED_HASH
+    token_matches = auth.verify_tracking_token(token or "DUMMY_TOKEN", token_hash)
+    token_valid = bool(report and report.tracking_token_hash and token and token_matches)
+    if not owns_account and not token_valid:
+        raise HTTPException(status_code=404, detail="Report not found or invalid tracking credentials.")
+    if report.status != "needs_information":
+        raise HTTPException(status_code=409, detail="This report is not awaiting additional information")
+
+    request_event = db.query(gov_models.ProcessTimeline).filter(
+        gov_models.ProcessTimeline.report_id == report.id,
+        gov_models.ProcessTimeline.status == "needs_information",
+    ).order_by(gov_models.ProcessTimeline.created_at.desc()).first()
+    report.status = "pending"
+    report.updated_at = datetime.now(timezone.utc)
+    db.add(gov_models.ProcessTimeline(
+        report_id=report.id, status="pending", previous_status="needs_information",
+        actor_role="resident" if owns_account else "guest_reporter",
+        note="Additional information received; engineering review resumes.", is_public=True,
+    ))
+    db.add(gov_models.ProcessTimeline(
+        report_id=report.id, status="pending", previous_status="needs_information",
+        actor_role="resident" if owns_account else "guest_reporter",
+        note=f"Reporter clarification: {message}", is_public=False,
+    ))
+    db.add(gov_models.AuditLog(
+        trigger_type="information_reply", report_id=report.id,
+        actor_role="resident" if owns_account else "guest_reporter",
+        action=f"Reporter supplied additional information for {report.ticket_id}",
+        details=message,
+    ))
+    if request_event and request_event.actor_id:
+        db.add(models.Notification(
+            official_id=request_event.actor_id,
+            title="Reporter clarification received",
+            message=f"New information is available for report {report.ticket_id}.",
+        ))
+    db.commit()
+    return {"ticket_id": report.ticket_id, "status": report.status,
+            "message": "Additional information recorded for engineering review."}
 
 
 @app.post("/api/reports/{report_id}/claim", response_model=schemas.ReportClaimResponse)

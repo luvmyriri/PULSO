@@ -1,5 +1,5 @@
 import json
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Any, Dict
 from datetime import datetime
 
@@ -285,6 +285,7 @@ class ReportTrackResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     location_barangay: Optional[str] = None
+    district_code: Optional[str] = None
     location_summary: Optional[str] = None
     location_string: Optional[str] = None
     image_url: Optional[str] = None
@@ -295,6 +296,12 @@ class ReportTrackResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ReportInformationReply(BaseModel):
+    ticket_id: str = Field(min_length=3, max_length=80)
+    tracking_token: Optional[str] = None
+    message: str = Field(min_length=10, max_length=2000)
 
 
 class ReportClaimRequest(BaseModel):

@@ -7,6 +7,7 @@ import {
   Calendar, Loader2, Activity 
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/apiBase';
+import { getAuthToken } from '../utils/authSession';
 import { formatFullAddress, parseAddressString } from '../utils/philippineAddress';
 import WizardHeader from '../components/report-wizard/WizardHeader';
 
@@ -28,6 +29,10 @@ export default function PublicTrackPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [reportData, setReportData] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [replyLoading, setReplyLoading] = useState(false);
+  const [replyMessage, setReplyMessage] = useState(null);
+  const [replyError, setReplyError] = useState(null);
 
   const fetchTrackStatus = useCallback(async (id, token) => {
     if (!id) return;
@@ -50,6 +55,7 @@ export default function PublicTrackPage() {
         const data = await response.json();
         setReportData(data);
       } else {
+        setReportData(null);
         if (response.status === 404 || response.status === 403) {
           setErrorMsg(t('track.lookup.errorNotFound', 'Report not found or invalid tracking credentials. Please check your Ticket ID and Tracking Token or Contact Number.'));
         } else {
@@ -58,23 +64,8 @@ export default function PublicTrackPage() {
       }
     } catch (err) {
       console.warn('Track lookup network error:', err);
-      // Fallback mock report for resilience if backend is not currently running
-      if (id.startsWith('RPT-') || id.startsWith('PULSO-')) {
-        setReportData({
-          ticket_id: id,
-          category: 'Roads & Bridges',
-          status: 'under_review',
-          location_string: 'Camarin Road, Barangay 174, Caloocan City',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          updated_at: new Date().toISOString(),
-          timeline: [
-            { stage: 'received', timestamp: new Date(Date.now() - 3600000).toISOString(), note: 'Public report received via PULSO Open Citizen Intake.' },
-            { stage: 'under_review', timestamp: new Date(Date.now() - 1800000).toISOString(), note: 'Geospatial AI triage validated coordinates within District 3.' },
-          ]
-        });
-      } else {
-        setErrorMsg('Network error connecting to civic registry. Please check your connection.');
-      }
+      setReportData(null);
+      setErrorMsg(t('track.lookup.networkError', 'Could not reach the civic registry. Check your connection and try again.'));
     } finally {
       setIsLoading(false);
     }
@@ -96,8 +87,52 @@ export default function PublicTrackPage() {
     fetchTrackStatus(ticketId.trim(), trackingToken.trim());
   };
 
+  const handleReplySubmit = async (event) => {
+    event.preventDefault();
+    const message = replyText.trim();
+    if (message.length < 10 || !reportData) return;
+    setReplyLoading(true);
+    setReplyError(null);
+    setReplyMessage(null);
+    try {
+      const authToken = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/api/reports/information-reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          ticket_id: reportData.ticket_id,
+          tracking_token: trackingToken.trim(),
+          message,
+        }),
+      });
+      if (!response.ok) {
+        setReplyError(response.status === 404
+          ? t('track.reply.credentialsError', 'Sign in as the report owner or enter the secret tracking token to send information.')
+          : t('track.reply.sendError', 'Your information was not recorded. Review the report status and try again.'));
+        return;
+      }
+      const result = await response.json();
+      setReportData((current) => current ? { ...current, status: result.status } : current);
+      setReplyText('');
+      setReplyMessage(t('track.reply.success', 'Your information was recorded for engineering review.'));
+      if (trackingToken.trim()) await fetchTrackStatus(reportData.ticket_id, trackingToken.trim());
+    } catch {
+      setReplyError(t('track.reply.networkError', 'Could not send your information. Check your connection and try again.'));
+    } finally {
+      setReplyLoading(false);
+    }
+  };
+
   // Determine current active stage index
-  const currentStageId = (reportData?.status || 'received').toLowerCase().replace(' ', '_');
+  const currentStageId = ({
+    pending: 'received', unverified: 'received', needs_information: 'under_review',
+    under_review: 'under_review', pending_approval: 'under_review',
+    approved_internal: 'validated', dispatched: 'assigned',
+    completed_pending_review: 'in_progress',
+  })[(reportData?.status || '').toLowerCase()] || (reportData?.status || 'received').toLowerCase().replace(' ', '_');
   let currentStageIndex = LIFECYCLE_STAGES.findIndex(s => s.id === currentStageId);
   if (currentStageIndex === -1) currentStageIndex = 0;
 
@@ -117,7 +152,7 @@ export default function PublicTrackPage() {
             {t('track.header.title', 'Track Public Infrastructure Report')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-            {t('track.header.subtitle', 'Follow the live engineering progress and milestone timeline for any Caloocan City ticket.')}
+            {t('track.header.subtitle', 'Read the latest recorded status and public timeline for your Caloocan City ticket.')}
           </p>
         </div>
 
@@ -174,9 +209,25 @@ export default function PublicTrackPage() {
           </div>
         )}
 
+        {replyMessage && <div role="status" className="p-4 rounded-xl border border-emerald-300 text-emerald-800 dark:text-emerald-300">{replyMessage}</div>}
+
         {/* ── TRACKING RESULTS ────────────────────────────────────────────────── */}
         {reportData && (
           <div className="space-y-6 animate-fade-in">
+            {reportData.status === 'needs_information' && (
+              <form onSubmit={handleReplySubmit} className="rounded-xl border border-orange-300 bg-white dark:bg-slate-900 p-5 space-y-3">
+                <h2 className="font-bold text-base">{t('track.reply.title', 'Additional information requested')}</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{t('track.reply.instructions', 'Read the latest request below. Add the details staff asked for. Sign in as the report owner or use your secret tracking token.')}</p>
+                <label htmlFor="track-reply" className="block text-sm font-semibold">{t('track.reply.label', 'Your response')}</label>
+                <textarea id="track-reply" value={replyText} onChange={(e) => setReplyText(e.target.value)} minLength={10} maxLength={2000} required rows={4}
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-sm focus-visible:outline-3 focus-visible:outline-orange-500" />
+                {replyError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{replyError}</p>}
+                <button type="submit" disabled={replyLoading || replyText.trim().length < 10}
+                  className="rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-orange-500">
+                  {replyLoading ? t('track.reply.sending', 'Sending…') : t('track.reply.send', 'Send information')}
+                </button>
+              </form>
+            )}
             
             {/* Privacy Redaction Banner */}
             <aside className="p-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-300">
@@ -195,6 +246,7 @@ export default function PublicTrackPage() {
                   <div className="font-mono font-black text-2xl text-slate-900 dark:text-white mt-0.5">
                     {reportData.ticket_id || reportData.id || ticketId}
                   </div>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{t('track.result.statusLabel', 'Recorded status')}: {t(`track.status.${reportData.status}`, reportData.public_status_label || reportData.status)}</p>
                 </div>
 
                 <div className="flex items-center gap-2">

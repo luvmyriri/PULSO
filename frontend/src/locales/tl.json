@@ -472,7 +472,7 @@
     "track": {
       "header": {
         "title": "Subaybayan ang Pampublikong Ulat sa Imprastraktura",
-        "subtitle": "Sundan ang aktwal na progreso at timeline ng pagkukumpuni para sa anumang ticket sa Caloocan City.",
+        "subtitle": "Tingnan ang pinakahuling naitalang katayuan at pampublikong timeline ng iyong ticket sa Caloocan City.",
         "badge": "Civic Aperture · Transparent na Pampublikong Gawain"
       },
       "lookup": {
@@ -484,10 +484,35 @@
         "tokenPlaceholder": "TRK-XXXX-XXXX-XXXX-XXXX",
         "submitBtn": "Subaybayan ang Ulat",
         "searching": "Hinahanap sa Talaan ng Lungsod...",
-        "errorNotFound": "Hindi nahanap ang ulat o mali ang tracking credentials. Pakisuri ang Ticket ID at Token."
+        "errorNotFound": "Hindi nahanap ang ulat o mali ang tracking credentials. Pakisuri ang Ticket ID at Token.",
+        "networkError": "Hindi makontak ang talaan ng lungsod. Suriin ang koneksiyon at subukan muli."
+      },
+      "reply": {
+        "title": "May hinihinging karagdagang impormasyon",
+        "instructions": "Basahin ang pinakahuling kahilingan sa ibaba. Idagdag ang impormasyong hiniling ng kawani. Mag-sign in bilang may-ari ng ulat o gamitin ang lihim na tracking token.",
+        "label": "Iyong tugon",
+        "send": "Ipadala ang impormasyon",
+        "sending": "Ipinapadala…",
+        "success": "Naitala ang iyong impormasyon para sa pagsusuri ng inhinyeriya.",
+        "credentialsError": "Mag-sign in bilang may-ari ng ulat o ilagay ang lihim na tracking token para makapagpadala ng impormasyon.",
+        "sendError": "Hindi naitala ang iyong impormasyon. Suriin ang katayuan ng ulat at subukan muli.",
+        "networkError": "Hindi maipadala ang impormasyon. Suriin ang koneksiyon at subukan muli."
+      },
+      "status": {
+        "pending": "Naghihintay ng pagsusuri",
+        "unverified": "Naghihintay ng beripikasyon",
+        "needs_information": "Kailangan ng karagdagang impormasyon",
+        "pending_approval": "Naghihintay ng pag-apruba ng inhinyeriya",
+        "approved_internal": "Inaprubahan para sa gawaing pang-field",
+        "dispatched": "Naitalaga ang field team",
+        "in_progress": "Kasalukuyang ginagawa",
+        "resolved": "Naresolba",
+        "rejected": "Tinanggihan",
+        "cancelled": "Kinansela"
       },
       "result": {
         "ticketHeader": "Mga Detalye ng Ticket",
+        "statusLabel": "Naitalang katayuan",
         "categoryLabel": "Kategorya",
         "barangayLabel": "Barangay / Lugar",
         "submittedOn": "Petsa ng Pag-uulat",

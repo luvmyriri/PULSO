@@ -15,6 +15,8 @@
 - Existing SMS provider changes from the original checkout are preserved in this branch.
 - Full report queues, archives, engineering dockets, information requests, project mapping, and operations triage are limited to dispatch roles. Repeated information requests cannot produce duplicate notifications while the ticket awaits a resident response.
 - Report-driven work orders require an approved report and reject a second non-cancelled work order. Consequential report and work-order decisions lock their database rows during the state check.
+- The reporter can now answer a staff information request with an owned resident account or the secret tracking token. The response is kept on the internal timeline and audit record, a public-safe transition returns the ticket to triage, and the requesting official receives an in-app notification. The public tracking page exposes this recovery path in English and Filipino and no longer fabricates a report when the registry is offline.
+- Public tracking returns a district code only when the report links to a registered barangay and its district; coordinates alone no longer produce a guessed district.
 - Report intake uses an indexed 15-metre PostGIS lookup after migration; the pre-migration PostgreSQL and SQLite paths retain a bounded great-circle fallback. Field-agent suggestions use only active eligible officials with locations updated in the last 15 minutes, with PostGIS nearest-distance lookup after migration.
 - The mounted predictive view now uses backend records rather than a fixed 2026 example. AI maintenance drafts require a registered asset, fail visibly when the provider is unavailable, and enter the canonical audited work-order command only after a human reason. The resulting order is **open for review**, not dispatched. Geographic/category similarity no longer counts unrelated resident reports against an asset.
 - Predictive scores and illustrative costs are labeled as unvalidated heuristic inspection prompts. Analytics report detail and exports have distinct server checks; CSV cells that could become spreadsheet formulas are neutralized.
@@ -32,6 +34,7 @@
 ## Verification
 
 - Government, SMS, and spatial duplicate checks: **66 passed**.
+- Focused report, government access, and resident clarification checks: **51 passed**.
 - Frontend production build passed after predictive route changes.
 - Full backend suite: **321 passed, five older resident tests failed** for ticket prefix, tracking-token validator, token hash salt, exact anti-enumeration text, and a missing legacy `ProcessTimeline` model. These are the same five categories seen at the prior checkpoint; no new full-suite failures appeared.
 
