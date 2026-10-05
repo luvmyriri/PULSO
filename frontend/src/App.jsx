@@ -14,7 +14,6 @@ import PublicTrackPage  from './pages/PublicTrackPage';
 import ResidentDashboard from './pages/ResidentDashboard';
 import GovDivisionPage   from './pages/GovDivisionPage';
 import PositionDashboard from './pages/PositionDashboard';
-import ProjectsWorkspacePage from './pages/ProjectsWorkspacePage';
 import OboInspectionsPage from './pages/OboInspectionsPage';
 import DispatcherDashboard from './pages/DispatcherDashboard';
 import GovProjectsPage   from './pages/GovProjectsPage';
@@ -174,9 +173,9 @@ function App() {
                             <GovOnly><GovAnnouncementEditor /></GovOnly>
                         } />
 
-                        {/* Combined planning and delivery workspace */}
+                        {/* Keep delivery bookmarks on the server-backed project registry. */}
                         <Route path="/gov/delivery" element={
-                            <GovOnly><ProjectsWorkspacePage /></GovOnly>
+                            <GovOnly><Navigate to="/gov/projects" replace /></GovOnly>
                         } />
 
                         {/* Legacy planning links preserve bookmarks and open the matching workspace view */}

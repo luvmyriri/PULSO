@@ -321,6 +321,7 @@ class ProjectRequestResponse(BaseModel):
     description: str
     requesting_party: Optional[str] = None
     barangay: Optional[str] = None
+    district_id: Optional[int] = None
     location_string: Optional[str] = None
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None

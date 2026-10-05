@@ -21,10 +21,11 @@
 - Report intake uses an indexed 15-metre PostGIS lookup after migration; the pre-migration PostgreSQL and SQLite paths retain a bounded great-circle fallback. Field-agent suggestions use only active eligible officials with locations updated in the last 15 minutes, with PostGIS nearest-distance lookup after migration.
 - The mounted predictive view now uses backend records rather than a fixed 2026 example. AI maintenance drafts require a registered asset, fail visibly when the provider is unavailable, and enter the canonical audited work-order command only after a human reason. The resulting order is **open for review**, not dispatched. Geographic/category similarity no longer counts unrelated resident reports against an asset.
 - Predictive scores and illustrative costs are labeled as unvalidated heuristic inspection prompts. Analytics report detail and exports have distinct server checks; CSV cells that could become spreadsheet formulas are neutralized.
+- The mounted delivery route now opens the server-backed project registry instead of a screen that substituted sample projects on fetch failure. The registry preserves last loaded records as visibly stale on refresh errors, distinguishes errors from empty results, maps its display groups from the recorded 13-state workflow, and reads district labels from registered district IDs instead of guessing from barangay names.
 
 ## Deliberate blocks and decisions still needed
 
-- **Project lifecycle:** the current database code stores 13 phases; the design material also carries a 10-phase proposal. Product direction is approved, but migration and mapping of persisted projects into a canonical lifecycle is still required. Project resolution and certificates remain blocked pending their evidence and review implementation.
+- **Project lifecycle:** the current database code stores 13 phases; the design material also carries a 10-phase proposal. The six UI workflow groups are now labeled as an overview, not as a statutory lifecycle. An explicit choice between the conflicting 10- and 13-stage sources is pending before migrating persisted projects. Project resolution and certificates remain blocked pending their evidence and review implementation.
 - **Money and emergency:** budget approval and emergency assignment still need concrete thresholds, sign-off, scope, evidence, and audit data contracts. A critical work priority does not activate emergency access or alerts.
 - **Data scope:** the final jurisdiction and capability matrix is unapproved. Dispatch/report access is narrowed by active official role; assignment scoping is enforced for field work orders. Broader field-level and jurisdiction-level access remains a release gate.
 - **Evidence and records:** report-image classification, legacy public image exposure, retention, legal hold, and disposition policy need owner approval and further implementation. Work-order proof and new government documents use private delivery.
@@ -36,7 +37,7 @@
 
 - Government, SMS, and spatial duplicate checks: **66 passed**.
 - Focused report, government access, and resident clarification checks: **55 passed** after the work-order edit guard.
-- Frontend production build passed after predictive route changes.
+- Frontend production build passed after predictive and project route changes.
 - Full backend suite: **321 passed, five older resident tests failed** for ticket prefix, tracking-token validator, token hash salt, exact anti-enumeration text, and a missing legacy `ProcessTimeline` model. These are the same five categories seen at the prior checkpoint; no new full-suite failures appeared.
 
 Do not present this branch as a completed government release until the blocked decisions and release gates above are resolved and verified.

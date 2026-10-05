@@ -34,7 +34,7 @@ import { API_BASE_URL } from '../../utils/apiBase';
 const API_BASE = API_BASE_URL;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The 6 Authoritative Macro-Phases of Caloocan LGU Infrastructure Projects
+// Six display groups for the currently persisted 13-status project workflow.
 // ─────────────────────────────────────────────────────────────────────────────
 export const INFRA_6_PHASES = [
     {
@@ -108,13 +108,8 @@ export const INFRA_6_PHASES = [
 // Helper: Map status or phase number into 6-phase metadata
 export function getPhaseInfo(status, currentPhase) {
     const s = (status || '').toLowerCase();
-    
-    // Explicit phase check
-    if (currentPhase && currentPhase >= 1 && currentPhase <= 6) {
-        return INFRA_6_PHASES[currentPhase - 1];
-    }
-    
-    // Detailed status string mapping
+    // The persisted workflow has 13 states. These six groups are a display
+    // summary only; a 1–6 database phase number is not a six-group index.
     if (s.includes('certif') || s === 'resolved' || s.includes('closed_completion')) {
         return INFRA_6_PHASES[5]; // Phase 6
     }
@@ -129,6 +124,10 @@ export function getPhaseInfo(status, currentPhase) {
     }
     if (s.includes('survey')) {
         return INFRA_6_PHASES[1]; // Phase 2
+    }
+    const groupByStoredPhase = [0, 0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5];
+    if (Number.isInteger(currentPhase) && currentPhase >= 1 && currentPhase <= 13) {
+        return INFRA_6_PHASES[groupByStoredPhase[currentPhase]];
     }
     return INFRA_6_PHASES[0]; // Phase 1 default
 }
@@ -172,23 +171,9 @@ export function getProjectCategory(title, description) {
     return { label: 'Civil Infrastructure', icon: Layers, color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700' };
 }
 
-// District parser from Barangay
-export function getCaloocanDistrict(barangayStr) {
-    if (!barangayStr) return 'Citywide';
-    const numMatch = barangayStr.match(/\d+/);
-    if (numMatch) {
-        const num = parseInt(numMatch[0], 10);
-        if (num >= 165 && num <= 188) return 'North Caloocan';
-        if (num >= 1 && num <= 164) return 'South Caloocan';
-    }
-    const lower = barangayStr.toLowerCase();
-    if (lower.includes('bagong silang') || lower.includes('camarin') || lower.includes('tala') || lower.includes('deparo') || lower.includes('pangarap')) {
-        return 'North Caloocan';
-    }
-    if (lower.includes('monumento') || lower.includes('grace park') || lower.includes('sangandaan')) {
-        return 'South Caloocan';
-    }
-    return 'Caloocan';
+// Only the registered district relation can establish a district.
+export function getCaloocanDistrict(districtId) {
+    return ({ 1: 'District 1', 2: 'District 2', 3: 'District 3' })[districtId] || 'District unrecorded';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -264,6 +249,7 @@ const MiniPulselineTracker = ({ currentPhaseNumber, statusName }) => {
 export default function LguProjectsView({ currentUser, token, onNavigate }) {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [phaseFilter, setPhaseFilter] = useState('');
@@ -279,19 +265,21 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
     // Fetch projects from backend
     const fetchProjects = async () => {
         setLoading(true);
+        setFetchError(null);
         try {
             const res = await fetch(`${API_BASE}/api/gov/projects`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
                 const data = await res.json();
-                setProjects(Array.isArray(data) ? data : []);
+                if (!Array.isArray(data)) throw new Error('Invalid project registry response');
+                setProjects(data);
             } else {
-                setProjects([]);
+                throw new Error(`Project registry returned ${res.status}`);
             }
         } catch (err) {
             console.error('Failed to fetch infrastructure projects:', err);
-            setProjects([]);
+            setFetchError('The project registry could not be refreshed. Try again.');
         } finally {
             setLoading(false);
         }
@@ -333,7 +321,7 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
 
     // Phase filter options
     const phaseOptions = useMemo(() => [
-        { value: '', label: 'All 6 Phases' },
+        { value: '', label: 'All workflow groups' },
         ...INFRA_6_PHASES.map(p => ({
             value: String(p.number),
             label: `${p.badge}: ${p.name} (${p.shortName})`
@@ -524,11 +512,11 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                                     LGU Infrastructure Projects
                                 </h1>
                                 <span className="px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] font-mono-data text-[10px] font-bold">
-                                    6-Phase Lifecycle
+                                    Project workflow
                                 </span>
                             </div>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block mt-0.5">
-                                Monitor all 6-phase infrastructure projects from request to certified completion.
+                                Review recorded project status and supporting work.
                             </p>
                         </div>
                     </div>
@@ -700,7 +688,7 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                             <OrangeSelect
                                 value={phaseFilter}
                                 onChange={(v) => { setPhaseFilter(v); setPage(1); }}
-                                placeholder="All 6 Phases"
+                                placeholder="All workflow groups"
                                 minWidth="150px"
                                 size="sm"
                                 icon={Layers}
@@ -755,6 +743,11 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                     {/* ─────────────────────────────────────────────────────────────
                         4. RICHER DATA TABLE WITH 6-PHASE PULSELINE PROGRESS
                     ────────────────────────────────────────────────────────────── */}
+                    {fetchError && (
+                        <div role="alert" className="mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                            {fetchError} {projects.length > 0 && 'Showing the last loaded records; they may be stale.'}
+                        </div>
+                    )}
                     <div className="bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden transition-colors">
                         
                         {loading ? (
@@ -766,6 +759,11 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                                 <span className="text-xs text-slate-400">
                                     Connecting to City Engineering Office database
                                 </span>
+                            </div>
+                        ) : fetchError && projects.length === 0 ? (
+                            <div className="p-8 text-center" role="alert">
+                                <p className="font-semibold">Project records are unavailable.</p>
+                                <button type="button" onClick={fetchProjects} className="mt-4 rounded-lg border px-4 py-2 font-semibold focus-visible:outline-3 focus-visible:outline-orange-500">Retry</button>
                             </div>
                         ) : filtered.length === 0 ? (
                             /* ── 5. MEANINGFUL EMPTY STATE ── */
@@ -779,7 +777,7 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-5 leading-relaxed">
                                     {activeFilterCount > 0
                                         ? "No infrastructure projects match your active search and filter parameters. Try clearing your filters to see all municipal records."
-                                        : "There are currently no infrastructure projects recorded in this division. Initiate the first 6-phase project to begin tracking."}
+                                        : "There are currently no infrastructure projects recorded in this division. Initiate a project to begin tracking."}
                                 </p>
                                 <div className="flex items-center justify-center gap-3">
                                     {activeFilterCount > 0 && (
@@ -810,7 +808,7 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                                             <th scope="col" className="py-3 px-4 w-24">TRACKING NO.</th>
                                             <th scope="col" className="py-3 px-4 min-w-[220px]">PROJECT &amp; DETAILS</th>
                                             <th scope="col" className="py-3 px-4 min-w-[150px]">BARANGAY</th>
-                                            <th scope="col" className="py-3 px-4 min-w-[190px]">6-PHASE PROGRESS</th>
+                                            <th scope="col" className="py-3 px-4 min-w-[190px]">WORKFLOW GROUP</th>
                                             <th scope="col" className="py-3 px-4 min-w-[140px]">STATUS</th>
                                             <th scope="col" className="py-3 px-4 min-w-[100px]">DATE FILED</th>
                                             <th scope="col" className="py-3 px-4 text-right min-w-[130px]">ACTION</th>
@@ -823,7 +821,7 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                                             const category = getProjectCategory(item.title, item.description);
                                             const CategoryIcon = category.icon;
                                             const phaseInfo = getPhaseInfo(item.status, item.current_phase);
-                                            const district = getCaloocanDistrict(item.barangay);
+                                            const district = getCaloocanDistrict(item.district_id);
                                             const date = item.created_at ? new Date(item.created_at).toLocaleDateString('en-PH') : '—';
                                             const nextAction = getNextPhaseStatus(item.status);
                                             const isAdvancing = advancingId === item.id;
@@ -974,7 +972,7 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                                             <Activity size={14} />
                                         </div>
                                         <h3 className="font-heading font-bold text-sm text-slate-900 dark:text-white">
-                                            Municipal 6-Phase Pipeline Distribution
+                                            Project workflow overview
                                         </h3>
                                     </div>
                                     <span className="text-[10px] font-mono-data text-slate-400">
@@ -982,7 +980,7 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                                     </span>
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-                                    All public works follow Caloocan's statutory 6-phase engineering lifecycle to ensure compliance with RA 9184 and quality structural sign-offs.
+                                    Current registry statuses are grouped for review. The canonical project lifecycle is awaiting reconciliation.
                                 </p>
 
                                 {/* 6-Step Visual Cards */}
@@ -1122,7 +1120,7 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                                         </span>
                                         <span className="text-slate-300 dark:text-slate-700">•</span>
                                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                                            {getCaloocanDistrict(selectedProject.barangay)}
+                                            {getCaloocanDistrict(selectedProject.district_id)}
                                         </span>
                                     </div>
                                     <h2 className="font-heading font-black text-lg sm:text-xl text-slate-900 dark:text-white leading-tight">
@@ -1142,7 +1140,7 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
                             {/* Full 6-Phase Pulseline Stepper */}
                             <div className="my-5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
                                 <div className="text-[11px] font-heading font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center justify-between">
-                                    <span>Official 6-Phase Pulseline Lifecycle</span>
+                                    <span>Current workflow overview</span>
                                     <span className="text-[#ff6b00]">
                                         Phase {getPhaseInfo(selectedProject.status, selectedProject.current_phase).number} of 6 Active
                                     </span>
