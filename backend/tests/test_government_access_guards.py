@@ -23,6 +23,9 @@ class _Query:
     def filter(self, *_args):
         return self
 
+    def with_for_update(self):
+        return self
+
     def first(self):
         return self.result
 
@@ -38,6 +41,9 @@ class _UsersDB:
 
     def commit(self):
         self.commits += 1
+
+    def refresh(self, _obj):
+        pass
 
 
 def _token(email):
@@ -215,6 +221,49 @@ def test_generic_work_order_patch_cannot_bypass_lifecycle():
 
     assert wo.status == "in_progress"
     assert db.commits == 0
+
+
+@pytest.mark.parametrize("field", ["estimated_cost", "actual_cost"])
+def test_generic_work_order_patch_cannot_change_money_without_approval(field):
+    wo = SimpleNamespace(status="open")
+    db = _UsersDB(official=wo)
+    db.query = lambda _model: _Query(wo)
+    with pytest.raises(HTTPException) as error:
+        gov_crud.update_work_order(
+            db, 12, gov_schemas.WorkOrderUpdate(**{field: 5000}),
+            actor_id=7, actor_role="dispatcher",
+        )
+    assert error.value.status_code == 422
+    assert db.commits == 0
+
+
+def test_generic_work_order_patch_cannot_reassign_active_work():
+    wo = SimpleNamespace(status="in_progress", assigned_to_id=8)
+    db = _UsersDB(official=wo)
+    db.query = lambda _model: _Query(wo)
+    with pytest.raises(HTTPException) as error:
+        gov_crud.update_work_order(
+            db, 12, gov_schemas.WorkOrderUpdate(assigned_to_id=9),
+            actor_id=7, actor_role="dispatcher",
+        )
+    assert error.value.status_code == 409
+    assert wo.assigned_to_id == 8
+    assert db.commits == 0
+
+
+def test_general_work_order_edit_records_changed_fields(monkeypatch):
+    wo = SimpleNamespace(id=12, wo_number="WO-12", status="open", title="Road edge")
+    db = _UsersDB(official=wo)
+    db.query = lambda _model: _Query(wo)
+    audits = []
+    monkeypatch.setattr(gov_crud, "_append_audit", lambda *_args, **kwargs: audits.append(kwargs))
+    result = gov_crud.update_work_order(
+        db, 12, gov_schemas.WorkOrderUpdate(title="Road edge repair"),
+        actor_id=7, actor_role="dispatcher",
+    )
+    assert result.title == "Road edge repair"
+    assert db.commits == 1
+    assert audits[0]["details"] == "Fields changed: title"
 
 
 def test_generic_project_patch_cannot_change_phase_budget_or_emergency():

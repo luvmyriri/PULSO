@@ -542,16 +542,26 @@ def update_work_order(
     actor_id: int,
     actor_role: str,
 ) -> Optional[gov_models.WorkOrder]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
     update_data = data.dict(exclude_unset=True)
-    if {"status", "completed_date", "citizen_feedback"} & update_data.keys():
-        raise HTTPException(status_code=422, detail="Use the governed lifecycle or resident feedback endpoint")
+    if {"status", "completed_date", "citizen_feedback", "estimated_cost", "actual_cost"} & update_data.keys():
+        raise HTTPException(status_code=422, detail="Use the governed lifecycle, cost, or resident feedback endpoint")
     if "assigned_to_id" in update_data:
+        if wo.status != "open":
+            raise HTTPException(status_code=409, detail="An active work order cannot be reassigned through a general edit")
         _validate_assignee(db, update_data["assigned_to_id"])
+    changed_fields = [key for key, value in update_data.items() if getattr(wo, key) != value]
     for k, v in update_data.items():
         setattr(wo, k, v)
+    if changed_fields:
+        _append_audit(
+            db, trigger_type="work_order_edit",
+            action=f"Work order {wo.wo_number} edited",
+            actor_id=actor_id, actor_role=actor_role, work_order_id=wo_id,
+            details="Fields changed: " + ", ".join(sorted(changed_fields)),
+        )
     db.commit()
     db.refresh(wo)
     return wo
@@ -563,7 +573,7 @@ def create_work_order_update(
     data: gov_schemas.WorkOrderUpdateCreate,
     user_id: int,
 ) -> Optional[gov_models.WorkOrderUpdate]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
 
@@ -640,7 +650,7 @@ def approve_work_order(
     approver_id: int,
     notes: Optional[str] = None,
 ) -> Optional[gov_models.WorkOrderApproval]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
     
@@ -678,7 +688,7 @@ def reject_work_order(
     approver_id: int,
     notes: Optional[str] = None,
 ) -> Optional[gov_models.WorkOrderApproval]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
     
@@ -2502,7 +2512,7 @@ def block_work_order(
     actor_id: int,
     actor_role: str,
 ) -> gov_models.WorkOrder:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
 
@@ -2559,7 +2569,7 @@ def unblock_work_order(
     actor_id: int,
     actor_role: str,
 ) -> gov_models.WorkOrder:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
 
