@@ -1609,7 +1609,7 @@ def read_reports(
     limit: int = 200,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role(*gov_router.DISPATCH_ROLES))
 ):
     """
     Returns a listing of all city reports with status filtering.
@@ -1736,8 +1736,11 @@ def read_report(
     db_report = crud.get_report(db, report_id=report_id)
     if db_report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    if current_user.role == "resident" and db_report.resident_id != current_user.id and db_report.claimed_by_user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to view this report")
+    if isinstance(current_user, models.Resident):
+        if db_report.resident_id != current_user.id and db_report.claimed_by_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this report")
+    elif current_user.role not in gov_router.DISPATCH_ROLES:
+        raise HTTPException(status_code=403, detail="Report is outside your authorized workspace")
     return db_report
 
 @app.get("/api/reports/{report_id}/timeline", response_model=List[gov_schemas.ProcessTimelineResponse])
@@ -1756,6 +1759,8 @@ def read_report_timeline(
         if db_report.resident_id != current_user.id and db_report.claimed_by_user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Not authorized to view this timeline")
         public_only = True
+    elif current_user.role not in gov_router.DISPATCH_ROLES:
+        raise HTTPException(status_code=403, detail="Report timeline is outside your authorized workspace")
         
     entries = gov_crud.get_timeline_for_report(db, report_id, public_only=public_only)
     return gov_crud.enrich_timeline(entries, db)

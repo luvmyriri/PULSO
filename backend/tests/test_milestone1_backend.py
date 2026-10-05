@@ -28,6 +28,7 @@ from sqlalchemy.pool import StaticPool
 import models
 import gov_models
 import auth
+import document_router
 from database import Base, get_db
 from main import app
 
@@ -751,6 +752,51 @@ def test_project_route_advances_one_phase_and_returns_project(client, seeded_use
     assert advanced.status_code == 200, advanced.text
     assert advanced.json()["id"] == project_id
     assert advanced.json()["current_phase"] == 2
+
+
+def test_document_upload_requires_staff_permission_and_existing_target(client, seeded_users_and_geo, monkeypatch, tmp_path):
+    monkeypatch.setattr(document_router, "UPLOAD_DIR", str(tmp_path))
+    resident_headers = {"Authorization": f"Bearer {seeded_users_and_geo['resident']}"}
+    staff_headers = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
+    upload = {"file": ("..\\survey.pdf", b"%PDF-1.4\nTest survey", "application/pdf")}
+    data = {"document_type": "survey_report", "target_model": "ProjectRequest", "target_id": "999"}
+
+    denied = client.post("/api/gov/documents/upload", data=data, files=upload, headers=resident_headers)
+    assert denied.status_code == 403
+
+    monkeypatch.setattr(document_router.roles_service, "assert_permission", lambda *_args: None)
+    missing = client.post("/api/gov/documents/upload", data=data, files=upload, headers=staff_headers)
+    assert missing.status_code == 404
+
+    db = TestingSessionLocal()
+    project = gov_models.ProjectRequest(
+        title="Survey target", description="Drainage study", requesting_party="City Engineering Department",
+        status="request_received", current_phase=1, created_by_id=501,
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    data["target_id"] = str(project.id)
+    db.close()
+
+    uploaded = client.post("/api/gov/documents/upload", data=data, files=upload, headers=staff_headers)
+    assert uploaded.status_code == 200, uploaded.text
+    document_id = uploaded.json()["document"]["id"]
+    db = TestingSessionLocal()
+    doc = db.query(gov_models.SystemDocument).filter(gov_models.SystemDocument.id == document_id).first()
+    assert doc.file_name == "survey.pdf"
+    db.close()
+    monkeypatch.setattr(document_router.roles_service, "has_permission", lambda *_args: True)
+    downloaded = client.get(f"/api/gov/documents/get/{document_id}", headers=staff_headers)
+    assert downloaded.status_code == 200
+    assert downloaded.content.startswith(b"%PDF-1.4")
+    outside = tmp_path.parent / "outside.pdf"
+    outside.write_bytes(b"%PDF-1.4\nNot governed")
+    db = TestingSessionLocal()
+    db.query(gov_models.SystemDocument).filter(gov_models.SystemDocument.id == document_id).first().file_path = str(outside)
+    db.commit()
+    db.close()
+    assert client.get(f"/api/gov/documents/get/{document_id}", headers=staff_headers).status_code == 404
 
 
 def test_completion_proof_is_private_and_requires_independent_review(client, seeded_users_and_geo):

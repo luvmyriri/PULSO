@@ -150,6 +150,17 @@ def test_rejection_requires_reason_and_eligible_intake_state(monkeypatch):
     assert reason_error.value.status_code == 422
 
 
+def test_report_and_internal_timeline_reads_reject_unscoped_official(monkeypatch):
+    monkeypatch.setattr(main.crud, "get_report", lambda *_args, **_kwargs: SimpleNamespace(id=4, resident_id=9, claimed_by_user_id=None))
+    actor = models.Official(id=12, role="records_officer")
+    with pytest.raises(HTTPException) as report_error:
+        main.read_report(report_id=4, db=SimpleNamespace(), current_user=actor)
+    assert report_error.value.status_code == 403
+    with pytest.raises(HTTPException) as timeline_error:
+        main.read_report_timeline(report_id=4, db=SimpleNamespace(), current_user=actor)
+    assert timeline_error.value.status_code == 403
+
+
 def test_public_static_mount_does_not_serve_documents():
     files = main.PublicUploadFiles(directory="uploads")
     with pytest.raises(HTTPException) as error:

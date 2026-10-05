@@ -3,11 +3,13 @@ from sqlalchemy.orm import Session
 from database import get_db
 from typing import Any, List, Union
 from gov_models import SystemDocument
+import gov_models
 from auth import get_current_user
 import os
 import hashlib
 import uuid
 import json
+import re
 import roles_service
 import models
 from datetime import datetime, timedelta
@@ -21,6 +23,12 @@ def _require_records_view(db: Session, current_user: Any):
     if not isinstance(current_user, models.Official):
         raise HTTPException(status_code=403, detail="Government records access required.")
     roles_service.assert_permission(db, current_user, "records", "view")
+
+
+def _require_records_manage(db: Session, current_user: Any):
+    if not isinstance(current_user, models.Official):
+        raise HTTPException(status_code=403, detail="Government records access required.")
+    roles_service.assert_permission(db, current_user, "records", "manage")
 
 UPLOAD_DIR = "uploads/docs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -77,7 +85,7 @@ def calculate_expiry(policy: str, start_date: datetime):
 
 def validate_file(file: UploadFile):
     """Validate file extension and content type."""
-    filename = file.filename.lower()
+    filename = (file.filename or "").lower()
     ext = filename.split('.')[-1] if '.' in filename else ''
     
     if ext not in ALLOWED_EXTENSIONS:
@@ -108,9 +116,18 @@ async def upload_document(
     Upload a document, calculate its SHA-256 fingerprint, and register it
     in the SystemDocument tracking table for status gating and FQA.
     """
-    valid_models = ["ProjectRequest", "WorkOrder", "ProcurementRequest", "OBOInspection"]
-    if target_model not in valid_models:
+    _require_records_manage(db, current_user)
+    target_models = {
+        "ProjectRequest": gov_models.ProjectRequest,
+        "WorkOrder": gov_models.WorkOrder,
+        "ProcurementRequest": gov_models.ProcurementRequest,
+        "OBOInspection": gov_models.OBOInspection,
+    }
+    if target_model not in target_models:
         raise HTTPException(status_code=400, detail="Invalid target model for document upload.")
+    target = db.query(target_models[target_model]).filter(target_models[target_model].id == target_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Linked record not found.")
 
     # Validate file type
     ext = validate_file(file)
@@ -146,7 +163,10 @@ async def upload_document(
         }
 
     # Save format: {uuid}_{safe_filename}
-    safe_filename = file.filename.replace(" ", "_").replace("/", "")
+    basename = (file.filename or "").replace("\\", "/").split("/")[-1]
+    safe_filename = re.sub(r"[^A-Za-z0-9._-]+", "_", basename).strip("._")
+    if not safe_filename:
+        raise HTTPException(status_code=400, detail="A valid filename is required.")
     unique_filename = f"{uuid.uuid4().hex}_{safe_filename}"
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
 
@@ -227,13 +247,22 @@ async def get_document_file(
              elif role != "resident":
                  raise HTTPException(status_code=403, detail="Access Denied: Missing Records capability.")
 
-    if not os.path.exists(doc.file_path):
+    root = os.path.realpath(UPLOAD_DIR)
+    path = os.path.realpath(doc.file_path)
+    try:
+        within_storage = os.path.commonpath([root, path]) == root
+    except ValueError:
+        within_storage = False
+    if not within_storage:
+        raise HTTPException(status_code=404, detail="Document file is outside governed storage.")
+    if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="File physical storage not found.")
 
     return FileResponse(
-        path=doc.file_path,
+        path=path,
         filename=doc.file_name,
-        media_type='application/octet-stream'
+        media_type='application/octet-stream',
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
     )
 
 
