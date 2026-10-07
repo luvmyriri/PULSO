@@ -1,8 +1,10 @@
-const CACHE_NAME = 'pulso-pwa-v3';
+const CACHE_NAME = 'pulso-pwa-v4';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/fonts/inter-latin-variable.woff2',
+  '/fonts/inter-latin-ext-variable.woff2',
   '/icon-192x192.png',
   '/icon-maskable-192.png',
   '/icon-512x512.png',

@@ -37,6 +37,7 @@
   --color-dark: #2c1d11;
   --color-light-offset: #f3e9e2;
   --color-light: #ffffff;
-  --font-sans: "Inter", sans-serif;
-  --font-display: "Oswald", sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --font-heading: var(--font-sans);
 }

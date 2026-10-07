@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import OfficialBanner from '../components/landing/OfficialBanner';
 import CivicNavbar from '../components/landing/CivicNavbar';
@@ -8,6 +8,8 @@ import CivicFooter from '../components/landing/CivicFooter';
 import TrackReportModal from '../components/landing/TrackReportModal';
 import LegalModal from '../components/LegalModal';
 import MobileAppTutorial from '../components/mobile/MobileAppTutorial';
+import MobileAppSplashScreen from '../components/mobile/MobileAppSplashScreen';
+import PulsoPulseLine from '../components/common/PulsoPulseLine';
 import { isInstalledApp, isTutorialCompleted } from '../utils/appContext';
 import { getAuthToken } from '../utils/authSession';
 
@@ -16,12 +18,14 @@ const MapPreviewSection = lazy(() => import('../components/landing/MapPreviewSec
 const HowItWorksSection = lazy(() => import('../components/landing/HowItWorksSection'));
 const EmergencyHotlinesSection = lazy(() => import('../components/landing/EmergencyHotlinesSection'));
 
-// Lightweight section skeleton fallback for smooth below-the-fold loading
+// Lightweight section skeleton fallback with signature traveling pulse line
 function SectionSkeleton({ height = 'h-72', title = 'Loading...' }) {
   return (
     <div className={`w-full ${height} max-w-7xl mx-auto my-8 px-4 flex items-center justify-center`} aria-busy="true">
-      <div className="w-full h-full rounded-2xl bg-slate-100 dark:bg-slate-900/50 animate-pulse border border-slate-200/60 dark:border-slate-800 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 text-xs font-mono-data">
-        <span className="w-6 h-6 rounded-full border-2 border-[#ff6b00] border-t-transparent animate-spin mb-2" />
+      <div className="w-full h-full rounded-2xl bg-slate-100 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 text-xs font-sans gap-3">
+        <div className="w-36">
+          <PulsoPulseLine />
+        </div>
         <span>{title}</span>
       </div>
     </div>
@@ -42,8 +46,37 @@ export default function Landing() {
   const tutorialCompleted = isTutorialCompleted();
   const isAuthenticated = Boolean(getAuthToken());
 
-  // 1. Installed Mobile App Context: Replace landing page with First-Launch Tutorial or Direct Flow
+  // Cold start splash state
+  const [splashFinished, setSplashFinished] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    if (!inApp) return true;
+    return Boolean(sessionStorage.getItem('pulso_session_started'));
+  });
+
+  // Hide static placeholder HTML splash once React mounts
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const initialSplash = document.getElementById('pulso-initial-splash');
+      if (initialSplash) {
+        initialSplash.style.display = 'none';
+      }
+    }
+  }, []);
+
+  // 1. Installed Mobile App Context:
   if (inApp) {
+    // Show splash screen on cold start
+    if (!splashFinished) {
+      return (
+        <MobileAppSplashScreen
+          onFinish={() => {
+            sessionStorage.setItem('pulso_session_started', 'true');
+            setSplashFinished(true);
+          }}
+        />
+      );
+    }
+
     if (!tutorialCompleted) {
       return <MobileAppTutorial />;
     }

@@ -10,6 +10,7 @@ import { API_BASE_URL } from '../utils/apiBase';
 import { getAuthToken } from '../utils/authSession';
 import { formatFullAddress, parseAddressString } from '../utils/philippineAddress';
 import WizardHeader from '../components/report-wizard/WizardHeader';
+import PulsoPulseLine from '../components/common/PulsoPulseLine';
 
 const LIFECYCLE_STAGES = [
   { id: 'received', key: 'received', defaultLabel: 'Received', defaultDesc: 'Report logged and queued for engineering triage.' },
@@ -200,6 +201,18 @@ export default function PublicTrackPage() {
             </button>
           </div>
         </form>
+
+        {/* ── CIVIC PULSE LOADING INDICATOR ─────────────────────────────────── */}
+        {isLoading && (
+          <div className="py-6 flex flex-col items-center justify-center gap-2.5 animate-fadeIn" role="status" aria-live="polite">
+            <div className="w-48">
+              <PulsoPulseLine />
+            </div>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium font-sans">
+              {t('track.lookup.searching', 'Searching Civic Registry...')}
+            </span>
+          </div>
+        )}
 
         {/* ── ERROR ALERT ─────────────────────────────────────────────────────── */}
         {errorMsg && (

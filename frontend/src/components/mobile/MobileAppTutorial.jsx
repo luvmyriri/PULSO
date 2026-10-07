@@ -1,48 +1,66 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ChevronLeft,
-  ChevronRight,
-  ArrowRight,
-  AlertTriangle,
-  Camera,
-  MapPin,
-  Wrench,
-  CheckCircle2,
-  Clock,
-  ShieldCheck,
-  HardHat,
-  Search,
-  Sparkles,
-  PhoneCall,
-  X
-} from 'lucide-react';
+import PulsoIcon from '../common/PulsoIcon';
 import { markTutorialCompleted } from '../../utils/appContext';
 import { getAuthToken } from '../../utils/authSession';
+import { useTheme } from '../../contexts/ThemeContext';
 
 /**
  * MobileAppTutorial
  * ─────────────────────────────────────────────────────────────────────────────
  * First-Launch Resident Onboarding Tutorial for the installed PULSO Mobile App.
  *
- * 5 Swipeable, Jargon-Free Screens:
- * 1. Welcome: "Report city problems in minutes." + Caloocan City seal logo
- * 2. Report it: "Tell us what's wrong." + Category, location, photo
- * 3. We receive it: "City Engineering gets your report." + Maintenance crew review
- * 4. Track it: "Follow your report." + Real PulseLine stages (Received -> Resolved)
- * 5. All set: "You're ready." + Report an Issue CTA, Sign in link, 911 emergency note
- *
- * Requirements:
- * - Fits within 360px x 800px screen without scrolling.
- * - Skip link on screens 1-4, back button from screen 2 onward.
- * - Same primary button position and size (>=48px tall).
- * - Swipe gestures (touch start/move/end) + keyboard navigation.
- * - WCAG AA accessible (progress dot aria-labels, screen reader live announcement).
+ * Global Typography & Design Contract:
+ * - Single font family: Inter across all headings, body, buttons, and labels.
+ * - Shared Type Scale:
+ *   - Display (Screen 1 heading): 32px mobile / 44px desktop, bold 700, -0.02em tracking
+ *   - Heading 1 (Screens 2-5): 28px mobile / 36px desktop, bold 700
+ *   - Card title (Screen 2 steps): 18px mobile / 20px desktop, semibold 600
+ *   - Body: 16px (1rem), regular 400, line-height 1.5, soft gray
+ *   - Small text (secondary notes, steps): 14px (0.875rem), regular 400 (min read size)
+ *   - Badges / Captions: 13px (0.8125rem), medium 500, sentence case (no monospace)
+ *   - Primary button: 16px (1rem), semibold 600, sentence case
+ *   - Tracking code: Inter with tabular figures (tabular-nums)
+ * - Centered headings with balanced text wrapping (text-wrap: balance).
+ * - Light (Morning Field Sheet) and Dark (Night Inspection) blended backgrounds.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export default function MobileAppTutorial({ replayMode = false, onComplete }) {
+export default function MobileAppTutorial({
+  replayMode = false,
+  onComplete,
+  isTestMode = false,
+  stepOverride,
+  onStepChange,
+  onNavigate,
+  reducedMotion = false,
+  externalContainerRef = null,
+  themeModeOverride = null
+}) {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(1);
+  const themeContext = useTheme();
+
+  // Active theme calculation (test override or app ThemeContext)
+  const activeSetting = themeModeOverride || themeContext?.theme || 'system';
+
+  const [osPrefersDark, setOsPrefersDark] = useState(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => setOsPrefersDark(e.matches);
+    media.addEventListener('change', handler);
+    return () => media.removeEventListener('change', handler);
+  }, []);
+
+  // Determine whether active view renders Dark or Light
+  const isDark = activeSetting === 'dark' || (activeSetting === 'system' && osPrefersDark);
+
+  const [currentStep, setCurrentStep] = useState(stepOverride || 1);
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
   const [announcement, setAnnouncement] = useState('Step 1 of 5: Report city problems in minutes.');
@@ -50,49 +68,70 @@ export default function MobileAppTutorial({ replayMode = false, onComplete }) {
 
   const totalSteps = 5;
 
-  const finishTutorial = useCallback((destination = '/report') => {
-    markTutorialCompleted();
+  useEffect(() => {
+    if (stepOverride && stepOverride >= 1 && stepOverride <= totalSteps) {
+      setCurrentStep(stepOverride);
+    }
+  }, [stepOverride]);
+
+  const changeStep = (nextStep) => {
+    setCurrentStep(nextStep);
+    onStepChange?.(nextStep);
+  };
+
+  const finishTutorial = useCallback((destination = '/report', actionName = 'Finished tutorial') => {
+    if (!isTestMode) {
+      markTutorialCompleted();
+    }
+    if (isTestMode && onNavigate) {
+      onNavigate(destination, actionName);
+      return;
+    }
     if (onComplete) {
       onComplete();
     } else if (replayMode) {
-      // If replaying from settings/dashboard, go back or to resident dashboard
       if (getAuthToken()) {
         navigate('/dashboard');
       } else {
         navigate('/resident-home');
       }
     } else {
-      // Normal first launch completion
       if (getAuthToken()) {
         navigate('/dashboard');
       } else {
         navigate(destination);
       }
     }
-  }, [navigate, onComplete, replayMode]);
+  }, [navigate, onComplete, replayMode, isTestMode, onNavigate]);
 
   const handleNext = () => {
     if (currentStep < totalSteps) {
-      setCurrentStep((prev) => prev + 1);
+      changeStep(currentStep + 1);
     } else {
-      finishTutorial('/report');
+      finishTutorial('/register', 'Register tapped');
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
-      setCurrentStep((prev) => prev - 1);
+      changeStep(currentStep - 1);
     } else if (replayMode) {
-      finishTutorial('/dashboard');
+      finishTutorial('/dashboard', 'Close tutorial tapped');
     }
   };
 
   const handleSkip = () => {
-    finishTutorial('/report');
+    finishTutorial('/report', 'Skip tapped');
   };
 
   const handleSignIn = () => {
-    markTutorialCompleted();
+    if (!isTestMode) {
+      markTutorialCompleted();
+    }
+    if (isTestMode && onNavigate) {
+      onNavigate('/login', 'Sign in tapped');
+      return;
+    }
     if (onComplete) onComplete();
     navigate('/login');
   };
@@ -134,7 +173,7 @@ export default function MobileAppTutorial({ replayMode = false, onComplete }) {
     }
   };
 
-  // Keyboard arrow navigation
+  // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowRight' && currentStep < totalSteps) {
@@ -149,13 +188,35 @@ export default function MobileAppTutorial({ replayMode = false, onComplete }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentStep]);
 
+  // Shared Blended Background styling:
+  const blendedBackgroundStyle = isDark
+    ? {
+        backgroundColor: '#070a12',
+        backgroundImage: 'radial-gradient(ellipse 110% 45% at 50% 0%, rgba(255, 107, 0, 0.14) 0%, rgba(255, 107, 0, 0.04) 28%, transparent 45%)'
+      }
+    : {
+        backgroundColor: '#f8f7f5',
+        backgroundImage: 'radial-gradient(ellipse 110% 45% at 50% 0%, rgba(255, 107, 0, 0.10) 0%, rgba(255, 107, 0, 0.03) 26%, transparent 45%)'
+      };
+
   return (
     <div
-      ref={containerRef}
+      ref={(node) => {
+        containerRef.current = node;
+        if (externalContainerRef) {
+          if (typeof externalContainerRef === 'function') externalContainerRef(node);
+          else externalContainerRef.current = node;
+        }
+      }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      className="relative w-full h-[100dvh] max-h-[820px] max-w-[430px] mx-auto bg-[#070a12] text-white flex flex-col justify-between px-5 py-4 select-none overflow-hidden font-sans border-x border-slate-900 shadow-2xl"
+      style={blendedBackgroundStyle}
+      className={`relative w-full ${
+        isTestMode ? 'h-full' : 'h-[100dvh]'
+      } max-w-md mx-auto flex flex-col justify-between px-5 pt-3 pb-5 sm:pb-6 select-none overflow-hidden font-sans transition-colors duration-150 ${
+        isDark ? 'text-white' : 'text-slate-900'
+      } ${reducedMotion ? '[&_*]:transition-none! [&_*]:animate-none!' : ''}`}
       role="region"
       aria-label="PULSO First Launch Tutorial"
     >
@@ -164,36 +225,42 @@ export default function MobileAppTutorial({ replayMode = false, onComplete }) {
         {announcement}
       </div>
 
-      {/* Ambient background glow in authentic PULSO orange */}
-      <div
-        className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-80 bg-orange-600/15 rounded-full blur-3xl pointer-events-none"
-        aria-hidden="true"
-      />
-
       {/* ── TOP BAR: Back Button, Progress Dots, Skip/Close Button ── */}
-      <header className="relative z-10 w-full flex items-center justify-between h-12 pt-1 shrink-0">
-        {/* Back Button or Spacer */}
-        <div className="w-12 flex items-center justify-start">
+      <header className="relative z-10 w-full flex items-center justify-between h-12 shrink-0">
+        {/* Back Button (48x48px tap target) */}
+        <div className="w-12 h-12 flex items-center justify-start">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={handleBack}
               aria-label="Go to previous screen"
-              className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+              className={`w-12 h-12 -ml-2 rounded-full flex items-center justify-center active:scale-95 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              <ChevronLeft size={24} />
+              <PulsoIcon
+                name="back"
+                size={24}
+                className={isDark ? 'text-slate-300' : 'text-slate-700'}
+              />
             </button>
           ) : replayMode ? (
             <button
               type="button"
               onClick={() => finishTutorial('/dashboard')}
               aria-label="Close tutorial"
-              className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+              className={`w-12 h-12 -ml-2 rounded-full flex items-center justify-center active:scale-95 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              <X size={20} />
+              <PulsoIcon
+                name="close"
+                size={20}
+                className={isDark ? 'text-slate-300' : 'text-slate-700'}
+              />
             </button>
           ) : (
-            <div className="w-10 h-10" aria-hidden="true" />
+            <div className="w-12 h-12" aria-hidden="true" />
           )}
         </div>
 
@@ -209,26 +276,32 @@ export default function MobileAppTutorial({ replayMode = false, onComplete }) {
               <button
                 key={stepNum}
                 type="button"
-                onClick={() => setCurrentStep(stepNum)}
+                onClick={() => changeStep(stepNum)}
                 aria-label={`Go to Step ${stepNum} of ${totalSteps}${isActive ? ' (Current)' : ''}`}
-                className={`transition-all duration-300 rounded-full h-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                className={`transition-all duration-200 rounded-full h-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
                   isActive
-                    ? 'w-7 bg-[#ff6b00] shadow-sm shadow-orange-500/50'
-                    : 'w-2 bg-slate-700/80 hover:bg-slate-500'
+                    ? 'w-7 bg-[#ff6b00]'
+                    : isDark
+                    ? 'w-2 bg-slate-700/80 hover:bg-slate-500'
+                    : 'w-2 bg-slate-300 hover:bg-slate-400'
                 }`}
               />
             );
           })}
         </nav>
 
-        {/* Skip Button (screens 1-4) or Close Icon in replay mode */}
-        <div className="w-12 flex items-center justify-end">
+        {/* Skip Button (screens 1-4, 48x48px tap target, pulso-small 14px) */}
+        <div className="w-12 h-12 flex items-center justify-end">
           {currentStep < totalSteps ? (
             <button
               type="button"
               onClick={handleSkip}
               aria-label="Skip onboarding tutorial"
-              className="text-xs font-bold text-slate-400 hover:text-white active:scale-95 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+              className={`min-h-[48px] min-w-[48px] -mr-2 px-3 py-2 pulso-small font-medium active:scale-95 transition-colors cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                isDark
+                  ? 'text-[#ff8a3d] hover:text-orange-300'
+                  : 'text-[#c2410c] hover:text-[#9a3412]'
+              }`}
             >
               Skip
             </button>
@@ -237,286 +310,563 @@ export default function MobileAppTutorial({ replayMode = false, onComplete }) {
               type="button"
               onClick={() => finishTutorial('/dashboard')}
               aria-label="Close tutorial"
-              className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+              className={`w-12 h-12 -mr-2 rounded-full flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+              }`}
             >
-              <X size={20} />
+              <PulsoIcon
+                name="close"
+                size={20}
+                className={isDark ? 'text-slate-400' : 'text-slate-600'}
+              />
             </button>
           ) : (
-            <div className="w-10 h-10" aria-hidden="true" />
+            <div className="w-12 h-12" aria-hidden="true" />
           )}
         </div>
       </header>
 
-      {/* ── STEP CONTENT AREA ── */}
-      <main className="relative z-10 flex-1 flex flex-col justify-between py-2 sm:py-3 min-h-0">
+      {/* ── 2. CONTENT ZONE: Vertical Centering slightly above true center (~45% from top) ── */}
+      <main className="relative z-10 flex-1 flex flex-col justify-center items-center w-full min-h-0 py-2 pb-[6%]">
         
         {/* ── SCREEN 1: WELCOME ── */}
         {currentStep === 1 && (
-          <div className="h-full flex flex-col justify-between animate-fadeIn">
-            {/* Upper Visual: Single Official Caloocan City Seal */}
-            <div className="flex-1 flex flex-col items-center justify-center relative min-h-[220px]">
-              <div className="relative flex items-center justify-center">
-                {/* Concentric municipal rings */}
-                <div className="absolute w-44 h-44 rounded-full border border-orange-500/20 animate-pulse" />
-                <div className="absolute w-36 h-36 rounded-full border border-dashed border-orange-500/30" />
-                <div className="w-28 h-28 rounded-full bg-slate-900/90 border-2 border-orange-500/60 p-1 shadow-xl shadow-orange-950/40 flex items-center justify-center overflow-hidden">
-                  <img
-                    src="/city-engineering-logo.png"
-                    alt="Official Caloocan City Seal"
-                    className="w-full h-full object-contain rounded-full"
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = '/engineering-logo.jpg';
-                    }}
-                  />
-                </div>
-              </div>
+          <div className="w-full max-w-sm mx-auto flex flex-col justify-center items-center text-center animate-fadeIn">
+            {/* Real Caloocan City seal with faint decorative rings (aria-hidden) */}
+            <div className="relative flex items-center justify-center mb-6">
+              {/* Faint decorative outer ring */}
+              <div
+                className="w-28 h-28 sm:w-32 sm:h-32 rounded-full border border-orange-500/15 absolute pointer-events-none"
+                aria-hidden="true"
+              />
+              {/* Faint decorative inner ring */}
+              <div
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border border-orange-500/20 absolute pointer-events-none"
+                aria-hidden="true"
+              />
 
-              {/* Civic Authenticity Badge */}
-              <div className="mt-4 px-3 py-1 rounded-full bg-orange-950/40 border border-orange-500/30 text-[11px] font-mono font-bold text-orange-400 tracking-wider uppercase">
-                Caloocan City Engineering
+              {/* Seal container */}
+              <div
+                className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full p-1 flex items-center justify-center overflow-hidden shadow-sm transition-colors ${
+                  isDark
+                    ? 'bg-slate-900 border border-slate-800'
+                    : 'bg-white border border-slate-200/90'
+                }`}
+              >
+                <img
+                  src="/city-engineering-logo.png"
+                  alt="Official Caloocan City Seal"
+                  className="w-full h-full object-contain rounded-full"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = '/engineering-logo.jpg';
+                  }}
+                />
               </div>
             </div>
 
-            {/* Content Text: Heading (<=5 words) & Body (<=2 short lines) */}
-            <div className="text-center px-2 py-3 shrink-0">
-              <h1 className="font-heading font-black text-2xl sm:text-[26px] tracking-tight text-white leading-tight">
-                Report city problems in minutes.
-              </h1>
-              <p className="text-sm text-slate-300 font-normal leading-relaxed mt-2 max-w-[310px] mx-auto">
-                PULSO is Caloocan City&apos;s direct line to City Engineering for fast repairs.
-              </p>
-            </div>
+            {/* Display Heading: strictly 2 lines ("Report city problems" / "in minutes.") */}
+            <h1
+              className={`font-bold text-center mx-auto mb-3 transition-colors text-[1.5rem] min-[380px]:text-[1.65rem] min-[420px]:text-[1.8rem] leading-[1.18] tracking-tight ${
+                isDark ? 'text-white' : 'text-[#0c2436]'
+              }`}
+            >
+              <span className="block">Report city problems</span>
+              <span className="block">in minutes.</span>
+            </h1>
+
+            {/* Body Text (1rem, max 2 lines, max-width 30ch, pretty wrapping) */}
+            <p
+              style={{
+                maxWidth: '30ch'
+              }}
+              className={`text-[1rem] leading-[1.5] font-normal text-center mx-auto transition-colors [text-wrap:pretty] ${
+                isDark ? 'text-slate-300' : 'text-[#475569]'
+              }`}
+            >
+              PULSO is Caloocan City&apos;s direct line to City Engineering for fast repairs.
+            </p>
           </div>
         )}
 
-        {/* ── SCREEN 2: REPORT IT ── */}
+        {/* ── SCREEN 2: REPORT IT (Simplified, 3-Step Numbered List, Jargon-Free) ── */}
         {currentStep === 2 && (
-          <div className="h-full flex flex-col justify-between animate-fadeIn">
-            {/* Upper Visual: 3 Concrete Action Cards (No Technical Jargon) */}
-            <div className="flex-1 flex flex-col items-center justify-center relative min-h-[220px] px-2">
-              <div className="w-full max-w-[290px] space-y-2.5">
-                {/* 1. Category Card */}
-                <div className="p-3 rounded-2xl bg-slate-900/90 border border-orange-500/30 flex items-center gap-3 shadow-md">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/15 text-[#ff6b00] flex items-center justify-center shrink-0">
-                    <Wrench size={20} />
-                  </div>
-                  <div className="min-w-0 flex-1 text-left">
-                    <span className="text-[10px] font-mono uppercase text-orange-400 font-bold block">1. Pick Problem</span>
-                    <span className="text-xs font-bold text-white truncate block">Broken streetlight, pothole, leak</span>
-                  </div>
-                </div>
-
-                {/* 2. Photo & Location Row */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
-                      <Camera size={16} />
-                    </div>
-                    <div className="min-w-0 text-left">
-                      <span className="text-[10px] font-bold text-slate-300 block">Add photo</span>
-                      <span className="text-[9px] text-slate-500 block truncate">Snap damage</span>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
-                      <MapPin size={16} />
-                    </div>
-                    <div className="min-w-0 text-left">
-                      <span className="text-[10px] font-bold text-slate-300 block">Pin location</span>
-                      <span className="text-[9px] text-slate-500 block truncate">Auto-detected</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Content Text: Heading (<=5 words) & Body (<=2 short lines) */}
-            <div className="text-center px-2 py-3 shrink-0">
-              <h2 className="font-heading font-black text-2xl sm:text-[26px] tracking-tight text-white leading-tight">
+          <div className="w-full max-w-sm mx-auto flex flex-col justify-center animate-fadeIn">
+            {/* Centered Heading & Subtitle Block */}
+            <div className="text-center mb-6">
+              <h2
+                className={`pulso-h1 font-bold text-center transition-colors [text-wrap:balance] ${
+                  isDark ? 'text-white' : 'text-[#0c2436]'
+                }`}
+              >
                 Tell us what&apos;s wrong.
               </h2>
-              <p className="text-sm text-slate-300 font-normal leading-relaxed mt-2 max-w-[310px] mx-auto">
-                Pick a category, mark the location, add a photo, and send. No technical knowledge needed.
+              <p
+                className={`pulso-body font-normal text-center mt-2 transition-colors [text-wrap:pretty] ${
+                  isDark ? 'text-slate-300' : 'text-[#475569]'
+                }`}
+              >
+                Three quick steps. No technical knowledge needed.
               </p>
             </div>
-          </div>
-        )}
 
-        {/* ── SCREEN 3: WE RECEIVE IT ── */}
-        {currentStep === 3 && (
-          <div className="h-full flex flex-col justify-between animate-fadeIn">
-            {/* Upper Visual: City Maintenance Crew Receiving Report */}
-            <div className="flex-1 flex flex-col items-center justify-center relative min-h-[220px]">
-              <div className="w-full max-w-[290px] p-4 rounded-3xl bg-slate-900/90 border border-slate-800/90 relative overflow-hidden text-center shadow-lg">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-orange-500/20 mb-3">
-                  <HardHat size={28} />
+            {/* Semantic Ordered List: Real <ol> and <li>, clearly non-interactive */}
+            <ol className="w-full space-y-4 text-left" aria-label="Reporting steps">
+              {/* Step 1: Take a photo */}
+              <li className="flex items-start gap-3.5">
+                <div
+                  className={`w-8 h-8 rounded-full bg-[#ff6b00] font-bold flex items-center justify-center text-sm tabular-nums shrink-0 shadow-2xs ${
+                    isDark ? 'text-white' : 'text-[#070a12]'
+                  }`}
+                  aria-hidden="true"
+                >
+                  1
                 </div>
-                <h3 className="text-sm font-heading font-black text-white">
-                  City Maintenance Crew
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Engineers review the details and schedule crews for hands-on repair.
-                </p>
-                
-                {/* Visual Route Indicator */}
-                <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-around text-[10px] text-slate-400">
-                  <div className="flex items-center gap-1 text-emerald-400 font-bold">
-                    <CheckCircle2 size={12} />
-                    <span>Submitted</span>
-                  </div>
-                  <ArrowRight size={12} className="text-slate-600" />
-                  <div className="flex items-center gap-1 text-orange-400 font-bold">
-                    <Wrench size={12} />
-                    <span>Crew Assigned</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Content Text: Heading (<=5 words) & Body (<=2 short lines) */}
-            <div className="text-center px-2 py-3 shrink-0">
-              <h2 className="font-heading font-black text-2xl sm:text-[26px] tracking-tight text-white leading-tight">
-                City Engineering gets your report.
-              </h2>
-              <p className="text-sm text-slate-300 font-normal leading-relaxed mt-2 max-w-[310px] mx-auto">
-                Our team reviews your submission and sends the right maintenance crew to fix it.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* ── SCREEN 4: TRACK IT ── */}
-        {currentStep === 4 && (
-          <div className="h-full flex flex-col justify-between animate-fadeIn">
-            {/* Upper Visual: Real PulseLine Stages Matching Track My Report */}
-            <div className="flex-1 flex flex-col items-center justify-center relative min-h-[220px]">
-              <div className="w-full max-w-[295px] p-3.5 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-lg">
-                {/* Ticket Header */}
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                  <span className="text-[10px] font-mono text-slate-400">TRACKING CODE</span>
-                  <span className="text-xs font-mono font-black text-orange-400">#PUL-2026-1049</span>
-                </div>
-
-                {/* 5 Real Stages from Track My Report */}
-                <div className="mt-3 space-y-2">
-                  {[
-                    { label: 'Received', done: true, current: false },
-                    { label: 'Under Review', done: true, current: false },
-                    { label: 'Assigned', done: true, current: true },
-                    { label: 'In Progress', done: false, current: false },
-                    { label: 'Resolved', done: false, current: false }
-                  ].map((stg, i) => (
-                    <div
-                      key={stg.label}
-                      className={`flex items-center justify-between px-2.5 py-1 rounded-xl text-xs ${
-                        stg.current
-                          ? 'bg-orange-500/15 border border-orange-500/40 text-orange-400 font-bold'
-                          : stg.done
-                          ? 'text-emerald-400 font-medium'
-                          : 'text-slate-500'
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <PulsoIcon
+                      name="photo"
+                      size={20}
+                      className={isDark ? 'text-slate-200 shrink-0' : 'text-[#334155] shrink-0'}
+                    />
+                    <h3
+                      className={`text-[1rem] sm:text-[1.0625rem] font-semibold tracking-tight whitespace-nowrap transition-colors ${
+                        isDark ? 'text-white' : 'text-[#0c2436]'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                          stg.done ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {stg.done ? '✓' : i + 1}
-                        </span>
-                        <span>{stg.label}</span>
-                      </div>
-                      {stg.current && (
-                        <span className="text-[9px] uppercase tracking-wider font-bold bg-[#ff6b00] text-white px-1.5 py-0.2 rounded-md">
-                          Live
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                      Take a photo
+                    </h3>
+                  </div>
+                  <p
+                    className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
+                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                    }`}
+                  >
+                    Show the broken streetlight, pothole, or leak.
+                  </p>
                 </div>
-              </div>
+              </li>
+
+              {/* Step 2: Choose what's wrong */}
+              <li className="flex items-start gap-3.5">
+                <div
+                  className={`w-8 h-8 rounded-full bg-[#ff6b00] font-bold flex items-center justify-center text-sm tabular-nums shrink-0 shadow-2xs ${
+                    isDark ? 'text-white' : 'text-[#070a12]'
+                  }`}
+                  aria-hidden="true"
+                >
+                  2
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <PulsoIcon
+                      name="category"
+                      size={20}
+                      className={isDark ? 'text-slate-200 shrink-0' : 'text-[#334155] shrink-0'}
+                    />
+                    <h3
+                      className={`text-[1rem] sm:text-[1.0625rem] font-semibold tracking-tight whitespace-nowrap transition-colors ${
+                        isDark ? 'text-white' : 'text-[#0c2436]'
+                      }`}
+                    >
+                      Choose what&apos;s wrong
+                    </h3>
+                  </div>
+                  <p
+                    className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
+                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                    }`}
+                  >
+                    Pick the closest match, like Road or Water.
+                  </p>
+                </div>
+              </li>
+
+              {/* Step 3: Check the place and send */}
+              <li className="flex items-start gap-3.5">
+                <div
+                  className={`w-8 h-8 rounded-full bg-[#ff6b00] font-bold flex items-center justify-center text-sm tabular-nums shrink-0 shadow-2xs ${
+                    isDark ? 'text-white' : 'text-[#070a12]'
+                  }`}
+                  aria-hidden="true"
+                >
+                  3
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <PulsoIcon
+                      name="location"
+                      size={20}
+                      className={isDark ? 'text-slate-200 shrink-0' : 'text-[#334155] shrink-0'}
+                    />
+                    <h3
+                      className={`text-[1rem] sm:text-[1.0625rem] font-semibold tracking-tight whitespace-nowrap transition-colors ${
+                        isDark ? 'text-white' : 'text-[#0c2436]'
+                      }`}
+                    >
+                      Check the place and send
+                    </h3>
+                  </div>
+                  <p
+                    className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
+                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                    }`}
+                  >
+                    Your phone finds where you are.
+                  </p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        )}
+
+        {/* ── SCREEN 3: WE RECEIVE IT (Honest City Engineering Review Stages) ── */}
+        {currentStep === 3 && (
+          <div className="w-full max-w-sm mx-auto flex flex-col justify-center animate-fadeIn">
+            <div className="text-center mb-6">
+              <h2
+                className={`pulso-h1 font-bold text-center transition-colors [text-wrap:balance] ${
+                  isDark ? 'text-white' : 'text-[#0c2436]'
+                }`}
+              >
+                City Engineering gets your report.
+              </h2>
+              <p
+                className={`pulso-body font-normal text-center mt-2 transition-colors [text-wrap:pretty] ${
+                  isDark ? 'text-slate-300' : 'text-[#475569]'
+                }`}
+              >
+                We review every report and send a team to fix it.
+              </p>
             </div>
 
-            {/* Content Text: Heading (<=5 words) & Body (<=2 short lines) */}
-            <div className="text-center px-2 py-3 shrink-0">
-              <h2 className="font-heading font-black text-2xl sm:text-[26px] tracking-tight text-white leading-tight">
+            {/* Plain resident-friendly process list (no box container) */}
+            <ol
+              className="w-full space-y-4 text-left list-none"
+              aria-label="How your report gets resolved"
+            >
+              <li className="flex items-start gap-3.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" aria-hidden="true" />
+                <div>
+                  <h3
+                    className={`pulso-body font-semibold block transition-colors ${
+                      isDark ? 'text-white' : 'text-[#0c2436]'
+                    }`}
+                  >
+                    We check your report
+                  </h3>
+                  <p
+                    className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
+                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                    }`}
+                  >
+                    Engineers verify the photo and location.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-sky-400 shrink-0 mt-1.5" aria-hidden="true" />
+                <div>
+                  <h3
+                    className={`pulso-body font-semibold block transition-colors ${
+                      isDark ? 'text-white' : 'text-[#0c2436]'
+                    }`}
+                  >
+                    We send a crew
+                  </h3>
+                  <p
+                    className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
+                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                    }`}
+                  >
+                    A repair team goes to the site to fix the problem.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-orange-400 shrink-0 mt-1.5" aria-hidden="true" />
+                <div>
+                  <h3
+                    className={`pulso-body font-semibold block transition-colors ${
+                      isDark ? 'text-white' : 'text-[#0c2436]'
+                    }`}
+                  >
+                    We update you
+                  </h3>
+                  <p
+                    className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
+                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                    }`}
+                  >
+                    You can track the progress until it&apos;s done.
+                  </p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        )}
+
+        {/* ── SCREEN 4: TRACK IT (Clear, 3-Milestone Resident Tracking) ── */}
+        {currentStep === 4 && (
+          <div className="w-full max-w-sm mx-auto flex flex-col justify-center animate-fadeIn">
+            <div className="text-center mb-5">
+              <h2
+                className={`pulso-h1 font-bold text-center transition-colors [text-wrap:balance] ${
+                  isDark ? 'text-white' : 'text-[#0c2436]'
+                }`}
+              >
                 Follow your report.
               </h2>
-              <p className="text-sm text-slate-300 font-normal leading-relaxed mt-2 max-w-[310px] mx-auto">
-                Use your tracking number to see progress at any time, using real updates from Received to Resolved.
+              <p
+                className={`pulso-body font-normal text-center mt-2 transition-colors [text-wrap:pretty] ${
+                  isDark ? 'text-slate-300' : 'text-[#475569]'
+                }`}
+              >
+                Check live progress anytime with your tracking code.
               </p>
+            </div>
+
+            {/* Clear resident tracking info (no box container) */}
+            <div className="w-full text-left">
+              {/* Header with Inter tabular tracking number & active status */}
+              <div
+                className={`flex items-center justify-between pb-3 mb-3 border-b transition-colors ${
+                  isDark ? 'border-slate-800' : 'border-slate-200'
+                }`}
+              >
+                <div>
+                  <span className={`pulso-caption block font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Tracking code
+                  </span>
+                  <span
+                    className={`tabular-nums font-semibold text-[15px] sm:text-[16px] ${
+                      isDark ? 'text-[#ff8a3d]' : 'text-[#c2410c]'
+                    }`}
+                  >
+                    PUL-2026-1049
+                  </span>
+                </div>
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    isDark
+                      ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                      : 'bg-orange-50 text-orange-800 border border-orange-200'
+                  }`}
+                >
+                  In progress
+                </span>
+              </div>
+
+              {/* 3 Universal Resident Milestones */}
+              <ol className="space-y-3.5 list-none" aria-label="Report progress stages">
+                {/* 1. Received */}
+                <li className="flex items-start gap-3">
+                  <div
+                    className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5"
+                    aria-hidden="true"
+                  >
+                    ✓
+                  </div>
+                  <div>
+                    <span
+                      className={`pulso-body font-semibold block transition-colors ${
+                        isDark ? 'text-white' : 'text-[#0c2436]'
+                      }`}
+                    >
+                      Received
+                    </span>
+                    <span
+                      className={`pulso-small block mt-0.5 transition-colors ${
+                        isDark ? 'text-slate-300' : 'text-[#475569]'
+                      }`}
+                    >
+                      Your report is confirmed and reviewed.
+                    </span>
+                  </div>
+                </li>
+
+                {/* 2. In progress (Current) */}
+                <li className="flex items-start gap-3">
+                  <div
+                    className="w-5 h-5 rounded-full bg-[#ff6b00] text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5"
+                    aria-hidden="true"
+                  >
+                    2
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`pulso-body font-semibold block transition-colors ${
+                          isDark ? 'text-white' : 'text-[#0c2436]'
+                        }`}
+                      >
+                        In progress
+                      </span>
+                      <span
+                        className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
+                          isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-[#c2410c]'
+                        }`}
+                      >
+                        Current
+                      </span>
+                    </div>
+                    <span
+                      className={`pulso-small block mt-0.5 transition-colors ${
+                        isDark ? 'text-slate-300' : 'text-[#475569]'
+                      }`}
+                    >
+                      A repair crew is working on the fix.
+                    </span>
+                  </div>
+                </li>
+
+                {/* 3. Resolved */}
+                <li className="flex items-start gap-3 opacity-60">
+                  <div
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                      isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'
+                    }`}
+                    aria-hidden="true"
+                  >
+                    3
+                  </div>
+                  <div>
+                    <span
+                      className={`pulso-body font-semibold block transition-colors ${
+                        isDark ? 'text-white' : 'text-[#0c2436]'
+                      }`}
+                    >
+                      Resolved
+                    </span>
+                    <span
+                      className={`pulso-small block mt-0.5 transition-colors ${
+                        isDark ? 'text-slate-400' : 'text-slate-500'
+                      }`}
+                    >
+                      Completed with photo proof of the repair.
+                    </span>
+                  </div>
+                </li>
+              </ol>
             </div>
           </div>
         )}
 
-        {/* ── SCREEN 5: ALL SET ── */}
+        {/* ── SCREEN 5: ALL SET (Honest Checkmark Visual & Final Action) ── */}
         {currentStep === 5 && (
-          <div className="h-full flex flex-col justify-between animate-fadeIn">
-            {/* Upper Visual: Ready Celebration Card */}
-            <div className="flex-1 flex flex-col items-center justify-center relative min-h-[220px]">
-              <div className="relative flex flex-col items-center justify-center">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center shadow-xl shadow-emerald-500/20 mb-3">
-                  <CheckCircle2 size={42} strokeWidth={2.5} />
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-[11px] font-bold text-emerald-400">
-                  <ShieldCheck size={14} />
-                  <span>City Service Ready</span>
-                </div>
-              </div>
+          <div className="w-full max-w-sm mx-auto flex flex-col justify-center items-center text-center animate-fadeIn">
+            {/* Plain checkmark icon without circular background container */}
+            <div className="mb-6 flex items-center justify-center">
+              <PulsoIcon
+                name="resolved"
+                size={64}
+                className={isDark ? 'text-emerald-500' : 'text-emerald-600'}
+              />
             </div>
 
-            {/* Content Text: Heading (<=5 words) & Body (<=2 short lines) */}
-            <div className="text-center px-2 py-3 shrink-0">
-              <h2 className="font-heading font-black text-2xl sm:text-[26px] tracking-tight text-white leading-tight">
-                You&apos;re ready.
-              </h2>
-              <p className="text-sm text-slate-300 font-normal leading-relaxed mt-2 max-w-[310px] mx-auto">
-                Report an issue in seconds. Signing in is optional, but lets you view report history.
-              </p>
-            </div>
+            <h2
+              className={`pulso-h1 font-bold text-center mb-2 transition-colors [text-wrap:balance] ${
+                isDark ? 'text-white' : 'text-[#0c2436]'
+              }`}
+            >
+              You&apos;re ready.
+            </h2>
+            <p
+              className={`pulso-body font-normal text-center transition-colors [text-wrap:pretty] ${
+                isDark ? 'text-slate-300' : 'text-[#475569]'
+              }`}
+            >
+              Create your account to start reporting issues and track repairs in Caloocan.
+            </p>
           </div>
         )}
 
       </main>
 
-      {/* ── FIXED BOTTOM ACTIONS: Primary Button, Secondary Links, Emergency Note ── */}
-      <footer className="relative z-10 w-full pt-1 pb-2 shrink-0">
-        {/* Primary Action Button (Fixed height >= 48px, consistent position) */}
+      {/* ── 3. ACTION ZONE: Primary Button & Screen 1 / 5 Secondary Links ── */}
+      <footer className="relative z-10 w-full shrink-0 pt-2 pb-1">
+        {/* Primary Action Button (16px semibold 600, sentence case, min-h-[50px], white text & icon in all modes) */}
         <button
           type="button"
           onClick={handleNext}
-          className="w-full min-h-[50px] sm:min-h-[52px] rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-black text-base tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:ring-[#ff6b00]"
+          className={`w-full min-h-[50px] sm:min-h-[52px] rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] pulso-btn-text font-semibold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer text-white focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-offset-2 ${
+            isDark
+              ? 'focus-visible:ring-offset-slate-950 focus-visible:ring-[#ff6b00]'
+              : 'focus-visible:ring-offset-[#f8f7f5] focus-visible:ring-[#ff6b00]'
+          }`}
         >
-          <span>{currentStep === totalSteps ? 'Report an Issue' : 'Next'}</span>
-          <ArrowRight size={18} strokeWidth={2.5} />
+          <span className="text-white">{currentStep === totalSteps ? 'Register' : 'Next'}</span>
+          <PulsoIcon
+            name="next"
+            size={20}
+            className="text-white"
+          />
         </button>
 
-        {/* Secondary Actions & Emergency Link */}
-        <div className="mt-2.5 min-h-[46px] flex flex-col items-center justify-center">
-          {currentStep === totalSteps ? (
-            <div className="w-full text-center space-y-1.5">
-              <div className="text-xs text-slate-400">
+        {/* Secondary Action Row: Anchored with equal spacing */}
+        <div className="mt-3 min-h-[28px] flex flex-col items-center justify-center">
+          {currentStep === 1 ? (
+            <div
+              className={`text-center pulso-small transition-colors ${
+                isDark ? 'text-slate-400' : 'text-slate-600'
+              }`}
+            >
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={handleSignIn}
+                className={`font-semibold hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded px-1 transition-colors ${
+                  isDark ? 'text-[#ff8a3d]' : 'text-[#c2410c]'
+                }`}
+              >
+                Sign in
+              </button>
+            </div>
+          ) : currentStep === totalSteps ? (
+            <div className="w-full text-center space-y-1">
+              <div
+                className={`pulso-small transition-colors ${
+                  isDark ? 'text-slate-400' : 'text-slate-600'
+                }`}
+              >
                 Already registered?{' '}
                 <button
                   type="button"
                   onClick={handleSignIn}
-                  className="font-bold text-[#ff6b00] hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded px-1"
+                  className={`font-semibold hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded px-1 transition-colors ${
+                    isDark ? 'text-[#ff8a3d]' : 'text-[#c2410c]'
+                  }`}
                 >
                   Sign in
                 </button>
-                <span className="text-[11px] text-slate-500 block">
-                  (Signing in is optional for reporting)
-                </span>
               </div>
 
-              {/* Emergency Banner Note */}
-              <div className="pt-1.5 flex items-center justify-center gap-1.5 text-[11px] text-red-400 border-t border-slate-900">
-                <AlertTriangle size={13} className="text-red-500 shrink-0" />
-                <span>
+              {/* Emergency Banner Note (Strictly one line across all phones) */}
+              <div
+                className={`pt-1 flex items-center justify-center gap-1.5 text-[12px] sm:text-[13px] tracking-tight whitespace-nowrap border-t transition-colors ${
+                  isDark
+                    ? 'text-red-400 border-slate-900'
+                    : 'text-red-700 border-slate-200'
+                }`}
+              >
+                <PulsoIcon
+                  name="warning"
+                  size={13}
+                  className={isDark ? 'text-red-400 shrink-0' : 'text-red-700 shrink-0'}
+                />
+                <span className="whitespace-nowrap">
                   In a life-threatening emergency, call{' '}
                   <a
                     href="tel:911"
-                    className="font-bold underline text-red-400 hover:text-red-300"
+                    onClick={(e) => {
+                      if (isTestMode) {
+                        e.preventDefault();
+                        onNavigate?.('tel:911', 'Emergency 911 tapped (tel:911 verified)');
+                      }
+                    }}
+                    className={`font-bold underline ${
+                      isDark ? 'text-red-400 hover:text-red-300' : 'text-red-700 hover:text-red-800'
+                    }`}
                     aria-label="Call 911 emergency hotline"
                   >
                     911
@@ -526,16 +876,8 @@ export default function MobileAppTutorial({ replayMode = false, onComplete }) {
               </div>
             </div>
           ) : (
-            <div className="text-center text-xs text-slate-400">
-              Already have an account?{' '}
-              <button
-                type="button"
-                onClick={handleSignIn}
-                className="font-bold text-[#ff6b00] hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded px-1"
-              >
-                Sign in
-              </button>
-            </div>
+            /* Screens 2, 3, 4: Clean spacer, keeping primary button anchored identically */
+            <div className="h-5" aria-hidden="true" />
           )}
         </div>
       </footer>

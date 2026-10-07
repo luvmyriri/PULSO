@@ -13,6 +13,7 @@ import ReportSuccessPage from './pages/ReportSuccessPage';
 import PublicTrackPage  from './pages/PublicTrackPage';
 import ResidentDashboard from './pages/ResidentDashboard';
 import MobileAppTutorial from './components/mobile/MobileAppTutorial';
+import DevAppPreviewPage from './pages/DevAppPreviewPage';
 import GovDivisionPage   from './pages/GovDivisionPage';
 import PositionDashboard from './pages/PositionDashboard';
 import OboInspectionsPage from './pages/OboInspectionsPage';
@@ -88,6 +89,9 @@ function App() {
                         <Route path="/register"       element={<ResidentSurface><Register /></ResidentSurface>} />
                         <Route path="/reset-password" element={<ResidentSurface><ResetPassword /></ResidentSurface>} />
                         <Route path="/gov"            element={<GovLanding />} />
+
+                        {/* ── TEST-ONLY APP PREVIEW ─────────────────────────── */}
+                        <Route path="/dev/app-preview" element={<DevAppPreviewPage />} />
 
                         {/* ── RESIDENT PORTAL ────────────────────────────────── */}
                         {/* Residents ONLY portal access */}

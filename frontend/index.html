@@ -8,8 +8,58 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="theme-color" content="#F4F7F5" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#071A2B" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f8f7f5" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#070a12" media="(prefers-color-scheme: dark)" />
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('pulso_theme') || 'system';
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = saved === 'dark' || (saved === 'system' && prefersDark);
+        var root = document.documentElement;
+        root.classList.remove('light', 'dark');
+        root.classList.add(isDark ? 'dark' : 'light');
+        var color = isDark ? '#070a12' : '#f8f7f5';
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', color);
+
+        // Check if cold-start of installed mobile app
+        var search = new URLSearchParams(window.location.search);
+        var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+                           (window.navigator && window.navigator.standalone === true) ||
+                           (localStorage.getItem('pulso_app_mode') === 'standalone') ||
+                           search.get('mode') === 'standalone' ||
+                           search.get('app') === 'true';
+        if (isStandalone && !sessionStorage.getItem('pulso_session_started')) {
+          window.__pulsoInitialSplashActive = true;
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    #pulso-initial-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #f8f7f5;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html.dark #pulso-initial-splash {
+      background-color: #070a12;
+    }
+    .pulso-splash-navy {
+      color: #0c2436;
+    }
+    html.dark .pulso-splash-navy {
+      color: #ffffff;
+    }
+  </style>
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -17,12 +67,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="PULSO - Official Public Utility & Infrastructure Monitoring Portal for Caloocan City. Report road hazards, water leaks, and power outages directly to City Engineering." />
   <title>PULSO | City of Caloocan Public Works &amp; Utility Portal</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Self-hosted Inter Variable Font (Latin & Latin Ext under 100KB, no CDN) -->
+  <link rel="preload" href="/fonts/inter-latin-variable.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
 </head>
 
 <body>
+  <!-- Instant First-HTML Cold-Start Splash (Removed when React hydrates) -->
+  <div id="pulso-initial-splash" role="status" aria-live="polite" aria-label="Loading PULSO">
+    <div style="height:48px;flex-shrink:0;"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;margin-top:-36px;">
+      <div style="font-size:clamp(2rem, 11vw, 3rem);font-weight:700;letter-spacing:-0.02em;line-height:1.1;white-space:nowrap;">
+        <span style="color:#ff6b00;">P</span><span class="pulso-splash-navy">ULSO</span>
+      </div>
+      <div style="width:180px;height:20px;margin-top:4px;">
+        <svg viewBox="0 0 200 20" style="width:100%;height:100%;overflow:visible;" fill="none" preserveAspectRatio="none">
+          <line x1="0" y1="10" x2="200" y2="10" stroke="#ff6b00" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+    <div style="padding-bottom:max(1.5rem, env(safe-area-inset-bottom, 1.5rem));font-size:14px;color:#64748b;">
+      Caloocan City Engineering
+    </div>
+  </div>
+  <script>
+    if (window.__pulsoInitialSplashActive) {
+      var splashEl = document.getElementById('pulso-initial-splash');
+      if (splashEl) splashEl.style.display = 'flex';
+    }
+  </script>
   <div id="root"></div>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script type="module" src="/src/main.jsx"></script>

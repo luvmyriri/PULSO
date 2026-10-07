@@ -2698,37 +2698,70 @@ const ProfileView = ({
                                         </div>
                                     </div>
 
-                                    {/* Dark Mode Toggle */}
-                                    <div
-                                        role="switch"
-                                        aria-checked={isDarkMode}
-                                        aria-label={`Dark Mode, currently ${isDarkMode ? 'on' : 'off'}`}
-                                        tabIndex={0}
-                                        onClick={handleToggleDarkMode}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                handleToggleDarkMode();
-                                            }
-                                        }}
-                                        className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                    >
+                                    {/* Appearance Setting [ Match my phone | Light | Dark ] */}
+                                    <div className="w-full min-h-[56px] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors select-none">
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <Moon size={18} className="text-orange-500 shrink-0" />
-                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
-                                                Dark Mode
-                                            </span>
+                                            <Sun size={18} className="text-orange-500 shrink-0" />
+                                            <div className="min-w-0">
+                                                <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate block">
+                                                    Appearance
+                                                </span>
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 block -mt-0.5">
+                                                    {theme === 'system' ? 'Match my phone' : theme === 'light' ? 'Light' : 'Dark'}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div
-                                            className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
-                                                isDarkMode ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
-                                            }`}
-                                        >
-                                            <div
-                                                className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
-                                                    isDarkMode ? 'translate-x-5' : 'translate-x-0'
+
+                                        {/* Segmented Control [ Match my phone | Light | Dark ] */}
+                                        <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 rounded-full p-0.5 border border-slate-300/70 dark:border-slate-700/80 shadow-2xs shrink-0 self-start sm:self-auto">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    changeTheme('system');
+                                                    if (showToast) showToast('Appearance set to Match my phone');
+                                                }}
+                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                                    theme === 'system'
+                                                        ? 'bg-orange-500 text-white shadow-xs'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                                                 }`}
-                                            />
+                                                aria-pressed={theme === 'system'}
+                                                aria-label="Appearance: Match my phone"
+                                            >
+                                                Match my phone
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    changeTheme('light');
+                                                    if (showToast) showToast('Light mode enabled');
+                                                }}
+                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                                    theme === 'light'
+                                                        ? 'bg-orange-500 text-white shadow-xs'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                                }`}
+                                                aria-pressed={theme === 'light'}
+                                                aria-label="Appearance: Light"
+                                            >
+                                                Light
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    changeTheme('dark');
+                                                    if (showToast) showToast('Dark mode enabled');
+                                                }}
+                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                                    theme === 'dark'
+                                                        ? 'bg-orange-500 text-white shadow-xs'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                                }`}
+                                                aria-pressed={theme === 'dark'}
+                                                aria-label="Appearance: Dark"
+                                            >
+                                                Dark
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
