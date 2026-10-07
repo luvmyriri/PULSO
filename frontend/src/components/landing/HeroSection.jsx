@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, Search, Smartphone, QrCode } from 'lucide-react';
 import CityNewsWidget from './CityNewsWidget';
 import PwaModal from './PwaModal';
+import { isInstalledApp } from '../../utils/appContext';
 
 /**
  * HeroSection
@@ -87,31 +88,33 @@ export default function HeroSection({ onOpenTrackModal }) {
                 </button>
               </div>
 
-              {/* Mobile App PWA Banner with QR Code Trigger - Normal size, even with buttons above */}
-              <div className="w-full p-2.5 sm:p-3 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-orange-200/90 dark:border-orange-900/50 shadow-2xs hover:shadow-xs transition-all flex items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-orange-100 dark:bg-orange-950/70 text-[#ff6b00] flex items-center justify-center shrink-0 shadow-2xs">
-                    <QrCode size={16} className="text-[#ff6b00]" />
+              {/* Mobile App PWA Banner with QR Code Trigger - Only visible on website, hidden inside mobile app */}
+              {!isInstalledApp() && (
+                <div className="w-full p-2.5 sm:p-3 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-orange-200/90 dark:border-orange-900/50 shadow-2xs hover:shadow-xs transition-all flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-orange-100 dark:bg-orange-950/70 text-[#ff6b00] flex items-center justify-center shrink-0 shadow-2xs">
+                      <QrCode size={16} className="text-[#ff6b00]" />
+                    </div>
+                    <div className="min-w-0 flex-1 text-left">
+                      <span className="text-xs font-heading font-black text-slate-900 dark:text-white block leading-tight">
+                        Install PULSO Mobile App
+                      </span>
+                      <p className="text-[10.5px] sm:text-[11px] text-slate-600 dark:text-slate-400 leading-tight mt-0.5 truncate">
+                        Scan QR code with camera to install.
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1 text-left">
-                    <span className="text-xs font-heading font-black text-slate-900 dark:text-white block leading-tight">
-                      Install PULSO Mobile App
-                    </span>
-                    <p className="text-[10.5px] sm:text-[11px] text-slate-600 dark:text-slate-400 leading-tight mt-0.5 truncate">
-                      Scan QR code with camera to install.
-                    </p>
-                  </div>
-                </div>
 
-                <button
-                  type="button"
-                  onClick={() => setPwaModalOpen(true)}
-                  className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white font-bold text-xs shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
-                >
-                  <Smartphone size={13} />
-                  <span>Install app</span>
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setPwaModalOpen(true)}
+                    className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white font-bold text-xs shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
+                  >
+                    <Smartphone size={13} />
+                    <span>Install app</span>
+                  </button>
+                </div>
+              )}
             </div>
 
           </div>

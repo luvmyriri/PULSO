@@ -2354,6 +2354,7 @@ const ProfileView = ({
     subView: propSubView,
     setSubView: propSetSubView
 }) => {
+    const navigate = useNavigate();
     const { theme, changeTheme } = useTheme();
     const translationHook = useTranslation();
     const activeI18n = propI18n || translationHook.i18n;
@@ -2852,6 +2853,32 @@ const ProfileView = ({
                                             </span>
                                         </div>
                                         <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                    </div>
+
+                                    {/* How PULSO Works (Tutorial Replay) */}
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => navigate('/tutorial')}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                navigate('/tutorial');
+                                            }
+                                        }}
+                                        aria-label="How PULSO Works (App Tutorial)"
+                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <HelpCircle size={18} className="text-orange-500 shrink-0" />
+                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
+                                                How PULSO Works
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className="text-[11px] font-mono text-slate-400">Tutorial</span>
+                                            <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                        </div>
                                     </div>
                                 </div>
                             </div>

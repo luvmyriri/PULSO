@@ -5,6 +5,7 @@ import Branding from '../Branding';
 import ThemeToggle from '../ThemeToggle';
 import PwaModal from './PwaModal';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../../utils/authSession';
+import { isInstalledApp } from '../../utils/appContext';
 
 /**
  * CivicNavbar
@@ -353,19 +354,21 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
                 </button>
               ))}
 
-              <button
-                type="button"
-                onClick={() => { setMobileMenuOpen(false); setPwaModalOpen(true); }}
-                className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl text-sm font-bold bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] border border-orange-200/80 dark:border-orange-800/60 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Smartphone size={16} className="text-[#ff6b00]" />
-                  <span>Install Mobile App (PWA)</span>
-                </div>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-[#ff6b00] text-white">
-                  QR Code
-                </span>
-              </button>
+              {!isInstalledApp() && (
+                <button
+                  type="button"
+                  onClick={() => { setMobileMenuOpen(false); setPwaModalOpen(true); }}
+                  className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl text-sm font-bold bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] border border-orange-200/80 dark:border-orange-800/60 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Smartphone size={16} className="text-[#ff6b00]" />
+                    <span>Install Mobile App (PWA)</span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-[#ff6b00] text-white">
+                    QR Code
+                  </span>
+                </button>
+              )}
             </div>
 
             <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-2">

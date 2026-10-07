@@ -1,4 +1,5 @@
 import React, { useState, lazy, Suspense } from 'react';
+import { Navigate } from 'react-router-dom';
 import OfficialBanner from '../components/landing/OfficialBanner';
 import CivicNavbar from '../components/landing/CivicNavbar';
 import HeroSection from '../components/landing/HeroSection';
@@ -6,6 +7,9 @@ import QuickActionsSection from '../components/landing/QuickActionsSection';
 import CivicFooter from '../components/landing/CivicFooter';
 import TrackReportModal from '../components/landing/TrackReportModal';
 import LegalModal from '../components/LegalModal';
+import MobileAppTutorial from '../components/mobile/MobileAppTutorial';
+import { isInstalledApp, isTutorialCompleted } from '../utils/appContext';
+import { getAuthToken } from '../utils/authSession';
 
 // Lazy-load below-the-fold components for ultra-fast initial paint
 const MapPreviewSection = lazy(() => import('../components/landing/MapPreviewSection'));
@@ -27,15 +31,32 @@ function SectionSkeleton({ height = 'h-72', title = 'Loading...' }) {
 /**
  * Landing (PULSO Civic Portal)
  * ─────────────────────────────────────────────────────────────────────────────
- * Professional civic portal redesigned for non-technical Caloocan City residents.
- * - Clarity: What PULSO does and how to use it in one plain sentence.
- * - Fast path: Direct 1-tap action to report an issue or track status.
- * - Credibility: Official city branding, live snapshot, and real utility activity.
- * - Supporting attraction slideshow showcasing Caloocan landmarks.
- * - Theme toggle parity: Dark navy/black base with orange accent & light mode.
+ * - Public Website: Retains full civic portal landing page (Hero, Map, News, etc.)
+ * - Installed Mobile App: Does NOT render landing page.
+ *   - First launch: routes to 5-step MobileAppTutorial.
+ *   - Returning user: routes to resident dashboard (if signed in) or guest report flow.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export default function Landing() {
+  const inApp = isInstalledApp();
+  const tutorialCompleted = isTutorialCompleted();
+  const isAuthenticated = Boolean(getAuthToken());
+
+  // 1. Installed Mobile App Context: Replace landing page with First-Launch Tutorial or Direct Flow
+  if (inApp) {
+    if (!tutorialCompleted) {
+      return <MobileAppTutorial />;
+    }
+
+    if (isAuthenticated) {
+      return <Navigate to="/dashboard" replace />;
+    }
+
+    // Returning unauthenticated app user: send straight to guest Report flow
+    return <Navigate to="/report" replace />;
+  }
+
+  // 2. Public Website Context: Render current website landing page unchanged
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
   const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
 

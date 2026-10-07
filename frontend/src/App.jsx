@@ -12,6 +12,7 @@ import ReportWizardPage from './pages/ReportWizardPage';
 import ReportSuccessPage from './pages/ReportSuccessPage';
 import PublicTrackPage  from './pages/PublicTrackPage';
 import ResidentDashboard from './pages/ResidentDashboard';
+import MobileAppTutorial from './components/mobile/MobileAppTutorial';
 import GovDivisionPage   from './pages/GovDivisionPage';
 import PositionDashboard from './pages/PositionDashboard';
 import OboInspectionsPage from './pages/OboInspectionsPage';
@@ -79,6 +80,7 @@ function App() {
                         {/* ── PUBLIC RESIDENT ROUTES ─────────────────────────── */}
                         <Route path="/"               element={<ResidentSurface><Landing /></ResidentSurface>} />
                         <Route path="/resident-home"  element={<ResidentSurface><Landing /></ResidentSurface>} />
+                        <Route path="/tutorial"       element={<ResidentSurface><MobileAppTutorial replayMode={true} /></ResidentSurface>} />
                         <Route path="/report"         element={<ResidentSurface><ReportWizardPage /></ResidentSurface>} />
                         <Route path="/report/success" element={<ResidentSurface><ReportSuccessPage /></ResidentSurface>} />
                         <Route path="/track"          element={<ResidentSurface><PublicTrackPage /></ResidentSurface>} />
