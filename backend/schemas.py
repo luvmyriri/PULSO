@@ -201,8 +201,8 @@ class ReportCreate(ReportBase):
 
 
 class ReportResolutionConfirm(BaseModel):
-    rating: int # 1-5
-    note: Optional[str] = None
+    rating: int = Field(ge=1, le=5)
+    note: Optional[str] = Field(default=None, max_length=2000)
 
 
 class ReportResponse(ReportBase):

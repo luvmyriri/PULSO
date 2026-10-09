@@ -797,6 +797,142 @@ def test_report_rejection_records_reason_without_penalizing_resident(client, see
     db.close()
 
 
+def test_resident_resolution_confirmation_requires_resolved_state_and_is_replay_safe(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    resident = db.query(models.Resident).filter(models.Resident.id == 901).one()
+    resident.trust_score = 50
+    resident.is_verified = True
+    report = models.Report(
+        ticket_id="PUL-CONFIRM-01", category="Roads", description="Repaired road",
+        status="pending", resident_id=901,
+    )
+    db.add(report)
+    db.commit()
+    report_id = report.id
+    db.close()
+
+    url = f"/api/reports/{report_id}/confirm"
+    headers = {"Authorization": f"Bearer {seeded_users_and_geo['resident']}"}
+    assert client.post(url, json={"rating": 5, "note": "Good repair"}, headers=headers).status_code == 409
+    for rating in (0, 6):
+        assert client.post(url, json={"rating": rating}, headers=headers).status_code == 422
+
+    db = TestingSessionLocal()
+    report = db.query(models.Report).filter(models.Report.id == report_id).one()
+    assert report.status == "pending"
+    assert db.query(gov_models.ProcessTimeline).filter_by(report_id=report_id).count() == 0
+    report.status = "resolved"
+    db.commit()
+    db.close()
+
+    first = client.post(url, json={"rating": 5, "note": " Good repair "}, headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["status"] == "closed_by_citizen"
+    repeat = client.post(url, json={"rating": 5, "note": "Good repair"}, headers=headers)
+    assert repeat.status_code == 200, repeat.text
+    assert client.post(url, json={"rating": 1, "note": "Changed"}, headers=headers).status_code == 409
+
+    db = TestingSessionLocal()
+    report = db.query(models.Report).filter(models.Report.id == report_id).one()
+    assert report.satisfaction_rating == 5
+    assert report.citizen_feedback_note == "Good repair"
+    assert report.citizen_confirmed_at is not None
+    assert db.query(models.Resident).filter(models.Resident.id == 901).one().trust_score == 55
+    timeline = db.query(gov_models.ProcessTimeline).filter_by(report_id=report_id).all()
+    assert len(timeline) == 1
+    assert timeline[0].is_public
+    assert "Good repair" not in timeline[0].note
+    audits = db.query(gov_models.AuditLog).filter_by(report_id=report_id).all()
+    assert len(audits) == 1
+    assert audits[0].actor_role == "resident" and audits[0].actor_id is None
+    db.close()
+
+
+def test_claimed_guest_report_can_be_confirmed_by_claiming_resident(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    db.query(models.Resident).filter(models.Resident.id == 901).one().is_verified = True
+    report = models.Report(
+        ticket_id="PUL-CONFIRM-GUEST", category="Drainage", description="Cleared drain",
+        status="resolved", reporter_type="guest", claimed_by_user_id=901,
+    )
+    db.add(report)
+    db.commit()
+    report_id = report.id
+    db.close()
+
+    headers = {"Authorization": f"Bearer {seeded_users_and_geo['resident']}"}
+    response = client.post(f"/api/reports/{report_id}/confirm", json={"rating": 3}, headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "closed_by_citizen"
+
+
+def test_report_cancellation_is_early_only_replay_safe_and_attributed_to_resident(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    resident = db.query(models.Resident).filter(models.Resident.id == 901).one()
+    resident.is_verified = True
+    resident.trust_score = 50
+    pending = models.Report(
+        ticket_id="PUL-CANCEL-01", category="Roads", description="Duplicate report",
+        status="pending", resident_id=901,
+    )
+    resolved = models.Report(
+        ticket_id="PUL-CANCEL-02", category="Roads", description="Completed repair",
+        status="resolved", resident_id=901,
+    )
+    db.add_all([pending, resolved])
+    db.commit()
+    pending_id, resolved_id = pending.id, resolved.id
+    db.close()
+
+    headers = {"Authorization": f"Bearer {seeded_users_and_geo['resident']}"}
+    url = f"/api/reports/{pending_id}/cancel"
+    assert client.post(f"/api/reports/{resolved_id}/cancel", headers=headers).status_code == 409
+    first = client.post(url, headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["status"] == "cancelled"
+    assert client.patch(url, headers=headers).status_code == 200
+
+    db = TestingSessionLocal()
+    assert db.query(models.Resident).filter(models.Resident.id == 901).one().trust_score == 49
+    timeline = db.query(gov_models.ProcessTimeline).filter_by(report_id=pending_id).all()
+    assert len(timeline) == 1 and timeline[0].actor_role == "resident"
+    assert timeline[0].actor_id is None
+    audits = db.query(gov_models.AuditLog).filter_by(report_id=pending_id).all()
+    assert len(audits) == 1 and audits[0].actor_role == "resident"
+    assert audits[0].actor_id is None
+    db.close()
+
+
+def test_report_cancellation_rejects_active_work_and_other_resident(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    db.query(models.Resident).filter(models.Resident.id == 901).one().is_verified = True
+    other = models.Resident(
+        id=902, full_name="Other Resident", email="other@citizen.ph",
+        password_hash=auth.get_password_hash("OtherPass123!"), is_verified=True,
+    )
+    report = models.Report(
+        ticket_id="PUL-CANCEL-WORK", category="Roads", description="Active assignment",
+        status="pending", resident_id=901,
+    )
+    db.add_all([other, report])
+    db.flush()
+    db.add(gov_models.WorkOrder(report_id=report.id, assigned_by_id=501, title="Inspect road", status="open"))
+    db.commit()
+    report_id = report.id
+    db.close()
+
+    other_token = auth.create_access_token({"sub": "other@citizen.ph"})
+    url = f"/api/reports/{report_id}/cancel"
+    assert client.post(url, headers={"Authorization": f"Bearer {other_token}"}).status_code == 403
+    owner_headers = {"Authorization": f"Bearer {seeded_users_and_geo['resident']}"}
+    assert client.post(url, headers=owner_headers).status_code == 409
+
+    db = TestingSessionLocal()
+    assert db.query(models.Report).filter(models.Report.id == report_id).one().status == "pending"
+    assert db.query(gov_models.ProcessTimeline).filter_by(report_id=report_id).count() == 0
+    db.close()
+
+
 def test_project_route_advances_one_phase_and_returns_project(client, seeded_users_and_geo):
     headers = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
     created = client.post("/api/gov/projects", json={

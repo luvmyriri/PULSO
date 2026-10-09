@@ -1,7 +1,7 @@
 # Government implementation checkpoint
 
 **Status:** observed implementation on `codex/government-finalization`; not a production approval. The user approved the documented government proposals as product direction on 2026-10-06.
-**Updated:** 2026-10-06.
+**Updated:** 2026-10-09.
 **Base:** `Latest-pulso-resident` at `4141c289`.
 
 ## Working paths
@@ -18,6 +18,8 @@
 - General work-order edits cannot alter cost, completion, feedback, or lifecycle state; active orders cannot be reassigned by a general edit. Approved metadata changes append an audit event. Approval, rejection, field updates, and blocker changes lock the work-order row before their state checks.
 - The reporter can now answer a staff information request with an owned resident account or the secret tracking token. The response is kept on the internal timeline and audit record, a public-safe transition returns the ticket to triage, and the requesting official receives an in-app notification. The public tracking page exposes this recovery path in English and Filipino and no longer fabricates a report when the registry is offline.
 - Public tracking returns a district code only when the report links to a registered barangay and its district; coordinates alone no longer produce a guessed district.
+- Resident resolution confirmation now requires a resolved report and a 1–5 rating. Identical retries return the existing closeout without another timeline, audit, or trust change; conflicting retries return 409. Claimed guest reports can be confirmed by the claiming account. Freeform feedback stays off the public timeline, and resident actions no longer write a resident ID into the official-only audit actor foreign key. The stored terminal value remains the observed legacy `closed_by_citizen` pending a governed lifecycle migration.
+- Report cancellation now locks the report, accepts only preapproval or rejected states without an active work order, and is replay safe. Resident cancellations preserve the existing one-point trust effect once and use resident attribution; staff cancellation uses the official actor. Later field-work and resolved states return 409.
 - Report intake uses an indexed 15-metre PostGIS lookup after migration; the pre-migration PostgreSQL and SQLite paths retain a bounded great-circle fallback. Field-agent suggestions use only active eligible officials with locations updated in the last 15 minutes, with PostGIS nearest-distance lookup after migration.
 - The mounted predictive view now uses backend records rather than a fixed 2026 example. AI maintenance drafts require a registered asset, fail visibly when the provider is unavailable, and enter the canonical audited work-order command only after a human reason. The resulting order is **open for review**, not dispatched. Geographic/category similarity no longer counts unrelated resident reports against an asset.
 - Predictive scores and illustrative costs are labeled as unvalidated heuristic inspection prompts. Analytics report detail and exports have distinct server checks; CSV cells that could become spreadsheet formulas are neutralized.
