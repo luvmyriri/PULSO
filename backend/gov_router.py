@@ -15,7 +15,7 @@ Endpoints:
   User Management      : /api/gov/users  (admin only)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Form, Header
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -30,6 +30,7 @@ import gov_models
 import gov_schemas
 import gov_crud
 import roles_service
+import command_integrity
 import os
 import io
 import uuid
@@ -161,6 +162,8 @@ def list_eligible_assignees(
 @router.post("/work-orders", response_model=gov_schemas.WorkOrderResponse)
 def create_work_order(
     data: gov_schemas.WorkOrderCreate,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -172,7 +175,15 @@ def create_work_order(
     - wo_type = "preemptive"  : Created proactively (FR-11)
     """
     _assert_role(current_user, *DISPATCH_ROLES)
-    wo = gov_crud.create_work_order(db, data, actor_id=current_user.id, actor_role=current_user.role)
+    key = command_integrity.validate_key(idempotency_key)
+    expected = command_integrity.parse_version(if_match)
+    if (key or expected is not None) and data.report_id is None:
+        raise HTTPException(status_code=422, detail="Versioned retries require a source report")
+    digest = command_integrity.request_hash(data.model_dump(mode="json")) if key else None
+    wo = gov_crud.create_work_order(
+        db, data, actor_id=current_user.id, actor_role=current_user.role,
+        idempotency_key=key, request_digest=digest, expected_report_version=expected,
+    )
     return gov_crud.enrich_work_order(wo, db)
 
 
@@ -1545,6 +1556,7 @@ def list_active_reports(
     return [
         {
             "id": r.id,
+            "version": r.version,
             "ticket_id": getattr(r, "ticket_id", f"PUL-{datetime.now().year}-{r.id:04d}"),
             "title": r.category or "Infrastructure Report",
             "category": r.category or "Infrastructure Report",
@@ -1915,6 +1927,8 @@ class ReportWorkApproval(BaseModel):
 def approve_report_for_work(
     report_id: int,
     payload: ReportWorkApproval,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -1922,9 +1936,19 @@ def approve_report_for_work(
     reason = payload.reason.strip()
     if len(reason) < 10:
         raise HTTPException(status_code=422, detail="A decision reason of at least 10 characters is required")
+    expected = command_integrity.parse_version(if_match)
+    key = command_integrity.validate_key(idempotency_key)
+    digest = command_integrity.request_hash({"reason": reason}) if key else None
     report = db.query(models.Report).filter(models.Report.id == report_id).with_for_update().first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    receipt = command_integrity.find_receipt(
+        db, actor_id=current_user.id, operation="report_approve_for_work",
+        report_id=report_id, key=key, digest=digest,
+    )
+    if receipt:
+        return receipt.result_json
+    command_integrity.check_version(report.version, expected)
     if report.status != "pending_approval":
         raise HTTPException(status_code=409, detail="Report is not awaiting field-work approval")
     gov_crud._sync_report_status(
@@ -1935,8 +1959,15 @@ def approve_report_for_work(
         db, trigger_type="approval", action=f"Report {report.ticket_id} field-work approval reason recorded",
         actor_id=current_user.id, actor_role=current_user.role, report_id=report_id, details=reason,
     )
+    db.flush()
+    result = {"id": report.id, "ticket_id": report.ticket_id, "status": report.status, "version": report.version}
+    command_integrity.record_receipt(
+        db, actor_id=current_user.id, operation="report_approve_for_work",
+        report_id=report_id, key=key, digest=digest, resource_id=report.id,
+        result_json=result,
+    )
     db.commit()
-    return {"id": report.id, "ticket_id": report.ticket_id, "status": report.status}
+    return result
 
 @router.get("/reports/{report_id}/project-mapping")
 def get_report_project_mapping(

@@ -207,6 +207,7 @@ class ReportResolutionConfirm(BaseModel):
 
 class ReportResponse(ReportBase):
     id: int
+    version: int = 1
     ticket_id: str
     resident_id: Optional[int] = None
     reporter_type: str = "registered"

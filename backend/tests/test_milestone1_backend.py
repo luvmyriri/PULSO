@@ -29,6 +29,7 @@ import models
 import gov_models
 import auth
 import document_router
+import outbox_worker
 from database import Base, get_db
 from main import app
 
@@ -753,6 +754,101 @@ def test_report_work_approval_requires_reason_and_eligible_state(client, seeded_
     db = TestingSessionLocal()
     assert db.query(models.Report).filter(models.Report.id == report_id).first().status == "dispatched"
     db.close()
+
+
+def test_report_approval_assignment_versions_replays_and_outbox(client, seeded_users_and_geo):
+    db = TestingSessionLocal()
+    db.query(models.Resident).filter_by(id=901).one().is_verified = True
+    report = models.Report(
+        ticket_id="PUL-INTEGRITY-01", category="Roads", description="Road needs repair",
+        status="pending_approval", resident_id=901,
+    )
+    db.add(report)
+    db.commit()
+    report_id, initial_version = report.id, report.version
+    db.close()
+
+    auth_headers = {"Authorization": f"Bearer {seeded_users_and_geo['city_engineer']}"}
+    approval_url = f"/api/gov/reports/{report_id}/approve-for-work"
+    approval_body = {"reason": "Engineering review confirms this requires field work"}
+    approval_headers = {**auth_headers, "If-Match": str(initial_version), "Idempotency-Key": "approve-integrity-01"}
+    first = client.post(approval_url, json=approval_body, headers=approval_headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["version"] == initial_version + 1
+    assert client.post(approval_url, json=approval_body, headers=approval_headers).json() == first.json()
+    assert client.post(approval_url, json={"reason": "A different valid approval reason"}, headers=approval_headers).status_code == 409
+    stale_headers = {**auth_headers, "If-Match": str(initial_version), "Idempotency-Key": "approve-integrity-02"}
+    conflict = client.post(approval_url, json=approval_body, headers=stale_headers)
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["current_version"] == initial_version + 1
+
+    work_url = "/api/gov/work-orders"
+    work_body = {"title": "Repair road", "report_id": report_id, "assigned_to_id": 503, "priority": "high"}
+    queue = client.get("/api/gov/reports", headers=auth_headers)
+    assert queue.status_code == 200
+    assert next(item for item in queue.json() if item["id"] == report_id)["version"] == initial_version + 1
+    stale_work = client.post(work_url, json=work_body, headers={
+        **auth_headers, "If-Match": str(initial_version), "Idempotency-Key": "work-integrity-stale",
+    })
+    assert stale_work.status_code == 409
+    assert stale_work.json()["detail"]["current_version"] == initial_version + 1
+    work_headers = {**auth_headers, "If-Match": str(initial_version + 1), "Idempotency-Key": "work-integrity-01"}
+    work = client.post(work_url, json=work_body, headers=work_headers)
+    assert work.status_code == 200, work.text
+    assert client.post(work_url, json=work_body, headers=work_headers).json()["id"] == work.json()["id"]
+    assert client.post(work_url, json={**work_body, "title": "Different work"}, headers=work_headers).status_code == 409
+
+    db = TestingSessionLocal()
+    assert db.query(models.Report).filter_by(id=report_id).one().version == initial_version + 2
+    assert db.query(gov_models.WorkOrder).filter_by(report_id=report_id).count() == 1
+    assert db.query(gov_models.CommandReceipt).filter_by(report_id=report_id).count() == 2
+    events = db.query(gov_models.OutboxEvent).order_by(gov_models.OutboxEvent.id).all()
+    assert len(events) == 2 and all(event.status == "pending" for event in events)
+    assert db.query(models.Notification).filter_by(resident_id=901).count() == 0
+    assert outbox_worker.deliver_pending(db) == 2
+    assert outbox_worker.deliver_pending(db) == 0
+    notifications = db.query(models.Notification).filter_by(resident_id=901).all()
+    assert len(notifications) == 2
+    assert {item.outbox_event_id for item in notifications} == {event.id for event in events}
+    db.close()
+
+    field_headers = {"Authorization": f"Bearer {seeded_users_and_geo['field_worker']}"}
+    inspector_headers = {"Authorization": f"Bearer {seeded_users_and_geo['inspector']}"}
+    resident_headers = {"Authorization": f"Bearer {seeded_users_and_geo['resident']}"}
+    wo_id = work.json()["id"]
+    progress = client.patch(f"/api/gov/agents/work-orders/{wo_id}/status", json={
+        "status": "in_progress", "notes": "Field crew arrived",
+    }, headers=field_headers)
+    assert progress.status_code == 200, progress.text
+
+    from PIL import Image
+    proof = io.BytesIO()
+    Image.new("RGB", (8, 8), color="blue").save(proof, format="JPEG")
+    evidence = client.post(
+        f"/api/gov/work-orders/{wo_id}/completion-evidence",
+        files={"image": ("proof.jpg", proof.getvalue(), "image/jpeg")},
+        data={"notes": "Repair completed and site checked"}, headers=field_headers,
+    )
+    assert evidence.status_code == 200, evidence.text
+    review = client.post(f"/api/gov/work-orders/{wo_id}/verify", json={
+        "passed": True, "notes": "Independent inspection passed",
+        "checklist_results": {
+            "specifications": True, "siteCleared": True,
+            "qualityTested": True, "photoVerified": True,
+        },
+    }, headers=inspector_headers)
+    assert review.status_code == 200, review.text
+    closeout = client.post(f"/api/reports/{report_id}/confirm", json={"rating": 5}, headers=resident_headers)
+    assert closeout.status_code == 200, closeout.text
+    assert closeout.json()["status"] == "closed_by_citizen"
+
+    db = TestingSessionLocal()
+    assert outbox_worker.deliver_pending(db) == 2
+    assert db.query(models.Notification).filter_by(resident_id=901).count() == 4
+    assert db.query(gov_models.ProcessTimeline).filter_by(report_id=report_id).count() >= 5
+    db.close()
+    filename = evidence.json()["image_url"].rsplit("/", 1)[-1]
+    os.remove(os.path.join("uploads", "docs", "work_orders", str(wo_id), filename))
 
 
 def test_report_rejection_records_reason_without_penalizing_resident(client, seeded_users_and_geo):

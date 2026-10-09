@@ -296,6 +296,8 @@ export default function CitizenReportsPage({ workspace }) {
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
+                    'Idempotency-Key': woData.idempotencyKey,
+                    ...(selected?.version ? { 'If-Match': String(selected.version) } : {}),
                 },
                 body: JSON.stringify({
                     report_id: woData.reportId,
@@ -307,7 +309,7 @@ export default function CitizenReportsPage({ workspace }) {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
-                throw new Error(body.detail || `Work order creation failed (HTTP ${res.status})`);
+                throw new Error(body.detail?.next_action || (typeof body.detail === 'string' ? body.detail : `Work order creation failed (HTTP ${res.status})`));
             }
             showToast('Work order assigned to the selected field official.');
             loadReports({ background: true });
@@ -660,7 +662,12 @@ export default function CitizenReportsPage({ workspace }) {
             {approveReportOpen && selected && <ApproveReportModal
                 report={selected}
                 onClose={() => setApproveReportOpen(false)}
-                onApproved={() => { showToast('Report approved for field work.'); loadReports({ background: true }); }}
+                onApproved={(decision) => {
+                    setSelectedDetail((current) => current?.id === decision.id ? { ...current, ...decision } : current);
+                    setReports((current) => current.map((item) => item.id === decision.id ? { ...item, ...decision } : item));
+                    showToast('Report approved for field work.');
+                    loadReports({ background: true });
+                }}
             />}
         </div>
     );

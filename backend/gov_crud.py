@@ -17,6 +17,7 @@ import gov_schemas
 import models  # for User lookups
 import re
 import notification_service
+import command_integrity
 from spatial_queries import nearby_available_agents
 
 
@@ -255,7 +256,7 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
     report.updated_at = datetime.now(timezone.utc)
 
     # Timeline entry (citizen-visible)
-    _append_timeline(
+    timeline = _append_timeline(
         db, status=new_status, previous_status=previous,
         actor_id=actor_id, actor_role=actor_role,
         report_id=report_id, is_public=True,
@@ -331,8 +332,11 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
     if new_status in notif_map:
         title, msg = notif_map[new_status]
         if report.resident_id is not None:
-            notif = models.Notification(resident_id=report.resident_id, title=title, message=msg)
-            db.add(notif)
+            db.add(gov_models.OutboxEvent(
+                event_key=f"report-status:{timeline.id}:resident:{report.resident_id}",
+                event_type="resident_in_app_notification",
+                payload={"resident_id": report.resident_id, "title": title, "message": msg},
+            ))
 
 
 def create_work_order(
@@ -340,6 +344,9 @@ def create_work_order(
     data: gov_schemas.WorkOrderCreate,
     actor_id: int,
     actor_role: str,
+    idempotency_key: Optional[str] = None,
+    request_digest: Optional[str] = None,
+    expected_report_version: Optional[int] = None,
 ) -> gov_models.WorkOrder:
     # 1. Territorial & Emergency Logic
     assignment_type = "territorial"
@@ -361,6 +368,13 @@ def create_work_order(
         report = db.query(models.Report).filter(models.Report.id == data.report_id).with_for_update().first()
         if not report:
             raise HTTPException(status_code=404, detail="Source report not found")
+        receipt = command_integrity.find_receipt(
+            db, actor_id=actor_id, operation="work_order_create", report_id=report.id,
+            key=idempotency_key, digest=request_digest,
+        )
+        if receipt:
+            return db.query(gov_models.WorkOrder).filter_by(id=receipt.resource_id).one()
+        command_integrity.check_version(report.version, expected_report_version)
         if report.status != "approved_internal":
             raise HTTPException(status_code=409, detail="Report must be approved before a work order is created")
         existing_work = db.query(gov_models.WorkOrder.id).filter(
@@ -434,6 +448,12 @@ def create_work_order(
     # A queued work order is not a dispatched field team.
     if data.report_id and assigned_to_id:
         _sync_report_status(db, data.report_id, "dispatched", actor_id, actor_role)
+
+    if data.report_id:
+        command_integrity.record_receipt(
+            db, actor_id=actor_id, operation="work_order_create", report_id=data.report_id,
+            key=idempotency_key, digest=request_digest, resource_id=wo.id,
+        )
 
     db.commit()
     db.refresh(wo)

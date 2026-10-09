@@ -411,6 +411,7 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
             created_at=datetime.now(timezone.utc)
         )
         db.add(timeline_entry)
+        db.flush()
         
         # 2. Immutable Audit Log
         audit_msg = f"Report {db_report.ticket_id} status changed from {previous_status} to {status}."
@@ -478,7 +479,11 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
         if status in status_messages:
             title, message = status_messages[status]
             if db_report.resident_id is not None:
-                db.add(models.Notification(resident_id=db_report.resident_id, title=title, message=message))
+                db.add(gov_models.OutboxEvent(
+                    event_key=f"report-status:{timeline_entry.id}:resident:{db_report.resident_id}",
+                    event_type="resident_in_app_notification",
+                    payload={"resident_id": db_report.resident_id, "title": title, "message": message},
+                ))
 
         # 4. Integration Hook: Automated Asset Resolution & Archival
         if status == "resolved":

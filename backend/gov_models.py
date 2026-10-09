@@ -14,7 +14,7 @@ Covers:
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime,
-    Float, ForeignKey, Text, Enum, JSON, Date
+    Float, ForeignKey, Text, Enum, JSON, Date, UniqueConstraint
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -282,6 +282,39 @@ class ProcessTimeline(Base):
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
     actor          = relationship("Official", foreign_keys=[actor_id])
+
+
+class CommandReceipt(Base):
+    """Result of a keyed report command, committed with its civic record."""
+    __tablename__ = "command_receipts"
+    __table_args__ = (UniqueConstraint(
+        "actor_id", "operation", "report_id", "idempotency_key",
+        name="uq_command_receipt_actor_operation_report_key",
+    ),)
+
+    id = Column(Integer, primary_key=True)
+    actor_id = Column(Integer, ForeignKey("officials.id"), nullable=False)
+    operation = Column(String(64), nullable=False)
+    report_id = Column(Integer, ForeignKey("reports.id"), nullable=False)
+    idempotency_key = Column(String(128), nullable=False)
+    request_hash = Column(String(64), nullable=False)
+    resource_id = Column(Integer, nullable=False)
+    result_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class OutboxEvent(Base):
+    """Committed intent for one resident in-app notification."""
+    __tablename__ = "outbox_events"
+
+    id = Column(Integer, primary_key=True)
+    event_key = Column(String(128), nullable=False, unique=True)
+    event_type = Column(String(64), nullable=False)
+    payload = Column(JSON, nullable=False)
+    status = Column(String(20), nullable=False, default="pending", server_default="pending", index=True)
+    attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
