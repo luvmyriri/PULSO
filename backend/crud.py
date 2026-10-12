@@ -336,11 +336,33 @@ def create_report(
                         report_data["kyc_tier_at_report"] = res.kyc_level
                         report_data["citizen_trust_score"] = res.trust_score
 
-            # 3. AUTO-DETECT BARANGAY_ID
+            # 3. SPATIAL & POSTGIS AUTO-ASSIGNMENT (Sector, Barangay, PostGIS geometry)
+            lat = report_data.get("location_lat")
+            lng = report_data.get("location_lng")
+            if lat is not None and lng is not None:
+                try:
+                    from services.spatial_service import locate_point
+                    from geoalchemy2.elements import WKTElement
+                    loc_info = locate_point(db, float(lat), float(lng))
+                    
+                    # Store PostGIS Point geometry (SRID 4326)
+                    report_data["location"] = WKTElement(f"POINT({lng} {lat})", srid=4326)
+                    
+                    if loc_info.get("sector"):
+                        report_data["sector"] = loc_info["sector"]
+                    if loc_info.get("barangay_id"):
+                        report_data["barangay_id"] = loc_info["barangay_id"]
+                    if loc_info.get("barangay_display") and not report_data.get("location_barangay"):
+                        report_data["location_barangay"] = loc_info["barangay_display"]
+                    elif loc_info.get("barangay_name") and not report_data.get("location_barangay"):
+                        report_data["location_barangay"] = loc_info["barangay_name"]
+                except Exception as e:
+                    logging.warning(f"Spatial auto-assignment failed: {e}")
+
+            # 4. AUTO-DETECT BARANGAY_ID FALLBACK
             # If we have a location_barangay string, try to find the canonical ID
-            if report_data.get("location_barangay"):
+            if not report_data.get("barangay_id") and report_data.get("location_barangay"):
                 brgy_name = report_data["location_barangay"].lower().replace("barangay", "").strip()
-                # Try exact name match or number match
                 brgy = db.query(models.Barangay).filter(
                     (func.lower(models.Barangay.name) == brgy_name) | 
                     (models.Barangay.name == report_data["location_barangay"])

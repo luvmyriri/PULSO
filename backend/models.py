@@ -7,11 +7,26 @@ from datetime import datetime
 import random
 import uuid
 import re
+from geoalchemy2 import Geometry
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Geographic Lookup Tables (3NF Normalisation)
+# Geographic Lookup Tables (3NF Normalisation & PostGIS Spatial Core)
 # ─────────────────────────────────────────────────────────────────────────────
+
+class CityBoundary(Base):
+    """
+    Authoritative boundary polygons for North and South Caloocan.
+    Stored as two separate non-contiguous MultiPolygons.
+    """
+    __tablename__ = "city_boundaries"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    name       = Column(String(64), unique=True, nullable=False) # 'North Caloocan' | 'South Caloocan'
+    sector     = Column(String(32), nullable=False)              # 'North' | 'South'
+    geom       = Column(Geometry(geometry_type="MULTIPOLYGON", srid=4326), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 
 class District(Base):
     """
@@ -37,11 +52,15 @@ class Barangay(Base):
     """
     __tablename__ = "barangays"
 
-    id          = Column(Integer,      primary_key=True, index=True)
-    name        = Column(String(150),  unique=True, nullable=False)   # "Barangay 172" / "Camarin"
-    district_id = Column(Integer,      ForeignKey("districts.id"), nullable=False, index=True)
-    zip_code    = Column(String(10),   nullable=True)
-    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+    id           = Column(Integer,      primary_key=True, index=True)
+    name         = Column(String(150),  unique=True, nullable=False)   # "Barangay 172" / "Camarin"
+    district_id  = Column(Integer,      ForeignKey("districts.id"), nullable=False, index=True)
+    sector       = Column(String(32),   nullable=True, index=True)    # 'North' | 'South'
+    brgy_num     = Column(Integer,      nullable=True, index=True)
+    display_name = Column(String(100),  nullable=True)
+    geom         = Column(Geometry(geometry_type="MULTIPOLYGON", srid=4326), nullable=True)
+    zip_code     = Column(String(10),   nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
     district    = relationship("District", back_populates="barangays")
 
@@ -248,6 +267,11 @@ class Report(Base):
     location_lat = Column(Float, nullable=True)
     location_lng = Column(Float, nullable=True)
     location_string = Column(String, nullable=True)
+    # PostGIS Spatial Core
+    location = Column(Geometry(geometry_type="POINT", srid=4326), nullable=True)
+    accuracy_m = Column(Float, default=0.0)
+    plus_code = Column(String(32), nullable=True)
+    sector = Column(String(32), nullable=True, index=True) # 'North' | 'South'
     status = Column(String, default="pending", index=True)
     image_url = Column(String, nullable=True)
     resolution_image_url = Column(String, nullable=True)

@@ -18,6 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from geoalchemy2 import Geometry
 from database import Base
 import uuid
 from datetime import datetime, timezone
@@ -623,6 +624,7 @@ class InfrastructureAsset(Base):
     asset_name           = Column(String, index=True)
     category             = Column(String) # Road, Bridge, Drainage, Building, Light
     gps_coordinates      = Column(JSON, nullable=True) # GeoJSON representation
+    geom                 = Column(Geometry(geometry_type="GEOMETRY", srid=4326), nullable=True) # Point, LineString, or Polygon
     material_type        = Column(String) # Asphalt, Concrete, Steel, etc.
     date_completed       = Column(Date, nullable=True)
     design_life          = Column(Integer, default=20) # Expected life in years

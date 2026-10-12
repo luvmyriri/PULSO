@@ -51,6 +51,7 @@ import predictive_router                # Predictive Maintenance Engine
 import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
 import pulseai_router                    # PULSEAI Persistent Chat & History Engine
+import spatial_router                    # PostGIS Spatial Queries & GeoEngine
 from database import engine, get_db
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
@@ -332,6 +333,8 @@ app.include_router(announcements_router.router)
 app.include_router(announcements_router.public_router)
 # PULSEAI Persistent Chat & History Module
 app.include_router(pulseai_router.router)
+# PostGIS Spatial Engine (Reverse geocoding, Nearby, Viewport GeoJSON, Hotspots, Duplicates)
+app.include_router(spatial_router.router)
 
 # ---------------------------------------------------------------------------
 # Health & Root
