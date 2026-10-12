@@ -4,6 +4,8 @@
 **Updated:** 2026-10-09.
 **Base:** `Latest-pulso-resident` at `4141c289`.
 
+For the remaining development order, source-document hierarchy, owner decisions, and release gates, see the [government development handoff](./GOVERNMENT_NEXT_DEVELOPMENT_HANDOFF.md).
+
 ## Working paths
 
 - Active government accounts are required for staff APIs; suspended accounts are denied.
