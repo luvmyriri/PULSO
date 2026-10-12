@@ -6,6 +6,8 @@ The existing PostgreSQL 18 service on port 5432 does not include PostGIS. A user
 
 `pulso_db` on port 5433 was restored from a read-only dump of the port-5432 database at Alembic revision `da48716fc54d`, then upgraded to `b72d4e_postgis_report_locations`. The port-5432 database was not changed. **The two databases do not replicate:** later writes to either are not copied to the other.
 
+On 2026-10-09, this branch also applied `c81a1f_report_reliability` on port 5433 for report versions, command receipts, and the in-app notification outbox. See [`GOVERNMENT_RELIABILITY_SLICE.md`](./GOVERNMENT_RELIABILITY_SLICE.md).
+
 This branch's backend reads `backend/.env.local` before the tracked `backend/.env`. The local override contains the port-5433 connection and is ignored by Git. An explicit `DATABASE_URL` process environment variable still takes precedence. Alembic now uses the same resolved URL as the backend, so run it from `backend/`:
 
 ```powershell

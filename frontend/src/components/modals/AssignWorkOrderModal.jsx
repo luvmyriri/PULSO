@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Truck, X } from 'lucide-react';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { getAuthToken } from '../../utils/authSession';
@@ -14,10 +14,12 @@ export default function AssignWorkOrderModal({ isOpen, onClose, report, onSubmit
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [reload, setReload] = useState(0);
+    const retryRef = useRef(null);
 
     useEffect(() => {
         if (!isOpen) return;
         setTitle(report ? `Work order for ${report.ticket_id || `report #${report.id}`}` : '');
+        retryRef.current = null;
         setAssigneeId('');
         setReason('');
         setError('');
@@ -51,13 +53,19 @@ export default function AssignWorkOrderModal({ isOpen, onClose, report, onSubmit
         }
         setSubmitting(true);
         try {
-            await onSubmit({
+            const command = {
                 reportId: report?.id || null,
                 title: title.trim(),
                 assigned_to_id: Number(assigneeId),
                 priority,
                 reason: reason.trim(),
-            });
+            };
+            const fingerprint = JSON.stringify(command);
+            if (!retryRef.current || retryRef.current.fingerprint !== fingerprint) {
+                retryRef.current = { fingerprint, key: crypto.randomUUID() };
+            }
+            await onSubmit({ ...command, idempotencyKey: retryRef.current.key });
+            retryRef.current = null;
             onClose();
         } catch (cause) {
             setError(cause.message || 'Could not create the work order. Retry after checking the record.');

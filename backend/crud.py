@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text, or_, case
 from sqlalchemy.exc import IntegrityError
+from fastapi import HTTPException
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import models, gov_models, schemas
@@ -410,6 +411,7 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
             created_at=datetime.now(timezone.utc)
         )
         db.add(timeline_entry)
+        db.flush()
         
         # 2. Immutable Audit Log
         audit_msg = f"Report {db_report.ticket_id} status changed from {previous_status} to {status}."
@@ -477,7 +479,11 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
         if status in status_messages:
             title, message = status_messages[status]
             if db_report.resident_id is not None:
-                db.add(models.Notification(resident_id=db_report.resident_id, title=title, message=message))
+                db.add(gov_models.OutboxEvent(
+                    event_key=f"report-status:{timeline_entry.id}:resident:{db_report.resident_id}",
+                    event_type="resident_in_app_notification",
+                    payload={"resident_id": db_report.resident_id, "title": title, "message": message},
+                ))
 
         # 4. Integration Hook: Automated Asset Resolution & Archival
         if status == "resolved":
@@ -544,23 +550,35 @@ def confirm_report_resolution(
     """
     report = db.query(models.Report).filter(
         models.Report.id == report_id,
-        models.Report.resident_id == resident_id
-    ).first()
+        or_(
+            models.Report.claimed_by_user_id == resident_id,
+            (models.Report.claimed_by_user_id.is_(None)) &
+            (models.Report.resident_id == resident_id),
+        ),
+    ).with_for_update().first()
     
     if not report:
         return None
         
+    note = (note.strip() or None) if note is not None else None
+    if report.status == "closed_by_citizen":
+        if report.satisfaction_rating == rating and report.citizen_feedback_note == note:
+            return report
+        raise HTTPException(status_code=409, detail="Resolution has already been confirmed with different feedback")
+    if report.status != "resolved":
+        raise HTTPException(status_code=409, detail="Only a resolved report can be confirmed")
+
     previous_status = report.status
     report.status = "closed_by_citizen"
-    report.citizen_confirmed_at = func.now()
+    report.citizen_confirmed_at = datetime.now(timezone.utc)
     report.satisfaction_rating = rating
     report.citizen_feedback_note = note
     
     # Reward participation
-    res = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
+    res = db.query(models.Resident).filter(models.Resident.id == resident_id).with_for_update().first()
     if res:
         if rating >= 4:
-            res.trust_score = min(100, (res.trust_score or 100) + 5)
+            res.trust_score = min(100, (100 if res.trust_score is None else res.trust_score) + 5)
         elif rating <= 2:
             # Low rating doesn't penalize trust, but we might want to flag for follow-up
             pass
@@ -570,17 +588,67 @@ def confirm_report_resolution(
         status="closed_by_citizen", 
         previous_status=previous_status, 
         report_id=report.id,
-        note=f"Citizen confirmed resolution. Rating: {rating}/5. Note: {note[:50] if note else 'None'}"
+        actor_role="resident",
+        note=f"Resident confirmed resolution. Rating: {rating}/5."
     )
-    
-    _append_audit(
-        db, 
-        trigger_type="citizen_action", 
+
+    # AuditLog.actor_id references officials, so identify the resident in details.
+    db.add(gov_models.AuditLog(
+        trigger_type="citizen_action",
         action=f"Report {report.ticket_id} confirmed resolved by resident. Rating: {rating}",
         report_id=report.id,
-        actor_id=resident_id
-    )
+        actor_role="resident",
+        details=json.dumps({"resident_id": resident_id, "rating": rating}),
+    ))
     
+    db.commit()
+    db.refresh(report)
+    return report
+
+
+def cancel_report(db: Session, report_id: int, actor: models.Resident | models.Official) -> Optional[models.Report]:
+    report = db.query(models.Report).filter(models.Report.id == report_id).with_for_update().first()
+    if report is None:
+        return None
+
+    is_staff = isinstance(actor, models.Official) and actor.role in ("dispatcher", "manager")
+    is_owner = isinstance(actor, models.Resident) and (
+        report.claimed_by_user_id == actor.id or
+        (report.claimed_by_user_id is None and report.resident_id == actor.id)
+    )
+    if not (is_staff or is_owner):
+        raise HTTPException(status_code=403, detail="Not authorized to cancel this report")
+    if report.status == "cancelled":
+        return report
+    if report.status not in (
+        "pending", "received", "unverified", "unvalidated",
+        "under_review", "needs_information", "rejected", "pending_approval",
+    ):
+        raise HTTPException(status_code=409, detail=f"Cannot cancel report with status '{report.status}'")
+    if db.query(gov_models.WorkOrder.id).filter(
+        gov_models.WorkOrder.report_id == report.id,
+        gov_models.WorkOrder.status != "cancelled",
+    ).first():
+        raise HTTPException(status_code=409, detail="Report has an active work order")
+
+    previous_status = report.status
+    report.status = "cancelled"
+    actor_role = actor.role if is_staff else "resident"
+    official_id = actor.id if is_staff else None
+    _append_timeline(
+        db, status="cancelled", previous_status=previous_status,
+        report_id=report.id, actor_id=official_id, actor_role=actor_role,
+        note="Report cancelled.",
+    )
+    db.add(gov_models.AuditLog(
+        trigger_type="status_change", report_id=report.id,
+        actor_id=official_id, actor_role=actor_role,
+        action=f"Report {report.ticket_id} cancelled from {previous_status}.",
+        details=json.dumps({"resident_id": actor.id}) if is_owner else None,
+    ))
+    if is_owner:
+        resident = db.query(models.Resident).filter(models.Resident.id == actor.id).with_for_update().one()
+        resident.trust_score = max(0, (100 if resident.trust_score is None else resident.trust_score) - 1)
     db.commit()
     db.refresh(report)
     return report

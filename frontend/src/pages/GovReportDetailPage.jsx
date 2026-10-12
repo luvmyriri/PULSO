@@ -173,6 +173,8 @@ export default function GovReportDetailPage() {
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
+                    'Idempotency-Key': woData.idempotencyKey,
+                    ...(report?.version ? { 'If-Match': String(report.version) } : {}),
                 },
                 body: JSON.stringify({
                     report_id: report.id,
@@ -184,7 +186,7 @@ export default function GovReportDetailPage() {
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || `Work order creation failed (HTTP ${res.status})`);
+                throw new Error(err.detail?.next_action || (typeof err.detail === 'string' ? err.detail : `Work order creation failed (HTTP ${res.status})`));
             }
             showToast('Work order assigned to the selected field official.');
             loadReportDetails();
@@ -611,7 +613,11 @@ export default function GovReportDetailPage() {
                 {approveModalOpen && <ApproveReportModal
                     report={report}
                     onClose={() => setApproveModalOpen(false)}
-                    onApproved={() => { showToast('Report approved for field work.'); loadReportDetails(); }}
+                    onApproved={(decision) => {
+                        setReport((current) => current?.id === decision.id ? { ...current, ...decision } : current);
+                        showToast('Report approved for field work.');
+                        loadReportDetails();
+                    }}
                 />}
             </main>
         </div>

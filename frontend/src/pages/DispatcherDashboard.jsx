@@ -419,6 +419,8 @@ const DispatcherDashboard = () => {
     const [showHeatmap, setShowHeatmap] = useState(false);
     
     const [selectedReport, setSelectedReport] = useState(null);
+    const approvalRetryRef = useRef(null);
+    const dispatchRetryRef = useRef(null);
     const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
 
     // Tactical Deep-Link state: set when navigated from Analytics Command Center
@@ -1077,15 +1079,26 @@ const DispatcherDashboard = () => {
         if (!reason) return;
         setActionLoading(id);
         try {
+            const trimmedReason = reason.trim();
+            const report = allReports.find((item) => item.id === id) || selectedReport;
+            if (!approvalRetryRef.current || approvalRetryRef.current.id !== id || approvalRetryRef.current.reason !== trimmedReason) {
+                approvalRetryRef.current = { id, reason: trimmedReason, key: crypto.randomUUID() };
+            }
             const response = await fetch(`${API_BASE_URL}/api/gov/reports/${id}/approve-for-work`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ reason: reason.trim() }),
+                headers: {
+                    'Content-Type': 'application/json', Authorization: `Bearer ${token}`,
+                    'Idempotency-Key': approvalRetryRef.current.key,
+                    ...(report?.version ? { 'If-Match': String(report.version) } : {}),
+                },
+                body: JSON.stringify({ reason: trimmedReason }),
             });
             if (!response.ok) {
                 const body = await response.json().catch(() => ({}));
-                throw new Error(body.detail || `Approval failed (HTTP ${response.status})`);
+                if (response.status === 409) approvalRetryRef.current = null;
+                throw new Error(body.detail?.next_action || (typeof body.detail === 'string' ? body.detail : `Approval failed (HTTP ${response.status})`));
             }
+            approvalRetryRef.current = null;
             await Swal.fire({ icon: 'success', title: 'Approved for field work', text: 'The report can now be assigned to an eligible field official.' });
             fetchReports();
             setSelectedReport(null);
@@ -1146,18 +1159,25 @@ const DispatcherDashboard = () => {
                 assigned_to_id: parseInt(dispatchForm.assigned_to_id, 10),
                 report_id: selectedReport.id
             };
+            const fingerprint = JSON.stringify(payload);
+            if (!dispatchRetryRef.current || dispatchRetryRef.current.fingerprint !== fingerprint) {
+                dispatchRetryRef.current = { fingerprint, key: crypto.randomUUID() };
+            }
 
             const response = await fetch(`${API_BASE_URL}/api/gov/work-orders`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token}`,
+                    'Idempotency-Key': dispatchRetryRef.current.key,
+                    ...(selectedReport.version ? { 'If-Match': String(selectedReport.version) } : {}),
                 },
                 body: JSON.stringify(payload)
             });
 
             if (response.ok) {
                 const newWo = await response.json();
+                dispatchRetryRef.current = null;
                 setIsDispatchModalOpen(false);
                 fetchReports();
                 setSelectedReport(null);
@@ -1172,11 +1192,12 @@ const DispatcherDashboard = () => {
                 });
             } else {
                 const err = await response.json();
+                if (response.status === 409) dispatchRetryRef.current = null;
                 console.error("Failed to create Work Order:", err);
                 Swal.fire({
                     icon: 'error',
                     title: 'Dispatch Failed',
-                    text: err.detail || 'Could not create work order on the server.',
+                    text: err.detail?.next_action || (typeof err.detail === 'string' ? err.detail : 'Could not create work order on the server.'),
                     confirmButtonColor: '#ff6b00'
                 });
             }

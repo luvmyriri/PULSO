@@ -2452,25 +2452,11 @@ def cancel_report(
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
-    """
-    Allow a resident to cancel their own report if it's still in verification or rejected.
-    If it's already being worked on (approved_internal, dispatched, resolved), can't cancel.
-    """
-    db_report = crud.get_report(db, report_id=report_id)
-    if not db_report:
+    """Cancel an owned or staff-managed report before approved field work begins."""
+    db_report = crud.cancel_report(db, report_id=report_id, actor=current_user)
+    if db_report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    
-    # Ownership Check
-    if db_report.resident_id != current_user.id and current_user.role not in ["dispatcher", "manager"]:
-        raise HTTPException(status_code=403, detail="Not authorized to cancel this report")
-        
-    # State Check
-    locked_statuses = ["approved_internal", "dispatched", "resolved", "cancelled"]
-    if db_report.status in locked_statuses:
-        raise HTTPException(status_code=400, detail=f"Cannot cancel report with status '{db_report.status}'. Action blocked.")
-
-    updated = crud.update_report_status(db, report_id=report_id, status="cancelled", actor_id=current_user.id)
-    return updated
+    return db_report
 
 @app.patch("/api/reports/{report_id}/resolve", response_model=schemas.ReportResponse)
 async def resolve_report(
