@@ -206,6 +206,7 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True)
+    outbox_event_id = Column(Integer, ForeignKey("outbox_events.id"), nullable=True, unique=True)
     
     # Dual FK support for segregated architecture
     resident_id = Column(Integer, ForeignKey("residents.id"), nullable=True)
@@ -225,6 +226,8 @@ class Report(Base):
     __tablename__ = "reports"
 
     id = Column(Integer, primary_key=True, index=True)
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+    __mapper_args__ = {"version_id_col": version}
     ticket_id = Column(String, unique=True, index=True, default=generate_ticket_id)
     
     # Points to Resident table (Explicitly nullable for guest submissions)

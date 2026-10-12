@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { getAuthToken } from '../../utils/authSession';
@@ -8,6 +8,7 @@ export default function ApproveReportModal({ report, onClose, onApproved }) {
     const [reason, setReason] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const retryRef = useRef(null);
     if (!report) return null;
 
     const submit = async (event) => {
@@ -19,16 +20,27 @@ export default function ApproveReportModal({ report, onClose, onApproved }) {
         }
         setSubmitting(true);
         try {
+            const trimmedReason = reason.trim();
+            if (!retryRef.current || retryRef.current.reason !== trimmedReason) {
+                retryRef.current = { reason: trimmedReason, key: crypto.randomUUID() };
+            }
             const response = await fetch(`${API_BASE_URL}/api/gov/reports/${report.id}/approve-for-work`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
-                body: JSON.stringify({ reason: reason.trim() }),
+                headers: {
+                    'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}`,
+                    'Idempotency-Key': retryRef.current.key,
+                    ...(report.version ? { 'If-Match': String(report.version) } : {}),
+                },
+                body: JSON.stringify({ reason: trimmedReason }),
             });
             if (!response.ok) {
                 const body = await response.json().catch(() => ({}));
-                throw new Error(body.detail || `Approval failed (HTTP ${response.status})`);
+                if (response.status === 409) retryRef.current = null;
+                throw new Error(body.detail?.next_action || (typeof body.detail === 'string' ? body.detail : `Approval failed (HTTP ${response.status})`));
             }
-            onApproved();
+            const decision = await response.json();
+            retryRef.current = null;
+            onApproved(decision);
             onClose();
         } catch (cause) {
             setError(cause.message || 'Approval failed');

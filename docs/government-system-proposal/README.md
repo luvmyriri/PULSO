@@ -22,6 +22,11 @@ Retain the existing application stack where practical. Introduce dependable back
 | [08 — Sources and decisions](08-research-sources-and-decision-register.md) | Evidence, unresolved approvals, source limits and recommendations to revalidate |
 | [09 — Reconciled implementation plan](09-reconciled-government-implementation-plan.md) | Actionable implementation roadmap reconciling proposals into engineering stages and work packages |
 | [10 — User profiling and research framework](10-user-profiling-and-operational-research-framework.md) | Work-based profiling for the 10 proposed user groups, research inquiries, separation of duties, and environmental matrices |
+| [11 — Priority, SLA, documents, spatial data, and ML plan](11-priority-sla-documents-spatial-ml-plan-2026-09-29.md) | Current-code gap review, proposed P0–P5 policy and internal clocks, document generation/public release, PostGIS migration, LightGBM proof plan, and owner decisions |
+| [12 — Email referrals, official documents, and publications](12-government-referrals-documents-and-publications-2026-09-29.md) | Caloocan source documents, external-department email handoff and clocks, controlled generated forms, announcement workflow, Canva role, and launch tests |
+| [13 — SMS provider research and release gates](13-semaphore-sms-decision-and-release-gates-2026-09-29.md) | Initial Semaphore recommendation, later PhilSMS test-provider selection, authentication and delivery blockers, and proof required before launch |
+| [14 — Government sprint roadmap and release plan](14-government-sprint-roadmap-and-release-plan-2026-10-05.md) | Relative pilot-to-finalization sequence, decision gates, release layers, and Definition of Ready/Done |
+| [15 — Sprint 0 and pilot backlog](15-government-sprint-0-and-pilot-backlog-2026-10-05.md) | Assignable S0/S1 evidence and contract tasks plus the future report-to-work implementation slices |
 
 The earlier [detailed operating-model proposal](../ui-ux-audit/24-government-operating-model-and-automation-proposal-v1.0.md) remains part of this handoff. This package extends it with communications, model research, integration and automation plans. It changes the **proposed** navigation from seven modules to eight by adding Updates & announcements. Its model shortlist is a dated update to the earlier general Gemini recommendation.
 

@@ -1,8 +1,10 @@
 # Government implementation checkpoint
 
 **Status:** observed implementation on `codex/government-finalization`; not a production approval. The user approved the documented government proposals as product direction on 2026-10-06.
-**Updated:** 2026-10-06.
+**Updated:** 2026-10-09.
 **Base:** `Latest-pulso-resident` at `4141c289`.
+
+For the remaining development order, source-document hierarchy, owner decisions, and release gates, see the [government development handoff](./GOVERNMENT_NEXT_DEVELOPMENT_HANDOFF.md).
 
 ## Working paths
 
@@ -18,6 +20,10 @@
 - General work-order edits cannot alter cost, completion, feedback, or lifecycle state; active orders cannot be reassigned by a general edit. Approved metadata changes append an audit event. Approval, rejection, field updates, and blocker changes lock the work-order row before their state checks.
 - The reporter can now answer a staff information request with an owned resident account or the secret tracking token. The response is kept on the internal timeline and audit record, a public-safe transition returns the ticket to triage, and the requesting official receives an in-app notification. The public tracking page exposes this recovery path in English and Filipino and no longer fabricates a report when the registry is offline.
 - Public tracking returns a district code only when the report links to a registered barangay and its district; coordinates alone no longer produce a guessed district.
+- Resident resolution confirmation now requires a resolved report and a 1–5 rating. Identical retries return the existing closeout without another timeline, audit, or trust change; conflicting retries return 409. Claimed guest reports can be confirmed by the claiming account. Freeform feedback stays off the public timeline, and resident actions no longer write a resident ID into the official-only audit actor foreign key. The stored terminal value remains the observed legacy `closed_by_citizen` pending a governed lifecycle migration.
+- Report cancellation now locks the report, accepts only preapproval or rejected states without an active work order, and is replay safe. Resident cancellations preserve the existing one-point trust effect once and use resident attribution; staff cancellation uses the official actor. Later field-work and resolved states return 409.
+- Report records now carry optimistic versions. Field-work approval and report-sourced work-order creation accept `If-Match` and `Idempotency-Key`; a stale version returns 409 with the current version, and a keyed replay returns the original approval or existing order without repeating civic side effects. The government approval/dispatch screens send these headers. Legacy clients can still omit them during migration.
+- Report status notifications from the pilot command paths are recorded as outbox events in the same database transaction as their timeline and audit. `outbox_worker.py` delivers each in-app notification once, using a unique event link. This is a functioning local worker, but production supervision, delivery monitoring, and conversion of remaining notification paths are still release work.
 - Report intake uses an indexed 15-metre PostGIS lookup after migration; the pre-migration PostgreSQL and SQLite paths retain a bounded great-circle fallback. Field-agent suggestions use only active eligible officials with locations updated in the last 15 minutes, with PostGIS nearest-distance lookup after migration.
 - The mounted predictive view now uses backend records rather than a fixed 2026 example. AI maintenance drafts require a registered asset, fail visibly when the provider is unavailable, and enter the canonical audited work-order command only after a human reason. The resulting order is **open for review**, not dispatched. Geographic/category similarity no longer counts unrelated resident reports against an asset.
 - Predictive scores and illustrative costs are labeled as unvalidated heuristic inspection prompts. Analytics report detail and exports have distinct server checks; CSV cells that could become spreadsheet formulas are neutralized.
@@ -30,14 +36,15 @@
 - **Money and emergency:** budget approval and emergency assignment still need concrete thresholds, sign-off, scope, evidence, and audit data contracts. A critical work priority does not activate emergency access or alerts.
 - **Data scope:** the final jurisdiction and capability matrix is unapproved. Dispatch/report access is narrowed by active official role; assignment scoping is enforced for field work orders. Broader field-level and jurisdiction-level access remains a release gate.
 - **Evidence and records:** report-image classification, legacy public image exposure, retention, legal hold, and disposition policy need owner approval and further implementation. Work-order proof and new government documents use private delivery.
-- **Reliability:** record version checks, idempotent consequential commands, transactional notification delivery, and an end-to-end deployment exercise remain to be implemented.
-- **PostGIS deployment:** migration `b72d4e_postgis_report_locations` has been applied and verified against a local PostgreSQL 18/PostGIS 3.6.2 instance on port 5433. The branch backend and Alembic use an ignored `.env.local` override for that instance. This is a snapshot copy of the original port-5432 database, not replication; other checkouts or deployed environments must be migrated and configured separately before claiming spatial operation there. See [`POSTGIS_LOCAL_SETUP.md`](./POSTGIS_LOCAL_SETUP.md).
+- **Reliability:** version and keyed retry checks now cover approval and report-sourced work-order creation. The in-app outbox covers report status changes through the pilot paths. Other consequential commands, legacy clients without these headers, remaining direct notification paths, production worker supervision, and an end-to-end deployment exercise remain.
+- **PostGIS deployment:** spatial migration `b72d4e_postgis_report_locations` and the later reliability migration `c81a1f_report_reliability` are applied on the local PostgreSQL 18/PostGIS 3.6.2 instance on port 5433. The branch backend and Alembic use an ignored `.env.local` override for that instance. This is a snapshot copy of the original port-5432 database, not replication; other checkouts or deployed environments must be migrated and configured separately. See [`POSTGIS_LOCAL_SETUP.md`](./POSTGIS_LOCAL_SETUP.md).
 - **Predictive model:** heuristic formulas are deterministic but have not been calibrated or validated against historical failures. They must not be interpreted as probabilities, confirmed schedules, or approved costs. The retired fixed insights, dashboard BI, and sample delivery pages are no longer routed, but other government routes and exports still need a full fake-data and provenance audit.
 
 ## Verification
 
 - Government, SMS, and spatial duplicate checks: **66 passed**.
 - Focused report, government access, and resident clarification checks: **55 passed** after the work-order edit guard.
+- Report reliability and government access checks: **60 passed** after the version, retry, and outbox slice. The integrated test covers approval → assignment → field work → private proof → independent inspection → resident closeout and notification delivery.
 - Frontend production build passed after predictive and project route changes.
 - Local PostGIS: Alembic head confirmed; both GiST indexes and generated geography values confirmed; report duplicate lookup and fresh agent suggestion both exercised through the PostGIS branch. Backend `/api/health` returned `200` with the local override.
 - Full backend suite: **321 passed, five older resident tests failed** for ticket prefix, tracking-token validator, token hash salt, exact anti-enumeration text, and a missing legacy `ProcessTimeline` model. These are the same five categories seen at the prior checkpoint; no new full-suite failures appeared.
