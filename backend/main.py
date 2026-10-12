@@ -28,6 +28,8 @@ import xml.etree.ElementTree as ET
 import email.utils
 from html import unescape
 load_dotenv()
+import mimetypes
+mimetypes.add_type("image/webp", ".webp")
 
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe") # Default to test key
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "1005696776742-cb6hpoeho2qap0plhgljboc3agf33d2s.apps.googleusercontent.com")
@@ -41,8 +43,10 @@ import gemini_service
 import deduplication_service
 import maps_service
 import sms_utils
+import analytics_service
 
 # Database imports
+import database
 import gov_models, gov_router, gov_schemas, gov_crud           # Government-side modules
 import models, schemas, crud
 import analytics_router                 # AI Analytics & Intelligence Engine
@@ -52,6 +56,7 @@ import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
 import pulseai_router                    # PULSEAI Persistent Chat & History Engine
 import spatial_router                    # PostGIS Spatial Queries & GeoEngine
+import admin_router                      # Staff, Residents, Settings & Governance
 from database import engine, get_db
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
@@ -335,6 +340,8 @@ app.include_router(announcements_router.public_router)
 app.include_router(pulseai_router.router)
 # PostGIS Spatial Engine (Reverse geocoding, Nearby, Viewport GeoJSON, Hotspots, Duplicates)
 app.include_router(spatial_router.router)
+# Administrative & Governance Engine (Staff, Residents, System Settings, Audit)
+app.include_router(admin_router.router)
 
 # ---------------------------------------------------------------------------
 # Health & Root
@@ -351,6 +358,30 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "service": "PULSO Core Engine"}
+
+@app.get("/api/analytics/stress-zones")
+def get_stress_zones_alias(
+    category: Optional[str] = Query(None, description="Filter by infrastructure category"),
+    days_back: int = Query(90, ge=7, le=365, description="Lookback window in days"),
+    min_points: int = Query(3, ge=2, le=20, description="Minimum reports to form a cluster"),
+    eps: float = Query(100.0, ge=10, le=2000, description="Clustering radius in meters"),
+    db: Session = Depends(get_db),
+    current_user=Depends(auth.get_current_user),
+):
+    """
+    DBSCAN spatial clustering endpoint for infrastructure stress zones.
+    Powered by PostgreSQL PostGIS ST_ClusterDBSCAN (units: meters).
+    """
+    if not isinstance(current_user, models.Official):
+        raise HTTPException(status_code=403, detail="Government capability required")
+    clusters = analytics_service.get_infrastructure_clusters(
+        db,
+        category_filter=category,
+        days_back=days_back,
+        min_samples=min_points,
+        radius_meters=eps,
+    )
+    return {"clusters": clusters, "count": len(clusters), "eps": eps, "min_points": min_points}
 
 @app.get("/api/ai/rate-limits")
 async def ai_rate_limit_status(
@@ -581,7 +612,9 @@ async def google_auth(
                     "phone_number": resident.phone_number,
                     "address": getattr(resident, "address", ""),
                     "display_name": getattr(resident, "display_name", resident.full_name),
+                    "avatar_url": resident.avatar_url,
                     "created_at": resident.created_at,
+                    "updated_at": resident.updated_at,
                     "is_verified": True,
                     "kyc_level": resident.kyc_level,
                     "capabilities": resident.capabilities,
@@ -727,7 +760,9 @@ async def google_complete_verification(
                 "phone_number": resident.phone_number,
                 "address": getattr(resident, "address", ""),
                 "display_name": getattr(resident, "display_name", resident.full_name),
+                "avatar_url": resident.avatar_url,
                 "created_at": resident.created_at,
+                "updated_at": resident.updated_at,
                 "kyc_level": resident.kyc_level,
                 "is_verified": resident.is_verified,
                 "capabilities": resident.capabilities,
@@ -879,11 +914,12 @@ async def login(
             detail="Account not verified. Please check your email for the verification code.",
         )
 
-    # 4. Check suspension status (Officials only)
-    if getattr(user, "is_suspended", False):
+    # 4. Check suspension status (Officials and Residents)
+    if getattr(user, "is_suspended", False) or getattr(user, "status", "active") == "suspended":
+        msg = "Account suspended by administration. Please contact City Engineering Administration." if getattr(user, "role", "") == "resident" else "Account suspended by administration. Please contact your department head."
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account suspended by administration. Please contact your department head.",
+            detail=msg,
         )
         
     from datetime import timedelta
@@ -903,7 +939,9 @@ async def login(
             "phone_number": user.phone_number,
             "address": getattr(user, "address", ""),
             "display_name": getattr(user, "display_name", user.full_name),
+            "avatar_url": user.avatar_url,
             "created_at": user.created_at,
+            "updated_at": getattr(user, "updated_at", None),
             "capabilities": user.capabilities,
             "access_level": getattr(getattr(user, "role_ref", None), "access_level", None)
         }
@@ -1525,7 +1563,9 @@ async def verify_phone_otp(req: VerifyPhoneOTPRequest, db: Session = Depends(get
             "phone_number": user.phone_number,
             "address": getattr(user, "address", ""),
             "display_name": getattr(user, "display_name", user.full_name),
+            "avatar_url": user.avatar_url,
             "created_at": user.created_at,
+            "updated_at": getattr(user, "updated_at", None),
             "capabilities": user.capabilities,
             "access_level": getattr(getattr(user, "role_ref", None), "access_level", None)
         }
@@ -2009,8 +2049,8 @@ def track_report_status(
             is_authorized = True
         # Check phone match
         if not is_authorized and report.contact_phone:
-            clean_input = re.sub(r'\D', '', provided_contact)
-            clean_stored = re.sub(r'\D', '', report.contact_phone)
+            clean_input = req.sub(r'\D', '', provided_contact)
+            clean_stored = req.sub(r'\D', '', report.contact_phone)
             if len(clean_input) >= 10 and len(clean_stored) >= 10:
                 if clean_input[-10:] == clean_stored[-10:]:
                     is_authorized = True
@@ -2294,6 +2334,97 @@ def get_kyc_status(
         "trust_score": current_user.trust_score,
         "last_verification": current_user.last_kyc_verification,
         "registration_date": current_user.created_at
+    }
+
+# ---------------------------------------------------------------------------
+# Profile Avatar Upload & Server-side Persistence
+# ---------------------------------------------------------------------------
+AVATAR_UPLOAD_DIR = "uploads/avatars"
+os.makedirs(AVATAR_UPLOAD_DIR, exist_ok=True)
+
+@app.post("/api/residents/{resident_id}/avatar")
+@app.post("/api/users/{resident_id}/avatar")
+async def upload_resident_avatar(
+    resident_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: Union[models.Resident, models.Official] = Depends(get_current_user)
+):
+    """
+    Upload and persist profile avatar on the server.
+    Validates MIME type (JPEG/PNG/WebP), limits size (2MB),
+    resizes server-side to 256x256 square, strips EXIF metadata,
+    stores in persistent uploads/avatars, and saves avatar_url in the database.
+    """
+    # 1. Authorization check
+    if current_user.id != resident_id and not hasattr(current_user, 'role_id'):
+        if getattr(current_user, 'role', None) not in ["dispatcher", "manager", "admin"]:
+            raise HTTPException(status_code=403, detail="Not authorized to update this avatar")
+
+    # 2. Content-Type and extension validation
+    allowed_types = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+    content_type = (file.content_type or "").lower()
+    filename_ext = os.path.splitext(file.filename or "")[1].lower()
+    
+    if content_type not in allowed_types and filename_ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(status_code=400, detail="Invalid image format. Only JPEG, PNG, or WebP files are allowed.")
+
+    # 3. Size validation (max 2 MB = 2 * 1024 * 1024 bytes)
+    MAX_BYTES = 2 * 1024 * 1024
+    image_bytes = await file.read()
+    if len(image_bytes) > MAX_BYTES:
+        raise HTTPException(status_code=400, detail=f"File exceeds maximum limit of 2MB (received {round(len(image_bytes) / (1024*1024), 2)}MB)")
+
+    if len(image_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    # 4. Image decode, EXIF strip, and 256x256 square resize via PIL
+    try:
+        from PIL import Image, ImageOps
+        import io
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            # Transpose orientation per EXIF, then strip all EXIF metadata by omitting exif in save
+            img = ImageOps.exif_transpose(img)
+            # Resize and crop to 256x256 square using high quality LANCZOS
+            img_square = ImageOps.fit(img, (256, 256), Image.Resampling.LANCZOS)
+            
+            # Save as high-quality WebP for minimal payload and crisp cross-browser fidelity
+            avatar_filename = f"avatar_u{resident_id}_{int(datetime.now(timezone.utc).timestamp())}.webp"
+            avatar_filepath = os.path.join(AVATAR_UPLOAD_DIR, avatar_filename)
+            
+            if img_square.mode in ("RGBA", "LA") or (img_square.mode == "P" and "transparency" in img_square.info):
+                img_square.save(avatar_filepath, "WEBP", quality=90, method=6)
+            else:
+                img_square.convert("RGB").save(avatar_filepath, "WEBP", quality=90, method=6)
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Avatar processing failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid or corrupt image file.")
+
+    # 5. Persist relative public URL in database
+    public_url = f"/api/uploads/avatars/{avatar_filename}"
+    
+    # Check if target is a Resident or Official
+    target_user = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
+    if not target_user:
+        target_user = db.query(models.Official).filter(models.Official.id == resident_id).first()
+        
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_user.avatar_url = public_url
+    target_user.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(target_user)
+
+    version_param = int(target_user.updated_at.timestamp()) if target_user.updated_at else int(datetime.now(timezone.utc).timestamp())
+    versioned_url = f"{public_url}?v={version_param}"
+
+    return {
+        "status": "success",
+        "message": "Avatar uploaded and saved successfully.",
+        "avatar_url": public_url,
+        "versioned_avatar_url": versioned_url,
+        "updated_at": target_user.updated_at.isoformat() if target_user.updated_at else None
     }
 
 @app.post("/api/residents/upgrade-kyc")

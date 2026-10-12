@@ -101,6 +101,7 @@ import {
 } from 'lucide-react';
 
 import PulseAIMarkdown from '../components/PulseAIMarkdown';
+import PulseAIChatWindow from '../components/PulseAIChatWindow';
 import { useTheme } from '../contexts/ThemeContext';
 import Swal from 'sweetalert2';
 import Branding from '../components/Branding';
@@ -113,12 +114,15 @@ import {
     REPORT_WORKFLOW_STEPS
 } from '../utils/reportWorkflow';
 import { API_BASE_URL } from '../utils/apiBase';
+import { apiFetch, dedupeFetch, checkServerHealth, logApiFailure } from '../utils/apiFetch';
 import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
 import ClaimReportModal from '../components/modals/ClaimReportModal';
 import IDCameraModal from '../components/IDCameraModal';
 import { watermarkEvidenceFile } from '../utils/watermark';
 import AvatarCropModal, { validateAvatarFile } from '../components/AvatarCropModal';
 import ReportDensityLayer from '../components/maps/ReportDensityLayer';
+import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
+import UserMenu from '../components/UserMenu';
 
 import {
     NORTH_CALOOCAN_PATH,
@@ -295,6 +299,69 @@ const KNOWLEDGE_BASE_ARTICLES = (t) => [
     { id: 4, title: t('knowledge.art4.title', { defaultValue: 'Noise Ordinance Info' }), category: t('knowledge.cat.community', { defaultValue: 'Community' }), excerpt: t('knowledge.art4.excerpt', { defaultValue: 'Understanding the city wide peace and order regulations.' }) },
 ];
 
+/**
+ * Builds an absolute URL for user avatars that works across different browsers,
+ * localhost, LAN hostnames, and devices, adding a cache-busting timestamp version.
+ */
+export const buildFullAvatarUrl = (avatarUrl, updatedAt) => {
+    if (!avatarUrl || typeof avatarUrl !== 'string') return null;
+    let url = avatarUrl.trim();
+    if (!url) return null;
+
+    if (url.startsWith('/')) {
+        url = `${API_BASE_URL}${url}`;
+    }
+
+    if (updatedAt) {
+        const v = typeof updatedAt === 'string' ? new Date(updatedAt).getTime() : updatedAt;
+        const separator = url.includes('?') ? '&' : '?';
+        if (!url.includes('v=')) {
+            url = `${url}${separator}v=${v}`;
+        }
+    }
+    return url;
+};
+
+/**
+ * Reusable UserAvatar component that adheres to PULSO Civic Aperture principles:
+ * - Renders high-fidelity server-persisted photo with cross-browser absolute URL
+ * - Automatic safe fallback to user's initial on empty URL or image load error (onError)
+ * - Cache-busting support
+ */
+export const UserAvatar = ({
+    avatarUrl,
+    updatedAt,
+    fallbackInitial = 'R',
+    alt = 'User Avatar',
+    className = 'w-full h-full object-cover',
+    initialClassName = ''
+}) => {
+    const [hasError, setHasError] = useState(false);
+    const resolvedUrl = React.useMemo(() => {
+        setHasError(false);
+        return buildFullAvatarUrl(avatarUrl, updatedAt);
+    }, [avatarUrl, updatedAt]);
+
+    if (!resolvedUrl || hasError) {
+        return (
+            <span className={initialClassName || 'select-none font-bold'}>
+                {fallbackInitial}
+            </span>
+        );
+    }
+
+    return (
+        <img
+            src={resolvedUrl}
+            alt={alt}
+            className={className}
+            onError={() => setHasError(true)}
+            crossOrigin="anonymous"
+            loading="lazy"
+        />
+    );
+};
+
 const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogout, t }) => {
     const navDestinations = [
         { id: 'overview', icon: <Home size={19} strokeWidth={2} />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
@@ -309,13 +376,14 @@ const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogo
                 {/* User Identity Snapshot */}
                 <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-5 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 hover:border-orange-500/50 cursor-pointer transition-all group shadow-2xs">
                     <div className={`w-11 h-11 rounded-full font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative border border-slate-200 dark:border-slate-700 ${
-                        user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-900' : 'bg-gradient-to-br from-orange-400 to-orange-600'
+                        user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-800' : 'bg-gradient-to-br from-orange-400 to-orange-600'
                     }`}>
-                        {user.avatarPhoto ? (
-                            <img src={user.avatarPhoto} alt={user.name} className="w-full h-full object-cover" />
-                        ) : (
-                            user.avatar
-                        )}
+                        <UserAvatar
+                            avatarUrl={user.avatarPhoto}
+                            updatedAt={user.updatedAt}
+                            fallbackInitial={user.avatar || 'R'}
+                            alt={user.name || 'Resident'}
+                        />
                     </div>
                     <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-[15px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">{user.name}</h3>
@@ -814,20 +882,20 @@ const ResidentHomeView = ({
 
                     {/* 4. Nearby Issues Card */}
                     <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-                        <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
-                                <MapPin size={20} className="text-[#ff6b00]" />
-                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                        <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2.5">
+                            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                                <MapPin size={20} className="text-[#ff6b00] shrink-0" />
+                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white truncate">
                                     Nearby issues
                                 </h3>
-                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
                                     {nearbyList.length} nearby
                                 </span>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setActiveModal('map')}
-                                className="text-xs font-bold text-[#ff6b00] hover:underline flex items-center gap-1.5 cursor-pointer min-h-[44px] px-2.5 py-1"
+                                className="text-xs font-bold text-[#ff6b00] hover:underline flex items-center gap-1.5 cursor-pointer min-h-[44px] px-2.5 py-1 shrink-0 whitespace-nowrap"
                             >
                                 <span>View map</span>
                                 <ChevronRight size={14} />
@@ -2339,6 +2407,74 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
     );
 };
 
+const SettingsRow = ({
+    icon: IconComponent,
+    label,
+    value,
+    onClick,
+    isDestructive = false,
+    showChevron = true,
+    ariaLabel
+}) => (
+    <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+            }
+        }}
+        aria-label={ariaLabel || label}
+        className={`w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800 focus-visible:ring-2 focus-visible:ring-orange-500 ${
+            isDestructive
+                ? 'text-red-600 dark:text-red-400 hover:bg-red-50/70 dark:hover:bg-red-950/30'
+                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+        }`}
+    >
+        <div className="flex items-center gap-3.5 min-w-0">
+            {IconComponent && (
+                <IconComponent
+                    size={20}
+                    className={`shrink-0 ${
+                        isDestructive
+                            ? 'text-red-500'
+                            : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                />
+            )}
+            <span
+                className={`text-[14px] font-semibold truncate ${
+                    isDestructive
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-slate-800 dark:text-slate-200'
+                }`}
+            >
+                {label}
+            </span>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+            {value && (
+                <span className="text-[13px] font-medium text-slate-400 dark:text-slate-500">
+                    {value}
+                </span>
+            )}
+            {showChevron && (
+                <ChevronRight
+                    size={18}
+                    className={`shrink-0 ${
+                        isDestructive
+                            ? 'text-red-400/80 dark:text-red-500/80'
+                            : 'text-slate-300 dark:text-slate-600'
+                    }`}
+                />
+            )}
+        </div>
+    </div>
+);
+
 const ProfileView = ({
     user,
     setUser,
@@ -2352,7 +2488,10 @@ const ProfileView = ({
     t,
     i18n: propI18n,
     subView: propSubView,
-    setSubView: propSetSubView
+    setSubView: propSetSubView,
+    token,
+    currentUser,
+    fetchUser
 }) => {
     const navigate = useNavigate();
     const { theme, changeTheme } = useTheme();
@@ -2380,32 +2519,181 @@ const ProfileView = ({
 
     // Settings States & Dialogs
     const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+        if (user?.preferences?.notifications_enabled !== undefined) {
+            return Boolean(user.preferences.notifications_enabled);
+        }
         const saved = localStorage.getItem('pulso_notifications_enabled');
         return saved !== null ? saved === 'true' : true;
     });
+
+    const [notificationCategories, setNotificationCategories] = useState(() => {
+        const defaultCats = {
+            reportStatus: true,
+            advisories: true,
+            emergencyAlerts: true
+        };
+        if (user?.preferences?.notification_categories) {
+            return { ...defaultCats, ...user.preferences.notification_categories };
+        }
+        try {
+            const saved = localStorage.getItem('pulso_notification_categories');
+            if (saved) return { ...defaultCats, ...JSON.parse(saved) };
+        } catch (e) {}
+        return defaultCats;
+    });
+
+    const [isLanguageSheetOpen, setIsLanguageSheetOpen] = useState(false);
+    const [isThemeSheetOpen, setIsThemeSheetOpen] = useState(false);
+    const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
     const [isRateModalOpen, setIsRateModalOpen] = useState(false);
     const [ratingScore, setRatingScore] = useState(5);
     const [ratingSubmitted, setRatingSubmitted] = useState(false);
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
-    // Synchronize dark mode with PULSO theme system
-    const isDarkMode = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+    // Password & Security States
+    const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+    const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
+    const [changingPassword, setChangingPassword] = useState(false);
 
-    const handleToggleDarkMode = () => {
-        const nextTheme = isDarkMode ? 'light' : 'dark';
-        changeTheme(nextTheme);
-        if (showToast) {
-            showToast(nextTheme === 'dark' ? 'Dark mode enabled' : 'Light mode enabled');
+    // Synchronize preferences with user prop changes
+    useEffect(() => {
+        if (user?.preferences?.notifications_enabled !== undefined) {
+            setNotificationsEnabled(Boolean(user.preferences.notifications_enabled));
+        }
+        if (user?.preferences?.notification_categories) {
+            setNotificationCategories(prev => ({ ...prev, ...user.preferences.notification_categories }));
+        }
+    }, [user?.preferences]);
+
+    const handleSavePreference = async (key, val) => {
+        const nextPreferences = {
+            ...(user?.preferences || {}),
+            [key]: val
+        };
+        if (key === 'notifications_enabled') {
+            localStorage.setItem('pulso_notifications_enabled', String(val));
+        } else if (key === 'notification_categories') {
+            localStorage.setItem('pulso_notification_categories', JSON.stringify(val));
+        } else if (key === 'language') {
+            localStorage.setItem('pulso_language', String(val));
+        } else if (key === 'theme') {
+            localStorage.setItem('pulso_theme', String(val));
+            localStorage.setItem('theme', String(val));
+        }
+
+        if (handleUpdateProfile) {
+            await handleUpdateProfile('preferences', nextPreferences);
         }
     };
 
-    const handleToggleNotifications = () => {
+    const handleToggleMasterNotifications = () => {
         const nextState = !notificationsEnabled;
         setNotificationsEnabled(nextState);
-        localStorage.setItem('pulso_notifications_enabled', String(nextState));
+        handleSavePreference('notifications_enabled', nextState);
         if (showToast) {
             showToast(nextState ? 'Notifications enabled' : 'Notifications muted');
+        }
+    };
+
+    const handleToggleCategory = (catKey) => {
+        const nextCats = {
+            ...notificationCategories,
+            [catKey]: !notificationCategories[catKey]
+        };
+        setNotificationCategories(nextCats);
+        handleSavePreference('notification_categories', nextCats);
+        if (showToast) {
+            showToast('Notification preference updated');
+        }
+    };
+
+    const handleSelectLanguage = (lang) => {
+        handleSwitchLanguage(lang);
+        handleSavePreference('language', lang);
+        setIsLanguageSheetOpen(false);
+    };
+
+    const [themeAnnouncement, setThemeAnnouncement] = useState('');
+
+    const handleSelectTheme = (thm) => {
+        changeTheme(thm);
+        handleSavePreference('theme', thm);
+        setIsThemeSheetOpen(false);
+        const announcementText = thm === 'system' ? 'Match my phone theme on' : thm === 'dark' ? 'Dark theme on' : 'Light theme on';
+        setThemeAnnouncement(announcementText);
+        if (showToast) {
+            showToast(thm === 'system' ? 'Appearance set to Match my phone' : thm === 'dark' ? 'Dark mode enabled' : 'Light mode enabled');
+        }
+    };
+
+    const hasLength = passwords.new.length >= 8;
+    const hasCapital = /[A-Z]/.test(passwords.new);
+    const hasNumber = /[0-9]/.test(passwords.new);
+    const hasSpecial = /[^A-Za-z0-9]/.test(passwords.new);
+    const passwordScore = [hasLength, hasCapital, hasNumber, hasSpecial].filter(Boolean).length;
+
+    const getStrengthMeter = () => {
+        if (!passwords.new) return { label: 'None', text: 'Enter password', color: 'text-slate-400 dark:text-slate-500', bar: 'bg-slate-300 dark:bg-slate-700' };
+        if (passwordScore === 1) return { label: 'Weak', text: 'Weak', color: 'text-rose-500', bar: 'bg-rose-500' };
+        if (passwordScore === 2) return { label: 'Fair', text: 'Fair', color: 'text-amber-500', bar: 'bg-amber-500' };
+        if (passwordScore === 3) return { label: 'Good', text: 'Good', color: 'text-orange-500', bar: 'bg-orange-500' };
+        return { label: 'Strong', text: 'Strong', color: 'text-emerald-500', bar: 'bg-emerald-500' };
+    };
+
+    const meter = getStrengthMeter();
+    const hasConfirm = passwords.confirm.length > 0;
+    const passwordsMatch = hasConfirm && passwords.new === passwords.confirm;
+    const isPasswordFormValid = passwords.current.trim().length > 0 && hasLength && hasCapital && hasNumber && hasSpecial && passwordsMatch && passwords.new !== passwords.current;
+
+    const handleChangePasswordSubmit = async (e) => {
+        e.preventDefault();
+        if (!isPasswordFormValid) {
+            if (!passwords.current) {
+                showToast?.('Please enter your current password', 'error');
+                return;
+            }
+            if (passwords.new.length < 8) {
+                showToast?.('Password must be at least 8 characters', 'error');
+                return;
+            }
+            if (passwords.new !== passwords.confirm) {
+                showToast?.('New passwords do not match', 'error');
+                return;
+            }
+            if (passwords.new === passwords.current) {
+                showToast?.('New password cannot be the same as current password', 'error');
+                return;
+            }
+            return;
+        }
+
+        setChangingPassword(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    current_password: passwords.current,
+                    new_password: passwords.new
+                })
+            });
+
+            if (res.ok) {
+                showToast?.('Password updated successfully');
+                setPasswords({ current: '', new: '', confirm: '' });
+                changeSubView('settings');
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast?.(err.detail || 'Failed to update password', 'error');
+            }
+        } catch (err) {
+            showToast?.('Network error while updating password', 'error');
+        } finally {
+            setChangingPassword(false);
         }
     };
 
@@ -2505,25 +2793,75 @@ const ProfileView = ({
     };
 
     const handleSaveCroppedAvatar = async (croppedBase64) => {
-        if (setUser) {
-            setUser(prev => ({
-                ...prev,
-                avatarPhoto: croppedBase64
-            }));
-        }
-        try {
-            localStorage.setItem(`pulso_avatar_${user.email || 'current'}`, croppedBase64);
-            localStorage.setItem('pulso_avatar_current', croppedBase64);
-        } catch (err) {
-            console.warn("Could not save avatar to localStorage", err);
+        const targetUserId = currentUser?.id || user?.id;
+        if (!targetUserId) {
+            if (showToast) showToast('Session not found. Please log in again.', 'error');
+            return;
         }
 
-        if (cropModalData?.revokeUrl) {
-            cropModalData.revokeUrl();
+        try {
+            // Convert base64 data URL to a clean binary Blob/File for multipart upload
+            const responseBlob = await fetch(croppedBase64);
+            const blob = await responseBlob.blob();
+            const formData = new FormData();
+            formData.append('file', blob, 'avatar.jpg');
+
+            const res = await fetch(`${API_BASE_URL}/api/residents/${targetUserId}/avatar`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || 'Failed to upload profile photo to server.');
+            }
+
+            const data = await res.json();
+            const serverAvatarUrl = data.avatar_url;
+            const updatedAt = data.updated_at || new Date().toISOString();
+
+            // 1. Immediately update local state with server URL and version timestamp
+            if (setUser) {
+                setUser(prev => ({
+                    ...prev,
+                    avatarPhoto: serverAvatarUrl,
+                    updatedAt: updatedAt
+                }));
+            }
+
+            // 2. Harmonize active session storage
+            try {
+                const currentStored = getAuthUser();
+                if (currentStored) {
+                    setAuthSession(token, {
+                        ...currentStored,
+                        avatar_url: serverAvatarUrl,
+                        updated_at: updatedAt
+                    });
+                }
+            } catch (err) {
+                // silent
+            }
+
+            // 3. Trigger full user refresh across all components
+            if (fetchUser) {
+                await fetchUser(targetUserId);
+            }
+
+            if (showToast) showToast('Profile photo updated and saved to server successfully!');
+        } catch (err) {
+            console.error("Avatar upload error:", err);
+            if (showToast) showToast(err.message || 'Error updating profile photo', 'error');
+        } finally {
+            if (cropModalData?.revokeUrl) {
+                cropModalData.revokeUrl();
+            }
+            setCropModalData(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
-        setCropModalData(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        if (showToast) showToast('Profile photo adjusted and saved successfully!');
     };
 
     const handleCloseCropModal = () => {
@@ -2545,409 +2883,550 @@ const ProfileView = ({
             className="w-full relative"
         >
             <AnimatePresence mode="wait">
-                {activeSubView === 'settings' ? (
+                {activeSubView === 'settings' && (
                     <motion.div
                         key="settings"
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
                         transition={{ duration: 0.15 }}
-                        className="w-full max-w-xl mx-auto space-y-5"
+                        className="w-full max-w-[640px] mx-auto space-y-5 pb-36 sm:pb-28"
                     >
-                        {/* Page Header */}
-                        <div className="flex items-center justify-between px-1">
-                            <div>
-                                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                    Settings
-                                </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                    Manage preferences, security, and account settings
-                                </p>
-                            </div>
+                        {/* Page Header (Title "Settings", no long subtitle) */}
+                        <div className="px-1 pt-1">
+                            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                Settings
+                            </h2>
                         </div>
 
-                        {/* Compact Profile Summary Row (Entry to Profile Details) */}
-                        <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => changeSubView('profile-details')}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    changeSubView('profile-details');
-                                }
-                            }}
-                            aria-label={`View full profile for ${user.fullName}`}
-                            className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 hover:border-orange-500/40 dark:hover:border-orange-500/40 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-all cursor-pointer select-none group outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
-                        >
+                        {/* User Card (top) */}
+                        <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-3.5 shadow-xs min-h-[72px]">
                             <div className="flex items-center gap-3.5 min-w-0">
-                                {/* Small Avatar Thumbnail */}
-                                <div className={`w-12 h-12 rounded-full font-black flex items-center justify-center text-white text-base shadow-sm border border-slate-200 dark:border-slate-700/80 shrink-0 overflow-hidden ${
-                                    user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-800' : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
+                                <div className={`w-13 h-13 rounded-full font-black flex items-center justify-center text-white text-base shadow-sm border border-slate-200 dark:border-slate-700/80 shrink-0 overflow-hidden ${
+                                    user.avatarPhoto
+                                        ? 'bg-slate-100 dark:bg-slate-800'
+                                        : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
                                 }`}>
-                                    {user.avatarPhoto ? (
-                                        <img src={user.avatarPhoto} alt={user.fullName} className="w-full h-full object-cover" />
-                                    ) : (
-                                        user.avatar
-                                    )}
+                                    <UserAvatar
+                                        avatarUrl={user.avatarPhoto}
+                                        updatedAt={user.updatedAt}
+                                        fallbackInitial={user.avatar || 'R'}
+                                        alt={user.fullName || 'Resident'}
+                                    />
                                 </div>
 
                                 <div className="min-w-0 text-left">
                                     <div className="flex items-center gap-1.5">
-                                        <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight truncate">
-                                            {user.fullName}
+                                        <h3 className="font-bold text-slate-900 dark:text-white text-base tracking-tight truncate">
+                                            {user.fullName || 'Resident'}
                                         </h3>
-                                        <ShieldCheck size={14} className="text-emerald-500 shrink-0" />
+                                        <ShieldCheck size={16} className="text-emerald-500 shrink-0" aria-label="Verified resident" />
                                     </div>
-                                    <div className="text-[12px] font-medium text-orange-600 dark:text-orange-400 group-hover:text-orange-500 flex items-center gap-1 transition-colors mt-0.5">
-                                        <span>View Profile Details</span>
-                                        <span aria-hidden="true" className="transition-transform duration-150 group-hover:translate-x-0.5">&rarr;</span>
-                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
+                                        {user.email || user.phone || 'alexismarcaida@gmail.com'}
+                                    </p>
                                 </div>
                             </div>
-
-                            <ChevronRight size={18} className="text-slate-400 group-hover:text-orange-500 shrink-0 transition-colors" />
                         </div>
 
-                        {/* Sectioned Settings List (GENERAL / SECURE / ACCOUNT) */}
+                        {/* Grouped Sections */}
                         <div className="w-full space-y-5">
-                            {/* GENERAL SECTION */}
-                            <div className="w-full">
-                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
-                                    General
-                                </h5>
-                                <div className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-200/70 dark:divide-slate-800/70 shadow-xs">
-                                    {/* Language / Translation Toggle [ EN | FIL ] */}
-                                    <div
-                                        className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors select-none"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <Globe size={18} className="text-orange-500 shrink-0" />
-                                            <div className="min-w-0">
-                                                <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate block">
-                                                    Language / Wika
-                                                </span>
-                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 block -mt-0.5">
-                                                    {isFilipino ? 'Filipino (Tagalog)' : 'English (US)'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Segmented Pill [ EN | FIL ] */}
-                                        <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 rounded-full p-0.5 border border-slate-300/70 dark:border-slate-700/80 shadow-2xs shrink-0">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleSwitchLanguage('en')}
-                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
-                                                    !isFilipino
-                                                        ? 'bg-orange-500 text-white shadow-xs'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                }`}
-                                                aria-pressed={!isFilipino}
-                                                aria-label="Switch language to English"
-                                            >
-                                                EN
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleSwitchLanguage('tl')}
-                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
-                                                    isFilipino
-                                                        ? 'bg-orange-500 text-white shadow-xs'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                }`}
-                                                aria-pressed={isFilipino}
-                                                aria-label="Palitan ang wika sa Filipino"
-                                            >
-                                                FIL
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Notifications Toggle */}
-                                    <div
-                                        role="switch"
-                                        aria-checked={notificationsEnabled}
-                                        aria-label={`Notifications, currently ${notificationsEnabled ? 'on' : 'off'}`}
-                                        tabIndex={0}
-                                        onClick={handleToggleNotifications}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                handleToggleNotifications();
-                                            }
-                                        }}
-                                        className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <Bell size={18} className="text-orange-500 shrink-0" />
-                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
-                                                Notifications
-                                            </span>
-                                        </div>
-                                        <div
-                                            className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
-                                                notificationsEnabled ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
-                                            }`}
-                                        >
-                                            <div
-                                                className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
-                                                    notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
-                                                }`}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Appearance Setting [ Match my phone | Light | Dark ] */}
-                                    <div className="w-full min-h-[56px] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors select-none">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <Sun size={18} className="text-orange-500 shrink-0" />
-                                            <div className="min-w-0">
-                                                <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate block">
-                                                    Appearance
-                                                </span>
-                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 block -mt-0.5">
-                                                    {theme === 'system' ? 'Match my phone' : theme === 'light' ? 'Light' : 'Dark'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Segmented Control [ Match my phone | Light | Dark ] */}
-                                        <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 rounded-full p-0.5 border border-slate-300/70 dark:border-slate-700/80 shadow-2xs shrink-0 self-start sm:self-auto">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    changeTheme('system');
-                                                    if (showToast) showToast('Appearance set to Match my phone');
-                                                }}
-                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
-                                                    theme === 'system'
-                                                        ? 'bg-orange-500 text-white shadow-xs'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                }`}
-                                                aria-pressed={theme === 'system'}
-                                                aria-label="Appearance: Match my phone"
-                                            >
-                                                Match my phone
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    changeTheme('light');
-                                                    if (showToast) showToast('Light mode enabled');
-                                                }}
-                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
-                                                    theme === 'light'
-                                                        ? 'bg-orange-500 text-white shadow-xs'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                }`}
-                                                aria-pressed={theme === 'light'}
-                                                aria-label="Appearance: Light"
-                                            >
-                                                Light
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    changeTheme('dark');
-                                                    if (showToast) showToast('Dark mode enabled');
-                                                }}
-                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
-                                                    theme === 'dark'
-                                                        ? 'bg-orange-500 text-white shadow-xs'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                }`}
-                                                aria-pressed={theme === 'dark'}
-                                                aria-label="Appearance: Dark"
-                                            >
-                                                Dark
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* SECURE SECTION */}
-                            <div className="w-full">
-                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
-                                    Secure
-                                </h5>
-                                <div className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-200/70 dark:divide-slate-800/70 shadow-xs">
-                                    {/* Rate App */}
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() => setIsRateModalOpen(true)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                setIsRateModalOpen(true);
-                                            }
-                                        }}
-                                        aria-label="Rate App"
-                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <Star size={18} className="text-orange-500 shrink-0" />
-                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
-                                                Rate App
-                                            </span>
-                                        </div>
-                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                    </div>
-
-                                    {/* Share App */}
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleShareApp}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                handleShareApp();
-                                            }
-                                        }}
-                                        aria-label="Share App"
-                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <Share2 size={18} className="text-orange-500 shrink-0" />
-                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
-                                                Share App
-                                            </span>
-                                        </div>
-                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                    </div>
-
-                                    {/* Privacy Policy */}
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleOpenPrivacy}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                handleOpenPrivacy();
-                                            }
-                                        }}
-                                        aria-label="Privacy Policy"
-                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <Shield size={18} className="text-orange-500 shrink-0" />
-                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
-                                                Privacy Policy
-                                            </span>
-                                        </div>
-                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                    </div>
-
-                                    {/* Terms & Conditions */}
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={handleOpenTerms}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                handleOpenTerms();
-                                            }
-                                        }}
-                                        aria-label="Terms and Conditions"
-                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <FileText size={18} className="text-orange-500 shrink-0" />
-                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
-                                                Terms &amp; Conditions
-                                            </span>
-                                        </div>
-                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                    </div>
-
-                                    {/* Contact */}
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() => setIsContactModalOpen(true)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                setIsContactModalOpen(true);
-                                            }
-                                        }}
-                                        aria-label="Contact and Support"
-                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <PhoneCall size={18} className="text-orange-500 shrink-0" />
-                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
-                                                Contact
-                                            </span>
-                                        </div>
-                                        <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                    </div>
-
-                                    {/* How PULSO Works (Tutorial Replay) */}
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() => navigate('/tutorial')}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                navigate('/tutorial');
-                                            }
-                                        }}
-                                        aria-label="How PULSO Works (App Tutorial)"
-                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <HelpCircle size={18} className="text-orange-500 shrink-0" />
-                                            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">
-                                                How PULSO Works
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="text-[11px] font-mono text-slate-400">Tutorial</span>
-                                            <ChevronRight size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* ACCOUNT SECTION */}
-                            <div className="w-full">
+                            <div>
                                 <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
                                     Account
                                 </h5>
-                                <div className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-200/70 dark:divide-slate-800/70 shadow-xs">
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
+                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs">
+                                    <SettingsRow
+                                        icon={User}
+                                        label="Manage Profile"
+                                        onClick={() => changeSubView('profile-details')}
+                                    />
+                                    <SettingsRow
+                                        icon={Lock}
+                                        label="Password & Security"
+                                        onClick={() => changeSubView('security')}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* PREFERENCES SECTION */}
+                            <div>
+                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
+                                    Preferences
+                                </h5>
+                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs">
+                                    <SettingsRow
+                                        icon={Bell}
+                                        label="Notifications"
+                                        value={notificationsEnabled ? 'On' : 'Off'}
+                                        onClick={() => changeSubView('notifications')}
+                                    />
+                                    <SettingsRow
+                                        icon={Globe}
+                                        label="Language"
+                                        value={isFilipino ? 'Filipino' : 'English'}
+                                        onClick={() => setIsLanguageSheetOpen(true)}
+                                    />
+                                    <SettingsRow
+                                        icon={Sun}
+                                        label="Theme"
+                                        value={theme === 'system' ? 'Match my phone' : theme === 'light' ? 'Light' : 'Dark'}
+                                        onClick={() => setIsThemeSheetOpen(true)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* SUPPORT SECTION */}
+                            <div>
+                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
+                                    Support
+                                </h5>
+                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs">
+                                    <SettingsRow
+                                        icon={HelpCircle}
+                                        label="How PULSO Works"
+                                        onClick={() => navigate('/tutorial?from=profile')}
+                                    />
+                                    <SettingsRow
+                                        icon={PhoneCall}
+                                        label="Contact"
+                                        onClick={() => setIsContactModalOpen(true)}
+                                    />
+                                    <SettingsRow
+                                        icon={Shield}
+                                        label="Privacy Policy"
+                                        onClick={handleOpenPrivacy}
+                                    />
+                                    <SettingsRow
+                                        icon={FileText}
+                                        label="Terms & Conditions"
+                                        onClick={handleOpenTerms}
+                                    />
+                                    <SettingsRow
+                                        icon={Star}
+                                        label="Rate App"
+                                        onClick={() => setIsRateModalOpen(true)}
+                                    />
+                                    <SettingsRow
+                                        icon={Share2}
+                                        label="Share App"
+                                        onClick={handleShareApp}
+                                    />
+                                    <SettingsRow
+                                        icon={Info}
+                                        label="About PULSO"
+                                        value="v2.4.0"
+                                        onClick={() => setIsAboutModalOpen(true)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* LOGOUT (STANDALONE RED ROW) */}
+                            <div className="pt-1">
+                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+                                    <SettingsRow
+                                        icon={LogOut}
+                                        label="Sign Out"
+                                        isDestructive={true}
                                         onClick={() => setIsLogoutConfirmOpen(true)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                setIsLogoutConfirmOpen(true);
-                                            }
-                                        }}
-                                        aria-label="Logout, end session"
-                                        className="w-full min-h-[50px] px-4 py-3 flex items-center justify-between gap-3 text-red-600 dark:text-red-400 hover:bg-red-50/70 dark:hover:bg-red-950/30 transition-colors cursor-pointer select-none outline-none focus-visible:bg-red-50 dark:focus-visible:bg-red-950/40"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <LogOut size={18} className="text-red-500 shrink-0" />
-                                            <span className="text-[13.5px] font-semibold text-red-600 dark:text-red-400 truncate">
-                                                {t('dashboard.sidebar.signOut', { defaultValue: 'Log Out' })}
-                                            </span>
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
+                {/* Sub-view: Password & Security */}
+                {activeSubView === 'security' && (
+                    <motion.div
+                        key="security"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.15 }}
+                        className="w-full max-w-[640px] mx-auto space-y-5 pb-36 sm:pb-28"
+                    >
+                        {/* Navigation / Header */}
+                        <div className="space-y-3">
+                            <button
+                                type="button"
+                                onClick={() => changeSubView('settings')}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[38px] outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+                                aria-label="Back to Settings"
+                            >
+                                <ChevronLeft size={16} className="shrink-0" />
+                                <span>Settings</span>
+                            </button>
+                            <div className="px-1">
+                                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    Password &amp; Security
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Manage your credentials, linked accounts, and active device sessions
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Change Password Form */}
+                        <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
+                            <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+                                <Lock size={18} className="text-slate-400 dark:text-slate-500" />
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                                    Change Password
+                                </h3>
+                            </div>
+
+                            <form onSubmit={handleChangePasswordSubmit} className="space-y-3.5">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        Current Password
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type={showPass.current ? 'text' : 'password'}
+                                            value={passwords.current}
+                                            onChange={(e) => setPasswords(prev => ({ ...prev, current: e.target.value }))}
+                                            placeholder="Enter current password"
+                                            className="w-full px-3.5 py-2.5 pr-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPass(prev => ({ ...prev, current: !prev.current }))}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                                            aria-label={showPass.current ? 'Hide password' : 'Show password'}
+                                        >
+                                            {showPass.current ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        New Password
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type={showPass.new ? 'text' : 'password'}
+                                            value={passwords.new}
+                                            onChange={(e) => setPasswords(prev => ({ ...prev, new: e.target.value }))}
+                                            placeholder="At least 8 characters with numbers & symbols"
+                                            className="w-full px-3.5 py-2.5 pr-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPass(prev => ({ ...prev, new: !prev.new }))}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                                            aria-label={showPass.new ? 'Hide password' : 'Show password'}
+                                        >
+                                            {showPass.new ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+
+                                    {/* Password Strength Meter */}
+                                    {passwords.new && (
+                                        <div className="mt-2 space-y-1.5">
+                                            <div className="flex items-center justify-between text-[11px]">
+                                                <span className="text-slate-400">Password Strength:</span>
+                                                <span className={`font-bold ${meter.color}`}>{meter.text}</span>
+                                            </div>
+                                            <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full ${meter.bar} transition-all duration-300`}
+                                                    style={{ width: `${(passwordScore / 4) * 100}%` }}
+                                                />
+                                            </div>
                                         </div>
-                                        <ChevronRight size={16} className="text-red-400/80 dark:text-red-500/80 shrink-0" />
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        Confirm New Password
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type={showPass.confirm ? 'text' : 'password'}
+                                            value={passwords.confirm}
+                                            onChange={(e) => setPasswords(prev => ({ ...prev, confirm: e.target.value }))}
+                                            placeholder="Re-type new password"
+                                            className="w-full px-3.5 py-2.5 pr-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPass(prev => ({ ...prev, confirm: !prev.confirm }))}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                                            aria-label={showPass.confirm ? 'Hide password' : 'Show password'}
+                                        >
+                                            {showPass.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                    {hasConfirm && (
+                                        <p className={`text-[11px] mt-1 font-medium ${passwordsMatch ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                            {passwordsMatch ? '✓ Passwords match' : '✕ Passwords do not match'}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="pt-2">
+                                    <button
+                                        type="submit"
+                                        disabled={changingPassword || !isPasswordFormValid}
+                                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm shadow-orange-500/20 min-h-[44px] flex items-center justify-center gap-2"
+                                    >
+                                        {changingPassword && <Loader2 size={14} className="animate-spin" />}
+                                        <span>{changingPassword ? 'Updating...' : 'Update Password'}</span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {/* Linked Google Account */}
+                        <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-3">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                Linked Accounts
+                            </h3>
+                            <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center shadow-xs border border-slate-200 dark:border-slate-700 font-bold text-sm text-slate-700 dark:text-slate-200">
+                                        G
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                                            Google Account
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                            {user.email || 'alexismarcaida@gmail.com'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60">
+                                    Connected
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 px-1">
+                                You can sign in with your linked Google account or set your standard password above.
+                            </p>
+                        </div>
+
+                        {/* Active Sessions */}
+                        <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-3">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                Active Sessions
+                            </h3>
+                            <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+                                <div className="flex items-center gap-3">
+                                    <Monitor size={18} className="text-slate-400" />
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                            <span>This device</span>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                            <span className="text-[11px] font-normal text-emerald-600 dark:text-emerald-400">Active now</span>
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                            Caloocan City, PH • Web Browser
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => showToast?.('Signed out of all other device sessions')}
+                                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[44px]"
+                            >
+                                Sign Out of Other Devices
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+
+                {/* Sub-view: Notification Preferences */}
+                {activeSubView === 'notifications' && (
+                    <motion.div
+                        key="notifications"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.15 }}
+                        className="w-full max-w-[640px] mx-auto space-y-5 pb-36 sm:pb-28"
+                    >
+                        {/* Navigation / Header */}
+                        <div className="space-y-3">
+                            <button
+                                type="button"
+                                onClick={() => changeSubView('settings')}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[38px] outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+                                aria-label="Back to Settings"
+                            >
+                                <ChevronLeft size={16} className="shrink-0" />
+                                <span>Settings</span>
+                            </button>
+                            <div className="px-1">
+                                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    Notifications
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Configure your alerts for public works, report updates, and civic advisories
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Master Switch Card */}
+                        <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
+                            <div
+                                role="switch"
+                                aria-checked={notificationsEnabled}
+                                tabIndex={0}
+                                onClick={handleToggleMasterNotifications}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        handleToggleMasterNotifications();
+                                    }
+                                }}
+                                className="flex items-center justify-between gap-4 cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-xl"
+                            >
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                                        Allow Notifications
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                        Master switch for all push and email alerts from PULSO
+                                    </p>
+                                </div>
+                                <div
+                                    className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
+                                        notificationsEnabled ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
+                                    }`}
+                                >
+                                    <div
+                                        className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
+                                            notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Categories Card */}
+                        <div className="w-full space-y-2">
+                            <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
+                                Notification Categories
+                            </h5>
+                            <div className={`w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs transition-opacity ${
+                                !notificationsEnabled ? 'opacity-50 pointer-events-none' : ''
+                            }`}>
+                                {/* 1. Report Status Updates */}
+                                <div
+                                    role="switch"
+                                    aria-checked={notificationCategories.reportStatus}
+                                    tabIndex={0}
+                                    onClick={() => handleToggleCategory('reportStatus')}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            handleToggleCategory('reportStatus');
+                                        }
+                                    }}
+                                    className="w-full min-h-[56px] p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                >
+                                    <div>
+                                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                                            Report status updates
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                            Live notifications when your reports are verified, assigned, or resolved
+                                        </p>
+                                    </div>
+                                    <div
+                                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
+                                            notificationCategories.reportStatus ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
+                                                notificationCategories.reportStatus ? 'translate-x-5' : 'translate-x-0'
+                                            }`}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* 2. City Advisories */}
+                                <div
+                                    role="switch"
+                                    aria-checked={notificationCategories.advisories}
+                                    tabIndex={0}
+                                    onClick={() => handleToggleCategory('advisories')}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            handleToggleCategory('advisories');
+                                        }
+                                    }}
+                                    className="w-full min-h-[56px] p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                >
+                                    <div>
+                                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                                            City advisories
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                            Public works announcements, road re-blocking, and engineering advisories
+                                        </p>
+                                    </div>
+                                    <div
+                                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
+                                            notificationCategories.advisories ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
+                                                notificationCategories.advisories ? 'translate-x-5' : 'translate-x-0'
+                                            }`}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* 3. Emergency Alerts */}
+                                <div
+                                    role="switch"
+                                    aria-checked={notificationCategories.emergencyAlerts}
+                                    tabIndex={0}
+                                    onClick={() => handleToggleCategory('emergencyAlerts')}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            handleToggleCategory('emergencyAlerts');
+                                        }
+                                    }}
+                                    className="w-full min-h-[56px] p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
+                                >
+                                    <div>
+                                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                                            Emergency alerts
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                            High-priority hazard alerts, storm warnings, and flash flood updates
+                                        </p>
+                                    </div>
+                                    <div
+                                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
+                                            notificationCategories.emergencyAlerts ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
+                                                notificationCategories.emergencyAlerts ? 'translate-x-5' : 'translate-x-0'
+                                            }`}
+                                        />
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </motion.div>
-                ) : (
+                )}
+
+                {/* Sub-view: Profile Details */}
+                {activeSubView === 'profile-details' && (
                     <motion.div
                         key="profile-details"
                         initial={{ opacity: 0, y: 8 }}
@@ -2981,13 +3460,16 @@ const ProfileView = ({
                                     {/* Avatar with Camera Upload Overlay & Touch Badge */}
                                     <div className="relative group">
                                         <div className={`w-36 h-36 rounded-full font-black flex items-center justify-center text-white text-5xl shadow-md border-2 border-slate-200 dark:border-slate-800 relative overflow-hidden transition-transform duration-200 group-hover:scale-[1.02] ${
-                                            user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-900' : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
+                                            user.avatarPhoto
+                                                ? 'bg-slate-100 dark:bg-slate-800'
+                                                : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
                                         }`}>
-                                            {user.avatarPhoto ? (
-                                                <img src={user.avatarPhoto} alt={user.fullName} className="w-full h-full object-cover" />
-                                            ) : (
-                                                user.avatar
-                                            )}
+                                            <UserAvatar
+                                                avatarUrl={user.avatarPhoto}
+                                                updatedAt={user.updatedAt}
+                                                fallbackInitial={user.avatar || 'R'}
+                                                alt={user.fullName || 'Resident'}
+                                            />
 
                                             {/* Hover Upload Overlay */}
                                             <button
@@ -3292,56 +3774,57 @@ const ProfileView = ({
             )}
 
             {/* Logout Confirmation Dialog */}
-            <AnimatePresence>
-                {isLogoutConfirmOpen && (
-                    <div
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
-                        onClick={() => setIsLogoutConfirmOpen(false)}
-                    >
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            role="alertdialog"
-                            aria-modal="true"
-                            aria-labelledby="logout-title"
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4"
-                        >
-                            <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 flex items-center justify-center text-red-600 dark:text-red-400 mx-auto">
-                                <LogOut size={22} />
-                            </div>
-                            <div className="text-center space-y-1">
-                                <h3 id="logout-title" className="text-base font-bold text-slate-900 dark:text-white">
-                                    Are you sure you want to log out?
-                                </h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    You will need to sign in again to file new reports and track your civic tickets.
-                                </p>
-                            </div>
-                            <div className="flex gap-2.5 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsLogoutConfirmOpen(false)}
-                                    className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[44px]"
+            {typeof document !== 'undefined' &&
+                createPortal(
+                    <AnimatePresence>
+                        {isLogoutConfirmOpen && (
+                            <div
+                                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+                                onClick={() => setIsLogoutConfirmOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    role="alertdialog"
+                                    aria-modal="true"
+                                    aria-labelledby="logout-title"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 text-center select-none"
                                 >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsLogoutConfirmOpen(false);
-                                        if (handleLogout) handleLogout();
-                                    }}
-                                    className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer shadow-sm shadow-red-500/20 min-h-[44px]"
-                                >
-                                    Log Out
-                                </button>
+                                    <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 flex items-center justify-center text-red-600 dark:text-red-400 mx-auto">
+                                        <LogOut size={22} />
+                                    </div>
+                                    <div>
+                                        <h3 id="logout-title" className="text-base font-bold text-slate-900 dark:text-white">
+                                            Are you sure you want to sign out?
+                                        </h3>
+                                    </div>
+                                    <div className="flex gap-2.5 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLogoutConfirmOpen(false)}
+                                            className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[44px]"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsLogoutConfirmOpen(false);
+                                                if (handleLogout) handleLogout();
+                                            }}
+                                            className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer shadow-sm shadow-red-500/20 min-h-[44px]"
+                                        >
+                                            Sign Out
+                                        </button>
+                                    </div>
+                                </motion.div>
                             </div>
-                        </motion.div>
-                    </div>
+                        )}
+                    </AnimatePresence>,
+                    document.body
                 )}
-            </AnimatePresence>
 
             {/* Rate App Interactive Feedback Modal */}
             <AnimatePresence>
@@ -3482,6 +3965,263 @@ const ProfileView = ({
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Language Modal (Centered on Mobile & Desktop) */}
+            {typeof document !== 'undefined' &&
+                createPortal(
+                    <AnimatePresence>
+                        {isLanguageSheetOpen && (
+                            <div
+                                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+                                onClick={() => setIsLanguageSheetOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.15 }}
+                                    role="dialog"
+                                    aria-modal="true"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 relative"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                                Select Language
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                Choose your preferred display language
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLanguageSheetOpen(false)}
+                                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                                            aria-label="Close"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSelectLanguage('en')}
+                                            className={`w-full p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                                                !isFilipino
+                                                    ? 'border-orange-500 bg-orange-500/10 dark:bg-orange-500/15'
+                                                    : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                                            }`}
+                                        >
+                                            <div>
+                                                <div className="text-sm font-bold text-slate-900 dark:text-white">
+                                                    English
+                                                </div>
+                                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                                    Default (United States)
+                                                </div>
+                                            </div>
+                                            {!isFilipino && (
+                                                <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0">
+                                                    <Check size={14} strokeWidth={3} />
+                                                </div>
+                                            )}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSelectLanguage('tl')}
+                                            className={`w-full p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                                                isFilipino
+                                                    ? 'border-orange-500 bg-orange-500/10 dark:bg-orange-500/15'
+                                                    : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                                            }`}
+                                        >
+                                            <div>
+                                                <div className="text-sm font-bold text-slate-900 dark:text-white">
+                                                    Filipino
+                                                </div>
+                                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                                    Tagalog
+                                                </div>
+                                            </div>
+                                            {isFilipino && (
+                                                <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0">
+                                                    <Check size={14} strokeWidth={3} />
+                                                </div>
+                                            )}
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </div>
+                        )}
+                    </AnimatePresence>,
+                    document.body
+                )}
+
+            {/* Theme & Appearance Modal (Centered on Mobile & Desktop) */}
+            {typeof document !== 'undefined' &&
+                createPortal(
+                    <AnimatePresence>
+                        {isThemeSheetOpen && (
+                            <div
+                                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+                                onClick={() => setIsThemeSheetOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.15 }}
+                                    role="dialog"
+                                    aria-modal="true"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 relative"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                                Appearance
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                Select your interface theme
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsThemeSheetOpen(false)}
+                                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                                            aria-label="Close"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+
+                                    {/* Accessible screen reader announcement for theme changes */}
+                                    <div className="sr-only" aria-live="polite" aria-atomic="true">
+                                        {themeAnnouncement}
+                                    </div>
+
+                                    <div
+                                        className="space-y-2 pt-1"
+                                        role="radiogroup"
+                                        aria-label="Select interface theme"
+                                    >
+                                        {[
+                                            { id: 'system', label: 'Match my phone', desc: 'Sync with system daylight & night mode', icon: Monitor },
+                                            { id: 'light', label: 'Light', desc: 'Morning Field Sheet — crisp mineral canvas', icon: Sun },
+                                            { id: 'dark', label: 'Dark', desc: 'Night Inspection — deep survey slate & high contrast', icon: Moon }
+                                        ].map((item) => {
+                                            const ItemIcon = item.icon;
+                                            const isSelected = theme === item.id;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    role="radio"
+                                                    aria-checked={isSelected}
+                                                    tabIndex={0}
+                                                    onClick={() => handleSelectTheme(item.id)}
+                                                    className={`w-full p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                                                        isSelected
+                                                            ? 'border-orange-500 bg-orange-500/10 dark:bg-orange-500/15'
+                                                            : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <ItemIcon size={18} className={isSelected ? 'text-orange-500' : 'text-slate-400'} />
+                                                        <div>
+                                                            <div className="text-sm font-bold text-slate-900 dark:text-white">
+                                                                {item.label}
+                                                            </div>
+                                                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                                                {item.desc}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0">
+                                                            <Check size={14} strokeWidth={3} />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </motion.div>
+                            </div>
+                        )}
+                    </AnimatePresence>,
+                    document.body
+                )}
+
+            {/* About PULSO Modal */}
+            {typeof document !== 'undefined' &&
+                createPortal(
+                    <AnimatePresence>
+                        {isAboutModalOpen && (
+                            <div
+                                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+                                onClick={() => setIsAboutModalOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    role="dialog"
+                                    aria-modal="true"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 relative"
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAboutModalOpen(false)}
+                                        className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg cursor-pointer"
+                                        aria-label="Close"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                    <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-950/50 border border-orange-200 dark:border-orange-900/60 flex items-center justify-center text-orange-500 mx-auto">
+                                        <Landmark size={24} />
+                                    </div>
+                                    <div className="text-center space-y-1">
+                                        <h3 className="text-base font-bold text-slate-900 dark:text-white">PULSO</h3>
+                                        <p className="text-xs font-semibold text-orange-600 dark:text-orange-400">
+                                            Version v2.4.0
+                                        </p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            City Engineering Department Management System
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2 pt-1 text-left text-xs">
+                                        <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                            <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Authority</div>
+                                            <div className="font-semibold text-slate-800 dark:text-slate-200">Local Government Unit of Caloocan City</div>
+                                        </div>
+                                        <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                            <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Department</div>
+                                            <div className="font-semibold text-slate-800 dark:text-slate-200">City Engineering Department (CED)</div>
+                                        </div>
+                                        <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-0.5">
+                                            <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Release Info</div>
+                                            <div className="text-slate-700 dark:text-slate-300">Production Build • October 2026</div>
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400">Civic Aperture Architecture v0.2</div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAboutModalOpen(false)}
+                                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[44px]"
+                                    >
+                                        Close
+                                    </button>
+                                </motion.div>
+                            </div>
+                        )}
+                    </AnimatePresence>,
+                    document.body
+                )}
         </motion.div>
     );
 };
@@ -3491,6 +4231,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
     const [changing, setChanging] = useState(false);
     const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
     const residentEmail = user?.email || 'alexismarcaida@gmail.com';
 
@@ -3703,7 +4444,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
 
                     <button
                         type="button"
-                        onClick={handleLogout}
+                        onClick={() => setIsLogoutConfirmOpen(true)}
                         className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase tracking-wider transition-all shadow-xs cursor-pointer active:scale-95"
                     >
                         <LogOut size={15} />
@@ -4196,6 +4937,62 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Sign Out Confirmation Modal */}
+            {typeof document !== 'undefined' &&
+                createPortal(
+                    <AnimatePresence>
+                        {isLogoutConfirmOpen && (
+                            <div
+                                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+                                onClick={() => setIsLogoutConfirmOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    role="alertdialog"
+                                    aria-modal="true"
+                                    aria-labelledby="settings-logout-confirm-title"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 text-center select-none"
+                                >
+                                    <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 flex items-center justify-center text-red-600 dark:text-red-400 mx-auto">
+                                        <LogOut size={22} />
+                                    </div>
+                                    <div>
+                                        <h3
+                                            id="settings-logout-confirm-title"
+                                            className="text-base font-bold text-slate-900 dark:text-white"
+                                        >
+                                            Are you sure you want to sign out?
+                                        </h3>
+                                    </div>
+                                    <div className="flex gap-2.5 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLogoutConfirmOpen(false)}
+                                            className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[44px]"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsLogoutConfirmOpen(false);
+                                                if (handleLogout) handleLogout();
+                                            }}
+                                            className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer shadow-sm shadow-red-500/20 min-h-[44px]"
+                                        >
+                                            Sign Out
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </div>
+                        )}
+                    </AnimatePresence>,
+                    document.body
+                )}
 
         </motion.div>
     );
@@ -5614,74 +6411,13 @@ const ResidentModals = ({
                                             />
                                         )}
 
-                                        {/* ═══════════════════════════════════════════════════════════════════
-                                            AUTHORITATIVE BARANGAY JURISDICTION BOUNDARIES (ALL 188 BARANGAYS)
-                                            MATCHING GOVERNMENT DISPATCHER GIS MAP EXACTLY
-                                        ══════════════════════════════════════════════════════════════════════ */}
-                                        {memoizedBarangayPolygons && memoizedBarangayPolygons.length > 0 ? (
-                                            memoizedBarangayPolygons.map((b) => (
-                                                b.paths.map((p, pi) => (
-                                                    <PolygonF
-                                                        key={`resident-brgy-${b.id}-${pi}`}
-                                                        paths={p}
-                                                        options={b.isNorth ? northPolygonOptions : southPolygonOptions}
-                                                    />
-                                                ))
-                                            ))
-                                        ) : (
-                                            /* Fallback boundary outlines if borderData has no features */
-                                            <>
-                                                <PolygonF
-                                                    key="resident-district-border-north"
-                                                    paths={NORTH_CALOOCAN_PATH}
-                                                    options={northPolygonOptions}
-                                                />
-                                                <PolygonF
-                                                    key="resident-district-border-south"
-                                                    paths={SOUTH_CALOOCAN_PATH}
-                                                    options={southPolygonOptions}
-                                                />
-                                            </>
-                                        )}
-
-                                        {/* North Caloocan District Centroid Label */}
-                                        <MarkerF
-                                            position={NORTH_CALOOCAN_CENTROID}
-                                            zIndex={110}
-                                            options={{
-                                                clickable: false,
-                                                optimized: true
-                                            }}
-                                            icon={window.google && window.google.maps ? {
-                                                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="134" height="32" viewBox="0 0 134 32">
-                                                        <rect x="2" y="2" width="130" height="28" rx="8" fill="#0c1424" fill-opacity="0.92" stroke="#ff6b00" stroke-width="1.5" />
-                                                        <circle cx="16" cy="16" r="4" fill="#ff6b00" />
-                                                        <text x="70" y="20" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.3">NORTH CALOOCAN</text>
-                                                    </svg>
-                                                `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                                anchor: new window.google.maps.Point(67, 16)
-                                            } : undefined}
-                                        />
-
-                                        {/* South Caloocan District Centroid Label */}
-                                        <MarkerF
-                                            position={SOUTH_CALOOCAN_CENTROID}
-                                            zIndex={110}
-                                            options={{
-                                                clickable: false,
-                                                optimized: true
-                                            }}
-                                            icon={window.google && window.google.maps ? {
-                                                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="134" height="32" viewBox="0 0 134 32">
-                                                        <rect x="2" y="2" width="130" height="28" rx="8" fill="#0c1424" fill-opacity="0.92" stroke="#ff6b00" stroke-width="1.5" />
-                                                        <circle cx="16" cy="16" r="4" fill="#ff6b00" />
-                                                        <text x="70" y="20" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.3">SOUTH CALOOCAN</text>
-                                                    </svg>
-                                                `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                                anchor: new window.google.maps.Point(67, 16)
-                                            } : undefined}
+                                        {/* Authoritative Shared Dual-Sector Caloocan Boundary Layer */}
+                                        <CaloocanBoundaryLayer
+                                            activeSector={activeSector}
+                                            onSectorClick={(sector) => setActiveSector(sector)}
+                                            isDarkMode={theme === 'dark'}
+                                            showBarangays={true}
+                                            showLabels={true}
                                         />
 
                                         {/* Caloocan City Hall North HQ Pin (Castle Icon) */}
@@ -6488,12 +7224,17 @@ const TopNavigation = ({
     processedHazards = [],
     setSelectedPost,
     setSelectedHazard,
-    setReportStatusFilter,
-    token
+    token,
+    isSearchOpen: controlledIsSearchOpen,
+    setIsSearchOpen: controlledSetIsSearchOpen,
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+    const [internalIsSearchOpen, setInternalIsSearchOpen] = useState(false);
+    const isSearchOpen = controlledIsSearchOpen !== undefined ? controlledIsSearchOpen : internalIsSearchOpen;
+    const setIsSearchOpen = (val) => {
+        setInternalIsSearchOpen(val);
+        controlledSetIsSearchOpen?.(val);
+    };
     const [recentSearches, setRecentSearches] = useState(() => {
         try {
             const saved = localStorage.getItem('pulso_recent_searches');
@@ -6505,9 +7246,47 @@ const TopNavigation = ({
 
     const searchRef = useRef(null);
     const searchInputRef = useRef(null);
+    const [searchPillWidth, setSearchPillWidth] = useState(240);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const userMenuTimeoutRef = useRef(null);
     const userMenuRef = useRef(null);
+
+    useEffect(() => {
+        if (!searchRef.current || typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                if (entry.contentRect?.width) {
+                    setSearchPillWidth(entry.contentRect.width);
+                }
+            }
+        });
+        observer.observe(searchRef.current);
+        return () => observer.disconnect();
+    }, []);
+
+    // Mobile scroll-direction detection: collapse search Row 2 on scroll-down, restore on scroll-up
+    const [isScrolledDown, setIsScrolledDown] = useState(false);
+    const lastScrollYRef = useRef(0);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentY = window.scrollY || document.documentElement.scrollTop;
+            if (isSearchOpen) {
+                setIsScrolledDown(false);
+                lastScrollYRef.current = currentY;
+                return;
+            }
+            if (currentY > 60 && currentY > lastScrollYRef.current + 6) {
+                setIsScrolledDown(true);
+            } else if (currentY < lastScrollYRef.current - 6 || currentY <= 25) {
+                setIsScrolledDown(false);
+            }
+            lastScrollYRef.current = currentY;
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [isSearchOpen]);
 
     const saveRecentSearch = (query) => {
         if (!query || !query.trim()) return;
@@ -6564,13 +7343,13 @@ const TopNavigation = ({
 
     // 1. Navigation & Quick Actions
     const quickActions = [
-        { label: 'File Infrastructure Report', category: 'Action', icon: <Camera size={16} />, onClick: () => { handleSetModal('file-report'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('File Report'); } },
-        { label: 'Barangay Hazard Map', category: 'Action', icon: <MapIcon size={16} />, onClick: () => { handleSetModal('map'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('Barangay Map'); } },
-        { label: 'LGU Online Services', category: 'Action', icon: <Handshake size={16} />, onClick: () => { handleSetModal('services'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('LGU Services'); } },
-        { label: 'Knowledge Base & Guides', category: 'Action', icon: <BookOpen size={16} />, onClick: () => { handleSetModal('knowledge'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('Knowledge Base'); } },
-        { label: 'My Report History', category: 'Navigation', icon: <FileText size={16} />, onClick: () => { handleSetTab('reports'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('My Reports'); } },
-        { label: 'My Profile & Account', category: 'Navigation', icon: <User size={16} />, onClick: () => { handleSetTab('profile'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('My Profile'); } },
-        { label: 'Account Settings & Security', category: 'Navigation', icon: <Settings size={16} />, onClick: () => { handleSetTab('settings'); setIsSearchOpen(false); setIsMobileSearchOpen(false); saveRecentSearch('Settings'); } },
+        { label: 'File infrastructure report', category: 'Action', icon: <Camera size={16} />, onClick: () => { handleSetModal('file-report'); setIsSearchOpen(false); saveRecentSearch('File infrastructure report'); } },
+        { label: 'Barangay hazard map', category: 'Action', icon: <MapIcon size={16} />, onClick: () => { handleSetModal('map'); setIsSearchOpen(false); saveRecentSearch('Barangay hazard map'); } },
+        { label: 'City services', category: 'Action', icon: <Handshake size={16} />, onClick: () => { handleSetModal('services'); setIsSearchOpen(false); saveRecentSearch('City services'); } },
+        { label: 'Help guides', category: 'Action', icon: <BookOpen size={16} />, onClick: () => { handleSetModal('knowledge'); setIsSearchOpen(false); saveRecentSearch('Help guides'); } },
+        { label: 'My Report History', category: 'Navigation', icon: <FileText size={16} />, onClick: () => { handleSetTab('reports'); setIsSearchOpen(false); saveRecentSearch('My Reports'); } },
+        { label: 'My Profile & Account', category: 'Navigation', icon: <User size={16} />, onClick: () => { handleSetTab('profile'); setIsSearchOpen(false); saveRecentSearch('My Profile'); } },
+        { label: 'Account Settings & Security', category: 'Navigation', icon: <Settings size={16} />, onClick: () => { handleSetTab('settings'); setIsSearchOpen(false); saveRecentSearch('Settings'); } },
     ];
 
     const matchedActions = q ? quickActions.filter(a => a.label.toLowerCase().includes(q)) : [];
@@ -6616,7 +7395,6 @@ const TopNavigation = ({
         if (setReportStatusFilter) setReportStatusFilter('all');
         handleSetTab('reports');
         setIsSearchOpen(false);
-        setIsMobileSearchOpen(false);
         if (showToast) showToast(`Navigating to report: ${r.ticket_id}`);
     };
 
@@ -6625,45 +7403,54 @@ const TopNavigation = ({
         if (setSelectedPost) setSelectedPost(adv);
         handleSetModal('post-details');
         setIsSearchOpen(false);
-        setIsMobileSearchOpen(false);
     };
 
     const handleSelectHotline = (h) => {
         saveRecentSearch(h.name);
         handleSetModal(`calling-${h.name}`);
         setIsSearchOpen(false);
-        setIsMobileSearchOpen(false);
     };
 
     const handleSelectKB = (kb) => {
         saveRecentSearch(kb.title);
         handleSetModal('knowledge');
         setIsSearchOpen(false);
-        setIsMobileSearchOpen(false);
     };
 
     const renderSearchDropdown = (isMobile = false) => (
-        <div className={`w-full ${isMobile ? 'p-1 sm:p-2' : 'max-h-[75vh] overflow-y-auto custom-scrollbar p-2'} divide-y divide-slate-100 dark:divide-slate-800/80`}>
+        <div className={`w-full ${isMobile ? 'p-2' : 'max-h-[calc(100dvh-5rem)] overflow-y-auto custom-scrollbar p-3'} divide-y divide-slate-100 dark:divide-slate-800/80`}>
             {/* If Query is Empty -> Show Shortcuts and Recent Searches */}
             {!q ? (
                 <div>
                     {recentSearches.length > 0 && (
-                        <div className="p-2 mb-2">
-                            <div className="flex items-center justify-between px-2 py-1 mb-1">
-                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Recent Searches</span>
-                                <button onClick={clearAllRecent} className="text-[11px] text-slate-400 hover:text-rose-500 transition-colors">Clear all</button>
+                        <div className="p-1 mb-2">
+                            <div className="flex items-center justify-between px-1 py-1 mb-2">
+                                <span className="text-[13px] font-semibold text-slate-500 dark:text-slate-400">Recent searches</span>
+                                <button
+                                    type="button"
+                                    onClick={clearAllRecent}
+                                    className="min-h-[48px] px-2 text-[13px] font-medium text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 flex items-center transition-colors cursor-pointer"
+                                >
+                                    Clear all
+                                </button>
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-wrap gap-2">
                                 {recentSearches.map((item, idx) => (
                                     <div
                                         key={idx}
                                         onClick={() => setSearchQuery(item)}
-                                        className="group inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-orange-50 dark:hover:bg-orange-950/40 text-slate-700 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 rounded-lg text-xs font-medium cursor-pointer transition-colors border border-slate-200/60 dark:border-slate-700/60"
+                                        className="group inline-flex items-center gap-2 min-h-[48px] pl-3.5 pr-1.5 bg-slate-100 dark:bg-slate-800/80 hover:bg-orange-50 dark:hover:bg-orange-950/40 text-slate-700 dark:text-slate-200 hover:text-orange-600 dark:hover:text-orange-400 rounded-xl text-[14px] font-normal cursor-pointer transition-colors border border-slate-200/70 dark:border-slate-700/70"
                                     >
-                                        <Clock size={12} className="text-slate-400 group-hover:text-orange-500" />
+                                        <Clock size={15} className="text-slate-400 group-hover:text-orange-500 shrink-0" />
                                         <span>{item}</span>
-                                        <button onClick={(e) => removeRecentSearch(e, item)} className="ml-1 text-slate-400 hover:text-rose-500 transition-colors">
-                                            <X size={12} />
+                                        <button
+                                            type="button"
+                                            onClick={(e) => removeRecentSearch(e, item)}
+                                            className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer ml-1"
+                                            title={`Remove ${item}`}
+                                            aria-label={`Remove ${item}`}
+                                        >
+                                            <X size={15} />
                                         </button>
                                     </div>
                                 ))}
@@ -6671,19 +7458,23 @@ const TopNavigation = ({
                         </div>
                     )}
 
-                    <div className="p-2">
-                        <div className="px-2 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Quick Shortcuts</div>
+                    <div className="p-1">
+                        <div className="px-1 py-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Quick shortcuts</div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                             {quickActions.slice(0, 4).map((action, idx) => (
                                 <button
                                     key={idx}
+                                    type="button"
                                     onClick={action.onClick}
-                                    className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition-colors text-slate-700 dark:text-slate-200 group"
+                                    className="flex items-center gap-3.5 px-3 min-h-[48px] py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors text-slate-800 dark:text-slate-200 group cursor-pointer"
                                 >
-                                    <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0 group-hover:bg-orange-500 group-hover:text-white transition-colors">
-                                        {action.icon}
-                                    </div>
-                                    <span className="text-xs font-semibold">{action.label}</span>
+                                    <span className="text-slate-400 group-hover:text-[#ff6b00] transition-colors shrink-0 flex items-center justify-center">
+                                        {idx === 0 && <Camera size={24} strokeWidth={1.75} />}
+                                        {idx === 1 && <MapIcon size={24} strokeWidth={1.75} />}
+                                        {idx === 2 && <Handshake size={24} strokeWidth={1.75} />}
+                                        {idx === 3 && <BookOpen size={24} strokeWidth={1.75} />}
+                                    </span>
+                                    <span className="text-[14px] sm:text-[15px] font-medium text-slate-800 dark:text-slate-100 group-hover:text-[#ff6b00] transition-colors">{action.label}</span>
                                 </button>
                             ))}
                         </div>
@@ -6694,29 +7485,30 @@ const TopNavigation = ({
                     <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-400">
                         <Search size={22} />
                     </div>
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">No results found for "{searchQuery}"</p>
-                    <p className="text-xs text-slate-500 mt-1">Try searching for ticket IDs, barangay locations, or service hotlines.</p>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">No results. Try a different word.</p>
+                    <p className="text-xs text-slate-500 mt-1">Try searching for ticket IDs, barangay locations, or services.</p>
                 </div>
             ) : (
                 <div className="space-y-3 p-1">
-                    {/* Quick Actions */}
+                    {/* Quick Shortcuts */}
                     {matchedActions.length > 0 && (
                         <div className="pt-2">
-                            <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Features & Navigation</div>
+                            <div className="px-2 py-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400">Guides</div>
                             <div className="space-y-1 mt-1">
                                 {matchedActions.map((action, idx) => (
                                     <button
                                         key={idx}
+                                        type="button"
                                         onClick={action.onClick}
-                                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition-colors group"
+                                        className="w-full flex items-center justify-between px-3 min-h-[48px] py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors group cursor-pointer"
                                     >
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-7 h-7 rounded-lg bg-orange-50 dark:bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-slate-400 group-hover:text-[#ff6b00] transition-colors shrink-0">
                                                 {action.icon}
-                                            </div>
-                                            <span className="text-xs font-semibold text-slate-900 dark:text-white">{action.label}</span>
+                                            </span>
+                                            <span className="text-[14px] font-medium text-slate-900 dark:text-white">{action.label}</span>
                                         </div>
-                                        <ArrowRight size={14} className="text-slate-400 group-hover:text-orange-500 group-hover:translate-x-1 transition-all" />
+                                        <ArrowRight size={16} className="text-slate-400 group-hover:text-orange-500 group-hover:translate-x-1 transition-all" />
                                     </button>
                                 ))}
                             </div>
@@ -6726,54 +7518,56 @@ const TopNavigation = ({
                     {/* Reports */}
                     {matchedReports.length > 0 && (
                         <div className="pt-2">
-                            <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Your Reports</div>
+                            <div className="px-2 py-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400">Reports</div>
                             <div className="space-y-1 mt-1">
                                 {matchedReports.map((r) => (
                                     <button
                                         key={r.id}
+                                        type="button"
                                         onClick={() => handleSelectReport(r)}
-                                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition-colors group"
+                                        className="w-full flex items-center justify-between px-3 min-h-[48px] py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors group cursor-pointer"
                                     >
-                                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-                                                <FileText size={14} />
+                                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                                            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                                                <FileText size={16} />
                                             </div>
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-slate-900 dark:text-white truncate">{r.category || r.ai_category}</span>
-                                                    <span className="font-mono text-[10px] text-slate-400">{r.ticket_id}</span>
+                                                    <span className="text-sm font-semibold text-slate-900 dark:text-white truncate">{r.category || r.ai_category}</span>
+                                                    <span className="font-mono text-[11px] text-slate-400">{r.ticket_id}</span>
                                                 </div>
-                                                <div className="text-[11px] text-slate-500 truncate">{r.location_string || 'No location specified'}</div>
+                                                <div className="text-xs text-slate-500 truncate">{r.location_string || 'No location specified'}</div>
                                             </div>
                                         </div>
-                                        <ArrowRight size={14} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all shrink-0" />
+                                        <ArrowRight size={16} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all shrink-0" />
                                     </button>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* Advisories */}
+                    {/* Places & Advisories */}
                     {matchedAdvisories.length > 0 && (
                         <div className="pt-2">
-                            <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Official Announcements</div>
+                            <div className="px-2 py-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400">Places</div>
                             <div className="space-y-1 mt-1">
                                 {matchedAdvisories.map((adv) => (
                                     <button
                                         key={adv.id}
+                                        type="button"
                                         onClick={() => handleSelectAdvisory(adv)}
-                                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition-colors group"
+                                        className="w-full flex items-center justify-between px-3 min-h-[48px] py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors group cursor-pointer"
                                     >
-                                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                                                <Bell size={14} />
+                                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                                            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                                                <Bell size={16} />
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{adv.title}</p>
-                                                <p className="text-[11px] text-slate-500 truncate">{adv.department} • {adv.category}</p>
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{adv.title}</p>
+                                                <p className="text-xs text-slate-500 truncate">{adv.department} • {adv.category}</p>
                                             </div>
                                         </div>
-                                        <ArrowRight size={14} className="text-slate-400 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all shrink-0" />
+                                        <ArrowRight size={16} className="text-slate-400 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all shrink-0" />
                                     </button>
                                 ))}
                             </div>
@@ -6783,21 +7577,22 @@ const TopNavigation = ({
                     {/* Hotlines */}
                     {matchedHotlines.length > 0 && (
                         <div className="pt-2">
-                            <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Emergency Hotlines</div>
+                            <div className="px-2 py-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400">Hotlines</div>
                             <div className="space-y-1 mt-1">
                                 {matchedHotlines.map((h, idx) => (
                                     <button
                                         key={idx}
+                                        type="button"
                                         onClick={() => handleSelectHotline(h)}
-                                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition-colors group"
+                                        className="w-full flex items-center justify-between px-3 min-h-[48px] py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors group cursor-pointer"
                                     >
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
-                                                <PhoneCall size={14} />
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+                                                <PhoneCall size={16} />
                                             </div>
                                             <div>
-                                                <p className="text-xs font-bold text-slate-900 dark:text-white">{h.name}</p>
-                                                <p className="text-[11px] text-slate-500">{h.tags}</p>
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">{h.name}</p>
+                                                <p className="text-xs text-slate-500">{h.tags}</p>
                                             </div>
                                         </div>
                                         <span className="font-mono text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 px-2 py-1 rounded-lg">
@@ -6809,27 +7604,28 @@ const TopNavigation = ({
                         </div>
                     )}
 
-                    {/* Knowledge Base */}
+                    {/* Guides & Knowledge Base */}
                     {matchedKB.length > 0 && (
                         <div className="pt-2">
-                            <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Knowledge Base Guides</div>
+                            <div className="px-2 py-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400">Guides</div>
                             <div className="space-y-1 mt-1">
                                 {matchedKB.map((kb) => (
                                     <button
                                         key={kb.id}
+                                        type="button"
                                         onClick={() => handleSelectKB(kb)}
-                                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition-colors group"
+                                        className="w-full flex items-center justify-between px-3 min-h-[48px] py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors group cursor-pointer"
                                     >
-                                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                            <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
-                                                <BookOpen size={14} />
+                                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                                            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
+                                                <BookOpen size={16} />
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{kb.title}</p>
-                                                <p className="text-[11px] text-slate-500 truncate">{kb.excerpt}</p>
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{kb.title}</p>
+                                                <p className="text-xs text-slate-500 truncate">{kb.excerpt}</p>
                                             </div>
                                         </div>
-                                        <span className="text-[10px] font-bold text-indigo-500 shrink-0">{kb.category}</span>
+                                        <span className="text-[11px] font-bold text-indigo-500 shrink-0">{kb.category}</span>
                                     </button>
                                 ))}
                             </div>
@@ -6841,329 +7637,278 @@ const TopNavigation = ({
     );
 
     return (
-        <header className="shrink-0 sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800 transition-colors">
-            <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-1 sm:gap-2">
+        <header className="shrink-0 sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800 transition-colors pt-[env(safe-area-inset-top,0px)]">
+            {/* Background 60% Navy Overlay on mobile when search is open: strictly starts below full header */}
+            <AnimatePresence>
+                {isSearchOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="fixed inset-x-0 bottom-0 top-[100%] bg-slate-950/60 backdrop-blur-xs z-30 pointer-events-auto"
+                        onClick={() => {
+                            setIsSearchOpen(false);
+                            searchInputRef.current?.blur();
+                        }}
+                    />
+                )}
+            </AnimatePresence>
 
-                {/* Left Area: Municipal Branding */}
-                <div className="flex items-center shrink-0">
-                    <a
-                        href="/dashboard"
-                        className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl shrink-0 cursor-pointer"
-                        onClick={(e) => { e.preventDefault(); handleSetTab('overview'); }}
-                        aria-label="Caloocan City - City Engineering Department - Powered by PULSO"
+            <div className="max-w-[1600px] mx-auto px-2.5 sm:px-4 lg:px-6 relative">
+                {/* 
+                  Single-row header across all views (mobile app and desktop).
+                  From left to right:
+                  1. Official Brand Lockup (Seal + CALOOCAN CITY / City Engineering Department / powered by: PULSO)
+                  2. Searchbar right beside branding name (Q Search PULSO)
+                  3. Notifications Bell + User Profile Avatar
+                */}
+                <div className="flex items-center justify-between gap-1.5 xs:gap-2 sm:gap-4 md:gap-6 h-14 sm:h-16 py-1 sm:py-0">
+
+                    {/* ── ZONE 1: BRAND BLOCK ── */}
+                    <div className={`items-center shrink-0 min-w-0 pr-0.5 sm:pr-1 ${isSearchOpen ? 'hidden md:flex' : 'flex'}`}>
+                        <a
+                            href="/dashboard"
+                            className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl cursor-pointer min-w-0"
+                            onClick={(e) => { e.preventDefault(); handleSetTab('overview'); }}
+                            aria-label="PULSO home, Caloocan City Engineering Department"
+                        >
+                            <Branding showText={true} />
+                        </a>
+                    </div>
+
+                    {/* ── ZONE 2: SEARCH BAR (Right beside branding name; expands to full-width top bar on mobile when clicked) ── */}
+                    <div
+                        role="search"
+                        className={`relative transition-all duration-150 ${
+                            isSearchOpen
+                                ? 'w-full max-w-full mx-0 md:flex-1 md:max-w-[560px] md:mx-4'
+                                : 'flex-1 min-w-[100px] xs:min-w-[120px] max-w-[480px] mx-1 sm:mx-2 md:mx-4'
+                        }`}
+                        ref={searchRef}
                     >
-                        <Branding size="h-7 w-7 xs:h-8 xs:w-8 sm:h-10 sm:w-10" showText={true} />
-                    </a>
-                </div>
-
-                {/* Search Bar (Centered on Mobile, Left-aligned on Desktop) */}
-                <div className="flex-1 flex justify-center md:justify-start items-center min-w-0 px-1 sm:px-3 md:pl-6 lg:pl-8" ref={searchRef}>
-                    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-full items-center px-2.5 xs:px-3 sm:px-3.5 py-1.5 sm:py-2 border border-transparent focus-within:border-slate-300 dark:focus-within:border-slate-600 focus-within:ring-2 focus-within:ring-slate-200 dark:focus-within:ring-slate-700/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all w-full max-w-[170px] xs:max-w-[210px] sm:max-w-[320px] md:max-w-[390px] lg:max-w-[460px] relative shadow-xs">
-                        {isSearchOpen ? (
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setIsSearchOpen(false);
-                                    if (searchInputRef.current) {
-                                        searchInputRef.current.blur();
-                                    }
-                                }}
-                                className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors p-0.5 -ml-1 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-700 cursor-pointer shrink-0 flex items-center justify-center active:scale-95"
-                                title="Close search"
-                                aria-label="Close search"
-                            >
-                                <ChevronLeft size={16} strokeWidth={2.5} className="sm:w-[17px] sm:h-[17px]" />
-                            </button>
-                        ) : (
-                            <Search size={14} className="text-slate-400 shrink-0 sm:w-[15px] sm:h-[15px]" />
-                        )}
-                        <input
-                            ref={searchInputRef}
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => { setSearchQuery(e.target.value); setIsSearchOpen(true); }}
-                            onFocus={() => setIsSearchOpen(true)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Escape') {
-                                    setIsSearchOpen(false);
-                                    searchInputRef.current?.blur();
+                        {/* Search Input Container */}
+                        <div
+                            className={`flex items-center transition-all duration-150 rounded-full bg-slate-100/90 dark:bg-[#0c1424] relative group w-full ${
+                                isSearchOpen
+                                    ? 'h-10 sm:h-10 border-2 border-[#ff6b00] ring-0 px-2 sm:px-3'
+                                    : 'h-8.5 sm:h-10 border border-slate-300 dark:border-slate-800 px-2.5 sm:px-3 hover:border-slate-400 dark:hover:border-slate-700'
+                            }`}
+                            style={{ outline: 'none' }}
+                            onClick={() => {
+                                if (!isSearchOpen) {
+                                    setIsSearchOpen(true);
+                                    searchInputRef.current?.focus();
                                 }
                             }}
-                            placeholder={t('dashboard.topNav.searchPlaceholder', { defaultValue: 'Search PULSO...' })}
-                            className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-[10.5px] xs:text-[11px] sm:text-xs md:text-sm ml-1.5 sm:ml-2 w-full text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-medium whitespace-nowrap"
-                            style={{ outline: 'none', boxShadow: 'none' }}
-                        />
-                        {searchQuery && (
-                            <button
-                                onClick={() => setSearchQuery('')}
-                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 shrink-0"
-                            >
-                                <X size={13} />
-                            </button>
-                        )}
+                        >
+                            {/* Dynamic Leading Icon: Search icon when inactive, Chevron button inside searchbar when active */}
+                            {isSearchOpen ? (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsSearchOpen(false);
+                                        setSearchQuery('');
+                                        searchInputRef.current?.blur();
+                                    }}
+                                    className="w-7 h-7 min-w-[28px] min-h-[28px] flex items-center justify-center text-[#ff6b00] hover:text-[#d94e00] dark:text-[#ff6b00] dark:hover:text-[#ff8533] rounded-full hover:bg-orange-500/10 dark:hover:bg-orange-500/20 active:scale-95 transition-all shrink-0 cursor-pointer -ml-1 mr-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                    title="Close search"
+                                    aria-label="Back / Close search"
+                                >
+                                    <ChevronLeft size={18} strokeWidth={2.6} />
+                                </button>
+                            ) : (
+                                <Search
+                                    size={16}
+                                    className="shrink-0 transition-colors mr-1.5 sm:mr-2 text-slate-400 dark:text-slate-400"
+                                />
+                            )}
 
-                        {/* Search Dropdown Popup */}
+                            {/* Input Field */}
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => { setSearchQuery(e.target.value); setIsSearchOpen(true); }}
+                                onFocus={() => setIsSearchOpen(true)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Escape') {
+                                        setIsSearchOpen(false);
+                                        setSearchQuery('');
+                                        searchInputRef.current?.blur();
+                                    }
+                                }}
+                                placeholder={t('dashboard.topNav.searchPlaceholder', { defaultValue: 'Search PULSO' })}
+                                aria-label="Search PULSO"
+                                className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-[13px] sm:text-[14px] font-normal flex-1 min-w-0 text-slate-900 dark:text-slate-100 placeholder:text-[13px] sm:placeholder:text-[14px] placeholder:font-normal placeholder-slate-400 dark:placeholder-slate-500 truncate caret-[#ff6b00]"
+                                style={{ outline: 'none', boxShadow: 'none' }}
+                            />
+
+                            {/* Clear (X) button - Visible only when searchQuery is present */}
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSearchQuery('');
+                                        searchInputRef.current?.focus();
+                                    }}
+                                    className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 shrink-0 cursor-pointer rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                                    title="Clear search query"
+                                    aria-label="Clear search"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Search Dropdown Popup: sits directly under search bar, full-width on mobile */}
                         <AnimatePresence>
                             {isSearchOpen && (
                                 <motion.div
-                                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                                    initial={{ opacity: 0, y: 6, scale: 0.99 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                                    exit={{ opacity: 0, y: 6, scale: 0.99 }}
                                     transition={{ duration: 0.15 }}
-                                    className="fixed inset-x-2.5 top-15 sm:absolute sm:top-12 sm:left-1/2 sm:-translate-x-1/2 md:left-0 md:translate-x-0 sm:inset-x-auto w-auto sm:w-[380px] lg:w-[460px] max-h-[75vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 text-slate-900 dark:text-white ring-1 ring-black/5"
+                                    className="fixed inset-x-2.5 top-[58px] sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 w-auto sm:w-[420px] md:w-[560px] max-h-[calc(100dvh-5rem)] overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 text-slate-900 dark:text-white ring-1 ring-black/5"
                                 >
                                     {renderSearchDropdown()}
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
-                </div>
 
-                {/* Right Area: Notifications */}
-                <div className="flex items-center justify-end gap-1 xs:gap-1.5 sm:gap-2.5 shrink-0">
-                    <div className="relative shrink-0">
-                        <button
-                            className="relative w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus:outline-none shrink-0"
-                            onClick={() => setShowNotifications(!showNotifications)}
-                            aria-label="Notifications"
-                        >
-                            <Bell size={14} className="sm:w-4 sm:h-4" />
-                            {notifications.length > 0 && notifications.some(n => !n.is_read && !n.is_hidden) && (
-                                <span className="absolute top-[4px] sm:top-[6px] right-[5px] sm:right-[8px] w-1.5 sm:w-2 h-1.5 sm:h-2 bg-red-500 rounded-full ring-2 ring-slate-100 dark:ring-slate-800"></span>
-                            )}
-                        </button>
+                    {/* ── ZONE 3: ACTIONS (Bell & Profile Photo) ── */}
+                    <div className={`items-center justify-end gap-1 sm:gap-2 shrink-0 ${isSearchOpen ? 'hidden md:flex' : 'flex'}`}>
+                        {/* Notifications Bell */}
+                        <div className="relative shrink-0">
+                            <button
+                                type="button"
+                                className="relative w-8.5 h-8.5 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] shrink-0 cursor-pointer"
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                aria-label="Notifications"
+                            >
+                                <Bell size={17} />
+                                {notifications.length > 0 && notifications.some(n => !n.is_read && !n.is_hidden) && (
+                                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+                                )}
+                            </button>
 
-                        <AnimatePresence>
-                            {showNotifications && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className="fixed sm:absolute top-14 sm:top-12 right-2 sm:right-0 w-[calc(100vw-1rem)] sm:w-[320px] max-w-[360px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 z-50 text-slate-900 dark:text-white"
-                                >
-                                    <div className="flex justify-between items-center mb-3 px-1">
-                                        <h3 className="font-bold text-base sm:text-lg">Notifications</h3>
-                                        <div className="flex items-center gap-3">
-                                            <button
-                                                onClick={handleMarkAllRead}
-                                                className="text-orange-500 text-xs font-bold hover:underline shrink-0"
-                                            >
-                                                Mark all read
-                                            </button>
-                                            <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1">
-                                                <X size={16} />
-                                            </button>
+                            <AnimatePresence>
+                                {showNotifications && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="fixed sm:absolute top-16 sm:top-14 right-2 sm:right-0 w-[calc(100vw-1rem)] sm:w-[320px] max-w-[360px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 z-50 text-slate-900 dark:text-white"
+                                    >
+                                        <div className="flex justify-between items-center mb-3 px-1">
+                                            <h3 className="font-bold text-base sm:text-lg">Notifications</h3>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={handleMarkAllRead}
+                                                    className="text-orange-500 text-xs font-bold hover:underline shrink-0"
+                                                >
+                                                    Mark all read
+                                                </button>
+                                                <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1" aria-label="Close notifications">
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="space-y-1 max-h-[350px] overflow-y-auto custom-scrollbar">
-                                        {notifications.filter(n => !n.is_hidden).length === 0 ? (
-                                             <div className="p-4 text-center text-sm text-slate-500">No new notifications</div>
-                                        ) : (
-                                            notifications.filter(n => !n.is_hidden).map(notification => (
-                                                <div key={notification.id} className="relative group block w-full">
-                                                    <button
-                                                        onClick={() => handleNotificationClick(notification)}
-                                                        className="w-full text-left p-2.5 sm:p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex gap-2.5 sm:gap-3 overflow-hidden pr-8"
-                                                    >
-                                                        <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
-                                                            <FileText size={16} />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white pr-2 truncate">{notification.title}</p>
-                                                            <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-0.5">{notification.message}</p>
-                                                            <span className="text-[10px] text-blue-500 font-bold mt-1 block">{new Date(notification.created_at).toLocaleString()}</span>
-                                                        </div>
-                                                        {!notification.is_read && (
-                                                            <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-3 right-3 group-hover:opacity-0 transition-opacity"></div>
-                                                        )}
-                                                    </button>
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_hidden: true } : n));
-                                                            try {
-                                                                const authToken = token || getAuthToken();
-                                                                await fetch(`${API_BASE_URL}/api/notifications/${notification.id}`, {
-                                                                    method: 'DELETE',
-                                                                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-                                                                });
-                                                            } catch (err) {
-                                                                console.error("Delete error:", err);
-                                                            }
-                                                        }}
-                                                        title="Dismiss notification"
-                                                        className="absolute top-2.5 right-1.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700 sm:opacity-0 sm:group-hover:opacity-100 transition-all z-10"
-                                                    >
-                                                        <X size={13} />
-                                                    </button>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                    <button onClick={() => { setShowNotifications(false); handleSetModal('all-notifications'); }} className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mt-2 py-2 border-t border-slate-100 dark:border-slate-800">See previous notifications</button>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-
-                    {/* User Profile Avatar with Hover & Click Sign Out Dropdown */}
-                    <div
-                        ref={userMenuRef}
-                        className="relative shrink-0"
-                        onMouseEnter={() => {
-                            if (userMenuTimeoutRef.current) clearTimeout(userMenuTimeoutRef.current);
-                            setShowUserMenu(true);
-                        }}
-                        onMouseLeave={() => {
-                            userMenuTimeoutRef.current = setTimeout(() => setShowUserMenu(false), 220);
-                        }}
-                    >
-                        <button
-                            type="button"
-                            onClick={() => setShowUserMenu(prev => !prev)}
-                            className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold text-[11px] sm:text-sm flex items-center justify-center text-white shadow-xs shrink-0 hover:opacity-95 hover:ring-2 hover:ring-orange-500/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer overflow-hidden"
-                            aria-label="User menu"
-                            aria-expanded={showUserMenu}
-                        >
-                            {user.avatarPhoto ? (
-                                <img src={user.avatarPhoto} alt={user.name} className="w-full h-full object-cover rounded-full" />
-                            ) : (
-                                user.avatar
-                            )}
-                        </button>
-
-                        <AnimatePresence>
-                            {showUserMenu && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                                    transition={{ duration: 0.15 }}
-                                    className="absolute top-11 sm:top-12 right-0 w-60 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/90 dark:border-slate-800 p-2 z-50 text-slate-900 dark:text-white ring-1 ring-black/5"
-                                >
-                                    {/* User Identity Snapshot */}
-                                    <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 mb-1 border border-slate-100 dark:border-slate-800/80">
-                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 font-bold text-xs flex items-center justify-center text-white shrink-0 shadow-xs overflow-hidden">
-                                            {user.avatarPhoto ? (
-                                                <img src={user.avatarPhoto} alt={user.name} className="w-full h-full object-cover rounded-full" />
+                                        <div className="space-y-1 max-h-[350px] overflow-y-auto custom-scrollbar">
+                                            {notifications.filter(n => !n.is_hidden).length === 0 ? (
+                                                 <div className="p-4 text-center text-sm text-slate-500">No new notifications</div>
                                             ) : (
-                                                user.avatar
+                                                notifications.filter(n => !n.is_hidden).map(notification => (
+                                                    <div key={notification.id} className="relative group block w-full">
+                                                        <button
+                                                            onClick={() => handleNotificationClick(notification)}
+                                                            className="w-full text-left p-2.5 sm:p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex gap-2.5 sm:gap-3 overflow-hidden pr-8"
+                                                        >
+                                                            <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                                                                <FileText size={16} />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white pr-2 truncate">{notification.title}</p>
+                                                                <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-0.5">{notification.message}</p>
+                                                                <span className="text-[10px] text-blue-500 font-bold mt-1 block">{new Date(notification.created_at).toLocaleString()}</span>
+                                                            </div>
+                                                            {!notification.is_read && (
+                                                                <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-3 right-3 group-hover:opacity-0 transition-opacity"></div>
+                                                            )}
+                                                        </button>
+                                                        <button
+                                                            onClick={async (e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_hidden: true } : n));
+                                                                try {
+                                                                    const authToken = token || getAuthToken();
+                                                                    await fetch(`${API_BASE_URL}/api/notifications/${notification.id}`, {
+                                                                        method: 'DELETE',
+                                                                        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                                                                    });
+                                                                } catch (err) {
+                                                                    console.error("Delete error:", err);
+                                                                }
+                                                            }}
+                                                            title="Dismiss notification"
+                                                            className="absolute top-2.5 right-1.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700 sm:opacity-0 sm:group-hover:opacity-100 transition-all z-10"
+                                                        >
+                                                            <X size={13} />
+                                                        </button>
+                                                    </div>
+                                                ))
                                             )}
                                         </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user.name}</p>
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.barangay || 'Resident'}</p>
-                                        </div>
-                                    </div>
+                                        <button onClick={() => { setShowNotifications(false); handleSetModal('all-notifications'); }} className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mt-2 py-2 border-t border-slate-100 dark:border-slate-800">See previous notifications</button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
 
-                                    {/* Actions */}
-                                    <div className="space-y-0.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setShowUserMenu(false);
-                                                handleSetTab('profile');
-                                            }}
-                                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors text-left cursor-pointer"
-                                        >
-                                            <User size={15} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                            <span>{t('dashboard.sidebar.account', { defaultValue: 'My Account' })}</span>
-                                        </button>
-
-                                        <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-
-                                        {handleLogout && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setShowUserMenu(false);
-                                                    handleLogout();
-                                                }}
-                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left cursor-pointer group"
-                                                title="Sign Out"
-                                            >
-                                                <LogOut size={15} className="text-red-500 dark:text-red-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
-                                                <span>{t('dashboard.sidebar.signOut', { defaultValue: 'Sign Out' })}</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                        {/* User Profile Avatar with Shared UserMenu Component */}
+                        <UserMenu
+                            name={user.name || 'Resident'}
+                            avatarUrl={user.avatarPhoto}
+                            avatarUpdatedAt={user.updatedAt}
+                            fallbackInitial={user.avatar || 'R'}
+                            subtitle={user.barangay || 'Resident'}
+                            triggerClassName="w-8.5 h-8.5 sm:w-10 sm:h-10 p-0.5"
+                            items={[
+                                {
+                                    id: 'account',
+                                    label: t('dashboard.sidebar.account', { defaultValue: 'My Account' }),
+                                    icon: User,
+                                    onClick: () => handleSetTab('profile'),
+                                },
+                                {
+                                    id: 'divider-signout',
+                                    divider: true,
+                                },
+                                ...(handleLogout
+                                    ? [
+                                          {
+                                              id: 'signout',
+                                              label: t('dashboard.sidebar.signOut', { defaultValue: 'Sign Out' }),
+                                              icon: LogOut,
+                                              danger: true,
+                                              isSignOut: true,
+                                              onClick: handleLogout,
+                                          },
+                                      ]
+                                    : []),
+                            ]}
+                            showTriggerName={false}
+                            showConfirmation={true}
+                            align="right"
+                        />
                     </div>
+
                 </div>
             </div>
-
-            {/* High-Fidelity Mobile Search Portal (Matches Web Search Dropdown Card & Unconstrained Viewport) */}
-            {typeof document !== 'undefined' && createPortal(
-                <AnimatePresence>
-                    {isMobileSearchOpen && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className="md:hidden fixed inset-0 z-[9999] bg-slate-950/70 backdrop-blur-md flex flex-col justify-start p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-                            onClick={() => setIsMobileSearchOpen(false)}
-                        >
-                            <motion.div
-                                initial={{ scale: 0.95, y: -12, opacity: 0 }}
-                                animate={{ scale: 1, y: 0, opacity: 1 }}
-                                exit={{ scale: 0.95, y: -12, opacity: 0 }}
-                                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full max-w-lg mx-auto bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[85dvh] overflow-hidden"
-                            >
-                                {/* Search Header Bar */}
-                                <div className="flex items-center gap-2.5 p-3 sm:p-3.5 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                                    <div className="flex-1 flex items-center bg-slate-100 dark:bg-slate-800 rounded-2xl px-3.5 py-2.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsMobileSearchOpen(false)}
-                                            className="text-slate-400 hover:text-slate-700 dark:hover:text-white mr-2 shrink-0 p-0.5 -ml-1 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-700 cursor-pointer flex items-center justify-center active:scale-95"
-                                            title="Close search"
-                                            aria-label="Close search"
-                                        >
-                                            <ChevronLeft size={18} strokeWidth={2.5} />
-                                        </button>
-                                        <input
-                                            type="text"
-                                            autoFocus
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder={t('dashboard.topNav.searchPlaceholder', { defaultValue: 'Search PULSO...' })}
-                                            className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-sm w-full text-slate-900 dark:text-white placeholder-slate-400 font-medium"
-                                            style={{ outline: 'none', boxShadow: 'none' }}
-                                        />
-                                        {searchQuery && (
-                                            <button
-                                                onClick={() => setSearchQuery('')}
-                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
-                                                title="Clear search query"
-                                            >
-                                                <X size={15} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsMobileSearchOpen(false)}
-                                        className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white px-2 py-1.5 cursor-pointer shrink-0"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-
-                                {/* Results Container (Card with exact parity to Web Dropdown) */}
-                                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-1 sm:p-2">
-                                    {renderSearchDropdown(true)}
-                                </div>
-                            </motion.div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>,
-                document.body
-            )}
         </header>
     );
 };
@@ -7180,6 +7925,13 @@ export default function ResidentDashboard() {
     // Contextual Claim Modal States & URL Parameter Deep-linking
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search);
+        const tabParam = searchParams.get('tab');
+        if (tabParam) {
+            setActiveTab(tabParam);
+            if (tabParam === 'profile') {
+                setAccountSubView('settings');
+            }
+        }
         const claimTicketParam = searchParams.get('claim_ticket') || searchParams.get('claim_id');
         const claimTokenParam = searchParams.get('claim_token') || searchParams.get('token');
         if (claimTicketParam || claimTokenParam) {
@@ -7221,9 +7973,18 @@ export default function ResidentDashboard() {
 
     // Prototype States
     const [activeTab, setActiveTab] = useState(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const tabParam = params.get('tab');
+            if (tabParam) {
+                console.log("PULSO: Initializing activeTab from URL:", tabParam);
+                return tabParam;
+            }
+        } catch (_) {}
         console.log("PULSO: Initializing activeTab: overview");
         return 'overview';
     });
+    const [isHeaderSearchOpen, setIsHeaderSearchOpen] = useState(false);
 
     const { isLoaded, loadError } = useGoogleMaps();
 
@@ -7311,6 +8072,7 @@ export default function ResidentDashboard() {
     const [accountSubView, setAccountSubView] = useState('settings'); // 'settings' | 'profile-details'
 
     const handleSetTab = (tab) => {
+        if (tab === activeTab) return;
         console.log(`PULSO: Switching tab: ${activeTab} -> ${tab}`);
         if (tab === 'profile') {
             setAccountSubView('settings');
@@ -7357,66 +8119,121 @@ export default function ResidentDashboard() {
 
     // Real User Data State (hoisted to precede loadData dependencies)
     const [user, setUser] = useState(() => {
-        const savedAvatar = typeof localStorage !== 'undefined' ? (localStorage.getItem('pulso_avatar_current') || null) : null;
+        const authU = getAuthUser();
         return {
-            name: 'Resident',
-            fullName: 'Loading...',
-            barangay: 'Loading...',
-            email: '',
-            phone: '',
-            memberSince: 'Loading...',
-            trustScore: 100,
-            avatar: 'R',
-            avatarPhoto: savedAvatar
+            name: authU?.full_name ? authU.full_name.split(' ')[0] : 'Resident',
+            fullName: authU?.full_name || 'Loading...',
+            barangay: authU?.barangay || 'Loading...',
+            email: authU?.email || '',
+            phone: authU?.phone_number || '',
+            memberSince: authU?.created_at ? new Date(authU.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : 'Loading...',
+            trustScore: authU?.trust_score || 100,
+            avatar: authU?.full_name ? authU.full_name.charAt(0).toUpperCase() : 'R',
+            avatarPhoto: authU?.avatar_url || null,
+            updatedAt: authU?.updated_at || null
         };
     });
     const [updatingProfile, setUpdatingProfile] = useState(false);
 
+    const [isServerUnreachable, setIsServerUnreachable] = useState(false);
+    const [retryCountdown, setRetryCountdown] = useState(null);
+    const [lastUpdatedTime, setLastUpdatedTime] = useState(null);
+    const retryAttemptRef = useRef(0);
+    const retryTimerRef = useRef(null);
+    const countdownIntervalRef = useRef(null);
+    const isFetchingDataRef = useRef(false);
+
     const fetchUser = useCallback(async (userId) => {
         if (!userId) return;
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                const savedAvatar = (typeof localStorage !== 'undefined')
-                    ? (localStorage.getItem(`pulso_avatar_${data.email || 'current'}`) || localStorage.getItem('pulso_avatar_current') || null)
-                    : null;
-                const nextUser = {
-                    name: data.full_name ? data.full_name.split(' ')[0] : 'Resident',
-                    fullName: data.full_name || '',
-                    address: formatAddress(data.address || ''),
-                    barangay: data.barangay || '',
-                    email: data.email || '',
-                    phone: data.phone_number || '',
-                    memberSince: new Date(data.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-                    trustScore: data.trust_score || 100,
-                    avatar: data.full_name ? data.full_name.charAt(0).toUpperCase() : 'R',
-                    avatarPhoto: savedAvatar
-                };
-                setUser(prev => {
-                    if (
-                        prev.name === nextUser.name &&
-                        prev.fullName === nextUser.fullName &&
-                        prev.address === nextUser.address &&
-                        prev.barangay === nextUser.barangay &&
-                        prev.email === nextUser.email &&
-                        prev.phone === nextUser.phone &&
-                        prev.memberSince === nextUser.memberSince &&
-                        prev.trustScore === nextUser.trustScore &&
-                        prev.avatar === nextUser.avatar &&
-                        prev.avatarPhoto === nextUser.avatarPhoto
-                    ) {
-                        return prev;
+        return dedupeFetch(`user_${userId}`, async () => {
+            try {
+                const res = await apiFetch(`/api/users/${userId}`);
+                if (res.ok && res.data) {
+                    const data = res.data;
+                    const nextUser = {
+                        name: data.full_name ? data.full_name.split(' ')[0] : 'Resident',
+                        fullName: data.full_name || '',
+                        address: formatAddress(data.address || ''),
+                        barangay: data.barangay || '',
+                        email: data.email || '',
+                        phone: data.phone_number || '',
+                        memberSince: new Date(data.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+                        trustScore: data.trust_score || 100,
+                        avatar: data.full_name ? data.full_name.charAt(0).toUpperCase() : 'R',
+                        avatarPhoto: data.avatar_url || null,
+                        updatedAt: data.updated_at || null,
+                        preferences: data.preferences || {}
+                    };
+
+                    try {
+                        const currentStored = getAuthUser();
+                        if (currentStored) {
+                            setAuthSession(token, {
+                                ...currentStored,
+                                ...data,
+                                avatar_url: data.avatar_url,
+                                updated_at: data.updated_at
+                            });
+                        }
+                    } catch (e) {
+                        // silent fail on restricted environments
                     }
-                    return nextUser;
-                });
+
+                    if (data.preferences) {
+                        try {
+                            if (data.preferences.theme && ['dark', 'light', 'system'].includes(data.preferences.theme)) {
+                                const localTheme = localStorage.getItem('pulso_theme') || localStorage.getItem('theme');
+                                if (!localTheme) {
+                                    changeTheme(data.preferences.theme);
+                                }
+                            }
+                            if (data.preferences.language && ['en', 'tl'].includes(data.preferences.language)) {
+                                const localLang = localStorage.getItem('pulso_language');
+                                if (!localLang && i18n?.changeLanguage) {
+                                    i18n.changeLanguage(data.preferences.language);
+                                }
+                            }
+                            if (data.preferences.notifications_enabled !== undefined) {
+                                localStorage.setItem('pulso_notifications_enabled', String(data.preferences.notifications_enabled));
+                            }
+                            if (data.preferences.notification_categories) {
+                                localStorage.setItem('pulso_notification_categories', JSON.stringify(data.preferences.notification_categories));
+                            }
+                        } catch (prefErr) {
+                            // ignore storage errors
+                        }
+                    }
+
+                    setUser(prev => {
+                        if (
+                            prev.name === nextUser.name &&
+                            prev.fullName === nextUser.fullName &&
+                            prev.address === nextUser.address &&
+                            prev.barangay === nextUser.barangay &&
+                            prev.email === nextUser.email &&
+                            prev.phone === nextUser.phone &&
+                            prev.memberSince === nextUser.memberSince &&
+                            prev.trustScore === nextUser.trustScore &&
+                            prev.avatar === nextUser.avatar &&
+                            prev.avatarPhoto === nextUser.avatarPhoto &&
+                            prev.updatedAt === nextUser.updatedAt &&
+                            JSON.stringify(prev.preferences) === JSON.stringify(nextUser.preferences)
+                        ) {
+                            return prev;
+                        }
+                        return nextUser;
+                    });
+                    return res;
+                } else if (res.isServerUnreachable) {
+                    logApiFailure(`/api/users/${userId}`, res);
+                }
+                return res;
+            } catch (error) {
+                console.error("PULSO: Error fetching user data:", error);
+                return { ok: false, error };
             }
-        } catch (error) {
-            console.error("PULSO: Error fetching user data:", error);
-        }
-    }, [token]);
+        });
+    }, [token, i18n, changeTheme]);
 
     // New State for User Reports
     const [userReports, setUserReports] = useState([]);
@@ -7445,109 +8262,125 @@ export default function ResidentDashboard() {
 
     const fetchUserReports = useCallback(async (userId) => {
         if (!userId) return;
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/reports/user/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setUserReports(prev => {
-                    if (Array.isArray(prev) && Array.isArray(data) && prev.length === data.length) {
-                        const unchanged = prev.every((p, i) => p.id === data[i]?.id && p.status === data[i]?.status && p.updated_at === data[i]?.updated_at);
-                        if (unchanged) return prev;
-                    }
-                    return Array.isArray(data) ? data : [];
-                });
+        return dedupeFetch(`user_reports_${userId}`, async () => {
+            try {
+                const res = await apiFetch(`/api/reports/user/${userId}`);
+                if (res.ok && Array.isArray(res.data)) {
+                    setUserReports(prev => {
+                        if (Array.isArray(prev) && prev.length === res.data.length) {
+                            const unchanged = prev.every((p, i) => p.id === res.data[i]?.id && p.status === res.data[i]?.status && p.updated_at === res.data[i]?.updated_at);
+                            if (unchanged) return prev;
+                        }
+                        return res.data;
+                    });
+                } else if (res.isServerUnreachable) {
+                    logApiFailure(`/api/reports/user/${userId}`, res);
+                }
+                return res;
+            } catch (error) {
+                console.error("PULSO: Error fetching reports:", error);
+                return { ok: false, error };
+            } finally {
+                setLoadingReports(false);
             }
-        } catch (error) {
-            console.error("PULSO: Error fetching reports:", error);
-        } finally {
-            setLoadingReports(false);
-        }
-    }, [token]);
+        });
+    }, []);
 
     const [publicReports, setPublicReports] = useState([]);
     const [loadingPublicReports, setLoadingPublicReports] = useState(true);
 
     const fetchPublicReports = useCallback(async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/reports/public?limit=100`);
-            if (response.ok) {
-                const data = await response.json();
-                const list = Array.isArray(data) ? data : [];
-                setPublicReports(prev => {
-                    if (Array.isArray(prev) && prev.length === list.length) {
-                        const unchanged = prev.every((p, i) => p.id === list[i]?.id && p.status === list[i]?.status && p.updated_at === list[i]?.updated_at);
-                        if (unchanged) return prev;
-                    }
-                    return list;
-                });
+        return dedupeFetch('public_reports', async () => {
+            try {
+                const res = await apiFetch('/api/reports/public?limit=100');
+                if (res.ok && Array.isArray(res.data)) {
+                    const list = res.data;
+                    setPublicReports(prev => {
+                        if (Array.isArray(prev) && prev.length === list.length) {
+                            const unchanged = prev.every((p, i) => p.id === list[i]?.id && p.status === list[i]?.status && p.updated_at === list[i]?.updated_at);
+                            if (unchanged) return prev;
+                        }
+                        return list;
+                    });
+                } else if (res.isServerUnreachable) {
+                    logApiFailure('/api/reports/public', res);
+                }
+                return res;
+            } catch (error) {
+                console.error("PULSO: Error fetching public reports:", error);
+                return { ok: false, error };
+            } finally {
+                setLoadingPublicReports(false);
             }
-        } catch (error) {
-            console.error("PULSO: Error fetching public reports:", error);
-        } finally {
-            setLoadingPublicReports(false);
-        }
+        });
     }, []);
 
     const [notifications, setNotifications] = useState([]);
 
     const fetchNotifications = useCallback(async (userId) => {
         if (!userId) return;
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setNotifications(prev => {
-                    if (Array.isArray(prev) && Array.isArray(data) && prev.length === data.length) {
-                        const unchanged = prev.every((p, i) => p.id === data[i]?.id && p.is_read === data[i]?.is_read);
-                        if (unchanged) return prev;
-                    }
-                    return Array.isArray(data) ? data : [];
-                });
+        return dedupeFetch(`notifications_${userId}`, async () => {
+            try {
+                const res = await apiFetch(`/api/notifications/user/${userId}`);
+                if (res.ok && Array.isArray(res.data)) {
+                    setNotifications(prev => {
+                        if (Array.isArray(prev) && prev.length === res.data.length) {
+                            const unchanged = prev.every((p, i) => p.id === res.data[i]?.id && p.is_read === res.data[i]?.is_read);
+                            if (unchanged) return prev;
+                        }
+                        return res.data;
+                    });
+                } else if (res.isServerUnreachable) {
+                    logApiFailure(`/api/notifications/user/${userId}`, res);
+                }
+                return res;
+            } catch (error) {
+                console.error("PULSO: Error fetching notifications:", error);
+                return { ok: false, error };
             }
-        } catch (error) {
-            console.error("PULSO: Error fetching notifications:", error);
-        }
-    }, [token]);
+        });
+    }, []);
 
     const fetchAdvisories = useCallback(async () => {
-        setLoadingAdvisories(prev => (prev ? prev : true));
-        setAdvisoriesError(null);
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/advisories`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error(`Advisory request failed (${response.status})`);
-            const data = await response.json();
-            if (!Array.isArray(data)) throw new Error('Advisory response was not a list');
-            setLguUpdates(prev => {
-                if (Array.isArray(prev) && prev.length === data.length) {
-                    const unchanged = prev.every((p, i) => p.id === data[i]?.id && p.updated_at === data[i]?.updated_at);
-                    if (unchanged) return prev;
+        return dedupeFetch('advisories', async () => {
+            setLoadingAdvisories(prev => (prev ? prev : true));
+            try {
+                const res = await apiFetch('/api/advisories');
+                if (res.ok && Array.isArray(res.data)) {
+                    setAdvisoriesError(null);
+                    setLguUpdates(prev => {
+                        if (Array.isArray(prev) && prev.length === res.data.length) {
+                            const unchanged = prev.every((p, i) => p.id === res.data[i]?.id && p.updated_at === res.data[i]?.updated_at);
+                            if (unchanged) return prev;
+                        }
+                        return res.data;
+                    });
+                } else {
+                    if (res.isServerUnreachable) {
+                        logApiFailure('/api/advisories', res);
+                        setAdvisoriesError(prev => (lguUpdates.length > 0 ? null : 'Advisories are temporarily unavailable.'));
+                    } else {
+                        setAdvisoriesError('Advisories are temporarily unavailable.');
+                    }
                 }
-                return data;
-            });
-        } catch (error) {
-            console.error("PULSO: Error fetching advisories:", error);
-            setLguUpdates([]);
-            setAdvisoriesError('Advisories are temporarily unavailable.');
-        } finally {
-            setLoadingAdvisories(false);
-        }
-    }, [token]);
+                return res;
+            } catch (error) {
+                console.error("PULSO: Error fetching advisories:", error);
+                setAdvisoriesError('Advisories are temporarily unavailable.');
+                return { ok: false, error };
+            } finally {
+                setLoadingAdvisories(false);
+            }
+        });
+    }, [lguUpdates.length]);
 
     const handleMarkAllRead = async () => {
         if (!currentUser) return;
         try {
-            const response = await fetch(`${API_BASE_URL}/api/notifications/user/${currentUser.id}/read`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await apiFetch(`/api/notifications/user/${currentUser.id}/read`, {
+                method: 'PATCH'
             });
-            if (response.ok) {
-                // Optimistically update UI
+            if (res.ok) {
                 setNotifications(notifications.map(n => ({ ...n, is_read: true })));
             }
         } catch (error) {
@@ -7556,12 +8389,10 @@ export default function ResidentDashboard() {
     };
 
     const handleNotificationClick = async (notif) => {
-        // Mark as read if it's currently unread
         if (!notif.is_read) {
             try {
-                await fetch(`${API_BASE_URL}/api/notifications/${notif.id}/read`, {
-                    method: 'PATCH',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                await apiFetch(`/api/notifications/${notif.id}/read`, {
+                    method: 'PATCH'
                 });
                 setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
             } catch (err) {
@@ -7569,14 +8400,11 @@ export default function ResidentDashboard() {
             }
         }
 
-        // Logic to navigate or show full details
         if (notif.message && (notif.message.includes('PUL-') || notif.message.includes('RPT-'))) {
-            // It's a report-related notification
             setActiveTab('reports');
             setReportStatusFilter('all');
             showToast(`Viewing details for report status update`);
         } else {
-            // General notification: Show full details in the advisory modal
             setSelectedPost({
                 department: 'System Notice',
                 title: notif.title,
@@ -7590,42 +8418,115 @@ export default function ResidentDashboard() {
         setShowNotifications(false);
     };
 
-    const isFetchingDataRef = useRef(false);
-    useEffect(() => {
-        const userId = currentUser?.id;
-        let isMounted = true;
+    const loadData = useCallback(async () => {
+        if (isFetchingDataRef.current) return;
+        if (!navigator.onLine) {
+            setIsServerUnreachable(true);
+            return;
+        }
 
-        const loadData = async () => {
-            if (isFetchingDataRef.current) return;
-            isFetchingDataRef.current = true;
-            try {
-                const tasks = [fetchPublicReports()];
-                if (userId) {
-                    tasks.push(
-                        fetchUser(userId),
-                        fetchAdvisories(),
-                        fetchUserReports(userId),
-                        fetchNotifications(userId)
-                    );
+        isFetchingDataRef.current = true;
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+        setRetryCountdown(null);
+
+        const userId = currentUser?.id;
+        try {
+            const tasks = [fetchPublicReports()];
+            if (userId) {
+                tasks.push(
+                    fetchUser(userId),
+                    fetchAdvisories(),
+                    fetchUserReports(userId),
+                    fetchNotifications(userId)
+                );
+            }
+
+            const results = await Promise.allSettled(tasks);
+            const hasNetworkFailures = results.some(r => {
+                if (r.status === 'rejected') return true;
+                return r.value && r.value.ok === false && r.value.isServerUnreachable;
+            });
+            const hasSuccessfulData = results.some(r => r.status === 'fulfilled' && r.value?.ok === true);
+
+            if (hasNetworkFailures && !hasSuccessfulData) {
+                setIsServerUnreachable(true);
+                const attempt = retryAttemptRef.current;
+                const backoffDelays = [2, 5, 15]; // Bounded exponential backoff: 2s, 5s, 15s
+                if (attempt < backoffDelays.length) {
+                    const delaySec = backoffDelays[attempt];
+                    retryAttemptRef.current = attempt + 1;
+                    setRetryCountdown(delaySec);
+
+                    let remaining = delaySec;
+                    countdownIntervalRef.current = setInterval(() => {
+                        remaining -= 1;
+                        if (remaining <= 0) {
+                            clearInterval(countdownIntervalRef.current);
+                            setRetryCountdown(null);
+                        } else {
+                            setRetryCountdown(remaining);
+                        }
+                    }, 1000);
+
+                    retryTimerRef.current = setTimeout(() => {
+                        loadData();
+                    }, delaySec * 1000);
+                } else {
+                    // Reached max retries (3), stop auto-polling until manual retry or online event
+                    setRetryCountdown(null);
                 }
-                await Promise.allSettled(tasks);
-            } catch (e) {
-                console.error("PULSO: Error in loadData sequence:", e);
-            } finally {
-                if (isMounted) {
-                    isFetchingDataRef.current = false;
-                }
+            } else {
+                setIsServerUnreachable(false);
+                setRetryCountdown(null);
+                retryAttemptRef.current = 0;
+                setLastUpdatedTime(new Date());
+            }
+        } catch (err) {
+            console.error("PULSO: Error in loadData sequence:", err);
+        } finally {
+            isFetchingDataRef.current = false;
+        }
+    }, [currentUser?.id, fetchPublicReports, fetchUser, fetchAdvisories, fetchUserReports, fetchNotifications]);
+
+    const handleManualRetry = useCallback(() => {
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+        setRetryCountdown(null);
+        retryAttemptRef.current = 0;
+        loadData();
+    }, [loadData]);
+
+    useEffect(() => {
+        loadData();
+
+        // 30-second background poll only when healthy (prevents loop when server is unreachable)
+        const interval = setInterval(() => {
+            if (navigator.onLine && !isServerUnreachable && retryAttemptRef.current === 0) {
+                loadData();
+            }
+        }, 30000);
+
+        const handleOnline = async () => {
+            if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+            if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+            retryAttemptRef.current = 0;
+            setRetryCountdown(null);
+            const healthy = await checkServerHealth(4000);
+            if (healthy) {
+                loadData();
             }
         };
 
-        loadData();
-        // Auto-refresh user data and reports every 30s to keep status badges sync'd
-        const interval = setInterval(loadData, 30000);
+        window.addEventListener('online', handleOnline);
+
         return () => {
-            isMounted = false;
             clearInterval(interval);
+            window.removeEventListener('online', handleOnline);
+            if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+            if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
         };
-    }, [currentUser?.id, token, advisoriesReloadKey, fetchPublicReports, fetchUser, fetchAdvisories, fetchUserReports, fetchNotifications]);
+    }, [currentUser?.id, loadData, isServerUnreachable]);
 
     const [reportNotes, setReportNotes] = useState('');
     const [reportCategory, setReportCategory] = useState([]);
@@ -7644,18 +8545,38 @@ export default function ResidentDashboard() {
     const [isSelectingLocation, setIsSelectingLocation] = useState(false);
     const [mapFilter, setMapFilter] = useState('Nearby'); // State for new map UI filter
     const [selectedHazard, setSelectedHazard] = useState(null); // Tracks the clicked map marker
-    const [borderData, setBorderData] = useState(caloocanBorderData);
+    const [borderData, setBorderData] = useState(() => {
+        try {
+            const cached = sessionStorage.getItem('pulso_cached_boundary_v1');
+            if (cached) return JSON.parse(cached);
+        } catch {
+            // fallback to bundled
+        }
+        return caloocanBorderData;
+    });
 
     // Fetch live authoritative Caloocan barangay borders, fallback to bundled GeoJSON
     useEffect(() => {
-        fetch(`${API_BASE_URL}/api/geo/caloocan-border`)
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (data?.features?.length > 0) {
-                    setBorderData(data);
+        try {
+            if (sessionStorage.getItem('pulso_cached_boundary_v1')) return;
+        } catch {
+            // non-fatal
+        }
+
+        apiFetch('/api/geo/caloocan-border', { timeout: 6000, skipAuth: true })
+            .then(res => {
+                if (res.ok && res.data?.features?.length > 0) {
+                    setBorderData(res.data);
+                    try {
+                        sessionStorage.setItem('pulso_cached_boundary_v1', JSON.stringify(res.data));
+                    } catch {
+                        // ignore storage errors
+                    }
                 }
             })
-            .catch(err => console.debug('Caloocan border fetch fallback to bundled:', err));
+            .catch(() => {
+                // Keep bundled GeoJSON silently
+            });
     }, []);
 
     const getCategoryColor = (category) => {
@@ -8246,18 +9167,37 @@ export default function ResidentDashboard() {
     const reverseGeocode = async (lat, lng) => {
         const requestId = ++geocodeRequest.current;
         setGeocodingAddress(true);
+        // Clear previous address state immediately so a stale address is NEVER shown
+        setLocationAddress('');
+        setStructuredAddress(null);
+
         let primaryAddress = '';
         let resolvedStructured = null;
         const autoPlusCode = encodeOpenLocationCode(lat, lng, true);
         let plusCodeStr = autoPlusCode;
 
-        // 1. Try Google Maps Geocoder First
-        if (isLoaded && window.google) {
+        // 1. Try backend reverse geocoding first (avoids browser referrer/key restrictions)
+        try {
+            const res = await apiFetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`, {
+                timeout: 4000
+            });
+            if (res.ok && res.data?.address && !res.data.address.startsWith("Lat:")) {
+                resolvedStructured = parseAddressString(res.data.address) || parseGeocodedAddress([], lat, lng, autoPlusCode);
+                if (!resolvedStructured.plusCode) resolvedStructured.plusCode = autoPlusCode;
+                primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
+                if (resolvedStructured.plusCode) plusCodeStr = resolvedStructured.plusCode;
+            }
+        } catch (backendErr) {
+            console.debug("[PULSO] Backend reverse geocode skipped/failed, falling back to client geocoder:", backendErr);
+        }
+
+        // 2. Fall back to browser Google Maps Geocoder if backend was unreachable or returned empty
+        if (!primaryAddress && isLoaded && window.google?.maps?.Geocoder) {
             try {
                 const geocoder = new window.google.maps.Geocoder();
                 const response = await Promise.race([
                     geocoder.geocode({ location: { lat, lng } }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Address lookup timed out')), 6000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Browser geocode timeout')), 4000))
                 ]);
                 if (response.results && response.results.length > 0) {
                     const googlePlusCode = response.plus_code?.compound_code || response.plus_code?.global_code || autoPlusCode;
@@ -8265,37 +9205,16 @@ export default function ResidentDashboard() {
                     primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
                     if (resolvedStructured.plusCode) plusCodeStr = resolvedStructured.plusCode;
                 }
-            } catch (err) {
-                console.warn("Frontend Google geocoding failed, trying server...", err);
+            } catch (browserErr) {
+                console.debug("[PULSO] Browser Google geocoding failed or timed out:", browserErr);
             }
         }
 
-        // 2. Fallback to Backend Google Maps API (avoids referrer/CORS restrictions)
-        if (!primaryAddress) {
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/geocode/reverse?lat=${lat}&lng=${lng}`, {
-                    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-                    signal: AbortSignal.timeout(6000)
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.address && !data.address.startsWith("Lat:")) {
-                        resolvedStructured = parseAddressString(data.address) || parseGeocodedAddress([], lat, lng, autoPlusCode);
-                        if (!resolvedStructured.plusCode) resolvedStructured.plusCode = autoPlusCode;
-                        primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-                        if (resolvedStructured.plusCode) plusCodeStr = resolvedStructured.plusCode;
-                    }
-                }
-            } catch (err) {
-                console.warn("Backend Google geocoding failed...", err);
-            }
-        }
-
-        // 3. Fallback to OpenStreetMap (Nominatim)
-        if (!primaryAddress) {
+        // 3. Fallback to OpenStreetMap (Nominatim) if still unresolved
+        if (!primaryAddress && navigator.onLine) {
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
-                    signal: AbortSignal.timeout(5000)
+                    signal: AbortSignal.timeout(4000)
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -8305,7 +9224,7 @@ export default function ResidentDashboard() {
                         resolvedStructured = {
                             subdivision: '',
                             plusCode: autoPlusCode,
-                            streetAddress: [addr.house_number, addr.road].filter(Boolean).join(' '),
+                            streetAddress: [addr.house_number, addr.road].filter(Boolean).join(' ') || 'Address unavailable',
                             barangay: brgyCandidate.includes('Barangay') ? brgyCandidate : (brgyCandidate ? `Barangay ${brgyCandidate}` : ''),
                             city: 'Caloocan',
                             postalCode: addr.postcode || getPostalCodeForBarangay(brgyCandidate),
@@ -8315,25 +9234,25 @@ export default function ResidentDashboard() {
                         plusCodeStr = autoPlusCode;
                     }
                 }
-            } catch (err) {
-                console.warn("Nominatim geocoding fallback failed...", err);
+            } catch (osmErr) {
+                // non-fatal
             }
         }
 
-        // 4. Fallback to BigDataCloud Plus Code
-        if (!plusCodeStr || plusCodeStr === autoPlusCode) {
+        // 4. Fallback to BigDataCloud Plus Code if needed
+        if ((!plusCodeStr || plusCodeStr === autoPlusCode) && navigator.onLine) {
             try {
                 const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`, {
-                    signal: AbortSignal.timeout(4000)
+                    signal: AbortSignal.timeout(3000)
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    if (data && data.plusCode) {
+                    if (data?.plusCode) {
                         const cleanCode = extractCleanPlusCode(data.plusCode, lat, lng);
                         if (cleanCode) plusCodeStr = cleanCode;
                     }
                 }
-            } catch (err) {
+            } catch {
                 // non-fatal
             }
         }
@@ -8355,19 +9274,20 @@ export default function ResidentDashboard() {
             plusCodeStr = 'Q22G+QGP';
         }
 
+        // 5. Final fallback: Known Caloocan barangay polygon or Coordinates with "Address unavailable"
         if (!resolvedStructured) {
             const autoBrgy = findBarangayByCoordinates(lat, lng);
             const brgyName = autoBrgy ? autoBrgy.name : '';
             resolvedStructured = {
                 subdivision: '',
                 plusCode: plusCodeStr || autoPlusCode,
-                streetAddress: '',
+                streetAddress: 'Address unavailable',
                 barangay: brgyName,
                 city: 'Caloocan',
                 postalCode: brgyName ? getPostalCodeForBarangay(brgyName) : '1421',
                 region: 'Metro Manila'
             };
-            primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
+            primaryAddress = `Address unavailable (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
         } else if (!resolvedStructured.barangay || !resolvedStructured.barangay.trim()) {
             const autoBrgy = findBarangayByCoordinates(lat, lng);
             if (autoBrgy) {
@@ -8378,7 +9298,7 @@ export default function ResidentDashboard() {
         }
 
         setStructuredAddress(resolvedStructured);
-        setLocationAddress(primaryAddress || `Caloocan City (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+        setLocationAddress(primaryAddress || `Address unavailable (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
         setPlusCode(plusCodeStr || autoPlusCode);
         setGeocodingAddress(false);
     };
@@ -8505,6 +9425,7 @@ export default function ResidentDashboard() {
             const payload = {};
             if (field === 'email') payload.email = value;
             if (field === 'phone') payload.phone_number = value;
+            if (field === 'preferences') payload.preferences = value;
 
             const response = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}`, {
                 method: 'PATCH',
@@ -8516,10 +9437,14 @@ export default function ResidentDashboard() {
             });
 
             if (response.ok) {
-                showToast(`${field === 'email' ? 'Email' : 'Mobile Number'} updated successfully`);
+                if (field !== 'preferences') {
+                    showToast(`${field === 'email' ? 'Email' : 'Mobile Number'} updated successfully`);
+                }
                 fetchUser(currentUser.id); // Refresh user data
             } else {
-                showToast("Failed to update profile", 'error');
+                if (field !== 'preferences') {
+                    showToast("Failed to update profile", 'error');
+                }
             }
         } catch (error) {
             console.error("Error updating profile:", error);
@@ -8924,6 +9849,40 @@ export default function ResidentDashboard() {
                 )}
             </AnimatePresence>
 
+            {/* Calm Server Unreachable Banner */}
+            <AnimatePresence>
+                {!isOffline && isServerUnreachable && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="bg-amber-500/10 dark:bg-amber-950/40 border-b border-amber-500/30 text-amber-900 dark:text-amber-200 px-4 py-2.5 flex items-center justify-between text-xs sm:text-sm font-medium z-50 relative backdrop-blur-md"
+                    >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                            <span className="truncate">
+                                {retryCountdown !== null
+                                    ? `We can't reach PULSO right now. Retrying in ${retryCountdown}s...`
+                                    : "We can't reach PULSO right now."}
+                            </span>
+                            {lastUpdatedTime && (
+                                <span className="hidden md:inline text-amber-700/80 dark:text-amber-400/70 text-[11px]">
+                                    (Saved data from {new Date(lastUpdatedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                                </span>
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleManualRetry}
+                            className="shrink-0 ml-3 px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-100 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <RotateCcw size={13} className="shrink-0" />
+                            Retry Now
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Render Overlay Modals */}
             <ResidentModals
                 activeModal={activeModal}
@@ -9113,6 +10072,8 @@ export default function ResidentDashboard() {
                 setSelectedHazard={setSelectedHazard}
                 setReportStatusFilter={setReportStatusFilter}
                 token={token}
+                isSearchOpen={isHeaderSearchOpen}
+                setIsSearchOpen={setIsHeaderSearchOpen}
             />
 
             {/* Main Layout Grid (Responsive 2-Column Content + Sticky Side Nav) */}
@@ -9202,6 +10163,9 @@ export default function ResidentDashboard() {
                                     i18n={i18n}
                                     subView={accountSubView}
                                     setSubView={setAccountSubView}
+                                    token={token}
+                                    currentUser={currentUser}
+                                    fetchUser={fetchUser}
                                 />
                             </div>
                         )}
@@ -9235,15 +10199,12 @@ export default function ResidentDashboard() {
                                 key="report"
                                 type="button"
                                 onClick={() => handleSetModal('file-report')}
-                                className="flex flex-col items-center justify-center -mt-7 sm:-mt-8 px-2 sm:px-3 group focus:outline-none cursor-pointer shrink-0"
+                                className="flex flex-col items-center justify-center -mt-5 sm:-mt-6 px-2 sm:px-3 group focus:outline-none cursor-pointer shrink-0"
                                 aria-label="Report an issue"
                             >
                                 <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white shadow-xl shadow-orange-500/30 flex items-center justify-center border-[3.5px] border-white dark:border-slate-900 transition-all group-hover:scale-105">
                                     <Plus size={26} strokeWidth={3} />
                                 </div>
-                                <span className="text-[10px] font-extrabold text-[#ff6b00] mt-1 tracking-tight">
-                                    {item.label}
-                                </span>
                             </button>
                         );
                     }
@@ -9279,431 +10240,17 @@ export default function ResidentDashboard() {
                 })}
             </nav>
 
-            {/* ── PULSO Resident AI Assistant Modal & Backdrop ────────────────── */}
-            <AnimatePresence>
-                {isAIChatOpen && (
-                    <>
-                        {/* Backdrop for maximized mode or mobile modal */}
-                        <motion.div
-                            key="resident-ai-backdrop"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className={`fixed inset-0 bg-black/60 backdrop-blur-xs z-[990] ${
-                                isAIMaximized ? 'block' : 'sm:hidden'
-                            }`}
-                            onClick={() => {
-                                if (isAIMaximized && window.innerWidth >= 640) {
-                                    setIsAIMaximized(false);
-                                } else {
-                                    setIsAIChatOpen(false);
-                                    setIsAIMaximized(false);
-                                }
-                            }}
-                        />
+            {/* ── Unified PULSEAI Assistant Window (Resident Role) ── */}
+            <PulseAIChatWindow
+                isOpen={isAIChatOpen}
+                onClose={() => setIsAIChatOpen(false)}
+                role="resident"
+                currentUser={currentUser || user}
+            />
 
-                        <motion.div
-                            key="resident-ai-chat"
-                            initial={{ opacity: 0, scale: 0.95, y: 16 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                            className={`fixed z-[1000] bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col transition-all duration-300 ${
-                                isAIMaximized
-                                    ? 'inset-0 sm:inset-6 md:inset-10 lg:inset-14 rounded-none sm:rounded-3xl h-[100dvh] sm:h-auto max-h-none'
-                                    : 'inset-x-3 bottom-[5.25rem] sm:inset-auto sm:bottom-24 sm:right-6 w-auto sm:w-[390px] h-[72dvh] sm:h-[530px] max-h-[580px] rounded-2xl'
-                            }`}
-                        >
-                            {/* Header */}
-                            <div className="p-3.5 sm:p-4 bg-gradient-to-r from-[#e65100] via-[#f97316] to-[#ea580c] flex justify-between items-center shrink-0">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0 shadow-xs">
-                                        <Brain size={18} className="text-white" />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-1.5">
-                                            <h4 className="font-bold text-white text-sm leading-tight">PULSEAI</h4>
-                                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="System Operational" />
-                                        </div>
-                                        <p className="text-[10px] text-orange-100 font-semibold uppercase tracking-wider">Community Helper · 24/7</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    {/* Start New Chat Button */}
-                                    <button
-                                        type="button"
-                                        onClick={handleStartNewChat}
-                                        title="Start New Chat"
-                                        aria-label="New Chat"
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
-                                    >
-                                        <Plus size={17} strokeWidth={2.5} />
-                                    </button>
-                                    {/* Toggle History View Button */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsAIHistoryOpen(prev => {
-                                                const next = !prev;
-                                                if (next && aiConversations.length === 0) {
-                                                    fetchAIConversations();
-                                                }
-                                                return next;
-                                            });
-                                        }}
-                                        title={isAIHistoryOpen ? "Return to chat" : "Past Conversations"}
-                                        aria-label="Toggle Conversation History"
-                                        className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
-                                            isAIHistoryOpen
-                                                ? 'bg-white/30 text-white shadow-xs'
-                                                : 'text-white/90 hover:text-white hover:bg-white/20'
-                                        }`}
-                                    >
-                                        <History size={16} />
-                                    </button>
-                                    {/* Maximize/Minimize */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsAIMaximized(prev => !prev)}
-                                        title={isAIMaximized ? 'Minimize' : 'Maximize'}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
-                                    >
-                                        {isAIMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                                    </button>
-                                    {/* Close Button */}
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); setIsAIHistoryOpen(false); }}
-                                        title="Close"
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                </div>
-                            </div>
 
-                            {/* Content Body: Either History View or Chat View */}
-                            {isAIHistoryOpen ? (
-                                /* History Drawer / Panel */
-                                <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-900">
-                                    {/* Panel Sub-Header */}
-                                    <div className="px-3.5 py-2.5 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/80 flex items-center justify-between shrink-0">
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsAIHistoryOpen(false)}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                                                title="Back to conversation"
-                                            >
-                                                <ChevronLeft size={16} />
-                                            </button>
-                                            <div>
-                                                <h5 className="font-bold text-xs text-slate-900 dark:text-white">Chat History</h5>
-                                                <p className="text-[10px] text-slate-400">
-                                                    {aiConversations.length} {aiConversations.length === 1 ? 'thread' : 'threads'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleStartNewChat}
-                                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#ea580c] hover:bg-[#c2410c] text-white flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
-                                        >
-                                            <Plus size={13} strokeWidth={2.5} />
-                                            <span>New Chat</span>
-                                        </button>
-                                    </div>
-
-                                    {/* Conversation List */}
-                                    <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
-                                        {loadingAIConversations ? (
-                                            <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
-                                                <Loader2 size={24} className="animate-spin text-[#ea580c]" />
-                                                <span className="text-xs font-medium">Loading conversations...</span>
-                                            </div>
-                                        ) : aiConversations.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                                                <div className="w-12 h-12 rounded-2xl bg-orange-100 dark:bg-orange-950/40 text-[#ea580c] dark:text-orange-400 flex items-center justify-center mb-3">
-                                                    <MessageSquare size={22} />
-                                                </div>
-                                                <h6 className="font-bold text-sm text-slate-800 dark:text-slate-200 mb-1">No saved conversations yet</h6>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-[240px] mb-4">
-                                                    Your inquiries, ticket lookups, and advisory questions will automatically be preserved here.
-                                                </p>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleStartNewChat}
-                                                    className="px-3.5 py-2 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                                                >
-                                                    Start First Conversation
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            aiConversations.map(conv => {
-                                                const isActive = conv.id === activeConversationId;
-                                                return (
-                                                    <div
-                                                        key={conv.id}
-                                                        onClick={() => loadConversationMessages(conv.id)}
-                                                        className={`p-3 rounded-xl border transition-all cursor-pointer relative group ${
-                                                            isActive
-                                                                ? 'bg-orange-50/90 dark:bg-orange-950/25 border-orange-300 dark:border-orange-800/60 shadow-xs'
-                                                                : 'bg-white dark:bg-slate-800/70 border-slate-200 dark:border-slate-700/60 hover:border-orange-200 dark:hover:border-orange-900/40 hover:shadow-2xs'
-                                                        }`}
-                                                    >
-                                                        <div className="flex items-start justify-between gap-2 mb-1">
-                                                            <h6 className={`font-semibold text-xs leading-snug line-clamp-1 ${
-                                                                isActive
-                                                                    ? 'text-orange-600 dark:text-orange-400 font-bold'
-                                                                    : 'text-slate-800 dark:text-slate-200 group-hover:text-orange-600 dark:group-hover:text-orange-400'
-                                                            }`}>
-                                                                {conv.title || 'Conversation'}
-                                                            </h6>
-                                                            <div className="flex items-center gap-1 shrink-0">
-                                                                {isActive && (
-                                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500 text-white">
-                                                                        Active
-                                                                    </span>
-                                                                )}
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => handleDeleteConversation(conv.id, e)}
-                                                                    title="Delete conversation"
-                                                                    disabled={deletingConversationId === conv.id}
-                                                                    className="opacity-70 group-hover:opacity-100 hover:text-rose-500 p-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-400 transition-all cursor-pointer"
-                                                                >
-                                                                    {deletingConversationId === conv.id ? (
-                                                                        <Loader2 size={13} className="animate-spin text-rose-500" />
-                                                                    ) : (
-                                                                        <Trash2 size={13} />
-                                                                    )}
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        {conv.last_message && (
-                                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed mb-1.5 font-medium">
-                                                                {conv.last_message}
-                                                            </p>
-                                                        )}
-                                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-0.5 border-t border-slate-100 dark:border-slate-700/40">
-                                                            <span>{formatRelativeTime(conv.updated_at || conv.created_at)}</span>
-                                                            <span>{conv.message_count || 0} msgs</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-
-                                    {/* Privacy Note & Clear All Footer */}
-                                    <div className="p-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700/80 shrink-0 space-y-2">
-                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
-                                            Saved to your resident account in compliance with RA 10173. You can erase threads at any time.
-                                        </p>
-                                        {aiConversations.length > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={handleClearAllConversations}
-                                                className="w-full py-1.5 text-[11px] font-bold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg border border-rose-200 dark:border-rose-900/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                                            >
-                                                <Trash2 size={12} />
-                                                <span>Clear All Chat History</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                /* Regular Chat View */
-                                <>
-                                    {/* Suggested quick-actions (Horizontally scrollable with Left & Right Chevrons) */}
-                                    {aiMessages.length === 1 && (
-                                        <div className="px-1.5 sm:px-2 py-1.5 bg-orange-50/90 dark:bg-slate-800/90 border-b border-orange-100 dark:border-slate-700 flex items-center gap-1 shrink-0 relative">
-                                            {/* Chevron Left Button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => scrollAiSuggestions('left')}
-                                                disabled={!canScrollAiLeft}
-                                                aria-label="Scroll suggestions left"
-                                                className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-150 ${
-                                                    canScrollAiLeft
-                                                        ? 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs border border-orange-200/90 dark:border-slate-600 hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] cursor-pointer active:scale-95'
-                                                        : 'text-slate-300 dark:text-slate-600 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
-                                                }`}
-                                            >
-                                                <ChevronLeft size={13} strokeWidth={2.5} />
-                                            </button>
-
-                                            {/* Scrollable Pills Container */}
-                                            <div
-                                                ref={aiSuggestionsScrollRef}
-                                                onScroll={updateAiSuggestionsScroll}
-                                                className="flex-1 flex gap-1.5 overflow-x-auto no-scrollbar scroll-smooth items-center py-0.5"
-                                            >
-                                                {[
-                                                    { label: 'How to file a report?', query: 'How to file a report?' },
-                                                    { label: 'My report status', query: 'What is the status of my reports?' },
-                                                    { label: 'City hotlines', query: 'What are the city emergency hotlines?' },
-                                                    { label: 'Evacuation routes', query: 'Where are the evacuation routes in Caloocan?' }
-                                                ].map(item => (
-                                                    <button
-                                                        key={item.label}
-                                                        type="button"
-                                                        onClick={() => handleResidentAIChat(null, item.query)}
-                                                        className="text-[11px] font-semibold whitespace-nowrap text-[#ea580c] dark:text-orange-300 bg-white dark:bg-slate-700 border border-orange-200 dark:border-orange-900/40 px-3 py-1 rounded-full hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] transition-colors shrink-0 cursor-pointer shadow-2xs"
-                                                    >
-                                                        {item.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-
-                                            {/* Chevron Right Button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => scrollAiSuggestions('right')}
-                                                disabled={!canScrollAiRight}
-                                                aria-label="Scroll suggestions right"
-                                                className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-150 ${
-                                                    canScrollAiRight
-                                                        ? 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs border border-orange-200/90 dark:border-slate-600 hover:bg-[#f05a00] hover:text-white hover:border-[#f05a00] cursor-pointer active:scale-95'
-                                                        : 'text-slate-300 dark:text-slate-600 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
-                                                }`}
-                                            >
-                                                <ChevronRight size={13} strokeWidth={2.5} />
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/* Messages Area */}
-                                    <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
-                                        {aiMessages.map((msg, i) => (
-                                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                                {msg.role === 'assistant' && (
-                                                    <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0 shadow-xs">
-                                                        <Brain size={12} className="text-white" />
-                                                    </div>
-                                                )}
-                                                <div className={`${isAIMaximized ? 'max-w-[85%] sm:max-w-[70%]' : 'max-w-[85%]'
-                                                    } p-3 rounded-2xl text-[13px] font-medium leading-relaxed ${msg.role === 'user'
-                                                        ? 'bg-[#f05a00] text-white rounded-br-xs shadow-xs'
-                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-xs border border-slate-200/50 dark:border-slate-700/50'
-                                                    }`}>
-                                                    {msg.role === 'assistant' ? (
-                                                        <PulseAIMarkdown content={msg.text} />
-                                                    ) : (
-                                                        <p className="whitespace-pre-wrap">{msg.text}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-
-                                        {/* Empty state quick-service shortcuts */}
-                                        {aiMessages.length === 1 && (
-                                            <div className="pt-1 pb-2">
-                                                <div className="flex items-center gap-2 mb-2 px-0.5">
-                                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Frequently Requested Services</span>
-                                                    <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700/60" />
-                                                </div>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                    {[
-                                                        {
-                                                            title: 'How to file a report?',
-                                                            desc: 'Step-by-step guide for hazard photo, map pin & ticket creation',
-                                                            badge: 'Guide',
-                                                            icon: AlertTriangle,
-                                                            query: 'How to file a report?'
-                                                        },
-                                                        {
-                                                            title: 'My report status',
-                                                            desc: 'Check live inspection and repair progress on your filed reports',
-                                                            badge: 'Live Data',
-                                                            icon: Clock,
-                                                            query: 'What is the status of my reports?'
-                                                        },
-                                                        {
-                                                            title: 'City hotlines',
-                                                            desc: 'Verified numbers for PNP, BFP Fire, DRRMO, and NDRRMC 911',
-                                                            badge: 'Emergency',
-                                                            icon: PhoneCall,
-                                                            query: 'What are the city emergency hotlines?'
-                                                        },
-                                                        {
-                                                            title: 'Evacuation routes',
-                                                            desc: 'Emergency guidance and DRRMO disaster shelter contacts',
-                                                            badge: 'Safety',
-                                                            icon: Compass,
-                                                            query: 'Where are the evacuation routes in Caloocan?'
-                                                        }
-                                                    ].map((card, idx) => (
-                                                        <button
-                                                            key={idx}
-                                                            type="button"
-                                                            onClick={() => handleResidentAIChat(null, card.query)}
-                                                            className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white/70 dark:bg-slate-800/70 hover:bg-orange-50/70 dark:hover:bg-orange-950/20 hover:border-orange-300 dark:hover:border-orange-800/60 text-left transition-all duration-150 group cursor-pointer shadow-xs flex flex-col justify-between"
-                                                        >
-                                                            <div className="flex items-center justify-between gap-1.5 mb-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="w-6 h-6 rounded-lg bg-orange-100 dark:bg-orange-900/40 text-[#ea580c] dark:text-orange-400 flex items-center justify-center shrink-0">
-                                                                        <card.icon size={13} />
-                                                                    </div>
-                                                                    <span className="font-semibold text-xs text-slate-800 dark:text-slate-100 group-hover:text-[#ea580c] dark:group-hover:text-orange-300 transition-colors">
-                                                                        {card.title}
-                                                                    </span>
-                                                                </div>
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                                                                    {card.badge}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug pl-8">
-                                                                {card.desc}
-                                                            </p>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {isAILoading && (
-                                            <div className="flex justify-start">
-                                                <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0">
-                                                    <Brain size={12} className="text-white" />
-                                                </div>
-                                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-xs flex gap-1 border border-slate-200/50 dark:border-slate-700/50">
-                                                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
-                                                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div ref={aiChatEndRef} />
-                                    </div>
-
-                                    {/* Input Form with safe bottom area */}
-                                    <form onSubmit={handleResidentAIChat} className="p-2.5 sm:p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={aiQuery}
-                                                onChange={e => setAiQuery(e.target.value)}
-                                                placeholder="Ask PULSEAI..."
-                                                className="flex-1 bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-[#f05a00]/30 rounded-xl px-3.5 py-2.5 text-xs sm:text-[13px] text-slate-900 dark:text-white focus:ring-2 focus:ring-[#f05a00] outline-none placeholder:text-slate-400"
-                                            />
-                                            <button
-                                                type="submit"
-                                                disabled={isAILoading || !aiQuery.trim()}
-                                                className="w-10 h-10 rounded-xl bg-[#f05a00] hover:bg-[#d94e00] flex items-center justify-center text-white transition-colors disabled:opacity-40 shrink-0 shadow-sm cursor-pointer"
-                                            >
-                                                <Search size={16} />
-                                            </button>
-                                        </div>
-                                    </form>
-                                </>
-                            )}
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
-
-            {/* ── Floating FAB Button (Hidden when maximized on mobile) ── */}
-            <div className={`fixed bottom-[calc(5.1rem+env(safe-area-inset-bottom,0px))] md:bottom-8 right-3.5 sm:right-5 md:right-6 z-[60] ${isAIChatOpen && isAIMaximized ? 'hidden' : 'block'}`}>
+            {/* ── Floating FAB Button (Hidden when maximized on mobile or when search is open) ── */}
+            <div className={`fixed bottom-[calc(5.1rem+env(safe-area-inset-bottom,0px))] md:bottom-8 right-3.5 sm:right-5 md:right-6 z-[60] ${(isAIChatOpen && isAIMaximized) || isHeaderSearchOpen ? 'hidden' : 'block'}`}>
                 <motion.button
                     onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                     whileHover={{ scale: 1.05 }}

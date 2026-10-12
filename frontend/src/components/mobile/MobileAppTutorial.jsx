@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import PulsoIcon from '../common/PulsoIcon';
+import PulsoBottomScrim from './PulsoBottomScrim';
 import { markTutorialCompleted } from '../../utils/appContext';
 import { getAuthToken } from '../../utils/authSession';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -27,6 +28,7 @@ import { useTheme } from '../../contexts/ThemeContext';
  */
 export default function MobileAppTutorial({
   replayMode = false,
+  isAuthenticated,
   onComplete,
   isTestMode = false,
   stepOverride,
@@ -37,7 +39,15 @@ export default function MobileAppTutorial({
   themeModeOverride = null
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const themeContext = useTheme();
+
+  // Detect whether resident is accessing from profile/settings or already authenticated
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(location?.search || '') : null;
+  const fromProfile = searchParams?.get('from') === 'profile' || searchParams?.get('tab') === 'profile';
+  const hasAuthToken = typeof window !== 'undefined' && Boolean(getAuthToken());
+  const isResidentLoggedIn = isAuthenticated !== undefined ? isAuthenticated : (hasAuthToken || fromProfile);
+  const returnToProfile = fromProfile || (replayMode && hasAuthToken) || (isResidentLoggedIn && !isTestMode);
 
   // Active theme calculation (test override or app ThemeContext)
   const activeSetting = themeModeOverride || themeContext?.theme || 'system';
@@ -58,7 +68,9 @@ export default function MobileAppTutorial({
   }, []);
 
   // Determine whether active view renders Dark or Light
-  const isDark = activeSetting === 'dark' || (activeSetting === 'system' && osPrefersDark);
+  const isDark = themeModeOverride
+    ? (themeModeOverride === 'dark' || (themeModeOverride === 'system' && osPrefersDark))
+    : (themeContext?.isDark ?? (typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : (activeSetting === 'dark' || (activeSetting === 'system' && osPrefersDark))));
 
   const [currentStep, setCurrentStep] = useState(stepOverride || 1);
   const [touchStart, setTouchStart] = useState(null);
@@ -89,39 +101,44 @@ export default function MobileAppTutorial({
     }
     if (onComplete) {
       onComplete();
+    } else if (returnToProfile) {
+      navigate('/dashboard?tab=profile');
     } else if (replayMode) {
       if (getAuthToken()) {
-        navigate('/dashboard');
+        navigate('/dashboard?tab=profile');
       } else {
         navigate('/resident-home');
       }
     } else {
       if (getAuthToken()) {
-        navigate('/dashboard');
+        navigate('/dashboard?tab=profile');
       } else {
         navigate(destination);
       }
     }
-  }, [navigate, onComplete, replayMode, isTestMode, onNavigate]);
+  }, [navigate, onComplete, replayMode, isTestMode, onNavigate, returnToProfile]);
 
   const handleNext = () => {
     if (currentStep < totalSteps) {
       changeStep(currentStep + 1);
     } else {
-      finishTutorial('/register', 'Register tapped');
+      finishTutorial(
+        returnToProfile ? '/dashboard?tab=profile' : '/register',
+        returnToProfile ? 'Back to Settings tapped' : 'Register tapped'
+      );
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
       changeStep(currentStep - 1);
-    } else if (replayMode) {
-      finishTutorial('/dashboard', 'Close tutorial tapped');
+    } else if (replayMode || returnToProfile) {
+      finishTutorial(returnToProfile ? '/dashboard?tab=profile' : '/dashboard', 'Close tutorial tapped');
     }
   };
 
   const handleSkip = () => {
-    finishTutorial('/report', 'Skip tapped');
+    finishTutorial(returnToProfile ? '/dashboard?tab=profile' : '/report', 'Skip tapped');
   };
 
   const handleSignIn = () => {
@@ -188,16 +205,12 @@ export default function MobileAppTutorial({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentStep]);
 
-  // Shared Blended Background styling:
-  const blendedBackgroundStyle = isDark
-    ? {
-        backgroundColor: '#070a12',
-        backgroundImage: 'radial-gradient(ellipse 110% 45% at 50% 0%, rgba(255, 107, 0, 0.14) 0%, rgba(255, 107, 0, 0.04) 28%, transparent 45%)'
-      }
-    : {
-        backgroundColor: '#f8f7f5',
-        backgroundImage: 'radial-gradient(ellipse 110% 45% at 50% 0%, rgba(255, 107, 0, 0.10) 0%, rgba(255, 107, 0, 0.03) 26%, transparent 45%)'
-      };
+  // City Scene Background styling & Tokens:
+  const skyColor = isDark ? '#080D19' : '#EAF2FF';
+  const bgImg = isDark ? 'url(/pulso-bg-dark.svg)' : 'url(/pulso-bg-light.svg)';
+  const scrimGradient = isDark
+    ? 'linear-gradient(to top, rgba(11, 17, 32, 0.15) 0%, rgba(11, 17, 32, 0.10) 45%, rgba(11, 17, 32, 0) 100%)'
+    : 'linear-gradient(to top, rgba(245, 249, 255, 0.15) 0%, rgba(245, 249, 255, 0.10) 45%, rgba(245, 249, 255, 0) 100%)';
 
   return (
     <div
@@ -211,164 +224,180 @@ export default function MobileAppTutorial({
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      style={blendedBackgroundStyle}
+      data-theme={isDark ? 'dark' : 'light'}
+      style={{
+        backgroundColor: skyColor,
+        '--bg-scrim-rgb': isDark ? '11, 17, 32' : '245, 249, 255',
+        transition: reducedMotion ? 'none' : 'background-color 150ms ease, color 150ms ease'
+      }}
       className={`relative w-full ${
-        isTestMode ? 'h-full' : 'h-[100dvh]'
-      } max-w-md mx-auto flex flex-col justify-between px-5 pt-3 pb-5 sm:pb-6 select-none overflow-hidden font-sans transition-colors duration-150 ${
+        isTestMode ? 'h-full' : 'min-h-[100vh] min-h-[100dvh]'
+      } flex flex-col justify-between items-center select-none overflow-hidden font-sans ${
         isDark ? 'text-white' : 'text-slate-900'
       } ${reducedMotion ? '[&_*]:transition-none! [&_*]:animate-none!' : ''}`}
       role="region"
       aria-label="PULSO First Launch Tutorial"
     >
+      {/* City scene illustration layer (30rem / 480px column centered on wide screens) */}
+      <div
+        className="absolute inset-0 w-full max-w-[480px] mx-auto pointer-events-none select-none z-0"
+        style={{
+          backgroundImage: bgImg,
+          backgroundSize: '100% auto',
+          backgroundPosition: 'center bottom',
+          backgroundRepeat: 'no-repeat',
+          transition: reducedMotion ? 'none' : 'background-image 150ms ease'
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Soft blurred bottom fade scrim behind action zone */}
+      <PulsoBottomScrim isDark={isDark} />
+
       {/* Live accessibility region for screen reader announcements */}
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
 
-      {/* ── TOP BAR: Back Button, Progress Dots, Skip/Close Button ── */}
-      <header className="relative z-10 w-full flex items-center justify-between h-12 shrink-0">
-        {/* Back Button (48x48px tap target) */}
-        <div className="w-12 h-12 flex items-center justify-start">
-          {currentStep > 1 ? (
-            <button
-              type="button"
-              onClick={handleBack}
-              aria-label="Go to previous screen"
-              className={`w-12 h-12 -ml-2 rounded-full flex items-center justify-center active:scale-95 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
-                isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <PulsoIcon
-                name="back"
-                size={24}
-                className={isDark ? 'text-slate-300' : 'text-slate-700'}
-              />
-            </button>
-          ) : replayMode ? (
-            <button
-              type="button"
-              onClick={() => finishTutorial('/dashboard')}
-              aria-label="Close tutorial"
-              className={`w-12 h-12 -ml-2 rounded-full flex items-center justify-center active:scale-95 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
-                isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <PulsoIcon
-                name="close"
-                size={20}
-                className={isDark ? 'text-slate-300' : 'text-slate-700'}
-              />
-            </button>
-          ) : (
-            <div className="w-12 h-12" aria-hidden="true" />
-          )}
-        </div>
+      {/* Centered Column Content Wrapper (30rem / 480px max-width) */}
+      <div className="relative z-10 w-full max-w-[480px] mx-auto flex-1 flex flex-col justify-between px-5 pt-3 pb-5 sm:pb-6">
 
-        {/* 5 Progress Dots */}
-        <nav
-          className="flex items-center gap-1.5"
-          aria-label={`Tutorial progress: Step ${currentStep} of ${totalSteps}`}
-        >
-          {Array.from({ length: totalSteps }).map((_, idx) => {
-            const stepNum = idx + 1;
-            const isActive = stepNum === currentStep;
-            return (
+        {/* ── TOP BAR: Back Button, Progress Dots, Skip/Close Button ── */}
+        <header className="w-full flex items-center justify-between h-12 shrink-0">
+          {/* Back Button (48x48px tap target) */}
+          <div className="w-12 h-12 flex items-center justify-start">
+            {currentStep > 1 ? (
               <button
-                key={stepNum}
                 type="button"
-                onClick={() => changeStep(stepNum)}
-                aria-label={`Go to Step ${stepNum} of ${totalSteps}${isActive ? ' (Current)' : ''}`}
-                className={`transition-all duration-200 rounded-full h-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
-                  isActive
-                    ? 'w-7 bg-[#ff6b00]'
-                    : isDark
-                    ? 'w-2 bg-slate-700/80 hover:bg-slate-500'
-                    : 'w-2 bg-slate-300 hover:bg-slate-400'
-                }`}
-              />
-            );
-          })}
-        </nav>
-
-        {/* Skip Button (screens 1-4, 48x48px tap target, pulso-small 14px) */}
-        <div className="w-12 h-12 flex items-center justify-end">
-          {currentStep < totalSteps ? (
-            <button
-              type="button"
-              onClick={handleSkip}
-              aria-label="Skip onboarding tutorial"
-              className={`min-h-[48px] min-w-[48px] -mr-2 px-3 py-2 pulso-small font-medium active:scale-95 transition-colors cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
-                isDark
-                  ? 'text-[#ff8a3d] hover:text-orange-300'
-                  : 'text-[#c2410c] hover:text-[#9a3412]'
-              }`}
-            >
-              Skip
-            </button>
-          ) : replayMode ? (
-            <button
-              type="button"
-              onClick={() => finishTutorial('/dashboard')}
-              aria-label="Close tutorial"
-              className={`w-12 h-12 -mr-2 rounded-full flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
-                isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <PulsoIcon
-                name="close"
-                size={20}
-                className={isDark ? 'text-slate-400' : 'text-slate-600'}
-              />
-            </button>
-          ) : (
-            <div className="w-12 h-12" aria-hidden="true" />
-          )}
-        </div>
-      </header>
-
-      {/* ── 2. CONTENT ZONE: Vertical Centering slightly above true center (~45% from top) ── */}
-      <main className="relative z-10 flex-1 flex flex-col justify-center items-center w-full min-h-0 py-2 pb-[6%]">
-        
-        {/* ── SCREEN 1: WELCOME ── */}
-        {currentStep === 1 && (
-          <div className="w-full max-w-sm mx-auto flex flex-col justify-center items-center text-center animate-fadeIn">
-            {/* Real Caloocan City seal with faint decorative rings (aria-hidden) */}
-            <div className="relative flex items-center justify-center mb-6">
-              {/* Faint decorative outer ring */}
-              <div
-                className="w-28 h-28 sm:w-32 sm:h-32 rounded-full border border-orange-500/15 absolute pointer-events-none"
-                aria-hidden="true"
-              />
-              {/* Faint decorative inner ring */}
-              <div
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border border-orange-500/20 absolute pointer-events-none"
-                aria-hidden="true"
-              />
-
-              {/* Seal container */}
-              <div
-                className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full p-1 flex items-center justify-center overflow-hidden shadow-sm transition-colors ${
-                  isDark
-                    ? 'bg-slate-900 border border-slate-800'
-                    : 'bg-white border border-slate-200/90'
+                onClick={handleBack}
+                aria-label="Go to previous screen"
+                className={`w-12 h-12 -ml-2 rounded-full flex items-center justify-center active:scale-95 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                  isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <img
-                  src="/city-engineering-logo.png"
-                  alt="Official Caloocan City Seal"
-                  className="w-full h-full object-contain rounded-full"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = '/engineering-logo.jpg';
-                  }}
+                <PulsoIcon
+                  name="back"
+                  size={24}
+                  className={isDark ? 'text-slate-300' : 'text-slate-700'}
                 />
+              </button>
+            ) : (replayMode || returnToProfile) ? (
+              <button
+                type="button"
+                onClick={() => finishTutorial(returnToProfile ? '/dashboard?tab=profile' : '/dashboard', 'Close tutorial tapped')}
+                aria-label="Close tutorial"
+                className={`w-12 h-12 -ml-2 rounded-full flex items-center justify-center active:scale-95 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                  isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <PulsoIcon
+                  name="close"
+                  size={20}
+                  className={isDark ? 'text-slate-300' : 'text-slate-700'}
+                />
+              </button>
+            ) : (
+              <div className="w-12 h-12" aria-hidden="true" />
+            )}
+          </div>
+
+          {/* 5 Progress Dots (48px tap target per dot, 35% white in dark, 40% slate in light) */}
+          <nav
+            className="flex items-center gap-0.5"
+            aria-label={`Tutorial progress: Step ${currentStep} of ${totalSteps}`}
+          >
+            {Array.from({ length: totalSteps }).map((_, idx) => {
+              const stepNum = idx + 1;
+              const isActive = stepNum === currentStep;
+              return (
+                <button
+                  key={stepNum}
+                  type="button"
+                  onClick={() => changeStep(stepNum)}
+                  aria-label={`Go to Step ${stepNum} of ${totalSteps}${isActive ? ' (Current)' : ''}`}
+                  className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-full"
+                >
+                  <span
+                    className={`transition-all duration-200 rounded-full ${
+                      isActive
+                        ? 'w-7 h-2 bg-[#ff6b00]'
+                        : isDark
+                        ? 'w-2 h-2 bg-white/35 hover:bg-white/50'
+                        : 'w-2 h-2 bg-[#334155]/40 hover:bg-[#334155]/60'
+                    }`}
+                  />
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Skip Button (screens 1-4, 48x48px tap target, pulso-small 14px, WCAG AA compliant >= 4.5:1) */}
+          <div className="w-12 h-12 flex items-center justify-end">
+            {currentStep < totalSteps ? (
+              <button
+                type="button"
+                onClick={handleSkip}
+                aria-label="Skip onboarding tutorial"
+                className={`min-h-[48px] min-w-[48px] -mr-2 px-3 py-2 pulso-small font-semibold active:scale-95 transition-colors cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                  isDark
+                    ? 'text-[#FF8A3D] hover:text-[#FFA266]'
+                    : 'text-[#B83A00] hover:text-[#8F2D00]'
+                }`}
+              >
+                Skip
+              </button>
+            ) : (replayMode || returnToProfile) ? (
+              <button
+                type="button"
+                onClick={() => finishTutorial(returnToProfile ? '/dashboard?tab=profile' : '/dashboard', 'Close tutorial tapped')}
+                aria-label="Close tutorial"
+                className={`w-12 h-12 -mr-2 rounded-full flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                  isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <PulsoIcon
+                  name="close"
+                  size={20}
+                  className={isDark ? 'text-slate-400' : 'text-slate-600'}
+                />
+              </button>
+            ) : (
+              <div className="w-12 h-12" aria-hidden="true" />
+            )}
+          </div>
+        </header>
+
+        {/* ── 2. CONTENT ZONE: Vertical Centering in top 58% of screen height ── */}
+        <main className="flex-1 flex flex-col justify-center items-center w-full min-h-0 py-2 pb-4 overflow-y-auto sm:overflow-visible">
+          
+          {/* ── SCREEN 1: WELCOME ── */}
+          {currentStep === 1 && (
+            <div className="w-full max-w-sm mx-auto flex flex-col justify-center items-center text-center animate-fadeIn">
+              {/* Real Caloocan City seal (5rem / 80px, no glow, no decorative rings, thin white outline in light mode) */}
+              <div className="relative flex items-center justify-center mb-6">
+                <div
+                  className={`relative w-20 h-20 rounded-full p-1 flex items-center justify-center overflow-hidden transition-colors ${
+                    isDark
+                      ? 'bg-slate-900 border border-slate-800'
+                      : 'bg-white border border-[rgba(255,255,255,0.85)] shadow-xs'
+                  }`}
+                >
+                  <img
+                    src="/city-engineering-logo.png"
+                    alt="Official Caloocan City Seal"
+                    className="w-full h-full object-contain rounded-full"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = '/engineering-logo.jpg';
+                    }}
+                  />
+                </div>
               </div>
-            </div>
 
             {/* Display Heading: strictly 2 lines ("Report city problems" / "in minutes.") */}
             <h1
               className={`font-bold text-center mx-auto mb-3 transition-colors text-[1.5rem] min-[380px]:text-[1.65rem] min-[420px]:text-[1.8rem] leading-[1.18] tracking-tight ${
-                isDark ? 'text-white' : 'text-[#0c2436]'
+                isDark ? 'text-white' : 'text-[#0B1630]'
               }`}
             >
               <span className="block">Report city problems</span>
@@ -381,7 +410,7 @@ export default function MobileAppTutorial({
                 maxWidth: '30ch'
               }}
               className={`text-[1rem] leading-[1.5] font-normal text-center mx-auto transition-colors [text-wrap:pretty] ${
-                isDark ? 'text-slate-300' : 'text-[#475569]'
+                isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
               }`}
             >
               PULSO is Caloocan City&apos;s direct line to City Engineering for fast repairs.
@@ -396,14 +425,14 @@ export default function MobileAppTutorial({
             <div className="text-center mb-6">
               <h2
                 className={`pulso-h1 font-bold text-center transition-colors [text-wrap:balance] ${
-                  isDark ? 'text-white' : 'text-[#0c2436]'
+                  isDark ? 'text-white' : 'text-[#0B1630]'
                 }`}
               >
                 Tell us what&apos;s wrong.
               </h2>
               <p
                 className={`pulso-body font-normal text-center mt-2 transition-colors [text-wrap:pretty] ${
-                  isDark ? 'text-slate-300' : 'text-[#475569]'
+                  isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                 }`}
               >
                 Three quick steps. No technical knowledge needed.
@@ -431,7 +460,7 @@ export default function MobileAppTutorial({
                     />
                     <h3
                       className={`text-[1rem] sm:text-[1.0625rem] font-semibold tracking-tight whitespace-nowrap transition-colors ${
-                        isDark ? 'text-white' : 'text-[#0c2436]'
+                        isDark ? 'text-white' : 'text-[#0B1630]'
                       }`}
                     >
                       Take a photo
@@ -439,7 +468,7 @@ export default function MobileAppTutorial({
                   </div>
                   <p
                     className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
-                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                      isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                     }`}
                   >
                     Show the broken streetlight, pothole, or leak.
@@ -466,7 +495,7 @@ export default function MobileAppTutorial({
                     />
                     <h3
                       className={`text-[1rem] sm:text-[1.0625rem] font-semibold tracking-tight whitespace-nowrap transition-colors ${
-                        isDark ? 'text-white' : 'text-[#0c2436]'
+                        isDark ? 'text-white' : 'text-[#0B1630]'
                       }`}
                     >
                       Choose what&apos;s wrong
@@ -474,7 +503,7 @@ export default function MobileAppTutorial({
                   </div>
                   <p
                     className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
-                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                      isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                     }`}
                   >
                     Pick the closest match, like Road or Water.
@@ -501,7 +530,7 @@ export default function MobileAppTutorial({
                     />
                     <h3
                       className={`text-[1rem] sm:text-[1.0625rem] font-semibold tracking-tight whitespace-nowrap transition-colors ${
-                        isDark ? 'text-white' : 'text-[#0c2436]'
+                        isDark ? 'text-white' : 'text-[#0B1630]'
                       }`}
                     >
                       Check the place and send
@@ -509,7 +538,7 @@ export default function MobileAppTutorial({
                   </div>
                   <p
                     className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
-                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                      isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                     }`}
                   >
                     Your phone finds where you are.
@@ -526,14 +555,14 @@ export default function MobileAppTutorial({
             <div className="text-center mb-6">
               <h2
                 className={`pulso-h1 font-bold text-center transition-colors [text-wrap:balance] ${
-                  isDark ? 'text-white' : 'text-[#0c2436]'
+                  isDark ? 'text-white' : 'text-[#0B1630]'
                 }`}
               >
                 City Engineering gets your report.
               </h2>
               <p
                 className={`pulso-body font-normal text-center mt-2 transition-colors [text-wrap:pretty] ${
-                  isDark ? 'text-slate-300' : 'text-[#475569]'
+                  isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                 }`}
               >
                 We review every report and send a team to fix it.
@@ -550,14 +579,14 @@ export default function MobileAppTutorial({
                 <div>
                   <h3
                     className={`pulso-body font-semibold block transition-colors ${
-                      isDark ? 'text-white' : 'text-[#0c2436]'
+                      isDark ? 'text-white' : 'text-[#0B1630]'
                     }`}
                   >
                     We check your report
                   </h3>
                   <p
                     className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
-                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                      isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                     }`}
                   >
                     Engineers verify the photo and location.
@@ -569,14 +598,14 @@ export default function MobileAppTutorial({
                 <div>
                   <h3
                     className={`pulso-body font-semibold block transition-colors ${
-                      isDark ? 'text-white' : 'text-[#0c2436]'
+                      isDark ? 'text-white' : 'text-[#0B1630]'
                     }`}
                   >
                     We send a crew
                   </h3>
                   <p
                     className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
-                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                      isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                     }`}
                   >
                     A repair team goes to the site to fix the problem.
@@ -588,14 +617,14 @@ export default function MobileAppTutorial({
                 <div>
                   <h3
                     className={`pulso-body font-semibold block transition-colors ${
-                      isDark ? 'text-white' : 'text-[#0c2436]'
+                      isDark ? 'text-white' : 'text-[#0B1630]'
                     }`}
                   >
                     We update you
                   </h3>
                   <p
                     className={`pulso-small font-normal mt-0.5 leading-snug transition-colors ${
-                      isDark ? 'text-slate-300' : 'text-[#475569]'
+                      isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                     }`}
                   >
                     You can track the progress until it&apos;s done.
@@ -612,14 +641,14 @@ export default function MobileAppTutorial({
             <div className="text-center mb-5">
               <h2
                 className={`pulso-h1 font-bold text-center transition-colors [text-wrap:balance] ${
-                  isDark ? 'text-white' : 'text-[#0c2436]'
+                  isDark ? 'text-white' : 'text-[#0B1630]'
                 }`}
               >
                 Follow your report.
               </h2>
               <p
                 className={`pulso-body font-normal text-center mt-2 transition-colors [text-wrap:pretty] ${
-                  isDark ? 'text-slate-300' : 'text-[#475569]'
+                  isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                 }`}
               >
                 Check live progress anytime with your tracking code.
@@ -640,7 +669,7 @@ export default function MobileAppTutorial({
                   </span>
                   <span
                     className={`tabular-nums font-semibold text-[15px] sm:text-[16px] ${
-                      isDark ? 'text-[#ff8a3d]' : 'text-[#c2410c]'
+                      isDark ? 'text-[#FF8A3D]' : 'text-[#B83A00]'
                     }`}
                   >
                     PUL-2026-1049
@@ -670,14 +699,14 @@ export default function MobileAppTutorial({
                   <div>
                     <span
                       className={`pulso-body font-semibold block transition-colors ${
-                        isDark ? 'text-white' : 'text-[#0c2436]'
+                        isDark ? 'text-white' : 'text-[#0B1630]'
                       }`}
                     >
                       Received
                     </span>
                     <span
                       className={`pulso-small block mt-0.5 transition-colors ${
-                        isDark ? 'text-slate-300' : 'text-[#475569]'
+                        isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                       }`}
                     >
                       Your report is confirmed and reviewed.
@@ -697,7 +726,7 @@ export default function MobileAppTutorial({
                     <div className="flex items-center gap-2">
                       <span
                         className={`pulso-body font-semibold block transition-colors ${
-                          isDark ? 'text-white' : 'text-[#0c2436]'
+                          isDark ? 'text-white' : 'text-[#0B1630]'
                         }`}
                       >
                         In progress
@@ -712,7 +741,7 @@ export default function MobileAppTutorial({
                     </div>
                     <span
                       className={`pulso-small block mt-0.5 transition-colors ${
-                        isDark ? 'text-slate-300' : 'text-[#475569]'
+                        isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
                       }`}
                     >
                       A repair crew is working on the fix.
@@ -733,7 +762,7 @@ export default function MobileAppTutorial({
                   <div>
                     <span
                       className={`pulso-body font-semibold block transition-colors ${
-                        isDark ? 'text-white' : 'text-[#0c2436]'
+                        isDark ? 'text-white' : 'text-[#0B1630]'
                       }`}
                     >
                       Resolved
@@ -766,14 +795,14 @@ export default function MobileAppTutorial({
 
             <h2
               className={`pulso-h1 font-bold text-center mb-2 transition-colors [text-wrap:balance] ${
-                isDark ? 'text-white' : 'text-[#0c2436]'
+                isDark ? 'text-white' : 'text-[#0B1630]'
               }`}
             >
               You&apos;re ready.
             </h2>
             <p
               className={`pulso-body font-normal text-center transition-colors [text-wrap:pretty] ${
-                isDark ? 'text-slate-300' : 'text-[#475569]'
+                isDark ? 'text-[#CBD5E1]' : 'text-[#334155]'
               }`}
             >
               Create your account to start reporting issues and track repairs in Caloocan.
@@ -784,103 +813,70 @@ export default function MobileAppTutorial({
       </main>
 
       {/* ── 3. ACTION ZONE: Primary Button & Screen 1 / 5 Secondary Links ── */}
-      <footer className="relative z-10 w-full shrink-0 pt-2 pb-1">
-        {/* Primary Action Button (16px semibold 600, sentence case, min-h-[50px], white text & icon in all modes) */}
+      <div role="region" aria-label="Action zone" className="w-full shrink-0 pt-2 pb-1 bg-transparent">
+        {/* Primary Action Button (16px semibold 600, sentence case, min-h-[50px], dark navy text for 6.1:1 contrast on #FF6B00) */}
         <button
           type="button"
           onClick={handleNext}
-          className={`w-full min-h-[50px] sm:min-h-[52px] rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] pulso-btn-text font-semibold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer text-white focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-offset-2 ${
+          className={`w-full min-h-[50px] sm:min-h-[52px] rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] pulso-btn-text font-semibold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer text-[#0B1630] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-offset-2 ${
             isDark
-              ? 'focus-visible:ring-offset-slate-950 focus-visible:ring-[#ff6b00]'
-              : 'focus-visible:ring-offset-[#f8f7f5] focus-visible:ring-[#ff6b00]'
+              ? 'focus-visible:ring-offset-[#080D19] focus-visible:ring-[#ff6b00]'
+              : 'focus-visible:ring-offset-[#EAF2FF] focus-visible:ring-[#ff6b00]'
           }`}
         >
-          <span className="text-white">{currentStep === totalSteps ? 'Register' : 'Next'}</span>
+          <span className="text-[#0B1630] font-semibold">
+            {currentStep === totalSteps ? (returnToProfile ? 'Back to Settings' : 'Register') : 'Next'}
+          </span>
           <PulsoIcon
             name="next"
             size={20}
-            className="text-white"
+            className="text-[#0B1630]"
           />
         </button>
 
         {/* Secondary Action Row: Anchored with equal spacing */}
-        <div className="mt-3 min-h-[28px] flex flex-col items-center justify-center">
-          {currentStep === 1 ? (
+        <div className="mt-2.5 min-h-[32px] flex flex-col items-center justify-center">
+          {currentStep === 1 && !isResidentLoggedIn ? (
             <div
-              className={`text-center pulso-small transition-colors ${
-                isDark ? 'text-slate-400' : 'text-slate-600'
+              className={`text-center pulso-small font-normal transition-colors ${
+                isDark ? 'text-[#B6C2DC]' : 'text-[#334155]'
               }`}
             >
               Already have an account?{' '}
               <button
                 type="button"
                 onClick={handleSignIn}
-                className={`font-semibold hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded px-1 transition-colors ${
-                  isDark ? 'text-[#ff8a3d]' : 'text-[#c2410c]'
+                className={`font-bold hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded px-1 transition-colors ${
+                  isDark ? 'text-[#FF8A3D] hover:text-[#FFA266]' : 'text-[#B83A00] hover:text-[#8F2D00]'
                 }`}
               >
                 Sign in
               </button>
             </div>
-          ) : currentStep === totalSteps ? (
-            <div className="w-full text-center space-y-1">
-              <div
-                className={`pulso-small transition-colors ${
-                  isDark ? 'text-slate-400' : 'text-slate-600'
+          ) : currentStep === totalSteps && !isResidentLoggedIn ? (
+            <div
+              className={`text-center pulso-small font-normal transition-colors ${
+                isDark ? 'text-[#B6C2DC]' : 'text-[#334155]'
+              }`}
+            >
+              Already registered?{' '}
+              <button
+                type="button"
+                onClick={handleSignIn}
+                className={`font-bold hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded px-1 transition-colors ${
+                  isDark ? 'text-[#FF8A3D] hover:text-[#FFA266]' : 'text-[#B83A00] hover:text-[#8F2D00]'
                 }`}
               >
-                Already registered?{' '}
-                <button
-                  type="button"
-                  onClick={handleSignIn}
-                  className={`font-semibold hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded px-1 transition-colors ${
-                    isDark ? 'text-[#ff8a3d]' : 'text-[#c2410c]'
-                  }`}
-                >
-                  Sign in
-                </button>
-              </div>
-
-              {/* Emergency Banner Note (Strictly one line across all phones) */}
-              <div
-                className={`pt-1 flex items-center justify-center gap-1.5 text-[12px] sm:text-[13px] tracking-tight whitespace-nowrap border-t transition-colors ${
-                  isDark
-                    ? 'text-red-400 border-slate-900'
-                    : 'text-red-700 border-slate-200'
-                }`}
-              >
-                <PulsoIcon
-                  name="warning"
-                  size={13}
-                  className={isDark ? 'text-red-400 shrink-0' : 'text-red-700 shrink-0'}
-                />
-                <span className="whitespace-nowrap">
-                  In a life-threatening emergency, call{' '}
-                  <a
-                    href="tel:911"
-                    onClick={(e) => {
-                      if (isTestMode) {
-                        e.preventDefault();
-                        onNavigate?.('tel:911', 'Emergency 911 tapped (tel:911 verified)');
-                      }
-                    }}
-                    className={`font-bold underline ${
-                      isDark ? 'text-red-400 hover:text-red-300' : 'text-red-700 hover:text-red-800'
-                    }`}
-                    aria-label="Call 911 emergency hotline"
-                  >
-                    911
-                  </a>{' '}
-                  first.
-                </span>
-              </div>
+                Sign in
+              </button>
             </div>
           ) : (
-            /* Screens 2, 3, 4: Clean spacer, keeping primary button anchored identically */
+            /* Screens 2, 3, 4 (and when authenticated on Screen 1 & 5): Clean spacer */
             <div className="h-5" aria-hidden="true" />
           )}
         </div>
-      </footer>
+      </div>
+      </div>
     </div>
   );
 }

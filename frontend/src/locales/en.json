@@ -776,7 +776,8 @@
         "s1_desc": "Residents are accountable for the accuracy of their reports. Submitting false or fake reports may result in account restrictions or suspension."
       },
       "topNav": {
-        "searchPlaceholder": "Search PULSO...",
+        "searchPlaceholder": "Search PULSO",
+        "searchCompactPlaceholder": "Search",
         "recentSearches": "Recent Searches"
       }
     },

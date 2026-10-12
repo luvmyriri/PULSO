@@ -101,7 +101,7 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
             id: 'settings',
             label: 'Settings',
             icon: Settings,
-            to: '/gov/administration?view=staff',
+            to: '/gov/administration?view=settings&tab=settings',
             matches: ['/gov/settings', '/gov/administration', '/gov/audit-logs', '/gov/users', '/gov/residents']
         }
     ];

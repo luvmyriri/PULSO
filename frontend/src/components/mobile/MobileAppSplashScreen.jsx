@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import PulsoBottomScrim from './PulsoBottomScrim';
 
 /**
  * MobileAppSplashScreen
@@ -159,10 +160,14 @@ export default function MobileAppSplashScreen({
     }
   };
 
-  const bgColor = isDark ? '#070a12' : '#f8f7f5';
-  const textColor = isDark ? '#ffffff' : '#0c2436';
-  const captionColor = isDark ? '#94a3b8' : '#64748b';
+  const skyColor = isDark ? '#080D19' : '#EAF2FF';
+  const textColor = isDark ? '#ffffff' : '#0B1630';
+  const captionColor = isDark ? '#CBD5E1' : '#334155';
   const orange = '#ff6b00';
+  const bgImg = isDark ? 'url(/pulso-bg-dark.svg)' : 'url(/pulso-bg-light.svg)';
+  const scrimGradient = isDark
+    ? 'linear-gradient(to top, rgba(11, 17, 32, 0.15) 0%, rgba(11, 17, 32, 0.10) 45%, rgba(11, 17, 32, 0) 100%)'
+    : 'linear-gradient(to top, rgba(245, 249, 255, 0.15) 0%, rgba(245, 249, 255, 0.10) 45%, rgba(245, 249, 255, 0) 100%)';
 
   // Slow connection message (> 5s) and offline error (> 12s or offline)
   const showSlowMessage = (elapsedSeconds >= 5 || forceSlow) && !isOffline && elapsedSeconds < 12 && !forceOffline;
@@ -173,17 +178,35 @@ export default function MobileAppSplashScreen({
       role="status"
       aria-live="polite"
       aria-label="Loading PULSO"
+      data-theme={isDark ? 'dark' : 'light'}
       style={{
-        backgroundColor: bgColor,
+        backgroundColor: skyColor,
+        '--bg-scrim-rgb': isDark ? '11, 17, 32' : '245, 249, 255',
         transition: reducedMotion ? 'none' : 'opacity 250ms ease-out',
         opacity: isFadingOut ? 0 : 1
       }}
       className={`${
         isTestMode
           ? 'absolute inset-0 z-30 w-full h-full'
-          : 'fixed inset-0 z-[99999] w-full h-[100dvh]'
+          : 'fixed inset-0 z-[99999] w-full min-h-[100vh] min-h-[100dvh]'
       } flex flex-col justify-between items-center select-none overflow-hidden font-sans`}
     >
+      {/* Background illustration layer (30rem / 480px column centered on wide screens) */}
+      <div
+        className="absolute inset-0 w-full max-w-[480px] mx-auto pointer-events-none select-none z-0"
+        style={{
+          backgroundImage: bgImg,
+          backgroundSize: '100% auto',
+          backgroundPosition: 'center bottom',
+          backgroundRepeat: 'no-repeat',
+          transition: reducedMotion ? 'none' : 'background-image 150ms ease'
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Soft blurred bottom fade scrim behind caption and action zone */}
+      <PulsoBottomScrim isDark={isDark} />
+
       {/* Invisible screen reader announcement */}
       <span className="sr-only">Loading PULSO</span>
 
@@ -301,7 +324,7 @@ export default function MobileAppSplashScreen({
                 }
               >
                 {/* Background Mask to conceal the flat line directly beneath the heartbeat wave */}
-                <rect x="-14" y="0" width="28" height="20" fill={bgColor} />
+                <rect x="-14" y="0" width="28" height="20" fill={skyColor} />
 
                 {/* Heartbeat Peak & Dip Path */}
                 <path
@@ -341,7 +364,7 @@ export default function MobileAppSplashScreen({
               <button
                 type="button"
                 onClick={handleRetry}
-                className="min-h-[48px] px-6 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-semibold text-sm shadow-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400 focus-visible:ring-offset-2"
+                className="min-h-[48px] px-6 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-[#0B1630] font-semibold text-sm shadow-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400 focus-visible:ring-offset-2"
                 style={{
                   outlineOffset: '2px'
                 }}

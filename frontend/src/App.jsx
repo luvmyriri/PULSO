@@ -272,7 +272,7 @@ function App() {
 
                         {/* System Settings — admin + exec only */}
                         <Route path="/gov/settings" element={
-                            <AdminOnly><Navigate to="/gov/administration?view=staff" replace /></AdminOnly>
+                            <AdminOnly><Navigate to="/gov/administration?view=settings&tab=settings" replace /></AdminOnly>
                         } />
 
                         {/* Analytics Intelligence BI Engine — government staff & dispatchers */}

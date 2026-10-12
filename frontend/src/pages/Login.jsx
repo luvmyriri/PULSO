@@ -14,6 +14,8 @@ import LegalModal from '../components/LegalModal';
 import PendingVerificationModal from '../components/PendingVerificationModal';
 import { setAuthSession } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
+import { isInstalledApp } from '../utils/appContext';
+import PulsoBottomScrim from '../components/mobile/PulsoBottomScrim';
 import '../index.css';
 
 /**
@@ -182,6 +184,8 @@ export default function Login() {
 
         return () => observer.disconnect();
     }, [theme]);
+
+    const isApp = isInstalledApp();
 
     // Reset reCAPTCHA verification on theme change to prevent submitting an invalidated token
     const prevThemeStateRef = useRef(isDark);
@@ -703,8 +707,34 @@ export default function Login() {
     };
 
     return (
-        <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden">
-
+        <div
+            style={isApp ? {
+                backgroundColor: isDark ? '#080D19' : '#EAF2FF',
+                transition: 'background-color 150ms ease, color 150ms ease'
+            } : undefined}
+            className={`relative min-h-screen min-h-[100dvh] w-full text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden ${
+                isApp
+                    ? ''
+                    : 'bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12]'
+            }`}
+        >
+            {/* Installed Mobile App City Scene Background */}
+            {isApp && (
+                <>
+                    <div
+                        className="absolute inset-0 w-full max-w-[480px] mx-auto pointer-events-none select-none z-0"
+                        style={{
+                            backgroundImage: isDark ? 'url(/pulso-bg-dark.svg)' : 'url(/pulso-bg-light.svg)',
+                            backgroundSize: '100% auto',
+                            backgroundPosition: 'center bottom',
+                            backgroundRepeat: 'no-repeat',
+                            transition: 'background-image 150ms ease'
+                        }}
+                        aria-hidden="true"
+                    />
+                    <PulsoBottomScrim isDark={isDark} />
+                </>
+            )}
 
             {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
             <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
@@ -731,26 +761,28 @@ export default function Login() {
                 </div>
             </header>
 
-            {/* ── Background Seal Watermark (Desktop only, hidden on mobile) ───── */}
-            <div
-                className="hidden lg:flex absolute inset-0 overflow-hidden pointer-events-none select-none z-0 items-center justify-end"
-                aria-hidden="true"
-            >
-                <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
-                    <div className="absolute inset-0 rounded-full border-2 border-orange-500/30 dark:border-white/20 animate-pulse" style={{ animationDuration: '6s' }} />
-                    <div className="absolute inset-[-18px] sm:inset-[-24px] rounded-full border border-dashed border-[#ff6b00]/40 dark:border-[#ff6b00]/30" />
-                    <div className="absolute inset-[-36px] sm:inset-[-50px] rounded-full border border-slate-400/25 dark:border-white/10" />
+            {/* ── Background Seal Watermark (Desktop website only, hidden in installed app and mobile) ───── */}
+            {!isApp && (
+                <div
+                    className="hidden lg:flex absolute inset-0 overflow-hidden pointer-events-none select-none z-0 items-center justify-end"
+                    aria-hidden="true"
+                >
+                    <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
+                        <div className="absolute inset-0 rounded-full border-2 border-orange-500/30 dark:border-white/20 animate-pulse" style={{ animationDuration: '6s' }} />
+                        <div className="absolute inset-[-18px] sm:inset-[-24px] rounded-full border border-dashed border-[#ff6b00]/40 dark:border-[#ff6b00]/30" />
+                        <div className="absolute inset-[-36px] sm:inset-[-50px] rounded-full border border-slate-400/25 dark:border-white/10" />
 
-                    <img
-                        src="/engineering-logo.jpg"
-                        alt="Official Caloocan City Seal Watermark"
-                        className="w-full h-full object-contain rounded-full drop-shadow-sm dark:brightness-105"
-                        loading="eager"
-                    />
+                        <img
+                            src="/engineering-logo.jpg"
+                            alt="Official Caloocan City Seal Watermark"
+                            className="w-full h-full object-contain rounded-full drop-shadow-sm dark:brightness-105"
+                            loading="eager"
+                        />
 
-                    <div className="absolute inset-0 rounded-full bg-radial from-transparent via-transparent to-white/40 dark:to-[#070a12]/50 pointer-events-none" />
+                        <div className="absolute inset-0 rounded-full bg-radial from-transparent via-transparent to-white/40 dark:to-[#070a12]/50 pointer-events-none" />
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ── Main Content Grid (60/40 Ratio in max-w-7xl on Desktop, Hero hidden on Mobile) ───────────── */}
             <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-6 lg:py-12 flex-1 flex items-center justify-center">

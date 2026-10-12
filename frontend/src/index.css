@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./components/modals/modal-dialogs.css";
 @import "./styles/sweetalert-civic.css";
+@import "./components/search-input.css";
 
 /* ── SELF-HOSTED INTER VARIABLE FONT (Weights 400 to 700 / 100-900, Latin & Latin-Ext under 100KB, no CDN) ── */
 @font-face {
@@ -788,7 +789,6 @@ footer[role="contentinfo"],
   border-top: 1px solid #1e293b !important;
 }
 
-html:not(.dark) footer,
 html:not(.dark) footer[role="contentinfo"],
 html:not(.dark) .civic-footer {
   background-color: #0f172a !important;
@@ -796,47 +796,67 @@ html:not(.dark) .civic-footer {
   border-top: 1px solid #1e293b !important;
 }
 
-html:not(.dark) footer .text-slate-400:not(:hover),
-html:not(.dark) footer .text-slate-400,
-html:not(.dark) footer .text-slate-500:not(:hover),
-html:not(.dark) footer .text-slate-500,
-html:not(.dark) footer p:not(:hover),
-html:not(.dark) footer li:not(:hover) {
+html:not(.dark) footer[role="contentinfo"] .text-slate-400:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-slate-400,
+html:not(.dark) .civic-footer .text-slate-400:not(:hover),
+html:not(.dark) .civic-footer .text-slate-400,
+html:not(.dark) footer[role="contentinfo"] .text-slate-500:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-slate-500,
+html:not(.dark) .civic-footer .text-slate-500:not(:hover),
+html:not(.dark) .civic-footer .text-slate-500,
+html:not(.dark) footer[role="contentinfo"] p:not(:hover),
+html:not(.dark) .civic-footer p:not(:hover),
+html:not(.dark) footer[role="contentinfo"] li:not(:hover),
+html:not(.dark) .civic-footer li:not(:hover) {
   color: #94a3b8 !important;
 }
 
-html:not(.dark) footer .text-slate-300:not(:hover),
-html:not(.dark) footer .text-slate-300 {
+html:not(.dark) footer[role="contentinfo"] .text-slate-300:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-slate-300,
+html:not(.dark) .civic-footer .text-slate-300:not(:hover),
+html:not(.dark) .civic-footer .text-slate-300 {
   color: #cbd5e1 !important;
 }
 
-html:not(.dark) footer .text-slate-200:not(:hover),
-html:not(.dark) footer .text-slate-200,
-html:not(.dark) footer .text-white:not(:hover),
-html:not(.dark) footer .text-white,
-html:not(.dark) footer strong:not(:hover) {
+html:not(.dark) footer[role="contentinfo"] .text-slate-200:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-slate-200,
+html:not(.dark) .civic-footer .text-slate-200:not(:hover),
+html:not(.dark) .civic-footer .text-slate-200,
+html:not(.dark) footer[role="contentinfo"] .text-white:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-white,
+html:not(.dark) .civic-footer .text-white:not(:hover),
+html:not(.dark) .civic-footer .text-white,
+html:not(.dark) footer[role="contentinfo"] strong:not(:hover),
+html:not(.dark) .civic-footer strong:not(:hover) {
   color: #ffffff !important;
 }
 
-html:not(.dark) footer a:not(:hover),
-html:not(.dark) footer button:not(:hover) {
+html:not(.dark) footer[role="contentinfo"] a:not(:hover),
+html:not(.dark) footer[role="contentinfo"] button:not(:hover),
+html:not(.dark) .civic-footer a:not(:hover),
+html:not(.dark) .civic-footer button:not(:hover) {
   color: #94a3b8 !important;
 }
 
-html:not(.dark) footer a:hover,
-html:not(.dark) footer button:hover {
+html:not(.dark) footer[role="contentinfo"] a:hover,
+html:not(.dark) footer[role="contentinfo"] button:hover,
+html:not(.dark) .civic-footer a:hover,
+html:not(.dark) .civic-footer button:hover {
   color: #ff6b00 !important;
 }
 
-html:not(.dark) footer .border-slate-800 {
+html:not(.dark) footer[role="contentinfo"] .border-slate-800,
+html:not(.dark) .civic-footer .border-slate-800 {
   border-color: #1e293b !important;
 }
 
-html:not(.dark) footer .border-slate-700 {
+html:not(.dark) footer[role="contentinfo"] .border-slate-700,
+html:not(.dark) .civic-footer .border-slate-700 {
   border-color: #334155 !important;
 }
 
-html:not(.dark) footer .bg-slate-800\/90 {
+html:not(.dark) footer[role="contentinfo"] .bg-slate-800\/90,
+html:not(.dark) .civic-footer .bg-slate-800\/90 {
   background-color: rgba(30, 41, 59, 0.9) !important;
 }
 
@@ -935,5 +955,64 @@ html:not(.dark) footer .bg-slate-800\/90 {
 input, select, textarea {
   font-size: 1rem;
 }
+
+/* ── PULSO MOBILE APP ONBOARDING SCENE TOKENS & UTILITIES ── */
+:root,
+[data-theme="light"] {
+  --bg-scrim-rgb: 245, 249, 255;
+  --pulso-onboarding-sky: #EAF2FF;
+  --pulso-onboarding-bg-img: url('/pulso-bg-light.svg');
+  --pulso-onboarding-scrim-base: #F5F9FF;
+  --pulso-onboarding-scrim-92: rgba(245, 249, 255, 0.92);
+  --pulso-onboarding-heading: #0B1630;
+  --pulso-onboarding-body: #334155;
+  --pulso-onboarding-link: #B83A00;
+  --pulso-onboarding-link-hover: #8F2D00;
+  --pulso-onboarding-dot-inactive: rgba(51, 65, 85, 0.40);
+  --pulso-onboarding-btn-text: #0B1630;
+  --text-heading: #0B1630;
+  --text-body: #334155;
+  --text-muted: #475569;
+  --link-accent: #B83A00;
+  --link-accent-hover: #8F2D00;
+}
+
+html.dark,
+[data-theme="dark"] {
+  --bg-scrim-rgb: 11, 17, 32;
+  --pulso-onboarding-sky: #080D19;
+  --pulso-onboarding-bg-img: url('/pulso-bg-dark.svg');
+  --pulso-onboarding-scrim-base: #0B1120;
+  --pulso-onboarding-scrim-92: rgba(11, 17, 32, 0.92);
+  --pulso-onboarding-heading: #FFFFFF;
+  --pulso-onboarding-body: #CBD5E1;
+  --pulso-onboarding-link: #FF8A3D;
+  --pulso-onboarding-link-hover: #FFA266;
+  --pulso-onboarding-dot-inactive: rgba(255, 255, 255, 0.35);
+  --pulso-onboarding-btn-text: #0B1630;
+  --text-heading: #FFFFFF;
+  --text-body: #CBD5E1;
+  --text-muted: #B6C2DC;
+  --link-accent: #FF8A3D;
+  --link-accent-hover: #FFA266;
+}
+
+.pulso-onboarding-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--pulso-onboarding-sky);
+  background-image: var(--pulso-onboarding-bg-img);
+  background-size: 100% auto;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  transition: background-color 150ms ease, background-image 150ms ease, color 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulso-onboarding-container {
+    transition: none !important;
+  }
+}
+
 
 

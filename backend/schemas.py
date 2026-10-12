@@ -43,7 +43,10 @@ class ResidentResponse(ResidentBase):
     trust_score: int
     is_verified: bool
     kyc_level: str
+    avatar_url: Optional[str] = None
+    preferences: Optional[Dict[str, Any]] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
     role: str = "resident"
 
     class Config:
@@ -149,6 +152,9 @@ class UserResponse(BaseModel):
     address: Optional[str] = None
     barangay_id: Optional[int] = None
     district_id: Optional[int] = None
+    avatar_url: Optional[str] = None
+    preferences: Optional[Dict[str, Any]] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -162,6 +168,8 @@ class UserUpdate(BaseModel):
     barangay: Optional[str] = None
     barangay_id: Optional[int] = None
     district_id: Optional[int] = None
+    avatar_url: Optional[str] = None
+    preferences: Optional[Dict[str, Any]] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

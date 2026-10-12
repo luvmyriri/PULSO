@@ -1,5 +1,5 @@
 import ReportDensityLayer from '../components/maps/ReportDensityLayer';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -23,6 +23,8 @@ import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
+import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
+import SearchInput from '../components/SearchInput';
 
 const CATEGORY_LABELS = {
     'roads_bridges': 'Roads & Bridges',
@@ -187,6 +189,9 @@ export default function GovAnalyticsPage({ workspace }) {
 
     const [summary, setSummary] = useState(null);
     const [clusters, setClusters] = useState([]);
+    const [clusteringLoading, setClusteringLoading] = useState(true);
+    const [clusteringError, setClusteringError] = useState(null);
+    const [clusterRetryTrigger, setClusterRetryTrigger] = useState(0);
     const [forecast, setForecast] = useState([]);
     const [recurrence, setRecurrence] = useState([]);
     const [heatmapData, setHeatmapData] = useState(null);
@@ -227,22 +232,22 @@ export default function GovAnalyticsPage({ workspace }) {
 
     const { isLoaded: mapsLoaded } = useGoogleMaps();
 
-    // ── Fetch All Data ──────────────────────────────────────────────────────
+    // ── Fetch General Analytics Data (KPIs, Forecast, Recurrence, Heatmap, Border) ──
     const fetchData = useCallback(async () => {
         setLoading(true);
         setFetchError(null);
         try {
-            const [summaryRes, clustersRes, forecastRes, recurrenceRes, heatmapRes, borderRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/gov/analytics/summary`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/clusters?days_back=${daysBack}${categoryFilter ? `&category=${categoryFilter}` : ''}`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/forecast`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/recurrence`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers }),
-                fetch(`${API_BASE_URL}/api/geo/caloocan-border`, { headers }),
+            const currentToken = getAuthToken();
+            const authHeaders = { Authorization: `Bearer ${currentToken}` };
+            const [summaryRes, forecastRes, recurrenceRes, heatmapRes, borderRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/gov/analytics/summary`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/forecast`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/recurrence`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/geo/caloocan-border`, { headers: authHeaders }),
             ]);
             if (summaryRes.ok)    setSummary(await summaryRes.json());
             else throw new Error(`Summary: ${summaryRes.status}`);
-            if (clustersRes.ok)   setClusters((await clustersRes.json()).clusters || []);
             if (forecastRes.ok)   setForecast(await forecastRes.json());
             if (recurrenceRes.ok) setRecurrence((await recurrenceRes.json()).recurrence_events || []);
             if (heatmapRes.ok)    setHeatmapData(await heatmapRes.json());
@@ -253,7 +258,70 @@ export default function GovAnalyticsPage({ workspace }) {
         } finally {
             setLoading(false);
         }
-    }, [daysBack, categoryFilter]);
+    }, [daysBack]);
+
+    // ── Fetch DBSCAN Spatial Clusters (Isolated lifecycle with 15s timeout & AbortController) ──
+    useEffect(() => {
+        let isCancelled = false;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort(new Error('Clustering request timed out after 15 seconds'));
+        }, 15000);
+
+        setClusteringLoading(true);
+        setClusteringError(null);
+
+        const runClustering = async () => {
+            try {
+                const authToken = getAuthToken();
+                const clusterHeaders = { Authorization: `Bearer ${authToken}` };
+                const params = new URLSearchParams({
+                    days_back: String(daysBack),
+                    min_points: '3',
+                    eps: '100',
+                });
+                if (categoryFilter) {
+                    params.set('category', categoryFilter);
+                }
+
+                const res = await fetch(`${API_BASE_URL}/api/gov/analytics/clusters?${params.toString()}`, {
+                    headers: clusterHeaders,
+                    signal: controller.signal,
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
+                }
+
+                const data = await res.json();
+                if (!isCancelled) {
+                    setClusters(Array.isArray(data.clusters) ? data.clusters : []);
+                }
+            } catch (err) {
+                if (isCancelled) return;
+                if (err.name === 'AbortError' || controller.signal.aborted) {
+                    console.error('DBSCAN clustering aborted or timed out (15s limit):', err);
+                    setClusteringError('Analysis timed out. Please check connection and try again.');
+                } else {
+                    console.error('DBSCAN clustering failed:', err);
+                    setClusteringError(err.message || 'Failed to complete spatial clustering');
+                }
+            } finally {
+                clearTimeout(timeoutId);
+                if (!isCancelled) {
+                    setClusteringLoading(false);
+                }
+            }
+        };
+
+        runClustering();
+
+        return () => {
+            isCancelled = true;
+            clearTimeout(timeoutId);
+            controller.abort();
+        };
+    }, [daysBack, categoryFilter, clusterRetryTrigger]);
 
     // ── Fetch Live Reports ──────────────────────────────────────────────────
     const fetchLiveReports = useCallback(async () => {
@@ -441,11 +509,13 @@ export default function GovAnalyticsPage({ workspace }) {
         return '#6366f1';
     };
 
-    const filteredClusters = clusters.filter(c =>
-        !searchTerm ||
-        c.barangay?.includes(searchTerm) ||
-        c.dominant_category?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredClusters = useMemo(() => {
+        return (clusters || []).filter(c =>
+            !searchTerm ||
+            c.barangay?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.dominant_category?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [clusters, searchTerm]);
 
     const TABS = [
         { key: 'map',        label: 'Intelligence Map',  icon: Globe },
@@ -590,29 +660,47 @@ export default function GovAnalyticsPage({ workspace }) {
                             {/* Cluster List Sidebar */}
                             <div className={`w-80 border-r flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
                                 <div className={`p-4 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                                    <div className="relative">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                        <input
-                                            type="text" placeholder="Search barangay or category..."
-                                            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                            className={`w-full border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 ${
-                                                isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'
-                                            }`}
-                                        />
-                                    </div>
-                                    <p className="text-xs text-slate-500 font-bold mt-2">{filteredClusters.length} stress zone{filteredClusters.length !== 1 ? 's' : ''} detected</p>
+                                    <SearchInput
+                                        value={searchTerm}
+                                        onChange={setSearchTerm}
+                                        placeholder="Search barangay or category"
+                                        ariaLabel="Search barangay or category"
+                                        onClear={() => setSearchTerm('')}
+                                        className="w-full"
+                                    />
+                                    <p className="text-xs text-slate-500 font-bold mt-2">
+                                        {clusteringLoading 
+                                            ? '- stress zones detected' 
+                                            : `${filteredClusters.length} stress zone${filteredClusters.length !== 1 ? 's' : ''} detected`
+                                        }
+                                    </p>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                                    {loading ? (
+                                    {clusteringLoading ? (
                                         <div className="text-center py-12 text-slate-500">
-                                            <Loader2 size={24} className="animate-spin mx-auto mb-2" />
-                                            Running DBSCAN clustering...
+                                            <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-500" />
+                                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Running DBSCAN clustering...</p>
+                                            <p className="text-xs text-slate-400 mt-1">Analyzing spatial density (100m radius)</p>
+                                        </div>
+                                    ) : clusteringError ? (
+                                        <div className="text-center py-10 px-4 text-slate-500">
+                                            <AlertTriangle size={32} className="mx-auto mb-2 text-rose-500 opacity-80" />
+                                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">We couldn't analyze this right now.</p>
+                                            <p className="text-xs text-slate-400 mt-1 max-w-[200px] mx-auto mb-3">{clusteringError}</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setClusterRetryTrigger(prev => prev + 1)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer shadow-sm"
+                                            >
+                                                <RotateCcw size={13} />
+                                                Retry
+                                            </button>
                                         </div>
                                     ) : filteredClusters.length === 0 ? (
                                         <div className="text-center py-12 text-slate-500">
                                             <Target size={32} className="mx-auto mb-2 opacity-30" />
-                                            <p className="text-sm font-bold">No stress zones detected</p>
-                                            <p className="text-xs mt-1">Try a wider date range</p>
+                                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No stress zones found for the selected period.</p>
+                                            <p className="text-xs text-slate-400 mt-1">Try a wider date range or clear filters</p>
                                         </div>
                                     ) : filteredClusters.map(c => (
                                         <ClusterCard key={c.cluster_id} cluster={c}
@@ -687,39 +775,15 @@ export default function GovAnalyticsPage({ workspace }) {
                                                     options={{ zIndex: 20 }}
                                                 />
                                             )}
-                                            {/* Caloocan City Borders — North & South (Orange) */}
-                                            {borderData?.features?.map((feature, i) => {
-                                                const props = feature.properties || {};
-                                                const sector = props.sector || 'Caloocan';
-                                                const isNorth = sector === 'North';
-                                                // Respect toggles
-                                                if (isNorth && !showNorthBorder) return null;
-                                                if (!isNorth && !showSouthBorder) return null;
-
-                                                const polygonOptions = {
-                                                    strokeColor: isNorth ? '#f97316' : '#ff6b00',
-                                                    strokeOpacity: 1.0,
-                                                    strokeWeight: isNorth ? 2.5 : 2.5,
-                                                    fillColor: isNorth ? '#f97316' : '#ff6b00',
-                                                    fillOpacity: isNorth
-                                                        ? (isDarkMode ? 0.10 : 0.06)
-                                                        : (isDarkMode ? 0.08 : 0.05),
-                                                    clickable: false,
-                                                    zIndex: isNorth ? 2 : 1,
-                                                };
-
-                                                const paths = feature.geometry.type === 'MultiPolygon'
-                                                    ? feature.geometry.coordinates.map(poly => poly[0].map(c => ({ lng: c[0], lat: c[1] })))
-                                                    : [feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))];
-
-                                                return paths.map((path, pi) => (
-                                                    <PolygonF
-                                                        key={`border-${i}-${pi}`}
-                                                        paths={path}
-                                                        options={polygonOptions}
-                                                    />
-                                                ));
-                                            })}
+                                            {/* Caloocan City Borders — Unified Single Orange Style */}
+                                            {(showNorthBorder || showSouthBorder) && (
+                                                <CaloocanBoundaryLayer
+                                                    activeSector={showNorthBorder && showSouthBorder ? 'all' : showNorthBorder ? 'north' : 'south'}
+                                                    isDarkMode={isDarkMode}
+                                                    showBarangays={true}
+                                                    showLabels={true}
+                                                />
+                                            )}
                                         </GoogleMap>
                                     ) : (
                                         <div className={`w-full h-full flex items-center justify-center text-slate-500 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
@@ -1127,7 +1191,9 @@ export default function GovAnalyticsPage({ workspace }) {
                             </div>
                             <div className={`border rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                                 <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-                                    <span className="font-bold text-slate-300">{filteredClusters.length} Infrastructure Stress Zones</span>
+                                    <span className="font-bold text-slate-300">
+                                        {clusteringLoading ? '-' : filteredClusters.length} Infrastructure Stress Zone{filteredClusters.length !== 1 ? 's' : ''}
+                                    </span>
                                     <span className="text-xs text-slate-500 font-semibold">Sorted by threat severity</span>
                                 </div>
                                 <table className="w-full">
@@ -1144,7 +1210,39 @@ export default function GovAnalyticsPage({ workspace }) {
                                         </tr>
                                     </thead>
                                     <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                        {filteredClusters.map(c => (
+                                        {clusteringLoading ? (
+                                            <tr>
+                                                <td colSpan={8} className="p-10 text-center text-slate-500">
+                                                    <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-500" />
+                                                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Running DBSCAN clustering...</p>
+                                                    <p className="text-xs text-slate-400 mt-1">Analyzing spatial density within 100m</p>
+                                                </td>
+                                            </tr>
+                                        ) : clusteringError ? (
+                                            <tr>
+                                                <td colSpan={8} className="p-10 text-center text-slate-500">
+                                                    <AlertTriangle size={28} className="mx-auto mb-2 text-rose-500" />
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">We couldn't analyze this right now.</p>
+                                                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto mb-3">{clusteringError}</p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setClusterRetryTrigger(prev => prev + 1)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
+                                                    >
+                                                        <RotateCcw size={13} />
+                                                        Retry
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ) : filteredClusters.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={8} className="p-10 text-center text-slate-500">
+                                                    <Target size={32} className="mx-auto mb-2 opacity-30" />
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No stress zones found for the selected period.</p>
+                                                    <p className="text-xs text-slate-400 mt-1">Try expanding the date filter or clearing filters</p>
+                                                </td>
+                                            </tr>
+                                        ) : filteredClusters.map(c => (
                                             <tr key={c.cluster_id} className={`transition-colors cursor-pointer ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}`}
                                                 onClick={() => { setActiveTab('map'); setSelectedCluster(c); }}>
                                                 <td className="p-4"><ThreatBadge level={c.threat_level} /></td>

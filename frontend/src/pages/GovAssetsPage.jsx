@@ -30,6 +30,7 @@ import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import OrangeSelect from '../components/OrangeSelect';
+import SearchInput from '../components/SearchInput';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import './citizen-reports.css';
@@ -464,39 +465,14 @@ export default function GovAssetsPage() {
 
                     {/* Filter Bar: Search & Condition Dropdown */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                        <div className="citizen-reports-search" style={{ flex: 1 }}>
-                            <Search size={15} />
-                            <input
-                                type="text"
-                                placeholder="Search by asset code (e.g. CAL-RD-...), name, or barangay..."
-                                value={searchQuery}
-                                onChange={(e) => updateParam('search', e.target.value)}
-                            />
-                            {searchQuery && (
-                                <button
-                                    type="button"
-                                    onClick={() => updateParam('search', '')}
-                                    style={{
-                                        position: 'absolute',
-                                        right: '10px',
-                                        top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: 'var(--gov-text-secondary)',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        padding: '4px',
-                                        borderRadius: '4px'
-                                    }}
-                                    title="Clear search"
-                                    aria-label="Clear search"
-                                >
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
+                        <SearchInput
+                            value={searchQuery}
+                            onChange={(val) => updateParam('search', val)}
+                            placeholder="Search issue, location or category"
+                            ariaLabel="Search issue, location or category"
+                            onClear={() => updateParam('search', '')}
+                            className="w-full sm:w-[320px] md:w-[360px]"
+                        />
 
                         <OrangeSelect
                             value={conditionParam}

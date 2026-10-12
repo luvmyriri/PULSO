@@ -773,7 +773,8 @@
         "s1_desc": "May pananagutan ang mga residente sa katumpakan ng kanilang mga ulat. Ang pagsusumite ng maling ulat ay maaaring magresulta sa limitasyon o suspensyon ng account."
       },
       "topNav": {
-        "searchPlaceholder": "Maghanap sa PULSO...",
+        "searchPlaceholder": "Maghanap sa PULSO",
+        "searchCompactPlaceholder": "Maghanap",
         "recentSearches": "Mga Nakaraang Paghahanap"
       }
     },

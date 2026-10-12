@@ -1,0 +1,182 @@
+/**
+ * search-input.css
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Single unified styling contract for all Government-side search fields.
+ * Strict token bindings, 13px font size, fully rounded pill, 40px desktop height,
+ * 4.5:1 accessible contrast, and zero per-page overrides.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+:root {
+  --search-font-size: 13px;
+  --search-font-size-rem: 0.8125rem;
+  --search-height: 40px;
+  --search-height-touch: 44px;
+  --search-bg: var(--gov-surface, #ffffff);
+  --search-border: var(--gov-rule, #cbd5e1);
+  --search-border-hover: #94a3b8;
+  --search-text: var(--gov-text, #0f172a);
+  --search-placeholder: #475569; /* 5.7:1 contrast on white (WCAG AA compliant >= 4.5:1) */
+  --search-icon: #64748b;
+  --search-icon-active: var(--gov-action, #ff6b00);
+  --search-focus-ring: var(--gov-action, #ff6b00);
+  --search-clear-btn: #64748b;
+  --search-clear-btn-hover: #0f172a;
+  --search-kbd-bg: #f1f5f9;
+  --search-kbd-border: #cbd5e1;
+  --search-kbd-text: #64748b;
+}
+
+.dark {
+  --search-bg: #0c1424; /* slightly lighter than #070a12 canvas */
+  --search-border: var(--gov-rule, #1e293b);
+  --search-border-hover: #334155;
+  --search-text: var(--gov-text, #f8fafc);
+  --search-placeholder: #94a3b8; /* 6.2:1 contrast on #0c1424 (WCAG AA compliant >= 4.5:1) */
+  --search-icon: #94a3b8;
+  --search-icon-active: var(--gov-action, #ff6b00);
+  --search-focus-ring: var(--gov-action, #ff6b00);
+  --search-clear-btn: #94a3b8;
+  --search-clear-btn-hover: #f8fafc;
+  --search-kbd-bg: #1e293b;
+  --search-kbd-border: #334155;
+  --search-kbd-text: #94a3b8;
+}
+
+/* Base pill wrapper */
+.gov-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 260px;
+  max-width: 420px;
+  height: var(--search-height);
+  min-height: var(--search-height);
+  padding: 0 14px;
+  background-color: var(--search-bg);
+  border: 1px solid var(--search-border);
+  border-radius: 9999px;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  box-sizing: border-box;
+}
+
+@media (pointer: coarse) {
+  .gov-search-wrapper {
+    height: var(--search-height-touch);
+    min-height: var(--search-height-touch);
+  }
+}
+
+.gov-search-wrapper:hover {
+  border-color: var(--search-border-hover);
+}
+
+.gov-search-wrapper:focus-within {
+  border-color: var(--search-focus-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--search-focus-ring) 25%, transparent);
+}
+
+/* Icon */
+.gov-search-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--search-icon);
+  margin-right: 10px;
+  pointer-events: none;
+  transition: color 150ms ease;
+}
+
+.gov-search-wrapper:focus-within .gov-search-icon {
+  color: var(--search-icon-active);
+}
+
+/* Input element */
+.gov-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: var(--search-font-size, 13px) !important;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--search-text);
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+}
+
+.gov-search-input::placeholder {
+  color: var(--search-placeholder) !important;
+  font-size: var(--search-font-size, 13px) !important;
+  font-weight: 400;
+  opacity: 1; /* override browser opacity */
+}
+
+/* Hide native search cancel button so our custom X button works cleanly */
+.gov-search-input::-webkit-search-decoration,
+.gov-search-input::-webkit-search-cancel-button,
+.gov-search-input::-webkit-search-results-button,
+.gov-search-input::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  display: none;
+}
+
+/* Clear button */
+.gov-search-clear-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 6px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 9999px;
+  color: var(--search-clear-btn);
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.gov-search-clear-btn:hover {
+  color: var(--search-clear-btn-hover);
+  background-color: color-mix(in srgb, var(--search-clear-btn) 15%, transparent);
+}
+
+/* Shortcut badge */
+.gov-search-kbd {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--search-kbd-text);
+  background-color: var(--search-kbd-bg);
+  border: 1px solid var(--search-kbd-border);
+  border-radius: 4px;
+  pointer-events: none;
+  user-select: none;
+}
+
+@media (max-width: 640px), (pointer: coarse) {
+  .gov-search-kbd {
+    display: none !important;
+  }
+}

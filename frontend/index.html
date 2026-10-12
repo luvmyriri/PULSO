@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="theme-color" content="#f8f7f5" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#070a12" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#EAF2FF" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#080D19" media="(prefers-color-scheme: dark)" />
   <script>
     (function () {
       try {
@@ -19,9 +19,29 @@
         var root = document.documentElement;
         root.classList.remove('light', 'dark');
         root.classList.add(isDark ? 'dark' : 'light');
-        var color = isDark ? '#070a12' : '#f8f7f5';
+        root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        var color = isDark ? '#080D19' : '#EAF2FF';
         var meta = document.querySelector('meta[name="theme-color"]');
         if (meta) meta.setAttribute('content', color);
+
+        // Preload active onboarding background SVG, fetch the other on idle
+        var activeBg = isDark ? '/pulso-bg-dark.svg' : '/pulso-bg-light.svg';
+        var idleBg = isDark ? '/pulso-bg-light.svg' : '/pulso-bg-dark.svg';
+        var link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = activeBg;
+        document.head.appendChild(link);
+
+        if ('requestIdleCallback' in window) {
+          window.requestIdleCallback(function() {
+            var idleLink = document.createElement('link');
+            idleLink.rel = 'prefetch';
+            idleLink.as = 'image';
+            idleLink.href = idleBg;
+            document.head.appendChild(idleLink);
+          });
+        }
 
         // Check if cold-start of installed mobile app
         var search = new URLSearchParams(window.location.search);
@@ -45,16 +65,21 @@
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
-      background-color: #f8f7f5;
+      background-color: #EAF2FF;
+      background-image: url('/pulso-bg-light.svg');
+      background-size: 100% auto;
+      background-position: center bottom;
+      background-repeat: no-repeat;
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
       user-select: none;
       -webkit-user-select: none;
     }
     html.dark #pulso-initial-splash {
-      background-color: #070a12;
+      background-color: #080D19;
+      background-image: url('/pulso-bg-dark.svg');
     }
     .pulso-splash-navy {
-      color: #0c2436;
+      color: #0B1630;
     }
     html.dark .pulso-splash-navy {
       color: #ffffff;

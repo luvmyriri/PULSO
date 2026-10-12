@@ -15,6 +15,7 @@ import {
     UserCog,
     Users,
     Wrench,
+    Bot,
 } from 'lucide-react';
 import { GOV_ROLES, EXECUTIVE_ROLES, SENIOR_ROLES, ADMIN_ONLY } from './ProtectedRoute';
 import { checkPermission } from '../utils/rbac_utils';
@@ -59,6 +60,7 @@ export const GOVERNMENT_WORKSPACES = {
             { key: 'staff', label: 'Staff and Roles', icon: UserCog, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
             { key: 'residents', label: 'Resident Accounts', icon: Users, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
             { key: 'settings', label: 'System Settings', icon: Settings, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
+            { key: 'automated-ai', label: 'Automated & AI Tools', icon: Bot, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
         ],
     },
 };

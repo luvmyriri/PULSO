@@ -5,6 +5,7 @@ import {
   PolygonF,
 } from '@react-google-maps/api';
 import { useGoogleMaps } from '../../contexts/GoogleMapsContext';
+import CaloocanBoundaryLayer from '../CaloocanBoundaryLayer';
 import {
   MapPin,
   Droplets,
@@ -545,30 +546,13 @@ export default function MapPreviewSection() {
                 onUnmount={onMapUnmount}
                 options={mapOptions}
               >
-                {/* North Caloocan Boundary Polygon */}
-                <PolygonF
-                  paths={NORTH_CALOOCAN_PATH}
-                  options={{
-                    fillColor: '#ff6b00',
-                    fillOpacity: isDarkMode ? 0.08 : 0.05,
-                    strokeColor: '#ff6b00',
-                    strokeOpacity: 0.85,
-                    strokeWeight: 2,
-                    clickable: false,
-                  }}
-                />
-
-                {/* South Caloocan Boundary Polygon */}
-                <PolygonF
-                  paths={SOUTH_CALOOCAN_PATH}
-                  options={{
-                    fillColor: '#ff6b00',
-                    fillOpacity: isDarkMode ? 0.08 : 0.05,
-                    strokeColor: '#ff6b00',
-                    strokeOpacity: 0.85,
-                    strokeWeight: 2,
-                    clickable: false,
-                  }}
+                {/* Authoritative Shared Dual-Sector Caloocan Boundary Layer */}
+                <CaloocanBoundaryLayer
+                  activeSector="all"
+                  isDarkMode={isDarkMode}
+                  showBarangays={false}
+                  showLabels={true}
+                  interactive={false}
                 />
 
                 {/* Real Caloocan System Markers */}

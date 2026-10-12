@@ -52,6 +52,7 @@ export function ThemeProvider({ children }) {
                 : currentTheme === 'dark';
 
             root.classList.add(activeDark ? 'dark' : 'light');
+            root.setAttribute('data-theme', activeDark ? 'dark' : 'light');
             setIsDark(activeDark);
             updateStatusBarColor(activeDark);
         };
@@ -64,6 +65,7 @@ export function ThemeProvider({ children }) {
                 root.classList.remove('light', 'dark');
                 const activeDark = e.matches;
                 root.classList.add(activeDark ? 'dark' : 'light');
+                root.setAttribute('data-theme', activeDark ? 'dark' : 'light');
                 setIsDark(activeDark);
                 updateStatusBarColor(activeDark);
             }
@@ -86,6 +88,7 @@ export function ThemeProvider({ children }) {
 
         setTheme(newTheme);
         localStorage.setItem('pulso_theme', newTheme);
+        localStorage.setItem('theme', newTheme);
     };
 
     return (

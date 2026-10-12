@@ -4,31 +4,44 @@ import React from 'react';
  * Branding
  * ─────────────────────────────────────────────────────────────────────────────
  * Official Municipal Brand Lockup:
- * - Single Official City Engineering Department Logo (Enhanced Gear Emblem).
- * - Stacked Municipal Hierarchy:
- *     1. CALOOCAN CITY
- *     2. City Engineering Department
- *     3. powered by: PULSO
+ * - Real Caloocan City Seal file next to the text at 2.5rem (40px), with no glow, ring, or recoloring.
+ * - Exact content and hierarchy:
+ *     1. CALOOCAN CITY (small, bold, uppercase with 0.04em spacing, slate)
+ *     2. City Engineering Department (bold, dark navy in light / white in dark, ≥14px)
+ *     3. powered by: PULSO (soft gray with vibrant orange PULSO, ≥12px)
+ * - Text is never under 12px, shrinking slightly with clamp() before truncating.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-const Branding = ({ className = "", size = "h-7 w-7 xs:h-8 xs:w-8 sm:h-10 sm:w-10", showText = true, vertical = false }) => {
+const Branding = ({
+    className = '',
+    size = 'w-9 h-9 sm:w-10 sm:h-10',
+    showText = true,
+    vertical = false,
+    sealSrc = '/city-engineering-logo.png',
+}) => {
     return (
         <div className={`flex ${vertical ? 'flex-col items-center text-center' : 'items-center'} gap-1.5 sm:gap-2.5 shrink-0 ${className}`}>
-            {/* Official City Engineering Department Logo */}
+            {/* Real Caloocan City Seal (Circular official logo, no glow, crisp aspect-square) */}
             <img 
-                src="/city-engineering-logo.png" 
-                alt="City Engineering Department Logo" 
-                className={`${size} aspect-square object-contain drop-shadow-sm rounded-full bg-white border border-slate-200 dark:border-slate-700 shrink-0 group-hover:scale-105 transition-transform duration-200`}
+                src={sealSrc} 
+                alt="Caloocan City Seal" 
+                className={`${size} min-w-[32px] min-h-[32px] sm:min-w-[40px] sm:min-h-[40px] aspect-square object-contain rounded-full shrink-0 select-none`}
+                loading="eager"
             />
             {showText && (
-                <div className={`flex flex-col text-left leading-tight ${vertical ? 'mt-2 items-center text-center' : ''} shrink-0`}>
-                    <span className="font-heading font-black text-slate-900 dark:text-white tracking-tight text-[9px] xs:text-[10px] sm:text-xs uppercase leading-none">
+                <div className={`flex flex-col text-left leading-tight min-w-0 ${vertical ? 'mt-1.5 items-center text-center' : ''}`}>
+                    {/* Line 1: CALOOCAN CITY (small, bold, uppercase with 0.04em spacing, slate) */}
+                    <span className="font-heading font-bold text-slate-500 dark:text-slate-400 tracking-[0.04em] text-[9px] sm:text-[11px] uppercase leading-none select-none">
                         CALOOCAN CITY
                     </span>
-                    <span className="font-heading font-black text-slate-800 dark:text-slate-100 tracking-tight text-[7.5px] xs:text-[9.5px] sm:text-sm lg:text-base leading-tight mt-0.5">
+
+                    {/* Line 2: City Engineering Department (bold, main line, dark navy in light mode, white in dark mode) */}
+                    <span className="font-heading font-bold text-slate-900 dark:text-white tracking-tight text-[11.5px] xs:text-[12.5px] sm:text-[14px] leading-tight mt-0.5 select-none truncate">
                         City Engineering Department
                     </span>
-                    <div className="flex items-center gap-1 text-[7px] xs:text-[8px] sm:text-[11px] font-mono-data text-slate-400 dark:text-slate-500 leading-none mt-0.5">
+
+                    {/* Line 3: powered by: PULSO ("powered by:" in soft gray, "PULSO" in orange) */}
+                    <div className="flex items-center gap-1 text-[8.5px] sm:text-[10.5px] text-slate-500 dark:text-slate-400 leading-none mt-0.5 select-none">
                         <span>powered by:</span>
                         <span className="font-heading font-black text-[#ff6b00] uppercase tracking-wider">PULSO</span>
                     </div>

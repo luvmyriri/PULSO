@@ -35,6 +35,7 @@ import GovSidebar from '../components/GovSidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovUserDropdown from '../components/GovUserDropdown';
+import SearchInput from '../components/SearchInput';
 import Swal from 'sweetalert2';
 
 // ─── Constants & Fallback Reference BI Data ──────────────────────────────────
@@ -312,7 +313,17 @@ export default function GovBiDashboard() {
 
                 {/* ── TOP FILTER BAR (Citizen Reports Pattern) ──────────────── */}
                 <div ref={dropdownRef} className="px-6 py-3 shrink-0 bg-white/70 dark:bg-[#09101f] border-b border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 relative z-30 backdrop-blur-sm">
-                    <div className="flex flex-wrap items-center gap-2">
+                    {/* First item on the left: Standard SearchInput */}
+                    <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+                        <SearchInput
+                            value={searchQuery}
+                            onChange={setSearchQuery}
+                            placeholder="Search metrics or barangay"
+                            ariaLabel="Search metrics or barangay"
+                            onClear={() => setSearchQuery('')}
+                            className="w-full sm:w-[320px] md:w-[360px]"
+                        />
+
                         {/* 1. Date Range Picker */}
                         <div className="relative">
                             <button
@@ -331,7 +342,7 @@ export default function GovBiDashboard() {
                             {openDropdown === 'date' && (
                                 <div className="absolute top-full left-0 mt-1.5 w-48 rounded-xl bg-white dark:bg-[#0c1424] border border-slate-200 dark:border-slate-800 shadow-xl p-1 z-30 space-y-0.5">
                                     {DATE_RANGES.map(d => (
-                                        <button
+                                         <button
                                             key={d.id}
                                             onClick={() => { setDateRange(d.id); setOpenDropdown(null); }}
                                             className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-heading cursor-pointer ${
@@ -464,18 +475,6 @@ export default function GovBiDashboard() {
                                 <span>Clear filters ({activeFiltersCount})</span>
                             </button>
                         )}
-                    </div>
-
-                    {/* Quick Search */}
-                    <div className="relative w-full sm:w-64">
-                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            placeholder="Search metrics or barangay..."
-                            className="w-full bg-white dark:bg-[#0c1424] border border-slate-200 dark:border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-[#ff6b00] transition-colors"
-                        />
                     </div>
                 </div>
 

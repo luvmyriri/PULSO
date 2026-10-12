@@ -106,7 +106,20 @@ class Resident(Base):
     auth_provider = Column(String, nullable=True, default="local")
     
     is_active = Column(Boolean, default=True)
+    status = Column(String, default="active", nullable=True)  # "active", "inactive", "pending", "suspended", "deactivated"
+    status_reason = Column(String, nullable=True)
+    status_changed_by = Column(String, nullable=True)
+    status_changed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # ID Verification Columns
+    id_verification_status = Column(String, default="N/A", nullable=True)  # "Verified", "Pending review", "Rejected", "N/A"
+    id_rejection_reason = Column(String, nullable=True)
+    id_verified_at = Column(DateTime(timezone=True), nullable=True)
+
+    avatar_url = Column(String, nullable=True)
+    preferences = Column(JSON, nullable=True, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     @property
     def role(self):
@@ -114,7 +127,7 @@ class Resident(Base):
         
     @property
     def is_suspended(self):
-        return False
+        return not self.is_active or self.status == "suspended"
 
     @property
     def barangay(self):
@@ -180,8 +193,9 @@ class Official(Base):
     suspension_reason = Column(String, nullable=True)
     suspended_at = Column(DateTime(timezone=True), nullable=True)
     suspended_by = Column(Integer, ForeignKey("officials.id"), nullable=True)
-    
+    avatar_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     role = Column(String, default="staff", index=True)  # Denormalized for query performance & compatibility
 
@@ -441,11 +455,53 @@ class ChatMessage(Base):
     conversation_id = Column(Integer, ForeignKey("chat_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(String(20), nullable=False)  # 'user' | 'assistant'
     content = Column(Text, nullable=False)
-    tool_name = Column(String(100), nullable=True)  # Tool called during grounding (e.g. get_my_reports)
-    tool_data = Column(Text, nullable=True)  # Reference snippet of retrieved data for audit/debugging
+    tool_name = Column(String(100), nullable=True)
+    tool_data = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     conversation = relationship("ChatConversation", back_populates="messages")
+
+
+class SystemSetting(Base):
+    """
+    Persisted system-wide configurations, policies, SLAs, and retention standards.
+    Supports versioning and tamper-evident history.
+    """
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, index=True, nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    value = Column(JSON, nullable=False)
+    policy_source = Column(String(255), nullable=True)
+    category = Column(String(50), default="general")
+    version = Column(Integer, default=1)
+    updated_by_id = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    updated_by = relationship("Official", foreign_keys=[updated_by_id])
+    history = relationship("SystemSettingHistory", back_populates="setting", cascade="all, delete-orphan", order_by="SystemSettingHistory.created_at.desc()")
+
+
+class SystemSettingHistory(Base):
+    """
+    Immutable audit history of all changes to system settings.
+    Requires mandatory reason and captures actor identity.
+    """
+    __tablename__ = "system_setting_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    setting_id = Column(Integer, ForeignKey("system_settings.id", ondelete="CASCADE"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+    old_value = Column(JSON, nullable=True)
+    new_value = Column(JSON, nullable=False)
+    reason = Column(Text, nullable=False)
+    changed_by_id = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    setting = relationship("SystemSetting", back_populates="history")
+    changed_by = relationship("Official", foreign_keys=[changed_by_id])
 
 
 # Import gov_models at the end to resolve circular dependency for relationships

@@ -803,6 +803,82 @@ def get_ai_assistant_response(
         invoked_tools.append({"tool": "get_evacuation_routes", "data": res[:500]})
         return res
 
+    def get_staff_reports_overview(status_or_scope: Optional[str] = None) -> str:
+        """Retrieve real administrative citizen reports for government staff triage, including unassigned, pending verification, and today's priority cases."""
+        if not db:
+            return "I couldn't load that right now. You can open Reports to check."
+        try:
+            import models
+            from sqlalchemy import or_
+            query = db.query(models.Report)
+            s_lower = (status_or_scope or "").lower()
+            if "unassigned" in s_lower:
+                reports = query.filter(
+                    models.Report.status.in_(['unverified', 'pending_approval', 'verified', 'pending']),
+                    or_(models.Report.assigned_to == None, models.Report.assigned_to == "")
+                ).order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Unassigned citizen reports requiring dispatch:"
+            elif "verification" in s_lower or "needs_verification" in s_lower or "unverified" in s_lower:
+                reports = query.filter(models.Report.status == 'unverified').order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Reports awaiting administrative verification:"
+            elif "priority" in s_lower or "critical" in s_lower or "today" in s_lower:
+                reports = query.filter(
+                    or_(models.Report.ai_urgency == 'Critical', models.Report.priority == 'critical')
+                ).order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Today's high and critical priority reports:"
+            else:
+                reports = query.order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Recent incoming reports in Caloocan Engineering theater:"
+
+            if not reports:
+                return f"No reports matching '{status_or_scope or 'current query'}' were found in the queue."
+
+            lines = [title_label]
+            for r in reports:
+                ticket_str = r.ticket_id or f"PUL-2026-{r.id:04d}"
+                loc = r.location_barangay or r.location_string or "North Caloocan"
+                cat = r.ai_category or r.category or "Infrastructure"
+                urg = r.ai_urgency or r.priority or "Normal"
+                lines.append(f"- Ticket **#{ticket_str}** | **{cat}** | Status: **{r.status}** | Priority: **{urg}** | Location: {loc}")
+            lines.append("\nNote: Suggestions are informational. Please confirm any status or assignment changes directly in the Reports docket.")
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_staff_reports_overview", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"I couldn't load that right now. You can open Reports to check. ({err})"
+            invoked_tools.append({"tool": "get_staff_reports_overview", "data": err_msg})
+            return err_msg
+
+    def get_staff_work_orders_overview(status_or_scope: Optional[str] = None) -> str:
+        """Retrieve real government work orders from the PULSO engineering operations system."""
+        if not db:
+            return "I couldn't load that right now. You can open Work Orders to check."
+        try:
+            import models
+            from sqlalchemy import or_
+            query = db.query(models.WorkOrder)
+            s_lower = (status_or_scope or "").lower()
+            if "overdue" in s_lower or "late" in s_lower:
+                wos = query.filter(models.WorkOrder.status.in_(['assigned', 'in_progress'])).order_by(models.WorkOrder.created_at.asc()).limit(5).all()
+                title_label = "Active work orders requiring scheduling review:"
+            else:
+                wos = query.order_by(models.WorkOrder.created_at.desc()).limit(5).all()
+                title_label = "Current engineering work orders:"
+
+            if not wos:
+                return "There are no overdue or active work orders flagged in your current division queue."
+
+            lines = [title_label]
+            for wo in wos:
+                wo_id = getattr(wo, "wo_number", None) or getattr(wo, "tracking_number", None) or f"WO-2026-{wo.id:03d}"
+                lines.append(f"- Order **#{wo_id}** | **{wo.title or 'Field Maintenance'}** | Status: **{wo.status}** | Priority: **{wo.priority or 'Normal'}**")
+            lines.append("\nPlease review team dispatch and verify progress in the Operations workspace.")
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_staff_work_orders_overview", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            return f"I couldn't load that right now. You can open Work Orders to check. ({err})"
+
     # ── Grounded Knowledge: Filing a report in PULSO ───────────────────────────
     REPORTING_GUIDE = (
         "To file an infrastructure report in PULSO, follow these steps:\n\n"
@@ -816,6 +892,14 @@ def get_ai_assistant_response(
     # ── Deterministic Keyword Fallback Handler ─────────────────────────────────
     def _deterministic_fallback(q: str) -> str:
         ql = q.lower()
+        if any(w in ql for w in ["unassigned", "unassigned report", "unassigned reports"]):
+            return get_staff_reports_overview("unassigned")
+        if any(w in ql for w in ["overdue", "overdue work", "overdue work order", "overdue work orders"]):
+            return get_staff_work_orders_overview("overdue")
+        if any(w in ql for w in ["needs verification", "unverified", "awaiting verification"]):
+            return get_staff_reports_overview("needs_verification")
+        if any(w in ql for w in ["priority", "priorities", "today's priorities", "critical reports"]):
+            return get_staff_reports_overview("today_priorities")
         if any(w in ql for w in ["hotline", "emergency", "police", "pnp", "fire", "bfp", "drrmo", "contact number"]):
             return get_city_hotlines()
         if any(w in ql for w in ["my report", "report status", "ticket status", "track report", "check report", "my ticket"]):
@@ -827,12 +911,13 @@ def get_ai_assistant_response(
         if any(w in ql for w in ["how to file", "how to report", "file a report", "submit a report"]):
             return REPORTING_GUIDE
         return (
-            "PULSO AI is currently operating in offline mode. "
+            "I couldn't load that right now. You can open Reports to check. "
             "For urgent emergencies or infrastructure hazards, please contact the **Caloocan City Action Center** at **(02) 8288-8811** "
             "or **Caloocan DRRMO** at **(02) 8397-6212**."
         )
 
     if not _SDK_READY:
+
         fallback_res = _deterministic_fallback(query)
         return {
             "response": _clean_response(fallback_res),
@@ -858,7 +943,14 @@ System Context: {context or "General citizen inquiry"}
 User Query: {query}
 """
 
-    tools = [get_my_reports, get_city_hotlines, get_active_advisories, get_evacuation_routes]
+    tools = [
+        get_my_reports,
+        get_city_hotlines,
+        get_active_advisories,
+        get_evacuation_routes,
+        get_staff_reports_overview,
+        get_staff_work_orders_overview
+    ]
     user_id = str(getattr(user, "id", "citizen"))
 
     try:

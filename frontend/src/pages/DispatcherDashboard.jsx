@@ -54,9 +54,12 @@ import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
 import ThemeToggle from '../components/ThemeToggle';
 import { useTheme } from '../contexts/ThemeContext';
-import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovUserDropdown from '../components/GovUserDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
+import PulseAIChatWindow from '../components/PulseAIChatWindow';
+import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
+import SearchInput from '../components/SearchInput';
 import Swal from 'sweetalert2';
 import { CANONICAL_STATUS_LIST, getStatusDescriptor, formatTicketId } from '../utils/reportWorkflow';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
@@ -566,15 +569,8 @@ const DispatcherDashboard = () => {
         return CALOOCAN_ALL_BARANGAYS_OPTIONS;
     }, [selectedArea]);
 
-    // AI Omni-Assistant State
+    // PULSEAI Assistant State
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-    const [aiQuery, setAiQuery] = useState('');
-    const [aiMessages, setAiMessages] = useState([
-        { role: 'assistant', text: `Greetings, Dispatcher ${currentUser?.full_name || ''}. I am your Engineering Co-pilot. How can I assist with triage today?` }
-    ]);
-    const [isAILoading, setIsAILoading] = useState(false);
-    const [isAIMaximized, setIsAIMaximized] = useState(false);
-    const aiChatEndRef = useRef(null);
 
     useEffect(() => {
         if (!token || !currentUser) {
@@ -646,61 +642,7 @@ const DispatcherDashboard = () => {
         }
     };
 
-    const handleAIChat = async (e) => {
-        e.preventDefault();
-        if (!aiQuery.trim() || isAILoading) return;
 
-        const userMsg = { role: 'user', text: aiQuery };
-        setAiMessages(prev => [...prev, userMsg]);
-        const capturedQuery = aiQuery;
-        setAiQuery('');
-        setIsAILoading(true);
-
-        try {
-            // If query is location-related, fetch live report data
-            let reportContext = '';
-            let reportsForMap = [];
-            const isLocationQuery = LOCATION_KEYWORDS.test(capturedQuery);
-
-            if (isLocationQuery) {
-                try {
-                    const rResp = await fetch(`${API_BASE_URL}/api/reports?limit=30&t=${Date.now()}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (rResp.ok) {
-                        reportsForMap = await rResp.json();
-                        reportContext = `\n\nLive Report Data (${reportsForMap.length} active reports):\n` +
-                            reportsForMap.map((r, i) =>
-                                `${i + 1}. ${formatTicketId(r.ticket_id, r.id)} — ${r.ai_category || r.category || 'Uncategorized'} — ${r.location_string || `Lat:${r.location_lat?.toFixed(4)}, Lng:${r.location_lng?.toFixed(4)}`} — Status: ${r.status}`
-                            ).join('\n');
-                    }
-                } catch { /* silently skip if reports unavailable */ }
-            }
-
-            const resp = await fetch(`${API_BASE_URL}/api/ai/assistant`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    query: capturedQuery,
-                    context: `Dispatcher View. Mode: ${dashboardMode}. Selection: ${selectedReport?.category || 'None'}.${reportContext}`
-                })
-            });
-            const data = await resp.json();
-            setAiMessages(prev => [...prev, {
-                role: 'assistant',
-                text: data.response,
-                mapData: reportsForMap.length > 0 ? reportsForMap : undefined
-            }]);
-        } catch (err) {
-            setAiMessages(prev => [...prev, { role: 'assistant', text: 'Error connecting to PULSO Brain.' }]);
-        } finally {
-            setIsAILoading(false);
-            setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-        }
-    };
 
     // Sync Street View with State — single consolidated effect
     useEffect(() => {
@@ -1810,19 +1752,19 @@ const DispatcherDashboard = () => {
                             </button>
                         </div>
 
-                        {/* PULSO Omni-Assistant AI Copilot in Header */}
+                        {/* PULSEAI Staff Assistant in Header */}
                         <button
                             onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all shadow-sm ${
                                 isAIChatOpen
-                                    ? 'bg-blue-600 text-white shadow-blue-500/25 ring-2 ring-blue-400'
-                                    : 'bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800'
+                                    ? 'bg-[#f05a00] text-white shadow-orange-500/25 ring-2 ring-[#f05a00]'
+                                    : 'bg-orange-50 dark:bg-orange-950/50 text-[#f05a00] dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 border border-orange-200 dark:border-orange-800/60'
                             }`}
-                            title={isAIChatOpen ? "Close AI Copilot" : "Open PULSO Omni-Assistant (AI Copilot)"}
-                            aria-label="Toggle PULSO Omni-Assistant AI Copilot"
+                            title={isAIChatOpen ? "Close PULSEAI" : "Open PULSEAI (Staff Assistant)"}
+                            aria-label="Toggle PULSEAI Staff Assistant"
                         >
                             <Brain size={14} className={isAIChatOpen ? 'animate-pulse' : ''} />
-                            <span className="hidden md:inline">AI Copilot</span>
+                            <span className="hidden md:inline font-heading">PULSEAI</span>
                             <span className="flex h-2 w-2 relative">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -1866,25 +1808,14 @@ const DispatcherDashboard = () => {
                                     </span>
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <div className="relative">
-                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-muted dark:text-slate-400 pointer-events-none" />
-                                        <input 
-                                            type="text" 
-                                            placeholder="Search by issue, location, category, or report ID..." 
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-neutral-bg dark:bg-slate-950 border border-neutral-border dark:border-slate-800 rounded-lg pl-9 pr-8 py-2 text-xs text-neutral-text dark:text-white placeholder-neutral-muted focus:outline-none focus:border-primary transition-colors" 
-                                        />
-                                        {searchQuery && (
-                                            <button 
-                                                onClick={() => setSearchQuery('')}
-                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5"
-                                                aria-label="Clear search query"
-                                            >
-                                                <X size={13} />
-                                            </button>
-                                        )}
-                                    </div>
+                                    <SearchInput
+                                        value={searchQuery}
+                                        onChange={setSearchQuery}
+                                        placeholder="Search ticket, citizen or category"
+                                        ariaLabel="Search by issue, location, category, or report ID"
+                                        onClear={() => setSearchQuery('')}
+                                        className="w-full"
+                                    />
                                     <div className="flex flex-col gap-2">
                                         {/* Area / Sector Filter (North vs South Caloocan) */}
                                         <OrangeSelect
@@ -2270,16 +2201,16 @@ const DispatcherDashboard = () => {
                         {isRightSidebarOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                     </button>
 
-                    {/* PULSO Omni-Assistant AI Brain Button on Map Canvas (Always positioned on map, never blocking triage cards) */}
+                    {/* PULSEAI Staff Assistant Button on Map Canvas */}
                     <button
                         onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                         className={`absolute top-4 right-16 z-40 shadow-xl border p-2.5 rounded-full transition-all flex items-center justify-center pointer-events-auto group ${
                             isAIChatOpen
-                                ? 'bg-blue-600 border-blue-500 text-white ring-2 ring-blue-400'
-                                : 'bg-white dark:bg-slate-900 border-neutral-border text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50'
+                                ? 'bg-[#f05a00] border-[#ea580c] text-white ring-2 ring-[#f05a00]'
+                                : 'bg-white dark:bg-slate-900 border-neutral-border text-[#f05a00] dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/50'
                         }`}
-                        title={isAIChatOpen ? "Close AI Assistant" : "Open PULSO Omni-Assistant (AI Copilot)"}
-                        aria-label="Toggle PULSO Omni-Assistant AI Copilot"
+                        title={isAIChatOpen ? "Close PULSEAI" : "Open PULSEAI (Staff Assistant)"}
+                        aria-label="Toggle PULSEAI Staff Assistant"
                     >
                         <Brain size={18} className={isAIChatOpen ? 'animate-pulse' : 'group-hover:scale-110 transition-transform'} />
                     </button>
@@ -2615,106 +2546,13 @@ const DispatcherDashboard = () => {
                         })()}
 
 
-                            {/* User Position Marker */}
-                            {/* ═══════════════════════════════════════════════════════════════════
-                                AUTHORITATIVE BARANGAY JURISDICTION BOUNDARIES (ALL 188 BARANGAYS)
-                            ══════════════════════════════════════════════════════════════════════ */}
-                            {borderData?.features?.map((feature, i) => {
-                                const props = feature.properties || {};
-                                const sector = props.sector || 'Caloocan';
-                                const isNorth = sector === 'North';
-
-                                const polygonOptions = {
-                                    strokeColor: isNorth ? '#f97316' : '#ff6b00',
-                                    strokeOpacity: 1.0,
-                                    strokeWeight: 2.2,
-                                    fillColor: isNorth ? '#f97316' : '#ff6b00',
-                                    fillOpacity: isNorth
-                                        ? (isDarkMode ? 0.10 : 0.06)
-                                        : (isDarkMode ? 0.08 : 0.05),
-                                    clickable: false,
-                                    zIndex: isNorth ? 2 : 1,
-                                };
-
-                                const paths = feature.geometry.type === 'MultiPolygon'
-                                    ? feature.geometry.coordinates.map(poly => poly[0].map(c => ({ lng: c[0], lat: c[1] })))
-                                    : [feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))];
-
-                                return paths.map((path, pi) => (
-                                    <PolygonF
-                                        key={`caloocan-brgy-border-${i}-${pi}`}
-                                        paths={path}
-                                        options={polygonOptions}
-                                    />
-                                ));
-                            })}
-
-                            {/* Fallback boundary outlines if borderData has no features */}
-                            {(!borderData?.features || borderData.features.length === 0) && (
-                                <>
-                                    <PolygonF
-                                        paths={NORTH_CALOOCAN_PATH}
-                                        options={{
-                                            fillColor: "#ff6b00",
-                                            fillOpacity: 0.08,
-                                            strokeColor: "#ff6b00",
-                                            strokeOpacity: 0.85,
-                                            strokeWeight: 2.5,
-                                            clickable: false,
-                                        }}
-                                    />
-                                    <PolygonF
-                                        paths={SOUTH_CALOOCAN_PATH}
-                                        options={{
-                                            fillColor: "#ff6b00",
-                                            fillOpacity: 0.08,
-                                            strokeColor: "#ff6b00",
-                                            strokeOpacity: 0.85,
-                                            strokeWeight: 2.5,
-                                            clickable: false,
-                                        }}
-                                    />
-                                </>
-                            )}
-
-                            {/* North Caloocan District Centroid Label */}
-                            <MarkerF
-                                position={NORTH_CALOOCAN_CENTROID}
-                                zIndex={110}
-                                options={{
-                                    clickable: false,
-                                    optimized: true
-                                }}
-                                icon={window.google && window.google.maps ? {
-                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="134" height="32" viewBox="0 0 134 32">
-                                            <rect x="2" y="2" width="130" height="28" rx="8" fill="#0c1424" fill-opacity="0.92" stroke="#ff6b00" stroke-width="1.5" />
-                                            <circle cx="16" cy="16" r="4" fill="#ff6b00" />
-                                            <text x="70" y="20" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.3">NORTH CALOOCAN</text>
-                                        </svg>
-                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                    anchor: new window.google.maps.Point(67, 16)
-                                } : undefined}
-                            />
-
-                            {/* South Caloocan District Centroid Label */}
-                            <MarkerF
-                                position={SOUTH_CALOOCAN_CENTROID}
-                                zIndex={110}
-                                options={{
-                                    clickable: false,
-                                    optimized: true
-                                }}
-                                icon={window.google && window.google.maps ? {
-                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="134" height="32" viewBox="0 0 134 32">
-                                            <rect x="2" y="2" width="130" height="28" rx="8" fill="#0c1424" fill-opacity="0.92" stroke="#ff6b00" stroke-width="1.5" />
-                                            <circle cx="16" cy="16" r="4" fill="#ff6b00" />
-                                            <text x="70" y="20" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.3">SOUTH CALOOCAN</text>
-                                        </svg>
-                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                    anchor: new window.google.maps.Point(67, 16)
-                                } : undefined}
+                            {/* Authoritative Shared Dual-Sector Caloocan Boundary Layer */}
+                            <CaloocanBoundaryLayer
+                                activeSector={selectedArea}
+                                onSectorClick={(sector) => setSelectedArea(sector)}
+                                isDarkMode={isDarkMode}
+                                showBarangays={true}
+                                showLabels={true}
                             />
 
                             {/* South Caloocan City Hall HQ Pin */}
@@ -3767,194 +3605,13 @@ const DispatcherDashboard = () => {
 
                 </main>
 
-                {/* PULSO Omni-Assistant Chat Window (Triggered from Top Header and Map Canvas toolbar) */}
-                <AnimatePresence>
-                    {isAIChatOpen && (
-                        <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
-                            {/* Backdrop (maximized only) */}
-                            {isAIMaximized && (
-                                <motion.div
-                                    key="backdrop"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[99]"
-                                    onClick={() => setIsAIMaximized(false)}
-                                />
-                            )}
-
-                            <motion.div
-                                key="chat"
-                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-                                className={`bg-slate-900 shadow-2xl border border-slate-700 overflow-hidden flex flex-col transition-all duration-300 ${
-                                    isAIMaximized
-                                        ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[100] rounded-3xl'
-                                        : 'w-[380px] h-[520px] rounded-2xl relative z-[100]'
-                                }`}
-                            >
-                                {/* Header */}
-                                <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shrink-0">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-blue-800 flex items-center justify-center animate-pulse">
-                                            <Brain size={18} className="text-white" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-white text-sm">PULSO Omni-Assistant</h4>
-                                            <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Engineering Co-pilot</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        {/* Maximize / Minimize toggle */}
-                                        <button
-                                            onClick={() => setIsAIMaximized(prev => !prev)}
-                                            title={isAIMaximized ? 'Minimize' : 'Maximize'}
-                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                                        >
-                                            {isAIMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                                        </button>
-                                        {/* Close */}
-                                        <button
-                                            onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
-                                            title="Close"
-                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Messages */}
-                                <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
-                                    {aiMessages.map((msg, i) => (
-                                        <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                            {/* Text bubble */}
-                                            <div className={`${
-                                                isAIMaximized ? 'max-w-[70%]' : 'max-w-[90%]'
-                                            } p-3 rounded-2xl text-xs font-medium leading-relaxed ${
-                                                msg.role === 'user' ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
-                                            }`}>
-                                                {msg.text}
-                                            </div>
-
-                                            {/* Map Result Card — shown only for assistant messages with location data */}
-                                            {msg.role === 'assistant' && msg.mapData && msg.mapData.length > 0 && isLoaded && (
-                                                <div className={`w-full ${isAIMaximized ? 'max-w-[85%]' : 'max-w-full'} rounded-2xl border border-slate-700 overflow-hidden bg-slate-800/80`}>
-                                                    {/* Map label */}
-                                                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/60 border-b border-slate-700">
-                                                        <MapIcon size={13} className="text-orange-400" />
-                                                        <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest">Live Report Locations</span>
-                                                        <span className="ml-auto text-[10px] text-slate-400 font-semibold">{msg.mapData.length} pins</span>
-                                                    </div>
-
-                                                    {/* Embedded mini Google Map */}
-                                                    <div className="w-full h-44 relative">
-                                                        <GoogleMap
-                                                            mapContainerStyle={{ width: '100%', height: '100%' }}
-                                                            center={CALOOCAN_CENTER}
-                                                            zoom={13}
-                                                            options={{
-                                                                disableDefaultUI: true,
-                                                                styles: isDarkMode ? [
-                                                                    { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-                                                                    { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-                                                                    { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
-                                                                    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-                                                                    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0c1626' }] },
-                                                                ] : [
-                                                                    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
-                                                                    { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
-                                                                    { elementType: 'labels.text.stroke', stylers: [{ color: '#f8fafc' }] },
-                                                                    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-                                                                    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
-                                                                ]
-                                                            }}
-                                                        >
-                                                            {msg.mapData.map(r => r.location_lat && r.location_lng && (
-                                                                <MarkerF
-                                                                    key={r.id}
-                                                                    position={{ lat: r.location_lat, lng: r.location_lng }}
-                                                                    title={`${formatTicketId(r.ticket_id, r.id)}: ${r.ai_category || r.category}`}
-                                                                    icon={window.google?.maps ? {
-                                                                        path: window.google.maps.SymbolPath.CIRCLE,
-                                                                        fillColor: r.status === 'resolved' ? '#22c55e' : r.ai_urgency === 'Critical' ? '#ef4444' : '#f97316',
-                                                                        fillOpacity: 1,
-                                                                        scale: 7,
-                                                                        strokeColor: 'white',
-                                                                        strokeWeight: 2,
-                                                                    } : undefined}
-                                                                />
-                                                            ))}
-                                                        </GoogleMap>
-                                                    </div>
-
-                                                    {/* Report list — scrollable */}
-                                                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-700/50 scrollbar-thin scrollbar-thumb-slate-700">
-                                                        {msg.mapData.map((r, idx) => (
-                                                            <button
-                                                                key={r.id}
-                                                                onClick={() => map?.panTo({ lat: r.location_lat, lng: r.location_lng })}
-                                                                className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-slate-700/50 transition-colors text-left group"
-                                                            >
-                                                                {/* Index badge */}
-                                                                <span className="shrink-0 w-5 h-5 rounded-full bg-slate-700 text-[10px] font-bold text-slate-300 flex items-center justify-center mt-0.5">{idx + 1}</span>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                                        <span className="text-[11px] font-bold text-white truncate">{r.ai_category || r.category || 'Uncategorized'}</span>
-                                                                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
-                                                                            r.status === 'resolved' ? 'bg-green-500/15 text-green-400' :
-                                                                            r.ai_urgency === 'Critical' ? 'bg-red-500/15 text-red-400' :
-                                                                            'bg-orange-500/15 text-orange-400'
-                                                                        }`}>{r.status}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1 mt-0.5">
-                                                                        <MapPin size={9} className="text-slate-500 shrink-0" />
-                                                                        <span className="text-[10px] text-slate-400 truncate">
-                                                                            {r.location_string || `${r.location_lat?.toFixed(4)}°N, ${r.location_lng?.toFixed(4)}°E`}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                                <span className="text-[9px] font-mono text-slate-600 group-hover:text-orange-400 transition-colors shrink-0">{formatTicketId(r.ticket_id, r.id)}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {isAILoading && (
-                                        <div className="flex justify-start">
-                                            <div className="bg-slate-800 p-3 rounded-2xl flex gap-1">
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div ref={aiChatEndRef} />
-                                </div>
-
-                                {/* Input */}
-                                <form onSubmit={handleAIChat} className="p-4 bg-slate-800 border-t border-slate-700 shrink-0">
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={aiQuery}
-                                            onChange={(e) => setAiQuery(e.target.value)}
-                                            placeholder="Ask PULSO Brain..."
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-blue-600 outline-none"
-                                        />
-                                        <button type="submit" disabled={isAILoading} className="absolute right-2 top-[7px] text-blue-400 hover:text-blue-300 disabled:opacity-40">
-                                            <Search size={16} />
-                                        </button>
-                                    </div>
-                                </form>
-                            </motion.div>
-                        </div>
-                    )}
-                </AnimatePresence>
+                {/* ── Unified PULSEAI Assistant Window (Staff Role) ── */}
+                <PulseAIChatWindow
+                    isOpen={isAIChatOpen}
+                    onClose={() => setIsAIChatOpen(false)}
+                    role="staff"
+                    currentUser={currentUser}
+                />
             </div>
             {/* ── Image Zoom Overlay ── */}
             <AnimatePresence>

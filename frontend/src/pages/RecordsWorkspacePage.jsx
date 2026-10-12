@@ -28,6 +28,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
+import SearchInput from '../components/SearchInput';
 import './records-workspace.css';
 
 const RECORDS_TABS = [
@@ -594,27 +595,14 @@ export default function RecordsWorkspacePage({ workspace = 'records' }) {
 
                 {/* Filter and Search Controls */}
                 <div className="records-controls-bar">
-                    <div className="records-search-box">
-                        <Search size={14} className="records-search-icon" />
-                        <input
-                            type="text"
-                            placeholder={!isAuditMode ? "Search records by ID, title, owner, or object..." : "Search timeline by event, actor, object, or correlation ID..."}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="records-search-input"
-                            aria-label="Search records"
-                        />
-                        {searchQuery && (
-                            <button
-                                type="button"
-                                className="records-search-clear"
-                                onClick={() => setSearchQuery('')}
-                                aria-label="Clear search"
-                            >
-                                <X size={12} />
-                            </button>
-                        )}
-                    </div>
+                    <SearchInput
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder={!isAuditMode ? "Search records by ID, title, owner or object" : "Search timeline by event, actor or ID"}
+                        ariaLabel={!isAuditMode ? "Search records by ID, title, owner or object" : "Search timeline by event, actor or ID"}
+                        onClear={() => setSearchQuery('')}
+                        className="w-full sm:w-[320px] md:w-[360px]"
+                    />
 
                     {!isAuditMode && (
                         <div className="records-filter-group">

@@ -23,9 +23,10 @@ import {
     Layers,
     Compass
 } from 'lucide-react';
-import { GoogleMap, PolygonF, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import ReportDensityLayer from '../components/maps/ReportDensityLayer';
+import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
 import GovSidebar from '../components/GovSidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
@@ -467,7 +468,7 @@ export default function GovTodayPage() {
                                                     onClick={() => handleSectorChange('south')}
                                                     className={`px-2.5 py-1 rounded-md text-xs font-heading font-semibold transition-all cursor-pointer ${
                                                         activeSector === 'south'
-                                                            ? 'bg-amber-500 text-white shadow-xs'
+                                                            ? 'bg-[#ff6b00] text-white shadow-xs'
                                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                                                     }`}
                                                 >
@@ -541,30 +542,13 @@ export default function GovTodayPage() {
                                                 mapTypeId={mapStyleType}
                                                 onLoad={(map) => setTodayMap(map)}
                                             >
-                                                {/* North Caloocan Sector Boundary */}
-                                                <PolygonF
-                                                    paths={NORTH_CALOOCAN_PATH}
-                                                    options={{
-                                                        strokeColor: '#ff6b00',
-                                                        strokeOpacity: activeSector === 'north' ? 1.0 : 0.6,
-                                                        strokeWeight: activeSector === 'north' ? 2.5 : 1.5,
-                                                        fillColor: '#ff6b00',
-                                                        fillOpacity: activeSector === 'north' ? 0.14 : 0.04,
-                                                    }}
-                                                    onClick={() => handleSectorChange('north')}
-                                                />
-
-                                                {/* South Caloocan Sector Boundary */}
-                                                <PolygonF
-                                                    paths={SOUTH_CALOOCAN_PATH}
-                                                    options={{
-                                                        strokeColor: '#f59e0b',
-                                                        strokeOpacity: activeSector === 'south' ? 1.0 : 0.6,
-                                                        strokeWeight: activeSector === 'south' ? 2.5 : 1.5,
-                                                        fillColor: '#f59e0b',
-                                                        fillOpacity: activeSector === 'south' ? 0.14 : 0.04,
-                                                    }}
-                                                    onClick={() => handleSectorChange('south')}
+                                                {/* Authoritative Shared Dual-Sector Caloocan Boundary Layer */}
+                                                <CaloocanBoundaryLayer
+                                                    activeSector={activeSector}
+                                                    onSectorClick={handleSectorChange}
+                                                    isDarkMode={isDark}
+                                                    showBarangays={true}
+                                                    showLabels={true}
                                                 />
 
                                                 {/* Report Density Heatmap Layer */}
@@ -601,8 +585,8 @@ export default function GovTodayPage() {
                                                 {selectedIncident && (
                                                     <InfoWindowF
                                                         position={{
-                                                            lat: Number(selectedIncident.latitude),
-                                                            lng: Number(selectedIncident.longitude)
+                                                             lat: Number(selectedIncident.latitude),
+                                                             lng: Number(selectedIncident.longitude)
                                                         }}
                                                         onCloseClick={() => setSelectedIncident(null)}
                                                     >
@@ -633,14 +617,14 @@ export default function GovTodayPage() {
                                             </GoogleMap>
                                         )}
 
-                                        {/* Corner Sector Legend Badges */}
+                                        {/* Corner Sector Legend Badges (Unified Orange Swatch) */}
                                         <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 pointer-events-none">
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/90 dark:bg-black/80 backdrop-blur-xs text-[10px] font-mono-data font-bold text-[#ff6b00] border border-[#ff6b00]/30 shadow-xs">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-[#ff6b00]" />
                                                 North Sector
                                             </span>
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/90 dark:bg-black/80 backdrop-blur-xs text-[10px] font-mono-data font-bold text-amber-500 border border-amber-500/30 shadow-xs">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/90 dark:bg-black/80 backdrop-blur-xs text-[10px] font-mono-data font-bold text-[#ff6b00] border border-[#ff6b00]/30 shadow-xs">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#ff6b00]" />
                                                 South Sector
                                             </span>
                                         </div>
@@ -705,16 +689,16 @@ export default function GovTodayPage() {
                                             onKeyDown={(e) => e.key === 'Enter' && handleSectorChange('south')}
                                             className={`p-4 rounded-xl border transition-all cursor-pointer text-left ${
                                                 activeSector === 'south'
-                                                    ? 'border-amber-500 ring-1 ring-amber-500/40 bg-amber-50/40 dark:bg-amber-950/10'
+                                                    ? 'border-[#ff6b00] ring-1 ring-[#ff6b00]/40 bg-orange-50/40 dark:bg-orange-950/10'
                                                     : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-50/60 dark:bg-[#090e1a] hover:border-slate-300 dark:hover:border-slate-700'
                                             }`}
                                         >
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-2">
-                                                    <MapPin size={15} className="text-amber-500" />
+                                                    <MapPin size={15} className="text-[#ff6b00]" />
                                                     <strong className="font-heading font-bold text-sm text-slate-900 dark:text-white">South Caloocan</strong>
                                                 </div>
-                                                <span className="text-[10px] font-heading font-semibold text-slate-400 hover:text-amber-500">
+                                                <span className="text-[10px] font-heading font-semibold text-slate-400 hover:text-[#ff6b00]">
                                                     {activeSector === 'south' ? '● Active' : 'Focus Sector →'}
                                                 </span>
                                             </div>

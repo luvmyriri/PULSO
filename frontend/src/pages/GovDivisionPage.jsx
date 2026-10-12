@@ -23,6 +23,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
+import SearchInput from '../components/SearchInput';
 import DocumentUploadModal from '../components/DocumentUploadModal';
 import ComplianceReminder from '../components/ComplianceReminder';
 import './planning-delivery-workspace.css';
@@ -1445,17 +1446,14 @@ const GovDivisionPage = ({ workspace, activePathOverride }) => {
                                 <div className="flex items-center gap-3 flex-wrap">
 
                                     {/* Search */}
-
-                                    <div className="relative flex-1 min-w-48">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            placeholder={isUsers ? 'Search by name, email, role, barangay…' : `Search ${config.title.toLowerCase()}...`}
-                                            value={search}
-                                            onChange={e => setSearch(e.target.value)}
-                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-orange-500 transition-colors"
-                                        />
-                                    </div>
+                                    <SearchInput
+                                        value={search}
+                                        onChange={setSearch}
+                                        placeholder={isUsers ? 'Search name, email, role or barangay' : `Search ${config.title.toLowerCase()}`}
+                                        ariaLabel={isUsers ? 'Search name, email, role or barangay' : `Search ${config.title.toLowerCase()}`}
+                                        onClear={() => setSearch('')}
+                                        className="w-full sm:w-[320px] md:w-[360px]"
+                                    />
                                     
                                     {/* J-ABAC Jurisdiction Toggle (Engineers Only) */}
                                     {['project_engineer', 'design_engineer', 'estimator', 'cad_operator', 'construction_foreman', 'building_inspector', 'electrical_inspector', 'mechanical_inspector'].includes(currentUser?.role) && currentUser?.barangay && (
