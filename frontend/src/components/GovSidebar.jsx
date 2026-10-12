@@ -116,7 +116,7 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
             <div>
                 <div className={`h-20 flex items-center px-4 border-b border-slate-200 dark:border-slate-800/80 ${isCollapsed ? 'justify-center' : ''}`}>
                     <Link
-                        to="/gov/my-dashboard"
+                        to="/gov/dashboard"
                         className="flex items-center gap-2.5 group overflow-hidden cursor-pointer"
                         title="City Government of Caloocan - City Engineering Department - PULSO"
                     >
