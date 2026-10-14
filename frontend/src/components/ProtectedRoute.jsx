@@ -18,8 +18,9 @@
 
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { ShieldX, LogOut, ChevronLeft } from 'lucide-react';
+import { ShieldX, LogOut, ChevronLeft } from '../icons';
 import { checkPermission } from '../utils/rbac_utils';
+import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Role groups (mirroring backend)
@@ -66,10 +67,9 @@ const ROLE_LABELS = {
 
 const UnauthorizedPage = ({ userRole, allowedRoles }) => {
     const handleSignOut = () => {
-        const user = JSON.parse(localStorage.getItem('pulso_user') || '{}');
+        const user = getAuthUser();
         const wasGov = user?.role && user.role !== 'resident';
-        localStorage.removeItem('pulso_token');
-        localStorage.removeItem('pulso_user');
+        clearAuthSession();
         window.location.href = wasGov ? '/gov' : '/login';
     };
 
@@ -143,9 +143,8 @@ const ProtectedRoute = ({ children, allowedRoles = null, requiredPermission = nu
     const location = useLocation();
 
     // Read auth state
-    const token = localStorage.getItem('pulso_token');
-    let user = null;
-    try { user = JSON.parse(localStorage.getItem('pulso_user')); } catch {}
+    const token = getAuthToken();
+    const user = getAuthUser();
 
     // Not authenticated → to login or gov portal depending on allowedRoles
     if (!token || !user) {

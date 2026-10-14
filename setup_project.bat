@@ -1,38 +1,67 @@
 @echo off
 setlocal
 set "ROOT_DIR=%~dp0"
+set "PYTHON_EXE=%ROOT_DIR%backend\.venv\Scripts\python.exe"
 
-echo [1/3] Setting up Backend...
-cd "%ROOT_DIR%backend"
-if not exist ".venv" (
-    python -m venv .venv
+if not exist "%ROOT_DIR%.env" (
+    echo [ERROR] Missing root .env. Copy .env.example and configure it.
+    exit /b 1
 )
-call .venv\Scripts\activate
-echo Installing Backend Requirements...
-pip install -r requirements.txt
-echo Backend Setup Complete!
-echo.
+if not exist "%ROOT_DIR%backend\.env" (
+    echo [ERROR] Missing backend\.env. Copy backend\.env.example and configure it.
+    exit /b 1
+)
+if not exist "%ROOT_DIR%frontend\.env" (
+    echo [ERROR] Missing frontend\.env. Copy frontend\.env.example and configure it.
+    exit /b 1
+)
 
-echo [2/3] Setting up Frontend...
-cd "%ROOT_DIR%frontend"
-echo Installing Frontend Dependencies...
-call npm install
-echo Frontend Setup Complete!
-echo.
+where node >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Node.js is missing. Install Node 20.19+ or 22.12+.
+    exit /b 1
+)
+where npm >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] npm is missing. Install Node 20.19+ or 22.12+.
+    exit /b 1
+)
+node -e "const [major,minor]=process.versions.node.split('.').map(Number);process.exit((major===20&&minor>=19)||(major===22&&minor>=12)||major>22?0:1)"
+if errorlevel 1 (
+    echo [ERROR] Node 20.19+ or 22.12+ is required.
+    exit /b 1
+)
 
-echo [3/3] Setting up Mobile App...
-cd "%ROOT_DIR%mobile_app"
-echo Installing Flutter Dependencies...
-call flutter pub get
-echo Mobile App Setup Complete!
-echo.
+if not exist "%PYTHON_EXE%" (
+    where py >nul 2>&1
+    if not errorlevel 1 (
+        py -3.12 -m venv "%ROOT_DIR%backend\.venv" >nul 2>&1
+    )
+    if not exist "%PYTHON_EXE%" (
+        where python >nul 2>&1
+        if not errorlevel 1 (
+            python -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" >nul 2>&1
+            if not errorlevel 1 python -m venv "%ROOT_DIR%backend\.venv"
+        )
+    )
+)
+if not exist "%PYTHON_EXE%" (
+    echo [ERROR] Python 3.12 was not found. Install it and rerun setup_project.bat.
+    exit /b 1
+)
+"%PYTHON_EXE%" -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] backend\.venv is not Python 3.12. Recreate this local venv, then retry.
+    exit /b 1
+)
 
-echo All Basic Dependencies Installed!
-echo.
-echo NEXT STEPS:
-echo 1. Create a PostgreSQL database named 'pulso_db'.
-echo 2. Update 'backend/.env' with your API keys.
-echo 3. Run 'alembic upgrade head' in the backend directory.
-echo 4. Start your servers!
-
-pause
+echo Installing backend requirements...
+"%PYTHON_EXE%" -m pip install -r "%ROOT_DIR%backend\requirements.txt"
+if errorlevel 1 exit /b 1
+echo Installing frontend dependencies from lockfile...
+pushd "%ROOT_DIR%frontend"
+call npm ci
+set "NPM_RESULT=%ERRORLEVEL%"
+popd
+if not "%NPM_RESULT%"=="0" exit /b %NPM_RESULT%
+echo Dependencies are ready. Start the database and run scripts\bootstrap_db.ps1 for a blank database.

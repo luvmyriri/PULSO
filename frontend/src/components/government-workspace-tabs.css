@@ -1,0 +1,108 @@
+.government-workspace-tabs {
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 0 24px;
+    background: #ffffff;
+    border-bottom: 1px solid #dbe4ec;
+}
+
+.government-workspace-tabs__rail {
+    display: flex;
+    min-width: max-content;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #9fb4c7 transparent;
+}
+
+.government-workspace-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-height: 46px;
+    padding: 0 12px;
+    gap: 7px;
+    color: #52667a;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 140ms ease, background-color 140ms ease;
+}
+
+.government-workspace-tab::after {
+    position: absolute;
+    right: 10px;
+    bottom: 0;
+    left: 10px;
+    height: 2px;
+    content: '';
+    background: transparent;
+}
+
+.government-workspace-tab:hover {
+    color: #075985;
+    background: #f4f8fb;
+}
+
+.government-workspace-tab.is-active {
+    color: #075985;
+}
+
+.government-workspace-tab.is-active::after {
+    background: #0b6b9b;
+}
+
+.government-workspace-tab:focus-visible {
+    z-index: 1;
+    outline: 3px solid #f59e0b;
+    outline-offset: -3px;
+}
+
+.dark .government-workspace-tabs {
+    background: #061d2b;
+    border-bottom-color: #1e4052;
+}
+
+.dark .government-workspace-tabs__rail {
+    scrollbar-color: #4f7183 transparent;
+}
+
+.dark .government-workspace-tab {
+    color: #a8bdc9;
+}
+
+.dark .government-workspace-tab:hover {
+    color: #e4f2f8;
+    background: #0b2939;
+}
+
+.dark .government-workspace-tab.is-active {
+    color: #8dd7f2;
+}
+
+.dark .government-workspace-tab.is-active::after {
+    background: #38bdf8;
+}
+
+@media (max-width: 760px) {
+    .government-workspace-tabs {
+        padding: 0 12px;
+    }
+
+    .government-workspace-tab {
+        min-height: 44px;
+        padding-inline: 10px;
+    }
+}
+
+@media (forced-colors: active) {
+    .government-workspace-tab.is-active::after {
+        background: Highlight;
+    }
+
+    .government-workspace-tab:focus-visible {
+        outline-color: Highlight;
+    }
+}

@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
@@ -42,7 +43,7 @@ class RegistrationSuccessScreen extends StatelessWidget {
                     border: Border.all(color: AppTheme.primaryOrange.withOpacity(0.3), width: 2),
                   ),
                   child: const Center(
-                    child: Icon(Icons.check_rounded, size: 70, color: AppTheme.primaryOrange),
+                    child: PulsoIcon(Icons.check_rounded, size: 70, color: AppTheme.primaryOrange),
                   ),
                 ).animate()
                   .scale(duration: 600.ms, curve: Curves.easeOutBack)

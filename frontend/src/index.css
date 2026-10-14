@@ -1,34 +1,329 @@
 @import "tailwindcss";
+@import "./components/modals/modal-dialogs.css";
+@import "./styles/sweetalert-civic.css";
+@import "./components/search-input.css";
+
+/* ── SELF-HOSTED INTER VARIABLE FONT (Weights 400 to 700 / 100-900, Latin & Latin-Ext under 100KB, no CDN) ── */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-variable.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext-variable.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Fallback font with size-adjust to eliminate layout shift while Inter loads */
+@font-face {
+  font-family: 'Inter-fallback';
+  src: local('Arial'), local('Helvetica');
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+  size-adjust: 107%;
+}
+
+html {
+  --solar-stroke-width: 2;
+  scroll-behavior: smooth;
+}
+
+/* 150ms Theme fade transition rule (switches instantly under reduced motion) */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, fill 150ms ease, stroke 150ms ease !important;
+  transition-delay: 0s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition: none !important;
+  }
+}
 
 /* Enforce manual dark mode toggling alongside system preferring */
 @variant dark (&:is(.dark *));
 
 @theme {
-  --color-primary-light: #fdba74;
-  --color-primary: #f97316;
-  --color-primary-dark: #ea580c;
+  --breakpoint-xs: 420px;
+  /* Brand Primary (Orange Palette) */
+  --color-primary: #ff6b00;
+  --color-primary-light: #ffefe5;
+  --color-primary-dark: #cc5200;
+  --color-primary-hover: #e65c00;
 
-  --color-dark-light: #1e293b;
-  --color-dark: #0f172a;
+  /* Brand Secondary (Green Accent) */
+  --color-secondary: #10b981;
+  --color-secondary-light: #ecfdf5;
+  --color-secondary-dark: #047857;
+  --color-secondary-hover: #059669;
 
-  --color-light-offset: #f8fafc;
+  /* Brand Neutrals */
+  --color-neutral-bg: #fffbf9;
+  --color-neutral-card: #ffffff;
+  --color-neutral-border: #f3e9e2;
+  --color-neutral-text: #2c1d11;
+  --color-neutral-muted: #736254;
+
+  /* Override standard tailwind theme color mappings for backward compatibility with existing indigo/blue components */
+  --color-indigo-50: #ffefe5;
+  --color-indigo-100: #ffd9c2;
+  --color-indigo-200: #ffb48a;
+  --color-indigo-300: #ff8e52;
+  --color-indigo-400: #ff7524;
+  --color-indigo-500: #e65c00;
+  --color-indigo-600: #ff6b00;
+  --color-indigo-700: #cc5200;
+  --color-indigo-800: #a34100;
+  --color-indigo-900: #7a3100;
+
+  --color-blue-50: #ecfdf5;
+  --color-blue-100: #d1fae5;
+  --color-blue-200: #a7f3d0;
+  --color-blue-300: #6ee7b7;
+  --color-blue-400: #34d399;
+  --color-blue-500: #10b981;
+  --color-blue-600: #059669;
+  --color-blue-700: #047857;
+  --color-blue-800: #065f46;
+  --color-blue-900: #064e3b;
+
+  --color-dark-light: #2c1d11;
+  --color-dark: #2c1d11;
+
+  --color-light-offset: #f3e9e2;
   --color-light: #ffffff;
 
-  --font-sans: "Inter", sans-serif;
-  --font-display: "Oswald", sans-serif;
+  /* Civic Aperture Design Tokens */
+  --color-ink: #132238;
+  --color-canvas: #f7f8fa;
+  --color-canvas-dark: #070a12;
+  --color-survey-blue: #075985;
+  --color-field-blue: #0b4f6c;
+  --color-field-blue-dark: #ff6b00;
+  --color-resident-action: #c2410c;
+  --color-resident-action-dark: #ff8a3d;
+  --color-pulse: #f97316;
+  --color-resolved: #0f766e;
+  --color-resolved-dark: #66d2c8;
+  --color-warning: #b45309;
+  --color-warning-dark: #fdb022;
+  --color-danger: #b42318;
+  --color-danger-dark: #fda29b;
+  --color-focus: #2563eb;
+  --color-focus-dark: #93c5fd;
+
+  --font-sans: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-display: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-heading: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-mono: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+
+:root {
+  /* Global Single Font Stack Token */
+  --font-sans: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --font-mono: var(--font-sans);
+
+  /* Shared Typography Scale Tokens (rem units) */
+  --type-display-size: 2rem;           /* 32px mobile */
+  --type-display-desktop: 2.75rem;     /* 44px desktop */
+  --type-display-weight: 700;
+  --type-display-line-height: 1.15;
+  --type-display-tracking: -0.02em;
+
+  --type-h1-size: 1.75rem;             /* 28px mobile */
+  --type-h1-desktop: 2.25rem;          /* 36px desktop */
+  --type-h1-weight: 700;
+  --type-h1-line-height: 1.2;
+  --type-h1-tracking: -0.015em;
+
+  --type-h2-size: 1.375rem;            /* 22px mobile */
+  --type-h2-desktop: 1.75rem;          /* 28px desktop */
+  --type-h2-weight: 600;
+  --type-h2-line-height: 1.25;
+
+  --type-card-title-size: 1.125rem;    /* 18px mobile */
+  --type-card-title-desktop: 1.25rem;  /* 20px desktop */
+  --type-card-title-weight: 600;
+  --type-card-title-line-height: 1.3;
+
+  --type-body-size: 1rem;              /* 16px */
+  --type-body-weight: 400;
+  --type-body-line-height: 1.5;
+
+  --type-small-size: 0.875rem;         /* 14px (minimum resident read size) */
+  --type-small-weight: 400;
+  --type-small-line-height: 1.45;
+
+  --type-caption-size: 0.8125rem;      /* 13px */
+  --type-caption-weight: 500;
+  --type-caption-line-height: 1.35;
+
+  --type-button-size: 1rem;            /* 16px */
+  --type-button-weight: 600;
+  --type-button-line-height: 1.25;
+
+  --bg: #fffbf9;
+  --text: #000000;
+  --surface: #ffffff;
+  --surface-hover: #f8fafc;
+  --border: #f3e9e2;
+  --accent: #ff6b00;
+  --accent-hover: #e65c00;
+  --muted: #000000;
+  --navy-dark: #070a12;
+  --bg-card: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #000000;
+  --border-color: #e2e8f0;
+
+  /* Civic Aperture - Morning Field Sheet (Light) */
+  --gov-canvas: #f7f8fa;
+  --gov-surface: #ffffff;
+  --gov-surface-subtle: #f8faf9;
+  --gov-surface-elevated: #ffffff;
+  --gov-text: #000000;
+  --gov-text-secondary: #000000;
+  --gov-text-muted: #000000;
+  --gov-rule: #c9d4d9;
+  --gov-rule-subtle: #e2e8f0;
+  --gov-action: #ff6b00;
+  --gov-action-strong: #e65c00;
+  --gov-action-soft: rgba(255, 107, 0, 0.08);
+  --gov-accent: #ff6b00;
+  --gov-accent-soft: rgba(255, 107, 0, 0.1);
+  --gov-selection: #e7f3f7;
+  --gov-focus: #ff6b00;
+  --gov-resident-action: #c2410c;
+  --gov-pulse: #f97316;
+  --gov-survey-blue: #075985;
+  --gov-resolved: #0f766e;
+  --gov-resolved-soft: rgba(15, 118, 110, 0.1);
+  --gov-warning: #b45309;
+  --gov-warning-soft: rgba(180, 83, 9, 0.1);
+  --gov-danger: #b42318;
+  --gov-danger-soft: rgba(180, 35, 24, 0.1);
+  --gov-critical: #b42318;
+  --gov-critical-soft: rgba(180, 35, 24, 0.1);
+  --gov-card-bg: #ffffff;
+  --gov-surface-hover: #f1f5f9;
+  --gov-sidebar-width: 256px;
+  --gov-sidebar-rail-width: 72px;
+
+  /* Mobile Tutorial & Civic Theme Tokens (Light Mode - Morning Field Sheet) */
+  --pulso-tut-bg-base: #f8f7f5;
+  --pulso-tut-bg-glow: rgba(255, 107, 0, 0.10);
+  --pulso-tut-bg-glow-fade: rgba(255, 107, 0, 0.03);
+  --pulso-tut-heading: #0c2436;
+  --pulso-tut-body: #475569;
+  --pulso-tut-btn-bg: #ff6b00;
+  --pulso-tut-btn-text: #070a12;
+  --pulso-tut-link: #c2410c;
+  --pulso-tut-dot-inactive: #cbd5e1;
+  --pulso-tut-dot-active: #ff6b00;
+  --pulso-tut-emergency: #b91c1c;
+}
+
+.dark {
+  --bg: #070a12;
+  --text: #f8fafc;
+  --surface: #0f172a;
+  --surface-hover: #1e293b;
+  --border: #1e293b;
+  --accent: #ff6b00;
+  --accent-hover: #e65c00;
+  --muted: #94a3b8;
+  --navy-dark: #070a12;
+  --bg-card: #0c1424;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border-color: #1e293b;
+
+  /* Brand Neutrals Dark Mode Overrides */
+  --color-neutral-bg: #070a12;
+  --color-neutral-card: #0c1424;
+  --color-neutral-border: #1e293b;
+  --color-neutral-text: #f8fafc;
+  --color-neutral-muted: #94a3b8;
+
+  /* Government Dark Mode Palette - Aligned with PULSO Night Theme */
+  --gov-canvas: #070a12;
+  --gov-surface: #090e1a;
+  --gov-surface-subtle: #0f172a;
+  --gov-surface-elevated: #111a2e;
+  --gov-text: #f8fafc;
+  --gov-text-secondary: #94a3b8;
+  --gov-text-muted: #64748b;
+  --gov-rule: #1e293b;
+  --gov-rule-subtle: #162032;
+  --gov-action: #ff6b00;
+  --gov-action-strong: #e65c00;
+  --gov-action-soft: rgba(255, 107, 0, 0.15);
+  --gov-accent: #ff6b00;
+  --gov-accent-soft: rgba(255, 107, 0, 0.15);
+  --gov-selection: rgba(255, 107, 0, 0.18);
+  --gov-focus: #ff6b00;
+  --gov-resident-action: #ff6b00;
+  --gov-pulse: #ff6b00;
+  --gov-survey-blue: #0284c7;
+  --gov-resolved: #10b981;
+  --gov-resolved-soft: rgba(16, 185, 129, 0.15);
+  --gov-warning: #f59e0b;
+  --gov-warning-soft: rgba(245, 158, 11, 0.15);
+  --gov-danger: #ef4444;
+  --gov-danger-soft: rgba(239, 68, 68, 0.15);
+  --gov-critical: #ef4444;
+  --gov-critical-soft: rgba(239, 68, 68, 0.15);
+  --gov-card-bg: #0c1424;
+  --gov-surface-hover: #1e293b;
+
+  /* Mobile Tutorial & Civic Theme Tokens (Dark Mode - Night Inspection) */
+  --pulso-tut-bg-base: #070a12;
+  --pulso-tut-bg-glow: rgba(255, 107, 0, 0.14);
+  --pulso-tut-bg-glow-fade: rgba(255, 107, 0, 0.04);
+  --pulso-tut-heading: #ffffff;
+  --pulso-tut-body: #cbd5e1;
+  --pulso-tut-btn-bg: #ff6b00;
+  --pulso-tut-btn-text: #ffffff;
+  --pulso-tut-link: #ff8a3d;
+  --pulso-tut-dot-inactive: #334155;
+  --pulso-tut-dot-active: #ff6b00;
+  --pulso-tut-emergency: #f87171;
 }
 
 @layer base {
   body {
-    background-color: transparent;
-    color: var(--color-dark);
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
 
   .dark body,
   body.dark {
-    background-color: transparent;
-    color: var(--color-light);
+    background-color: var(--bg);
+    color: var(--text);
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: #ff6b00;
   }
 
   /* Global hand cursor for all interactive elements */
@@ -43,6 +338,45 @@
   select,
   label {
     cursor: pointer;
+  }
+
+  /* Universal WCAG 2.2 AA visible focus double-ring pattern for interactive controls */
+  a:focus-visible,
+  button:focus-visible,
+  input[type="checkbox"]:focus-visible,
+  input[type="radio"]:focus-visible,
+  input[type="submit"]:focus-visible,
+  input[type="button"]:focus-visible,
+  input[type="reset"]:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible:not(.outline-none),
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 3px solid #f97316 !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Prevent text, search, and form inputs from rendering intrusive sharp orange rectangular outlines */
+  input[type="text"]:focus,
+  input[type="text"]:focus-visible,
+  input[type="search"]:focus,
+  input[type="search"]:focus-visible,
+  input[type="email"]:focus,
+  input[type="email"]:focus-visible,
+  input[type="password"]:focus,
+  input[type="password"]:focus-visible,
+  input[type="number"]:focus,
+  input[type="number"]:focus-visible,
+  input[type="tel"]:focus,
+  input[type="tel"]:focus-visible,
+  input:not([type]):focus,
+  input:not([type]):focus-visible,
+  .outline-none:focus,
+  .outline-none:focus-visible,
+  [class*="outline-none"]:focus,
+  [class*="outline-none"]:focus-visible {
+    outline: none !important;
+    outline-offset: 0 !important;
   }
 
   ::selection {
@@ -342,4 +676,344 @@
   .animate-wave-ring {
     animation: wave-ring 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
+
+  @keyframes gradient-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .animate-gradient-flow {
+    background-size: 200% auto !important;
+    animation: gradient-flow 6s ease infinite !important;
+  }
+
+  .hero-grid-bg {
+    background-color: transparent;
+    background-image: none !important;
+  }
+
+  .hero-grid-perspective {
+    background-color: transparent;
+    background-image: none !important;
+  }
 }
+
+/* Hide Spline Watermark globally */
+#logo,
+.spline-watermark,
+a[href*="spline.design"],
+canvas + div {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Typography tokens for PULSO Civic Portal */
+.font-heading {
+  font-family: var(--font-heading), "Space Grotesk", sans-serif;
+}
+
+.font-mono-data {
+  font-family: var(--font-mono), "JetBrains Mono", monospace;
+}
+
+/* Accessibility: prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   HIGH-CONTRAST LIGHT MODE TYPOGRAPHY (USER REQUIREMENT)
+   All gray/slate text classes render as solid black in light mode across all pages.
+   Dark mode (.dark) remains completely unaffected with zero regression.
+   Uses :not(:hover) so standard hover states (:hover) smoothly override.
+   ========================================================================== */
+
+html:not(.dark) :not(footer):not(footer *).text-slate-300:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-slate-400:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-slate-500:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-slate-600:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-slate-700:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-gray-400:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-gray-500:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-gray-600:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-zinc-400:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-zinc-500:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-zinc-600:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-neutral-400:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-neutral-500:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-neutral-600:not(:hover),
+html:not(.dark) :not(footer):not(footer *).text-neutral-muted:not(:hover) {
+  color: #000000 !important;
+}
+
+/* SVG fills for chart labels, axes, and legends */
+html:not(.dark) .fill-slate-400,
+html:not(.dark) .fill-slate-500,
+html:not(.dark) .fill-slate-600,
+html:not(.dark) .fill-slate-700,
+html:not(.dark) .fill-gray-400,
+html:not(.dark) .fill-gray-500,
+html:not(.dark) .fill-zinc-400,
+html:not(.dark) .fill-zinc-500,
+html:not(.dark) .fill-neutral-400,
+html:not(.dark) .fill-neutral-500 {
+  fill: #000000 !important;
+}
+
+/* Recharts chart text in light mode */
+html:not(.dark) .recharts-cartesian-axis-tick text,
+html:not(.dark) .recharts-legend-item-text,
+html:not(.dark) .recharts-text {
+  fill: #000000 !important;
+}
+
+/* Form input placeholders in light mode remain distinct from typed input */
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #475569;
+}
+
+/* Preserve crisp contrast for official municipal dark civic footer in light mode */
+footer[role="contentinfo"],
+.civic-footer {
+  background-color: #0f172a !important; /* bg-slate-900 */
+  color: #cbd5e1 !important;
+  border-top: 1px solid #1e293b !important;
+}
+
+html:not(.dark) footer[role="contentinfo"],
+html:not(.dark) .civic-footer {
+  background-color: #0f172a !important;
+  color: #cbd5e1 !important;
+  border-top: 1px solid #1e293b !important;
+}
+
+html:not(.dark) footer[role="contentinfo"] .text-slate-400:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-slate-400,
+html:not(.dark) .civic-footer .text-slate-400:not(:hover),
+html:not(.dark) .civic-footer .text-slate-400,
+html:not(.dark) footer[role="contentinfo"] .text-slate-500:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-slate-500,
+html:not(.dark) .civic-footer .text-slate-500:not(:hover),
+html:not(.dark) .civic-footer .text-slate-500,
+html:not(.dark) footer[role="contentinfo"] p:not(:hover),
+html:not(.dark) .civic-footer p:not(:hover),
+html:not(.dark) footer[role="contentinfo"] li:not(:hover),
+html:not(.dark) .civic-footer li:not(:hover) {
+  color: #94a3b8 !important;
+}
+
+html:not(.dark) footer[role="contentinfo"] .text-slate-300:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-slate-300,
+html:not(.dark) .civic-footer .text-slate-300:not(:hover),
+html:not(.dark) .civic-footer .text-slate-300 {
+  color: #cbd5e1 !important;
+}
+
+html:not(.dark) footer[role="contentinfo"] .text-slate-200:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-slate-200,
+html:not(.dark) .civic-footer .text-slate-200:not(:hover),
+html:not(.dark) .civic-footer .text-slate-200,
+html:not(.dark) footer[role="contentinfo"] .text-white:not(:hover),
+html:not(.dark) footer[role="contentinfo"] .text-white,
+html:not(.dark) .civic-footer .text-white:not(:hover),
+html:not(.dark) .civic-footer .text-white,
+html:not(.dark) footer[role="contentinfo"] strong:not(:hover),
+html:not(.dark) .civic-footer strong:not(:hover) {
+  color: #ffffff !important;
+}
+
+html:not(.dark) footer[role="contentinfo"] a:not(:hover),
+html:not(.dark) footer[role="contentinfo"] button:not(:hover),
+html:not(.dark) .civic-footer a:not(:hover),
+html:not(.dark) .civic-footer button:not(:hover) {
+  color: #94a3b8 !important;
+}
+
+html:not(.dark) footer[role="contentinfo"] a:hover,
+html:not(.dark) footer[role="contentinfo"] button:hover,
+html:not(.dark) .civic-footer a:hover,
+html:not(.dark) .civic-footer button:hover {
+  color: #ff6b00 !important;
+}
+
+html:not(.dark) footer[role="contentinfo"] .border-slate-800,
+html:not(.dark) .civic-footer .border-slate-800 {
+  border-color: #1e293b !important;
+}
+
+html:not(.dark) footer[role="contentinfo"] .border-slate-700,
+html:not(.dark) .civic-footer .border-slate-700 {
+  border-color: #334155 !important;
+}
+
+html:not(.dark) footer[role="contentinfo"] .bg-slate-800\/90,
+html:not(.dark) .civic-footer .bg-slate-800\/90 {
+  background-color: rgba(30, 41, 59, 0.9) !important;
+}
+
+/* ── PULSO SHARED TYPOGRAPHY SCALE CLASSES ── */
+.pulso-display {
+  font-family: var(--font-sans);
+  font-size: var(--type-display-size);
+  font-weight: var(--type-display-weight);
+  line-height: var(--type-display-line-height);
+  letter-spacing: var(--type-display-tracking);
+  text-wrap: balance;
+}
+@media (min-width: 640px) {
+  .pulso-display {
+    font-size: var(--type-display-desktop);
+  }
+}
+
+.pulso-h1 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h1-size);
+  font-weight: var(--type-h1-weight);
+  line-height: var(--type-h1-line-height);
+  letter-spacing: var(--type-h1-tracking);
+  text-wrap: balance;
+}
+@media (min-width: 640px) {
+  .pulso-h1 {
+    font-size: var(--type-h1-desktop);
+  }
+}
+
+.pulso-h2 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h2-size);
+  font-weight: var(--type-h2-weight);
+  line-height: var(--type-h2-line-height);
+  text-wrap: balance;
+}
+@media (min-width: 640px) {
+  .pulso-h2 {
+    font-size: var(--type-h2-desktop);
+  }
+}
+
+.pulso-card-title {
+  font-family: var(--font-sans);
+  font-size: var(--type-card-title-size);
+  font-weight: var(--type-card-title-weight);
+  line-height: var(--type-card-title-line-height);
+}
+@media (min-width: 640px) {
+  .pulso-card-title {
+    font-size: var(--type-card-title-desktop);
+  }
+}
+
+.pulso-body {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-line-height);
+  text-wrap: pretty;
+}
+
+.pulso-small {
+  font-family: var(--font-sans);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-line-height);
+}
+
+.pulso-caption {
+  font-family: var(--font-sans);
+  font-size: var(--type-caption-size);
+  font-weight: var(--type-caption-weight);
+  line-height: var(--type-caption-line-height);
+  text-transform: none;
+}
+
+.pulso-btn-text {
+  font-family: var(--font-sans);
+  font-size: var(--type-button-size);
+  font-weight: var(--type-button-weight);
+  line-height: var(--type-button-line-height);
+  text-transform: none;
+}
+
+/* Tabular figures for tracking numbers and timestamps */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Ensure mobile form fields are at least 16px to prevent iOS Safari auto-zoom on focus */
+input, select, textarea {
+  font-size: 1rem;
+}
+
+/* ── PULSO MOBILE APP ONBOARDING SCENE TOKENS & UTILITIES ── */
+:root,
+[data-theme="light"] {
+  --bg-scrim-rgb: 245, 249, 255;
+  --pulso-onboarding-sky: #EAF2FF;
+  --pulso-onboarding-bg-img: url('/pulso-bg-light.svg');
+  --pulso-onboarding-scrim-base: #F5F9FF;
+  --pulso-onboarding-scrim-92: rgba(245, 249, 255, 0.92);
+  --pulso-onboarding-heading: #0B1630;
+  --pulso-onboarding-body: #334155;
+  --pulso-onboarding-link: #B83A00;
+  --pulso-onboarding-link-hover: #8F2D00;
+  --pulso-onboarding-dot-inactive: rgba(51, 65, 85, 0.40);
+  --pulso-onboarding-btn-text: #0B1630;
+  --text-heading: #0B1630;
+  --text-body: #334155;
+  --text-muted: #475569;
+  --link-accent: #B83A00;
+  --link-accent-hover: #8F2D00;
+}
+
+html.dark,
+[data-theme="dark"] {
+  --bg-scrim-rgb: 11, 17, 32;
+  --pulso-onboarding-sky: #080D19;
+  --pulso-onboarding-bg-img: url('/pulso-bg-dark.svg');
+  --pulso-onboarding-scrim-base: #0B1120;
+  --pulso-onboarding-scrim-92: rgba(11, 17, 32, 0.92);
+  --pulso-onboarding-heading: #FFFFFF;
+  --pulso-onboarding-body: #CBD5E1;
+  --pulso-onboarding-link: #FF8A3D;
+  --pulso-onboarding-link-hover: #FFA266;
+  --pulso-onboarding-dot-inactive: rgba(255, 255, 255, 0.35);
+  --pulso-onboarding-btn-text: #0B1630;
+  --text-heading: #FFFFFF;
+  --text-body: #CBD5E1;
+  --text-muted: #B6C2DC;
+  --link-accent: #FF8A3D;
+  --link-accent-hover: #FFA266;
+}
+
+.pulso-onboarding-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--pulso-onboarding-sky);
+  background-image: var(--pulso-onboarding-bg-img);
+  background-size: 100% auto;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  transition: background-color 150ms ease, background-image 150ms ease, color 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulso-onboarding-container {
+    transition: none !important;
+  }
+}
+
+
+

@@ -24,8 +24,6 @@ System Admin has a unique password.
 | **Mechanical Inspector**| `mechanical.inspector@caloocan.gov.ph` | `CEO@pulso2025!` |
 | **System Administrator**| `admin@pulso.system` | `SysAdmin@pulso2025!` |
 
----
-
 ## 🙋 Resident Portal (`/login`)
 These accounts are used for general testing of the citizen-facing features and legacy generic testing. Ensure you run `python create_test_accounts.py` if these don't work.
 

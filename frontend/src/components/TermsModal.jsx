@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, FileText, Lock, Scale, Info, BrainCircuit, Landmark, Gavel, Eye } from 'lucide-react';
+import { X, ShieldCheck, FileText, Lock, Scale, Info, BrainCircuit, Landmark, Gavel, Eye } from '../icons';
 
 const TermsModal = ({ isOpen, onClose, type = 'terms' }) => {
     if (!isOpen) return null;

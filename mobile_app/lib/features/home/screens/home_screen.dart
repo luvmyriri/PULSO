@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -133,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       IconButton(
                                         onPressed: () => Navigator.pop(context),
-                                        icon: const Icon(
+                                        icon: const PulsoIcon(
                                           Icons.close,
                                           color: Colors.white54,
                                         ),
@@ -214,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       child: Row(
                                         children: [
-                                          const Icon(
+                                          const PulsoIcon(
                                             Icons.location_on,
                                             color: Colors.green,
                                             size: 20,
@@ -384,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        PulsoIcon(
                           Icons.camera_alt_rounded,
                           color: Colors.white,
                           size: 22,
@@ -433,28 +434,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 BottomNavigationBarItem(
                   icon: Padding(
                     padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.home_rounded),
+                    child: PulsoIcon(Icons.home_rounded),
                   ),
                   label: 'Home',
                 ),
                 BottomNavigationBarItem(
                   icon: Padding(
                     padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.map_rounded),
+                    child: PulsoIcon(Icons.map_rounded),
                   ),
                   label: 'Map',
                 ),
                 BottomNavigationBarItem(
                   icon: Padding(
                     padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.shield_rounded),
+                    child: PulsoIcon(Icons.shield_rounded),
                   ),
                   label: 'OBO Services',
                 ),
                 BottomNavigationBarItem(
                   icon: Padding(
                     padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.person_rounded),
+                    child: PulsoIcon(Icons.person_rounded),
                   ),
                   label: 'Profile',
                 ),
@@ -639,7 +640,7 @@ class _HomeFeed extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               onTap: () {},
               child: Center(
-                child: Icon(link['icon'], color: link['color'], size: 28),
+                child: PulsoIcon(link['icon'], color: link['color'], size: 28),
               ),
             ),
           ),
@@ -662,7 +663,7 @@ class _HomeFeed extends StatelessWidget {
   Widget _buildSectionHeader(String title, IconData icon, {String? action}) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white54, size: 18),
+        PulsoIcon(icon, color: Colors.white54, size: 18),
         const SizedBox(width: 8),
         Text(
           title,
@@ -703,7 +704,7 @@ class _PlaceholderPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 64, color: Colors.white12),
+            PulsoIcon(icon, size: 64, color: Colors.white12),
             const SizedBox(height: 16),
             Text(
               label,
@@ -771,7 +772,7 @@ class _ColorsHeader extends StatelessWidget {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        PulsoIcon(
                           Icons.verified,
                           color: Colors.greenAccent,
                           size: 10,
@@ -808,7 +809,7 @@ class _ColorsHeader extends StatelessWidget {
             const CircleAvatar(
               radius: 20,
               backgroundColor: AppTheme.primaryOrange,
-              child: Icon(Icons.person, color: Colors.white, size: 20),
+              child: PulsoIcon(Icons.person, color: Colors.white, size: 20),
             ),
             Positioned(
               top: -2,
@@ -854,7 +855,7 @@ class _AdvisoryPost extends StatelessWidget {
                 backgroundColor: isAlert
                     ? Colors.redAccent.withOpacity(0.2)
                     : Colors.blueAccent.withOpacity(0.2),
-                child: Icon(
+                child: PulsoIcon(
                   isAlert ? Icons.warning_rounded : Icons.info_rounded,
                   color: isAlert ? Colors.redAccent : Colors.blueAccent,
                   size: 20,
@@ -879,7 +880,7 @@ class _AdvisoryPost extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              const Icon(Icons.more_horiz, color: Colors.white54),
+              const PulsoIcon(Icons.more_horiz, color: Colors.white54),
             ],
           ),
           const SizedBox(height: 16),
@@ -936,7 +937,7 @@ class _FeedActionButton extends StatelessWidget {
         foregroundColor: Colors.white54,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
-      icon: Icon(icon, size: 18),
+      icon: PulsoIcon(icon, size: 18),
       label: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
@@ -965,7 +966,7 @@ class _ReportCard extends StatelessWidget {
               color: (report['color'] as Color).withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(report['icon'], color: report['color'], size: 24),
+            child: PulsoIcon(report['icon'], color: report['color'], size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -988,7 +989,7 @@ class _ReportCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(
+                    const PulsoIcon(
                       Icons.access_time_rounded,
                       size: 12,
                       color: Colors.white38,

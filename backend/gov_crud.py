@@ -5,14 +5,20 @@ City Engineering Office, Caloocan City — PULSO System
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
-from datetime import datetime, timezone
-from typing import Optional, List
+from datetime import datetime, timezone, timedelta, date
+from typing import Optional, List, Dict, Any
+from fastapi import HTTPException
+import secrets
+import os
+import logging
 
 import gov_models
 import gov_schemas
 import models  # for User lookups
 import re
-from utils import geometry_utils
+import notification_service
+import command_integrity
+from spatial_queries import nearby_available_agents
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,12 +127,14 @@ def _notify_role(db: Session, roles: List[str], title: str, message: str, priori
     db.flush()
 
     # Trigger SMS for Level 100 emergencies
-    if priority >= 100:
+    if priority >= 100 and os.getenv("PULSO_ENABLE_PRIORITY_SMS", "false").lower() == "true":
         try:
             from sms_utils import send_emergency_sms
             for o in officials:
                 if o.phone_number:
-                    send_emergency_sms(o.phone_number, title, message)
+                    result = send_emergency_sms(o.phone_number, title, message)
+                    if not result.accepted:
+                        logging.getLogger(__name__).warning("Priority staff SMS was not accepted by the provider")
         except ImportError:
             pass # sms_utils not yet created or failed
 
@@ -182,37 +190,62 @@ def find_smart_dispatch_suggestions(db: Session, report_id: int, limit: int = 3)
     if not report or report.location_lat is None or report.location_lng is None:
         return []
 
-    # Get agents who are 'available' or 'returning'
-    active_locations = db.query(gov_models.AgentLocation).filter(
-        gov_models.AgentLocation.status.in_(["available", "returning"])
-    ).all()
-
-    suggestions = []
-    for loc in active_locations:
-        dist = geometry_utils.calculate_haversine_distance(
-            report.location_lat, report.location_lng,
-            loc.latitude, loc.longitude
-        )
-        
-        # Fetch official info
-        user = db.query(models.Official).filter(models.Official.id == loc.agent_id).first()
-        if user:
-            suggestions.append({
-                "agent_id": user.id,
-                "full_name": user.full_name,
-                "distance_km": round(dist, 2),
-                "status": loc.status
-            })
-
-    # Sort by distance (asc)
-    suggestions.sort(key=lambda x: x["distance_km"])
-    return suggestions[:limit]
+    return nearby_available_agents(db, report.location_lat, report.location_lng, limit=limit)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Work Orders
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: int, actor_role: str):
+_WORK_ORDER_TRANSITIONS = {
+    "open": {"assigned", "cancelled"},
+    "assigned": {"in_progress", "cancelled"},
+    "in_progress": {"completed_pending_review", "cancelled"},
+    "rework_required": {"in_progress"},
+}
+
+_ASSIGNEE_ROLES = {"field_worker", "foreman", "construction_foreman", "project_engineer", "building_inspector"}
+
+
+def _validate_work_order_evidence(image_url: Optional[str], wo_id: int):
+    if not image_url:
+        return
+    prefix = f"/api/gov/work-orders/{wo_id}/evidence/"
+    if not image_url.startswith(prefix):
+        raise HTTPException(status_code=422, detail="Evidence must belong to this work order")
+    filename = image_url[len(prefix):]
+    if not re.fullmatch(r"[a-f0-9]{32}\.jpg", filename):
+        raise HTTPException(status_code=422, detail="Invalid evidence reference")
+    if not os.path.isfile(os.path.join("uploads", "docs", "work_orders", str(wo_id), filename)):
+        raise HTTPException(status_code=422, detail="Evidence image was not found")
+
+
+def _validate_assignee(db: Session, assignee_id: Optional[int]):
+    if assignee_id is None:
+        return
+    person = db.query(models.Official).filter(models.Official.id == assignee_id).first()
+    if not person or not person.is_active or person.is_suspended or person.role not in _ASSIGNEE_ROLES:
+        raise HTTPException(status_code=409, detail="Assignee must be an active eligible field official")
+
+
+def _validate_work_order_transition(db: Session, wo, new_status: str, evidence_url: Optional[str] = None):
+    if new_status not in _WORK_ORDER_TRANSITIONS.get(wo.status, set()):
+        raise HTTPException(status_code=409, detail=f"Cannot transition work order from '{wo.status}' to '{new_status}'")
+    if new_status == "assigned" and not wo.assigned_to_id:
+        raise HTTPException(status_code=409, detail="An eligible assignee is required before assignment")
+    if new_status == "assigned" and wo.report_id:
+        report = db.query(models.Report).filter(models.Report.id == wo.report_id).first()
+        if not report or report.status != "approved_internal":
+            raise HTTPException(status_code=409, detail="Source report must be approved before assignment")
+    if new_status == "completed_pending_review":
+        prior_proof = db.query(gov_models.WorkOrderUpdate).filter(
+            gov_models.WorkOrderUpdate.work_order_id == wo.id,
+            gov_models.WorkOrderUpdate.image_url.isnot(None),
+        ).first()
+        if not (evidence_url or prior_proof):
+            raise HTTPException(status_code=409, detail="Completion evidence is required before review")
+
+
+def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: int, actor_role: str, note: Optional[str] = None):
     """Update the citizen report status + notify the citizen. Called by gov CRUD functions."""
     from datetime import datetime, timezone
     report = db.query(models.Report).filter(models.Report.id == report_id).first()
@@ -223,20 +256,21 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
     report.updated_at = datetime.now(timezone.utc)
 
     # Timeline entry (citizen-visible)
-    _append_timeline(
+    timeline = _append_timeline(
         db, status=new_status, previous_status=previous,
         actor_id=actor_id, actor_role=actor_role,
         report_id=report_id, is_public=True,
-        note=f"Report status updated to {new_status}",
+        note=note or f"Report status updated to {new_status}",
     )
     _append_audit(
         db, trigger_type="status_change",
         action=f"Report {report.ticket_id} status → {new_status}",
         actor_id=actor_id, actor_role=actor_role,
         report_id=report_id,
+        details=note,
     )
 
-    # ────── Integration Hook: Automated Asset Resolution & Archival ──────
+    # Asset and records effects follow the independently verified resolution.
     if new_status == "resolved":
         # Find linked work orders to identify the asset
         work_orders = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.report_id == report_id).all()
@@ -252,24 +286,25 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
                 db.add(maintenance_log)
                 
                 # b) Archive to System Document Registry (Records & Registry Connection)
-                resolution_doc = gov_models.SystemDocument(
-                    document_type="survey_report",
-                    file_name=f"RESOLUTION_PROOF_{report.ticket_id}.jpg",
-                    file_path=report.resolution_image_url or "system_link",
-                    category="Infrastructure",
-                    target_model="WorkOrder",
-                    target_id=wo.id,
-                    uploader_id=actor_id,
-                    uploaded_at=datetime.now(timezone.utc),
-                    metadata_json={
-                        "report_ticket": report.ticket_id,
-                        "asset_id": wo.asset_id,
-                        "category": report.category,
-                        "resolution_status": "Finalized",
-                        "synced_from": "gov_command_center"
-                    }
-                )
-                db.add(resolution_doc)
+                if report.resolution_image_url:
+                    resolution_doc = gov_models.SystemDocument(
+                        document_type="survey_report",
+                        file_name=f"RESOLUTION_PROOF_{report.ticket_id}.jpg",
+                        file_path=report.resolution_image_url,
+                        category="Infrastructure",
+                        target_model="WorkOrder",
+                        target_id=wo.id,
+                        uploader_id=actor_id,
+                        uploaded_at=datetime.now(timezone.utc),
+                        metadata_json={
+                            "report_ticket": report.ticket_id,
+                            "asset_id": wo.asset_id,
+                            "category": report.category,
+                            "resolution_status": "Finalized",
+                            "synced_from": "gov_command_center"
+                        }
+                    )
+                    db.add(resolution_doc)
                 
                 # c) Log Asset-Specific Maintenance Audit
                 db.add(gov_models.AuditLog(
@@ -285,7 +320,7 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
     # For now, relying on timeline as the single source of truth for the resident app.
 
     # Citizen notification
-    ticket = report.ticket_id or f"RPT-{report.id}"
+    ticket = report.ticket_id or f"PUL-{datetime.now().year}-{report.id:04d}"
     notif_map = {
         "pending_approval": ("Report Verified", f"Your report {ticket} has been verified and is pending engineering approval."),
         "approved_internal": ("Report Approved", f"Good news! Your report {ticket} has been approved and is ready for dispatch."),
@@ -296,8 +331,12 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
     }
     if new_status in notif_map:
         title, msg = notif_map[new_status]
-        notif = models.Notification(resident_id=report.resident_id, title=title, message=msg)
-        db.add(notif)
+        if report.resident_id is not None:
+            db.add(gov_models.OutboxEvent(
+                event_key=f"report-status:{timeline.id}:resident:{report.resident_id}",
+                event_type="resident_in_app_notification",
+                payload={"resident_id": report.resident_id, "title": title, "message": msg},
+            ))
 
 
 def create_work_order(
@@ -305,26 +344,48 @@ def create_work_order(
     data: gov_schemas.WorkOrderCreate,
     actor_id: int,
     actor_role: str,
+    idempotency_key: Optional[str] = None,
+    request_digest: Optional[str] = None,
+    expected_report_version: Optional[int] = None,
 ) -> gov_models.WorkOrder:
     # 1. Territorial & Emergency Logic
     assignment_type = "territorial"
-    is_emergency = (data.priority == "critical")
-    priority_score = 100.0 if is_emergency else 0.0
+    # Critical work priority does not itself authorize emergency access or an alert.
+    priority_score = 100.0 if data.priority == "critical" else 0.0
     
     assigned_to_id = data.assigned_to_id
+    _validate_assignee(db, assigned_to_id)
+    asset = None
+    if data.asset_id:
+        asset = db.query(gov_models.InfrastructureAsset).filter(
+            gov_models.InfrastructureAsset.asset_id == data.asset_id
+        ).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Infrastructure asset not found")
 
     # Handle Jurisdictional Handover & Smart Dispatch
     if data.report_id:
-        report = db.query(models.Report).filter(models.Report.id == data.report_id).first()
+        report = db.query(models.Report).filter(models.Report.id == data.report_id).with_for_update().first()
+        if not report:
+            raise HTTPException(status_code=404, detail="Source report not found")
+        receipt = command_integrity.find_receipt(
+            db, actor_id=actor_id, operation="work_order_create", report_id=report.id,
+            key=idempotency_key, digest=request_digest,
+        )
+        if receipt:
+            return db.query(gov_models.WorkOrder).filter_by(id=receipt.resource_id).one()
+        command_integrity.check_version(report.version, expected_report_version)
+        if report.status != "approved_internal":
+            raise HTTPException(status_code=409, detail="Report must be approved before a work order is created")
+        existing_work = db.query(gov_models.WorkOrder.id).filter(
+            gov_models.WorkOrder.report_id == report.id,
+            gov_models.WorkOrder.status != "cancelled",
+        ).first()
+        if existing_work:
+            raise HTTPException(status_code=409, detail="Report already has a work order")
         if report:
-            # A. AUTO-ASSIGN for Critical / Emergencies
-            if is_emergency and not assigned_to_id:
-                suggestions = find_smart_dispatch_suggestions(db, data.report_id, limit=1)
-                if suggestions:
-                    assigned_to_id = suggestions[0]["agent_id"]
-                    assignment_type = "proximity_auto"
-            
-            # B. Territorial Validation
+            # Critical recommendations require an authorized human assignment.
+            # Territorial Validation
             if report.location_barangay:
                 territorial_lead = get_territorial_lead(db, report.location_barangay)
                 if territorial_lead and assigned_to_id and assigned_to_id != territorial_lead.id:
@@ -345,12 +406,13 @@ def create_work_order(
         wo_type=data.wo_type,
         priority=data.priority,
         priority_score=priority_score,
-        is_emergency_assignment=is_emergency,
+        is_emergency_assignment=False,
         assignment_type=assignment_type,
         scheduled_date=data.scheduled_date,
         category=data.category,
         estimated_cost=data.estimated_cost,
         ai_plan_summary=data.ai_plan_summary,
+        asset_id=data.asset_id,
         notes=data.notes,
         status="open" if not assigned_to_id else "assigned",
     )
@@ -363,6 +425,10 @@ def create_work_order(
             brgy = db.query(models.Barangay).filter(models.Barangay.id == report.barangay_id).first()
             if brgy:
                 wo.district_id = brgy.district_id
+    elif asset:
+        wo.barangay_id = asset.barangay_id
+        if asset.barangay_ref and asset.barangay_ref.district:
+            wo.district_id = asset.barangay_ref.district_id
     db.add(wo)
     db.flush()
 
@@ -379,15 +445,15 @@ def create_work_order(
         work_order_id=wo.id, report_id=data.report_id, project_id=data.project_id,
     )
 
-    # 4. Emergency Escalation (SMS & Priority Notification)
-    if is_emergency:
-        msg = f"LEVEL 100 EMERGENCY: {data.title} at Report #{data.report_id}. Immediate response required."
-        _notify_engineering_dept(db, title="Level 100 Alert", message=msg, priority=100)
-        # SMS is handled within _notify_role called by _notify_engineering_dept
-
-    # 5. Lifecycle Link: auto-dispatch the linked citizen report
-    if data.report_id:
+    # A queued work order is not a dispatched field team.
+    if data.report_id and assigned_to_id:
         _sync_report_status(db, data.report_id, "dispatched", actor_id, actor_role)
+
+    if data.report_id:
+        command_integrity.record_receipt(
+            db, actor_id=actor_id, operation="work_order_create", report_id=data.report_id,
+            key=idempotency_key, digest=request_digest, resource_id=wo.id,
+        )
 
     db.commit()
     db.refresh(wo)
@@ -439,13 +505,12 @@ def update_work_order_status(
     actor_role: str,
     note: Optional[str] = None,
 ) -> Optional[gov_models.WorkOrder]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
     previous = wo.status
+    _validate_work_order_transition(db, wo, new_status)
     wo.status = new_status
-    if new_status == "completed":
-        wo.completed_date = _now()
 
     _append_timeline(
         db, status=new_status, previous_status=previous,
@@ -462,8 +527,7 @@ def update_work_order_status(
     # ── Lifecycle Link: propagate WO status back to citizen report ──
     if wo.report_id:
         report_status_map = {
-            "in_progress": "dispatched",   # Crew is actively working
-            "completed":   "resolved",     # Work done → report resolved
+            "in_progress": "in_progress",
             "cancelled":   "approved_internal",  # Cancelled → revert to pre-dispatch
         }
         if new_status in report_status_map:
@@ -498,33 +562,26 @@ def update_work_order(
     actor_id: int,
     actor_role: str,
 ) -> Optional[gov_models.WorkOrder]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
     update_data = data.dict(exclude_unset=True)
-    previous_status = wo.status
+    if {"status", "completed_date", "citizen_feedback", "estimated_cost", "actual_cost"} & update_data.keys():
+        raise HTTPException(status_code=422, detail="Use the governed lifecycle, cost, or resident feedback endpoint")
+    if "assigned_to_id" in update_data:
+        if wo.status != "open":
+            raise HTTPException(status_code=409, detail="An active work order cannot be reassigned through a general edit")
+        _validate_assignee(db, update_data["assigned_to_id"])
+    changed_fields = [key for key, value in update_data.items() if getattr(wo, key) != value]
     for k, v in update_data.items():
         setattr(wo, k, v)
-    if "status" in update_data and update_data["status"] != previous_status:
-        _append_timeline(
-            db, status=update_data["status"], previous_status=previous_status,
-            actor_id=actor_id, actor_role=actor_role, work_order_id=wo_id,
-        )
+    if changed_fields:
         _append_audit(
-            db, trigger_type="status_change",
-            action=f"Work order {wo.wo_number} updated → status {update_data['status']}",
+            db, trigger_type="work_order_edit",
+            action=f"Work order {wo.wo_number} edited",
             actor_id=actor_id, actor_role=actor_role, work_order_id=wo_id,
+            details="Fields changed: " + ", ".join(sorted(changed_fields)),
         )
-        # ── Lifecycle Link: propagate WO status back to citizen report ──
-        if wo.report_id:
-            report_status_map = {
-                "in_progress": "dispatched",
-                "completed":   "resolved",
-                "cancelled":   "approved_internal",
-            }
-            new_st = update_data["status"]
-            if new_st in report_status_map:
-                _sync_report_status(db, wo.report_id, report_status_map[new_st], actor_id, actor_role)
     db.commit()
     db.refresh(wo)
     return wo
@@ -536,18 +593,19 @@ def create_work_order_update(
     data: gov_schemas.WorkOrderUpdateCreate,
     user_id: int,
 ) -> Optional[gov_models.WorkOrderUpdate]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
+
+    _validate_work_order_evidence(data.image_url, wo_id)
 
     previous_status = wo.status
     new_status = data.new_status or previous_status
 
     # Update WO status if provided
     if data.new_status and data.new_status != previous_status:
+        _validate_work_order_transition(db, wo, data.new_status, data.image_url)
         wo.status = data.new_status
-        if data.new_status == "completed":
-            wo.completed_date = _now()
         
         # Timeline and Audit for status change
         _append_timeline(
@@ -563,8 +621,7 @@ def create_work_order_update(
         # Sync back to report if exists
         if wo.report_id:
             report_status_map = {
-                "in_progress": "dispatched",
-                "completed":   "resolved",
+                "in_progress": "in_progress",
                 "cancelled":   "approved_internal",
             }
             if data.new_status in report_status_map:
@@ -573,7 +630,7 @@ def create_work_order_update(
     # Create the update record
     update_entry = gov_models.WorkOrderUpdate(
         work_order_id=wo_id,
-        user_id=user_id,
+        official_id=user_id,
         previous_status=previous_status,
         new_status=new_status,
         comment=data.comment,
@@ -582,17 +639,23 @@ def create_work_order_update(
     db.add(update_entry)
     db.commit()
     db.refresh(update_entry)
+    update_entry.user_id = update_entry.official_id
+    update_entry.user_name = _name(db, update_entry.official_id)
     return update_entry
 
 
 def enrich_work_order(wo: gov_models.WorkOrder, db: Session) -> gov_models.WorkOrder:
     wo.assigned_by_name = wo.assigned_by.full_name if getattr(wo, 'assigned_by', None) else None
     wo.assigned_to_name = wo.assigned_to.full_name if getattr(wo, 'assigned_to', None) else None
+    source_report = db.query(models.Report).filter(models.Report.id == wo.report_id).first() if wo.report_id else None
+    wo.location_string = source_report.location_string if source_report else None
+    wo.barangay = source_report.location_barangay if source_report else None
     
     # Enrich updates
     if getattr(wo, 'updates', None):
         for up in wo.updates:
-            up.user_name = up.user.full_name if getattr(up, 'user', None) else None
+            up.user_id = up.official_id
+            up.user_name = up.official.full_name if getattr(up, 'official', None) else None
             
     return wo
 
@@ -607,7 +670,7 @@ def approve_work_order(
     approver_id: int,
     notes: Optional[str] = None,
 ) -> Optional[gov_models.WorkOrderApproval]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
     
@@ -619,9 +682,11 @@ def approve_work_order(
     )
     db.add(approval)
     
+    previous_status = wo.status
+    _validate_work_order_transition(db, wo, "assigned")
     wo.status = "assigned"
     _append_timeline(
-        db, status="assigned", previous_status=wo.status,
+        db, status="assigned", previous_status=previous_status,
         actor_id=approver_id, actor_role="approver",
         note=notes, work_order_id=wo_id,
     )
@@ -643,7 +708,7 @@ def reject_work_order(
     approver_id: int,
     notes: Optional[str] = None,
 ) -> Optional[gov_models.WorkOrderApproval]:
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         return None
     
@@ -655,9 +720,12 @@ def reject_work_order(
     )
     db.add(approval)
     
+    previous_status = wo.status
+    if previous_status != "open":
+        raise HTTPException(status_code=409, detail="Only an open work order can be rejected")
     wo.status = "rejected"
     _append_timeline(
-        db, status="rejected", previous_status=wo.status,
+        db, status="rejected", previous_status=previous_status,
         actor_id=approver_id, actor_role="approver",
         note=notes, work_order_id=wo_id,
     )
@@ -1275,6 +1343,18 @@ def advance_project_phase(
         return None
     previous = proj.status
 
+    # Guard the currently persisted phase sequence; the final LGU lifecycle is
+    # still a product decision and may replace this sequence later.
+    phase_by_status = {status: phase for phase, status in PROJECT_PHASE_STATUSES.items()}
+    current_phase = phase_by_status.get(previous)
+    requested_phase = phase_by_status.get(new_status)
+    if current_phase is None or requested_phase is None:
+        raise ValueError("Unknown project phase; manual lifecycle review is required")
+    if requested_phase != current_phase + 1:
+        raise ValueError("Project phases must advance one step at a time")
+    if new_status in {"resolved", "closed_completion_certified"}:
+        raise ValueError("Project completion requires a governed evidence and certificate decision")
+
     # ── Role-Based Sign-off Gating ──
     # Milestones requiring Lead/Chief sign-off for accountability
     senior_milestones = ["survey_complete", "boq_submitted", "budget_confirmed", "closed_completion_certified"]
@@ -1434,45 +1514,15 @@ def update_project(
     ).first()
     if not proj:
         return None
-    update_data = data.dict(exclude_unset=True)
+    update_data = data.model_dump(exclude_unset=True)
+    protected = {"status", "current_phase", "estimated_cost", "is_emergency", "procurement_modality"}
+    if protected & update_data.keys():
+        raise HTTPException(
+            status_code=422,
+            detail="Lifecycle, budget, procurement, and emergency fields require a governed decision endpoint",
+        )
     for k, v in update_data.items():
         setattr(proj, k, v)
-    db.commit()
-    db.refresh(proj)
-    return proj
-
-
-def issue_certificate_of_completion(
-    db: Session,
-    proj_id: int,
-    actor_id: int,
-    actor_role: str,
-    notes: Optional[str] = None,
-) -> Optional[gov_models.ProjectRequest]:
-    proj = db.query(gov_models.ProjectRequest).filter(
-        gov_models.ProjectRequest.id == proj_id
-    ).first()
-    if not proj:
-        return None
-    now = _now()
-    proj.certificate_issued = True
-    proj.certificate_issued_by_id = actor_id
-    proj.completed_at = now
-    proj.status = "closed_completion_certified"
-    proj.current_phase = 13
-
-    _append_timeline(
-        db, status="closed_completion_certified", previous_status=proj.status,
-        actor_id=actor_id, actor_role=actor_role,
-        note=notes or "Certificate of Completion issued.",
-        project_id=proj_id, is_public=True,
-    )
-    _append_audit(
-        db, trigger_type="maintenance",
-        action=f"Certificate of Completion issued for {proj.proj_number}",
-        actor_id=actor_id, actor_role=actor_role, project_id=proj_id,
-        details=notes,
-    )
     db.commit()
     db.refresh(proj)
     return proj
@@ -1485,99 +1535,6 @@ def enrich_project(proj: gov_models.ProjectRequest, db: Session):
     proj.project_engineer_name = proj.project_engineer.full_name if getattr(proj, 'project_engineer', None) else None
     return proj
 
-
-def approve_with_budget(
-    db: Session,
-    report_id: int,
-    data: gov_schemas.ApproveWithBudgetRequest,
-    actor_id: int,
-    actor_role: str,
-):
-    """
-    Transitions a citizen report to 'approved_internal' and creates a linked ProjectRequest
-    with initial Bill of Quantities (BoQ) items.
-    """
-    report = db.query(models.Report).filter(models.Report.id == report_id).first()
-    if not report:
-        raise ValueError(f"Report {report_id} not found.")
-
-    # 1. Update Report Status
-    previous_status = report.status
-    report.status = "approved_internal"
-    
-    # 2. Create Project Request
-    new_project = gov_models.ProjectRequest(
-        title=data.project_title,
-        description=data.description or report.description,
-        requesting_party="Citizen Report via PULSO",
-        barangay=report.reporter_resident.barangay if report.reporter_resident else None,
-        location_string=report.location_string,
-        location_lat=report.location_lat,
-        location_lng=report.location_lng,
-        estimated_cost=data.estimated_cost,
-        is_emergency=data.is_emergency,
-        procurement_modality=data.procurement_modality,
-        status="request_received",
-        current_phase=1,
-        created_by_id=actor_id,
-        source_report_id=report_id
-    )
-    db.add(new_project)
-    db.flush() # Get project ID
-
-    # 3. Create Procurement Request (Initial Draft)
-    new_pr = gov_models.ProcurementRequest(
-        project_id=new_project.id,
-        raised_by_id=actor_id,
-        title=f"Initial Procurement for {data.project_title}",
-        purpose=f"Infrastructure repair based on Report {report.ticket_id}",
-        status="draft"
-    )
-    db.add(new_pr)
-    db.flush()
-
-    # 4. Add BoQ Items
-    for item in data.items:
-        boq = gov_models.BoQItem(
-            procurement_request_id=new_pr.id,
-            item_name=item.item_name,
-            unit=item.unit,
-            quantity=item.quantity,
-            unit_cost=item.unit_cost,
-            total_cost=item.quantity * item.unit_cost,
-            specifications=item.specifications
-        )
-        db.add(boq)
-
-    # 5. Audit & Timeline
-    _append_timeline(
-        db, status="approved_internal", previous_status=previous_status,
-        actor_id=actor_id, actor_role=actor_role,
-        note=f"Report approved with initial budget of ₱{data.estimated_cost:,.2f}",
-        report_id=report_id, is_public=True
-    )
-    
-    _append_audit(
-        db, trigger_type="status_change",
-        action=f"Report {report.ticket_id} → approved_internal (Project Created)",
-        actor_id=actor_id, actor_role=actor_role, report_id=report_id,
-        details=f"Linked to new project {new_project.proj_number}"
-    )
-
-    db.commit()
-    db.refresh(new_project)
-    db.refresh(report)
-    
-    return {
-        "report": report,
-        "project": new_project,
-        "procurement_request": new_pr
-    }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# OBO Inspections  (Section 6.4)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def create_obo_inspection(
     db: Session,
@@ -2232,3 +2189,885 @@ def delete_advisory(db: Session, advisory_id: str, actor_id: int):
         db.commit()
         return True
     return False
+
+
+# =============================================================================
+# Milestone 1: Physical Infrastructure Assets CRUD
+# =============================================================================
+
+def normalize_asset_category(category_input: str) -> str:
+    """Map singular/plural variations to the 5 standard categories."""
+    cat = (category_input or "").strip().lower()
+    if cat in ["road", "roads", "pavement", "highway"]:
+        return "Roads"
+    elif cat in ["drainage", "drain", "culvert", "canal", "sewer"]:
+        return "Drainage"
+    elif cat in ["bridge", "bridges", "overpass", "flyover"]:
+        return "Bridges"
+    elif cat in ["public building", "public buildings", "building", "buildings", "hall"]:
+        return "Public Buildings"
+    elif cat in ["facility", "facilities", "street light", "light", "lights", "park", "plaza"]:
+        return "Facilities"
+    return (category_input or "Facilities").title()
+
+
+def get_condition_tier(score: float) -> str:
+    if score >= 80.0: return "good"
+    elif score >= 60.0: return "fair"
+    elif score >= 40.0: return "poor"
+    return "critical"
+
+
+def enrich_asset_response(asset: gov_models.InfrastructureAsset, db: Session) -> gov_schemas.AssetResponse:
+    from predictive_engine import calculate_ahs
+    score = asset.condition_score if asset.condition_score is not None else calculate_ahs(db, asset.asset_id)
+    tier = get_condition_tier(score)
+    
+    active_wo_count = db.query(func.count(gov_models.WorkOrder.id)).filter(
+        gov_models.WorkOrder.asset_id == asset.asset_id,
+        gov_models.WorkOrder.status.notin_(["completed", "cancelled"])
+    ).scalar() or 0
+
+    last_maint = db.query(func.max(gov_models.MaintenanceHistory.completion_date)).filter(
+        gov_models.MaintenanceHistory.asset_id == asset.asset_id
+    ).scalar()
+
+    barangay_name = asset.barangay
+    district_code = None
+    if asset.barangay_ref:
+        barangay_name = asset.barangay_ref.name
+        if asset.barangay_ref.district:
+            district_code = asset.barangay_ref.district.code
+
+    return gov_schemas.AssetResponse(
+        asset_id=asset.asset_id,
+        asset_name=asset.asset_name,
+        category=normalize_asset_category(asset.category),
+        gps_coordinates=asset.gps_coordinates,
+        material_type=asset.material_type,
+        date_completed=asset.date_completed,
+        design_life=asset.design_life or 20,
+        original_contractor=asset.original_contractor,
+        barangay=barangay_name,
+        barangay_id=asset.barangay_id,
+        barangay_name=barangay_name,
+        district_code=district_code,
+        condition_score=score,
+        condition_tier=tier,
+        status=asset.status or "operational",
+        active_work_orders_count=active_wo_count,
+        last_maintenance_date=last_maint,
+        created_at=asset.created_at,
+    )
+
+
+def enrich_asset_detail(asset: gov_models.InfrastructureAsset, db: Session) -> gov_schemas.AssetDetailResponse:
+    from predictive_engine import calculate_dv
+    base_resp = enrich_asset_response(asset, db)
+    dv = calculate_dv(db, asset.asset_id)
+
+    env = None
+    if asset.barangay_id:
+        env = db.query(gov_models.EnvironmentalContext).filter(
+            gov_models.EnvironmentalContext.barangay_id == asset.barangay_id
+        ).first()
+
+    maint_logs = db.query(gov_models.MaintenanceHistory).filter(
+        gov_models.MaintenanceHistory.asset_id == asset.asset_id
+    ).order_by(gov_models.MaintenanceHistory.completion_date.desc()).all()
+
+    maint_resp = [
+        gov_schemas.AssetMaintenanceLogResponse(
+            log_id=m.log_id,
+            asset_id=m.asset_id,
+            work_type=m.work_type or "Maintenance",
+            cost=m.cost,
+            completion_date=m.completion_date
+        )
+        for m in maint_logs
+    ]
+
+    wos = db.query(gov_models.WorkOrder).filter(
+        gov_models.WorkOrder.asset_id == asset.asset_id
+    ).order_by(gov_models.WorkOrder.created_at.desc()).limit(20).all()
+
+    active_wos_data = [
+        {
+            "id": w.id,
+            "wo_number": w.wo_number,
+            "title": w.title,
+            "status": w.status,
+            "priority": w.priority,
+            "scheduled_date": w.scheduled_date.isoformat() if w.scheduled_date else None,
+            "assigned_to_name": _name(db, w.assigned_to_id),
+            "estimated_cost": w.estimated_cost
+        }
+        for w in wos
+    ]
+
+    projects = [
+        {
+            "id": p.id,
+            "title": p.title,
+            "status": p.status,
+            "budget": p.budget
+        }
+        for p in (asset.projects or [])
+    ]
+
+    return gov_schemas.AssetDetailResponse(
+        **base_resp.model_dump(),
+        deterioration_velocity=dv,
+        flood_risk_level=env.flood_risk_level if env else "Low",
+        soil_subsidence=env.soil_subsidence if env else 0.0,
+        maintenance_history=maint_resp,
+        active_work_orders=active_wos_data,
+        linked_projects=projects
+    )
+
+
+def create_infrastructure_asset(
+    db: Session,
+    data: gov_schemas.AssetCreate,
+    actor_id: int,
+    actor_role: str,
+) -> gov_models.InfrastructureAsset:
+    cat_normalized = normalize_asset_category(data.category)
+    
+    asset_id = data.asset_id
+    if not asset_id:
+        prefix = cat_normalized[:2].upper()
+        asset_id = f"CAL-{prefix}-{secrets.token_hex(2).upper()}"
+
+    existing = db.query(gov_models.InfrastructureAsset).filter(
+        gov_models.InfrastructureAsset.asset_id == asset_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Asset ID '{asset_id}' already exists.")
+
+    barangay_name = data.barangay
+    if data.barangay_id:
+        brgy = db.query(models.Barangay).filter(models.Barangay.id == data.barangay_id).first()
+        if brgy:
+            barangay_name = brgy.name
+
+    asset = gov_models.InfrastructureAsset(
+        asset_id=asset_id,
+        asset_name=data.asset_name,
+        category=cat_normalized,
+        gps_coordinates=data.gps_coordinates,
+        material_type=data.material_type,
+        date_completed=data.date_completed,
+        design_life=data.design_life,
+        original_contractor=data.original_contractor,
+        barangay=barangay_name,
+        barangay_id=data.barangay_id,
+        condition_score=data.condition_score or 100.0,
+        status=data.status or "operational",
+    )
+    db.add(asset)
+    db.flush()
+
+    _append_audit(
+        db,
+        trigger_type="maintenance",
+        action=f"Created physical infrastructure asset {asset.asset_id} ({cat_normalized})",
+        actor_id=actor_id,
+        actor_role=actor_role,
+        details=f"Name: {asset.asset_name} | Barangay: {barangay_name}"
+    )
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
+def list_infrastructure_assets(
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+    category: Optional[str] = None,
+    barangay: Optional[str] = None,
+    condition_score: Optional[str] = None,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = "asset_id",
+    order: Optional[str] = "asc",
+) -> List[gov_models.InfrastructureAsset]:
+    q = db.query(gov_models.InfrastructureAsset).options(
+        joinedload(gov_models.InfrastructureAsset.barangay_ref)
+    )
+
+    if category:
+        cat_norm = normalize_asset_category(category)
+        q = q.filter(or_(
+            gov_models.InfrastructureAsset.category.ilike(f"%{cat_norm}%"),
+            gov_models.InfrastructureAsset.category.ilike(f"%{category}%")
+        ))
+
+    if barangay:
+        if barangay.isdigit():
+            q = q.filter(or_(
+                gov_models.InfrastructureAsset.barangay_id == int(barangay),
+                gov_models.InfrastructureAsset.barangay == barangay
+            ))
+        else:
+            q = q.filter(gov_models.InfrastructureAsset.barangay.ilike(f"%{barangay}%"))
+
+    if condition_score:
+        cs = condition_score.strip().lower()
+        if cs == "critical":
+            q = q.filter(gov_models.InfrastructureAsset.condition_score < 40.0)
+        elif cs == "poor":
+            q = q.filter(gov_models.InfrastructureAsset.condition_score >= 40.0,
+                         gov_models.InfrastructureAsset.condition_score < 60.0)
+        elif cs == "fair":
+            q = q.filter(gov_models.InfrastructureAsset.condition_score >= 60.0,
+                         gov_models.InfrastructureAsset.condition_score < 80.0)
+        elif cs == "good":
+            q = q.filter(gov_models.InfrastructureAsset.condition_score >= 80.0)
+        else:
+            try:
+                score_num = float(cs)
+                q = q.filter(gov_models.InfrastructureAsset.condition_score <= score_num)
+            except ValueError:
+                pass
+
+    if search:
+        s = f"%{search}%"
+        q = q.filter(or_(
+            gov_models.InfrastructureAsset.asset_id.ilike(s),
+            gov_models.InfrastructureAsset.asset_name.ilike(s),
+            gov_models.InfrastructureAsset.material_type.ilike(s),
+            gov_models.InfrastructureAsset.original_contractor.ilike(s)
+        ))
+
+    sort_col = getattr(gov_models.InfrastructureAsset, sort_by, gov_models.InfrastructureAsset.asset_id)
+    if order == "desc":
+        q = q.order_by(sort_col.desc())
+    else:
+        q = q.order_by(sort_col.asc())
+
+    return q.offset(skip).limit(limit).all()
+
+
+def get_infrastructure_assets_stats(db: Session) -> gov_schemas.AssetStatsResponse:
+    from predictive_engine import calculate_ahs
+    all_assets = db.query(gov_models.InfrastructureAsset).all()
+
+    standard_categories = ["Roads", "Drainage", "Bridges", "Public Buildings", "Facilities"]
+    category_data = {
+        cat: {
+            "category_name": cat,
+            "total_count": 0,
+            "scores": [],
+            "condition_breakdown": {"good": 0, "fair": 0, "poor": 0, "critical": 0},
+            "active_work_orders": 0,
+        }
+        for cat in standard_categories
+    }
+
+    active_wo_counts = dict(
+        db.query(
+            gov_models.WorkOrder.asset_id,
+            func.count(gov_models.WorkOrder.id)
+        ).filter(
+            gov_models.WorkOrder.asset_id.isnot(None),
+            gov_models.WorkOrder.status.notin_(["completed", "cancelled"])
+        ).group_by(gov_models.WorkOrder.asset_id).all()
+    )
+
+    total_critical = 0
+    all_scores = []
+
+    for asset in all_assets:
+        cat = normalize_asset_category(asset.category)
+        if cat not in category_data:
+            cat = "Facilities"
+
+        score = asset.condition_score
+        if score is None:
+            score = calculate_ahs(db, asset.asset_id)
+
+        all_scores.append(score)
+        category_data[cat]["total_count"] += 1
+        category_data[cat]["scores"].append(score)
+
+        tier = get_condition_tier(score)
+        category_data[cat]["condition_breakdown"][tier] += 1
+        if tier == "critical":
+            total_critical += 1
+
+        category_data[cat]["active_work_orders"] += active_wo_counts.get(asset.asset_id, 0)
+
+    cat_stats_dict = {}
+    for cat_name, val in category_data.items():
+        avg_score = round(sum(val["scores"]) / max(len(val["scores"]), 1), 1)
+        cat_stats_dict[cat_name] = gov_schemas.CategoryStats(
+            category_name=cat_name,
+            total_count=val["total_count"],
+            avg_condition_score=avg_score,
+            condition_breakdown=gov_schemas.CategoryConditionBreakdown(**val["condition_breakdown"]),
+            active_work_orders=val["active_work_orders"],
+        )
+
+    overall_avg = round(sum(all_scores) / max(len(all_scores), 1), 1) if all_scores else 100.0
+    total_active_wos = sum(active_wo_counts.values())
+
+    return gov_schemas.AssetStatsResponse(
+        total_assets=len(all_assets),
+        overall_avg_condition=overall_avg,
+        total_critical_assets=total_critical,
+        total_active_work_orders=total_active_wos,
+        categories=cat_stats_dict,
+    )
+
+
+# =============================================================================
+# Milestone 1: Work Order Blockers & Separation of Duties Inspections
+# =============================================================================
+
+def block_work_order(
+    db: Session,
+    wo_id: int,
+    data: gov_schemas.WorkOrderBlockRequest,
+    actor_id: int,
+    actor_role: str,
+) -> gov_models.WorkOrder:
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found")
+
+    if wo.status not in ("assigned", "in_progress"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot block work order that is already '{wo.status}'."
+        )
+
+    prev_status = wo.status
+    wo.status = "blocked"
+
+    blocker = gov_models.WorkOrderBlocker(
+        work_order_id=wo.id,
+        reason_code=data.reason_code,
+        delay_days=data.delay_days,
+        notes=data.notes,
+        blocked_by_id=actor_id,
+        is_resolved=False,
+    )
+    db.add(blocker)
+
+    _append_timeline(
+        db,
+        status="blocked",
+        previous_status=prev_status,
+        actor_id=actor_id,
+        actor_role=actor_role,
+        note=f"Work blocked ({data.reason_code}): +{data.delay_days}d estimated delay. {data.notes or ''}".strip(),
+        work_order_id=wo.id,
+        report_id=wo.report_id,
+        project_id=wo.project_id,
+    )
+
+    _append_audit(
+        db,
+        trigger_type="status_change",
+        action=f"Work order {wo.wo_number} marked BLOCKED ({data.reason_code})",
+        actor_id=actor_id,
+        actor_role=actor_role,
+        work_order_id=wo.id,
+        details=f"Delay: {data.delay_days} days | Notes: {data.notes}"
+    )
+
+    db.commit()
+    db.refresh(wo)
+    return wo
+
+
+def unblock_work_order(
+    db: Session,
+    wo_id: int,
+    data: gov_schemas.WorkOrderUnblockRequest,
+    actor_id: int,
+    actor_role: str,
+) -> gov_models.WorkOrder:
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found")
+
+    if wo.status != "blocked":
+        raise HTTPException(status_code=409, detail="Work order is not blocked")
+    if data.next_status not in (None, "in_progress"):
+        raise HTTPException(status_code=422, detail="A resolved blocker can only resume in progress")
+    if not (data.resolution_notes or "").strip():
+        raise HTTPException(status_code=422, detail="Blocker resolution notes are required")
+
+    open_blockers = db.query(gov_models.WorkOrderBlocker).filter(
+        gov_models.WorkOrderBlocker.work_order_id == wo_id,
+        gov_models.WorkOrderBlocker.is_resolved == False
+    ).all()
+
+    now_utc = datetime.now(timezone.utc)
+    for b in open_blockers:
+        b.is_resolved = True
+        b.resolved_at = now_utc
+        b.resolved_by_id = actor_id
+        b.resolution_notes = data.resolution_notes
+
+    next_status = data.next_status or "in_progress"
+    prev_status = wo.status
+    wo.status = next_status
+
+    _append_timeline(
+        db,
+        status=next_status,
+        previous_status=prev_status,
+        actor_id=actor_id,
+        actor_role=actor_role,
+        note=f"Blocker resolved. Resumed work order ({next_status}). Notes: {data.resolution_notes or 'None'}",
+        work_order_id=wo.id,
+        report_id=wo.report_id,
+        project_id=wo.project_id,
+    )
+
+    _append_audit(
+        db,
+        trigger_type="status_change",
+        action=f"Work order {wo.wo_number} UNBLOCKED -> {next_status}",
+        actor_id=actor_id,
+        actor_role=actor_role,
+        work_order_id=wo.id,
+        details=data.resolution_notes
+    )
+
+    db.commit()
+    db.refresh(wo)
+    return wo
+
+
+def verify_work_order_inspection(
+    db: Session,
+    wo_id: int,
+    data: gov_schemas.WorkOrderVerifyRequest,
+    inspector_id: int,
+    inspector_role: str,
+) -> Dict[str, Any]:
+    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found")
+
+    if wo.status != "completed_pending_review":
+        raise HTTPException(status_code=409, detail="Work order must await independent completion review")
+    if not (data.notes or "").strip():
+        raise HTTPException(status_code=422, detail="Inspection findings are required")
+    if data.passed:
+        checks = data.checklist_results or {}
+        required_checks = ("specifications", "siteCleared", "qualityTested", "photoVerified")
+        if not all(checks.get(key) is True for key in required_checks):
+            raise HTTPException(status_code=409, detail="All inspection checks must be completed before certification")
+
+    # MANDATORY SEPARATION OF DUTIES ENFORCEMENT
+    if wo.assigned_to_id is not None and inspector_id == wo.assigned_to_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Separation of duties violation: Assigned field worker cannot inspect or verify their own work order."
+        )
+
+    inspection = gov_models.WorkOrderInspection(
+        work_order_id=wo.id,
+        inspector_id=inspector_id,
+        inspection_date=data.inspection_date or datetime.now(timezone.utc),
+        checklist_results=data.checklist_results,
+        passed=data.passed,
+        notes=data.notes,
+        evidence_photo_url=data.evidence_photo_url,
+    )
+    db.add(inspection)
+    db.flush()
+
+    prev_status = wo.status
+    if data.passed:
+        wo.status = "completed"
+        wo.completed_date = datetime.now(timezone.utc)
+        timeline_note = f"Independent inspection PASSED (Inspector #{inspector_id}). Work order verified."
+        if wo.report_id:
+            remaining = db.query(gov_models.WorkOrder).filter(
+                gov_models.WorkOrder.report_id == wo.report_id,
+                gov_models.WorkOrder.id != wo.id,
+                gov_models.WorkOrder.status.notin_(("completed", "cancelled", "rejected")),
+            ).count()
+            if remaining == 0:
+                _sync_report_status(db, wo.report_id, "resolved", inspector_id, inspector_role)
+    else:
+        wo.status = "rework_required"
+        timeline_note = f"Independent inspection FAILED: Rework required. Notes: {data.notes or 'None'}"
+        if wo.report_id:
+            _sync_report_status(db, wo.report_id, "in_progress", inspector_id, inspector_role)
+
+    _append_timeline(
+        db,
+        status=wo.status,
+        previous_status=prev_status,
+        actor_id=inspector_id,
+        actor_role=inspector_role,
+        note=timeline_note,
+        work_order_id=wo.id,
+        report_id=wo.report_id,
+        project_id=wo.project_id,
+    )
+
+    _append_audit(
+        db,
+        trigger_type="status_change",
+        action=f"Work order {wo.wo_number} inspection verification: {'PASSED' if data.passed else 'FAILED'}",
+        actor_id=inspector_id,
+        actor_role=inspector_role,
+        work_order_id=wo.id,
+        details=f"Passed: {data.passed} | Notes: {data.notes}"
+    )
+
+    db.commit()
+    db.refresh(wo)
+    db.refresh(inspection)
+
+    return {
+        "work_order": enrich_work_order(wo, db),
+        "inspection": {
+            "id": inspection.id,
+            "work_order_id": inspection.work_order_id,
+            "inspector_id": inspection.inspector_id,
+            "inspector_name": _name(db, inspection.inspector_id),
+            "passed": inspection.passed,
+            "inspection_date": inspection.inspection_date,
+            "notes": inspection.notes,
+            "checklist_results": inspection.checklist_results,
+        }
+    }
+
+
+# =============================================================================
+# Milestone 1: Citizen Report Request-Info Logic
+# =============================================================================
+
+def request_citizen_information(
+    db: Session,
+    report_id: int,
+    data: gov_schemas.ReportRequestInfo,
+    actor_id: int,
+    actor_role: str,
+) -> Dict[str, Any]:
+    report = db.query(models.Report).filter(models.Report.id == report_id).with_for_update().first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Citizen report not found")
+
+    if report.status not in ("pending", "received", "unverified", "unvalidated", "under_review", "validated", "pending_approval"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot request information for report in '{report.status}' status."
+        )
+
+    reason = data.reason.strip()
+    message = data.message.strip()
+    if len(reason) < 3 or len(message) < 10:
+        raise HTTPException(status_code=422, detail="A reason and actionable message are required")
+
+    prev_status = report.status
+    report.status = "needs_information"
+    report.updated_at = datetime.now(timezone.utc)
+
+    # 1. Public Process Timeline Entry
+    timeline_entry = _append_timeline(
+        db,
+        status="needs_information",
+        previous_status=prev_status,
+        actor_id=actor_id,
+        actor_role=actor_role,
+        note=f"Action Required: [{reason}] {message}",
+        is_public=True,
+        report_id=report.id,
+    )
+
+    # 2. Resident Notification Dispatch
+    ticket = report.ticket_id or f"PUL-{report.id}"
+    notif_msg = f"City Engineering requested more information for report {ticket}: {message}"
+    if report.resident_id:
+        notif = models.Notification(
+            resident_id=report.resident_id,
+            title="Information Needed on Your Report",
+            message=notif_msg,
+            priority=10
+        )
+        db.add(notif)
+    elif report.contact_email:
+        notification_service.log_notification("guest_email", report.contact_email, notif_msg, "request_info")
+
+    # 3. Audit Log Entry
+    _append_audit(
+        db,
+        trigger_type="status_change",
+        action=f"Requested citizen information for report {ticket}: {reason}",
+        actor_id=actor_id,
+        actor_role=actor_role,
+        details=message,
+        report_id=report.id,
+    )
+
+    db.commit()
+    db.refresh(report)
+
+    return {
+        "status": "success",
+        "report_id": report.id,
+        "ticket_id": report.ticket_id,
+        "new_status": report.status,
+        "timeline_id": timeline_entry.id,
+        "message": "Information request recorded on the report timeline."
+    }
+
+
+# =============================================================================
+# Milestone 1: Today Operations Hub Logic
+# =============================================================================
+
+def format_time_diff(dt, now_utc):
+    if not dt:
+        return "recently"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    diff = now_utc - dt
+    total_seconds = int(diff.total_seconds())
+    if total_seconds < 3600:
+        return f"{max(1, total_seconds // 60)}m ago"
+    elif total_seconds < 86400:
+        return f"{total_seconds // 3600}h ago"
+    else:
+        return f"{total_seconds // 86400}d ago"
+
+
+def get_operations_today_hub(db: Session) -> gov_schemas.GovOperationsTodayResponse:
+    now_utc = datetime.now(timezone.utc)
+    seven_days_ago = now_utc - timedelta(days=7)
+
+    # 1. Leadership Metrics
+    assigned_rows = db.query(gov_models.WorkOrder.report_id).filter(
+        gov_models.WorkOrder.report_id.isnot(None),
+        gov_models.WorkOrder.assigned_to_id.isnot(None)
+    ).all()
+    assigned_report_ids = [r[0] for r in assigned_rows if r[0] is not None]
+
+    unassigned_query = db.query(func.count(models.Report.id)).filter(
+        models.Report.status.in_(["received", "pending", "under_review", "validated"])
+    )
+    if assigned_report_ids:
+        unassigned_query = unassigned_query.filter(models.Report.id.notin_(assigned_report_ids))
+    unassigned_count = unassigned_query.scalar() or 0
+
+    overdue_count = db.query(func.count(gov_models.WorkOrder.id)).filter(
+        gov_models.WorkOrder.status.notin_(["completed", "cancelled"]),
+        gov_models.WorkOrder.scheduled_date.isnot(None),
+        gov_models.WorkOrder.scheduled_date < now_utc
+    ).scalar() or 0
+
+    awaiting_count = db.query(func.count(gov_models.WorkOrder.id)).filter(
+        gov_models.WorkOrder.status == "awaiting_verification"
+    ).scalar() or 0
+
+    open_reports_hp = db.query(func.count(models.Report.id)).filter(
+        models.Report.status.notin_(["resolved", "cancelled", "rejected"]),
+        or_(models.Report.ai_urgency.in_(["critical", "high"]), models.Report.severity_score >= 7.0)
+    ).scalar() or 0
+    open_wo_hp = db.query(func.count(gov_models.WorkOrder.id)).filter(
+        gov_models.WorkOrder.status.notin_(["completed", "cancelled"]),
+        gov_models.WorkOrder.priority.in_(["critical", "high"])
+    ).scalar() or 0
+    open_hp = open_reports_hp + open_wo_hp
+
+    resolved_7d = db.query(func.count(models.Report.id)).filter(
+        models.Report.status == "resolved",
+        models.Report.updated_at >= seven_days_ago
+    ).scalar() or 0
+
+    metrics = gov_schemas.OperationsLeadershipMetrics(
+        unassigned_concerns=unassigned_count,
+        overdue_actions=overdue_count,
+        awaiting_verification=awaiting_count,
+        open_high_priority=open_hp,
+        resolved_in_period=resolved_7d,
+    )
+
+    # 2. Triage items
+    triage_items: List[gov_schemas.OperationsTriageItem] = []
+
+    urgent_reports = db.query(models.Report).filter(
+        models.Report.status.in_(["received", "pending", "under_review", "validated"]),
+        or_(models.Report.ai_urgency == "critical", models.Report.severity_score >= 8.5)
+    ).order_by(models.Report.created_at.asc()).limit(5).all()
+
+    for r in urgent_reports:
+        time_ago = format_time_diff(r.created_at, now_utc)
+        triage_items.append(gov_schemas.OperationsTriageItem(
+            id=r.id,
+            entity_type="report",
+            ticket_id=r.ticket_id or f"PUL-{r.id}",
+            title=r.description[:50] if r.description else "Critical Citizen Report",
+            category=r.category or "Civic Concern",
+            priority="critical",
+            status=r.status,
+            barangay=r.location_barangay,
+            time_in_state=time_ago,
+            action_url=f"/gov/reports/{r.id}",
+            recommended_action="Dispatch Emergency Work Order",
+        ))
+
+    blocked_wos = db.query(gov_models.WorkOrder).filter(
+        gov_models.WorkOrder.status == "blocked"
+    ).order_by(gov_models.WorkOrder.updated_at.desc()).limit(5).all()
+
+    for wo in blocked_wos:
+        time_ago = format_time_diff(wo.updated_at or wo.created_at, now_utc)
+        triage_items.append(gov_schemas.OperationsTriageItem(
+            id=wo.id,
+            entity_type="work_order",
+            ticket_id=wo.wo_number,
+            title=wo.title,
+            category=wo.category or "Field Repair",
+            priority=wo.priority or "normal",
+            status="blocked",
+            barangay=f"District {wo.district_id}" if wo.district_id else None,
+            time_in_state=time_ago,
+            action_url=f"/gov/work/{wo.id}",
+            recommended_action="Resolve Site Blocker",
+        ))
+
+    verify_wos = db.query(gov_models.WorkOrder).filter(
+        gov_models.WorkOrder.status == "awaiting_verification"
+    ).order_by(gov_models.WorkOrder.updated_at.asc()).limit(5).all()
+
+    for wo in verify_wos:
+        time_ago = format_time_diff(wo.updated_at or wo.created_at, now_utc)
+        triage_items.append(gov_schemas.OperationsTriageItem(
+            id=wo.id,
+            entity_type="work_order",
+            ticket_id=wo.wo_number,
+            title=wo.title,
+            category=wo.category or "Field Repair",
+            priority=wo.priority or "normal",
+            status="awaiting_verification",
+            barangay=f"District {wo.district_id}" if wo.district_id else None,
+            time_in_state=time_ago,
+            action_url=f"/gov/work/{wo.id}",
+            recommended_action="Dispatch Independent Inspector",
+        ))
+
+    # 3. Sector summary
+    all_active_reports = db.query(models.Report).filter(
+        models.Report.status.notin_(["resolved", "cancelled", "rejected"])
+    ).all()
+
+    def _is_report_north(rep) -> bool:
+        if rep.barangay_id:
+            b = db.query(models.Barangay).filter(models.Barangay.id == rep.barangay_id).first()
+            if b and b.district_id in (2, 3):
+                return True
+        if rep.location_lat and rep.location_lat >= 14.69:
+            return True
+        if rep.location_barangay:
+            digits = "".join(filter(str.isdigit, str(rep.location_barangay)))
+            if digits and int(digits) >= 165:
+                return True
+        return False
+
+    north_open, south_open = 0, 0
+    north_crit, south_crit = 0, 0
+    for r in all_active_reports:
+        is_north = _is_report_north(r)
+        is_crit = (r.ai_urgency == "critical" or (r.severity_score is not None and r.severity_score >= 8.5))
+        if is_north:
+            north_open += 1
+            if is_crit: north_crit += 1
+        else:
+            south_open += 1
+            if is_crit: south_crit += 1
+
+    all_resolved_7d = db.query(models.Report).filter(
+        models.Report.status == "resolved",
+        models.Report.updated_at >= seven_days_ago
+    ).all()
+    north_res, south_res = 0, 0
+    for r in all_resolved_7d:
+        if _is_report_north(r):
+            north_res += 1
+        else:
+            south_res += 1
+
+    all_active_wos = db.query(gov_models.WorkOrder).filter(
+        gov_models.WorkOrder.status.notin_(["completed", "cancelled"])
+    ).all()
+    north_wo, south_wo = 0, 0
+    for w in all_active_wos:
+        if w.district_id in (2, 3):
+            north_wo += 1
+        else:
+            south_wo += 1
+
+    sector_summary = gov_schemas.SectorSummary(
+        north_caloocan=gov_schemas.SectorMetric(
+            open_tickets=north_open,
+            critical_count=north_crit,
+            resolved_7d=north_res,
+            active_work_orders=north_wo,
+        ),
+        south_caloocan=gov_schemas.SectorMetric(
+            open_tickets=south_open,
+            critical_count=south_crit,
+            resolved_7d=south_res,
+            active_work_orders=south_wo,
+        )
+    )
+
+    # 4. Team capacity
+    taskforces = [
+        {"team_id": "roads_div", "team_name": "Road & Pavement Taskforce", "category": "Road", "base_capacity": 10},
+        {"team_id": "drainage_div", "team_name": "North Drainage Maintenance Unit", "category": "Drainage", "base_capacity": 8},
+        {"team_id": "lights_div", "team_name": "Streetlight & Electrical Section", "category": "Light", "base_capacity": 8},
+        {"team_id": "bldg_div", "team_name": "Public Buildings & Structures", "category": "Building", "base_capacity": 6},
+        {"team_id": "bridges_div", "team_name": "Bridge & Overpass Engineering", "category": "Bridge", "base_capacity": 4},
+    ]
+
+    team_capacity_list = []
+    for tf in taskforces:
+        cat_filter = tf["category"]
+        active_cnt = db.query(func.count(gov_models.WorkOrder.id)).filter(
+            gov_models.WorkOrder.category.ilike(f"%{cat_filter}%"),
+            gov_models.WorkOrder.status.in_(["assigned", "in_progress", "awaiting_verification"])
+        ).scalar() or 0
+
+        blocked_cnt = db.query(func.count(gov_models.WorkOrder.id)).filter(
+            gov_models.WorkOrder.category.ilike(f"%{cat_filter}%"),
+            gov_models.WorkOrder.status == "blocked"
+        ).scalar() or 0
+
+        personnel_cnt = db.query(func.count(models.Official.id)).filter(
+            models.Official.is_active == True,
+            models.Official.account_type == "staff"
+        ).scalar() or 5
+
+        cap_max = tf["base_capacity"]
+        cap_pct = round(min((active_cnt / max(cap_max, 1)) * 100.0, 100.0), 1)
+
+        team_capacity_list.append(gov_schemas.TeamCapacityItem(
+            team_id=tf["team_id"],
+            team_name=tf["team_name"],
+            category=tf["category"],
+            active_orders=active_cnt,
+            blocked_orders=blocked_cnt,
+            personnel_count=personnel_cnt,
+            capacity_pct=cap_pct,
+        ))
+
+    return gov_schemas.GovOperationsTodayResponse(
+        timestamp=now_utc,
+        metrics=metrics,
+        needs_attention=triage_items,
+        sector_summary=sector_summary,
+        team_capacity=team_capacity_list,
+    )
+

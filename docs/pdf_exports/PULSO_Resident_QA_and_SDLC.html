@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Resident-Side User Stories, QA Contract & SDLC</title>
+    <style>
+        
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@page {
+    size: A4 portrait;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-center {
+        content: counter(page);
+    }
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.55;
+    color: #1e293b;
+    background-color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+/* Document Header & Cover */
+.doc-cover {
+    page-break-after: always;
+    padding: 40px 20px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 90vh;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 30px;
+}
+
+.pulse-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 2px solid #f97316;
+    border-radius: 10px;
+    color: #f97316;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-title {
+    font-size: 16pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #0f172a;
+    text-transform: uppercase;
+}
+
+.brand-sub {
+    font-size: 8.5pt;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.cover-main {
+    margin: 40px 0;
+}
+
+.cover-badge {
+    display: inline-block;
+    padding: 5px 14px;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.cover-title {
+    font-size: 26pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+}
+
+.cover-subtitle {
+    font-size: 12pt;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.6;
+    max-width: 650px;
+    margin-bottom: 30px;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 24px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.meta-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+}
+
+.meta-value {
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.cover-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8pt;
+    color: #64748b;
+}
+
+/* Headings */
+h1 {
+    font-size: 17pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-top: 28px;
+    margin-bottom: 14px;
+    letter-spacing: -0.3px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h2 {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    border-left: 3.5px solid #f97316;
+    padding-left: 10px;
+    letter-spacing: -0.2px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h4, h5, h6 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #475569;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+p {
+    margin: 0 0 10px 0;
+}
+
+/* Lists */
+ul, ol {
+    margin: 0 0 12px 0;
+    padding-left: 22px;
+}
+
+li {
+    margin-bottom: 4px;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 18px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+thead {
+    display: table-header-group;
+}
+
+tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid #1e293b;
+    letter-spacing: 0.2px;
+}
+
+td {
+    padding: 7px 10px;
+    border: 1px solid #e2e8f0;
+    vertical-align: top;
+    color: #334155;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+tbody tr:hover {
+    background-color: #f1f5f9;
+}
+
+/* Blockquotes / Callouts */
+blockquote {
+    margin: 14px 0;
+    padding: 10px 16px;
+    background-color: #f8fafc;
+    border-left: 4px solid #3b82f6;
+    border-radius: 0 6px 6px 0;
+    color: #334155;
+    font-size: 9pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* Code & Preformatted */
+code {
+    font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+    font-size: 8.2pt;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+pre {
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 8pt;
+    line-height: 1.45;
+    margin: 12px 0 16px 0;
+    border: 1px solid #334155;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+    border: none;
+    font-size: inherit;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.badge-implemented {
+    background-color: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.badge-proposed {
+    background-color: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
+.badge-broken {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.badge-risk {
+    background-color: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.badge-gap {
+    background-color: #faf5ff;
+    color: #6b21a8;
+    border: 1px solid #e9d5ff;
+}
+
+.badge-decision {
+    background-color: #fff1f2;
+    color: #9f1239;
+    border: 1px solid #fecdd3;
+}
+
+.badge-backend {
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+
+.badge-live {
+    background-color: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.badge-public {
+    background-color: #f0f9ff;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+}
+
+.badge-bearer {
+    background-color: #f5f3ff;
+    color: #5b21b6;
+    border: 1px solid #ddd6fe;
+}
+
+.badge-owner {
+    background-color: #fdf2f8;
+    color: #9d174d;
+    border: 1px solid #fbcfe8;
+}
+
+.badge-gov {
+    background-color: #f0fdfa;
+    color: #115e59;
+    border: 1px solid #99f6e4;
+}
+
+.badge-capability {
+    background-color: #fff7ed;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+}
+
+.badge-p0 {
+    background-color: #dc2626;
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.badge-p1 {
+    background-color: #ea580c;
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.badge-p2 {
+    background-color: #64748b;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* Print Utilities */
+.page-break {
+    page-break-before: always;
+}
+
+.no-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 20px 0;
+}
+
+/* User Story Cards */
+.story-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.story-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.story-id {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+    </style>
+</head>
+<body>
+    
+    <div class="doc-cover">
+        <div class="cover-brand">
+            <div class="pulse-logo">P</div>
+            <div class="brand-text">
+                <span class="brand-title">PULSO PLATFORM</span>
+                <span class="brand-sub">Civic Operations & Engineering</span>
+            </div>
+        </div>
+        <div class="cover-main">
+            <span class="cover-badge">RESIDENT QA & SDLC SPECIFICATION</span>
+            <h1 class="cover-title">Resident-Side User Stories, QA Contract & SDLC</h1>
+            <div class="cover-subtitle">Comprehensive acceptance criteria, identity tier gates, reporting lifecycle, and automated test matrix for resident surfaces.</div>
+            <div class="meta-grid">
+                
+        <div class="meta-item">
+            <span class="meta-label">Document type</span>
+            <span class="meta-value">Product requirements + QA acceptance + delivery lifecycle</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Status</span>
+            <span class="meta-value">Baseline verified; target contract proposed for approval</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Version</span>
+            <span class="meta-value">1.0</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Last validated</span>
+            <span class="meta-value">23 August 2026</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Product scope</span>
+            <span class="meta-value">Resident web portal, resident mobile surfaces, shared API, identity, reporting, tracking, notifications, and closeout</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Target stream</span>
+            <span class="meta-value">`codex/ui-reworks-residents`, consuming approved contracts from `codex/ui-reworks`</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Implementation</span>
+            <span class="meta-value">Not started; this document changes no application code</span>
+        </div>
+        
+            </div>
+        </div>
+        <div class="cover-footer">
+            <span>City Government of Caloocan &bull; Engineering & Resident Operations</span>
+            <span>CONFIDENTIAL &bull; STYLIZED QA SPECIFICATION</span>
+        </div>
+    </div>
+    
+    <div class="content-body">
+        <h2 id="1-executive-qa-assessment">1. Executive QA assessment</h2>
+<p>PULSO already contains the main resident service loop: identity verification, registration, email verification, sign-in, report submission, jurisdiction and duplicate checks, government processing, status notifications, proof of resolution, and resident feedback. It is not yet safe to describe that loop as release-ready.</p>
+<p>The most serious current risks are:</p>
+<ul>
+<li>a resident can update an official account when their independent numeric IDs collide;</li>
+<li>inactive resident accounts and previously issued tokens are not reliably blocked;</li>
+<li>report status and resident confirmation can bypass the intended lifecycle;</li>
+<li>uploaded evidence is publicly addressable and is not validated strongly enough server-side;</li>
+<li>registration, reset-password, notification, mobile, and profile clients disagree with the backend contract;</li>
+<li>automated identity and AI decisions lack complete accessible recovery routes;</li>
+<li>offline replay and double submission have no idempotency contract;</li>
+<li>English/Filipino, keyboard, screen-reader, light/dark, and low-connectivity parity are incomplete.</li>
+</ul>
+<p>No visual implementation should be accepted until the P0 identity, authorization, state-machine, evidence, and endpoint-contract gates in this document pass.</p>
+<h2 id="2-how-to-read-this-document">2. How to read this document</h2>
+<h3 id="evidence-classification">Evidence classification</h3>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="badge badge-implemented">Implemented</span></td>
+<td>A current backend route exists and at least one current resident client consumes it. This does not imply that it is defect-free.</td>
+</tr>
+<tr>
+<td><span class="badge badge-backend">Backend-only</span></td>
+<td>A current route exists, but no active resident UI was confirmed.</td>
+</tr>
+<tr>
+<td><span class="badge badge-gap">UI-contract gap</span></td>
+<td>A current client calls a path, method, or payload the backend does not provide.</td>
+</tr>
+<tr>
+<td><span class="badge badge-risk">Observed risk</span></td>
+<td>The route is reachable but violates a security, data-integrity, lifecycle, privacy, accessibility, or recovery expectation.</td>
+</tr>
+<tr>
+<td><span class="badge badge-proposed">Proposed</span></td>
+<td>Target behavior for approval; it must not be represented as implemented.</td>
+</tr>
+<tr>
+<td><span class="badge badge-decision">Decision required</span></td>
+<td>Product, operations, privacy, security, or legal ownership is needed before design freeze.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="source-authority">Source authority</h3>
+<p>When sources conflict, use this order:</p>
+<ol>
+<li>current backend route decorators, schemas, models, and authorization dependencies;</li>
+<li>current frontend/mobile calls and route declarations;</li>
+<li>this target acceptance contract and the approved UI/UX dossier;</li>
+<li>older catalogs and walkthroughs as historical context only.</li>
+</ol>
+<p>The current web route authority is <a href="../../frontend/src/App.jsx#L51">App.jsx</a>. The resident API authority is <a href="../../backend/main.py#L247">main.py</a>, with identity behavior in <a href="../../backend/auth.py#L12">auth.py</a>, schemas in <a href="../../backend/schemas.py#L14">schemas.py</a>, and persistence behavior in <a href="../../backend/crud.py#L191">crud.py</a>.</p>
+<h2 id="3-scope-actors-and-data-sensitivity">3. Scope, actors, and data sensitivity</h2>
+<h3 id="resident-actors">Resident actors</h3>
+<table>
+<thead>
+<tr>
+<th>Actor</th>
+<th>Need</th>
+<th>Current authority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Visitor</td>
+<td>Understand PULSO, eligibility, privacy, and the correct portal</td>
+<td>Public routes only</td>
+</tr>
+<tr>
+<td>Prospective resident</td>
+<td>Prove residency and create an account</td>
+<td>Public OCR, registration, and OTP routes</td>
+</tr>
+<tr>
+<td>Unverified resident</td>
+<td>Complete email verification or recover delivery</td>
+<td>Cannot use protected APIs</td>
+</tr>
+<tr>
+<td>Verified resident</td>
+<td>Submit and track reports, receive updates, manage profile</td>
+<td>JWT with role <code>resident</code></td>
+</tr>
+<tr>
+<td>KYC-upgraded resident</td>
+<td>View or improve identity tier</td>
+<td>Backend-only Bronze/Silver/Gold flow</td>
+</tr>
+<tr>
+<td>Returning tracker</td>
+<td>Quickly understand the latest case state and required action</td>
+<td><code>/dashboard</code> in-memory views</td>
+</tr>
+<tr>
+<td>Assisted-service resident</td>
+<td>Complete a task when camera, OCR, literacy, disability, or connectivity prevents self-service</td>
+<td><strong>Proposed; operating owner required</strong></td>
+</tr>
+<tr>
+<td>Privacy/support reviewer</td>
+<td>Resolve identity, duplicate, eligibility, or account disputes</td>
+<td><strong>Proposed; not a resident-facing role</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="sensitive-data-handled">Sensitive data handled</h3>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Minimum classification</th>
+<th>Required control</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Government ID and PhilSys data</td>
+<td>Highly restricted identity data</td>
+<td>purpose notice, minimization, encryption, access audit, retention rule, no public URL</td>
+</tr>
+<tr>
+<td>Name, email, phone, home address</td>
+<td>Personal information</td>
+<td>authenticated owner access, verified changes, cross-namespace object authorization</td>
+</tr>
+<tr>
+<td>GPS, exact location, photos</td>
+<td>Sensitive evidence/location</td>
+<td>purpose-limited access, metadata policy, secure download, retention rule</td>
+</tr>
+<tr>
+<td>Report narrative and feedback</td>
+<td>Case record</td>
+<td>ownership, public-safe projection, moderation with appeal/recovery</td>
+</tr>
+<tr>
+<td>Trust/KYC score</td>
+<td>Decision-affecting profile data</td>
+<td>transparent policy, correction/appeal, no unexplained punishment</td>
+</tr>
+<tr>
+<td>AI prompts/results</td>
+<td>Derived/potentially sensitive data</td>
+<td>disclosed processor use, minimized context, provenance and human review</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-current-and-target-route-model">4. Current and target route model</h2>
+<h3 id="current-web-routes">Current web routes</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Current behavior</th>
+<th>Contract state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/</code></td>
+<td>Public landing and resident app download</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>/login</code></td>
+<td>Sign-in, registration OTP continuation, and modal recovery</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>/register</code></td>
+<td>ID scan, details, credentials, OTP, success</td>
+<td>Implemented with contract defects</td>
+</tr>
+<tr>
+<td><code>/reset-password</code></td>
+<td>Token-link reset screen</td>
+<td><span class="badge badge-gap">UI-contract gap</span></td>
+</tr>
+<tr>
+<td><code>/dashboard</code></td>
+<td>Overview, reports, profile, settings as local tabs/modals</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>*</code></td>
+<td>Redirects to <code>/</code></td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+</tbody>
+</table>
+<p>The URL-addressable report, update, account, and wizard routes in the <a href="./04-resident-experience-spec.md#4-route-model">resident experience specification</a> are <strong>proposed</strong>, not current routes.</p>
+<h3 id="target-route-outcomes">Target route outcomes</h3>
+<ul>
+<li>Reload, back, forward, share, and session recovery must retain the resident’s location in the flow.</li>
+<li>A report detail must have a stable URL and restore list filters/scroll position.</li>
+<li>Each report step must preserve an encrypted local draft and expose a safe exit.</li>
+<li>Deep links must redirect to sign-in and return to the intended resident record after authentication.</li>
+<li>Government routes must never be rendered from resident local-storage role edits.</li>
+</ul>
+<h2 id="5-whole-resident-service-cycle">5. Whole resident service cycle</h2>
+<pre><code class="language-text">Discover service and scope
+→ understand privacy and eligibility
+→ verify residency / choose assisted review
+→ create unverified account
+→ verify email OTP
+→ sign in and establish active session
+→ view dashboard/advisories
+→ capture evidence and confirm location
+→ receive editable AI suggestion
+→ review duplicate/jurisdiction result
+→ submit exactly once and receive ticket
+→ government review and assignment
+→ resident receives public-safe updates
+→ government supplies resolution proof
+→ resident confirms/rates or raises a follow-up
+→ case enters governed retention and analytics
+</code></pre>
+<h3 id="intended-report-lifecycle">Intended report lifecycle</h3>
+<pre><code class="language-text">pending
+  → pending_approval
+  → approved_internal
+  → dispatched
+  → resolved
+  → closed_by_citizen
+
+Branches before operational lock:
+pending / unverified → rejected
+pending / pending_approval / rejected → cancelled
+</code></pre>
+<p>This is an inferred intended path, not an enforced current state machine. The generic status route assigns any string (<a href="../../backend/main.py#L1230">main.py</a>); resident confirmation has no <code>resolved</code> precondition (<a href="../../backend/crud.py#L427">crud.py</a>); and public/archive/stat views omit or rename some terminal states.</p>
+<h3 id="target-resident-facing-vocabulary">Target resident-facing vocabulary</h3>
+<table>
+<thead>
+<tr>
+<th>Internal state</th>
+<th>Resident label</th>
+<th>Resident meaning</th>
+<th>Primary next action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pending</code></td>
+<td>Received</td>
+<td>PULSO has the report and ticket</td>
+<td>View details</td>
+</tr>
+<tr>
+<td><code>pending_approval</code></td>
+<td>Under review</td>
+<td>City staff verified the report and are planning action</td>
+<td>Wait / respond if asked</td>
+</tr>
+<tr>
+<td><code>approved_internal</code></td>
+<td>Approved for action</td>
+<td>The issue is approved for assignment</td>
+<td>View update</td>
+</tr>
+<tr>
+<td><code>dispatched</code></td>
+<td>Team assigned</td>
+<td>Work has been assigned or dispatched</td>
+<td>Track progress</td>
+</tr>
+<tr>
+<td><code>in_progress</code></td>
+<td>Work in progress</td>
+<td>A team is actively handling the issue</td>
+<td>Track progress</td>
+</tr>
+<tr>
+<td><code>resolved</code></td>
+<td>Resolution ready for review</td>
+<td>The city recorded completion evidence</td>
+<td>Review resolution</td>
+</tr>
+<tr>
+<td><code>closed_by_citizen</code></td>
+<td>Closed</td>
+<td>The resident confirmed the outcome</td>
+<td>View record</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>Could not verify</td>
+<td>Staff could not validate the report</td>
+<td>Review reason / resubmit</td>
+</tr>
+<tr>
+<td><code>cancelled</code></td>
+<td>Retracted</td>
+<td>The resident or authorized staff withdrew it before work lock</td>
+<td>View record</td>
+</tr>
+<tr>
+<td><code>needs_information</code></td>
+<td>Information needed</td>
+<td>Staff need a specific correction or detail</td>
+<td>Provide information</td>
+</tr>
+<tr>
+<td><code>duplicate</code></td>
+<td>Linked to another report</td>
+<td>Evidence contributes to a canonical ticket</td>
+<td>Track canonical ticket</td>
+</tr>
+<tr>
+<td><code>outside_scope</code></td>
+<td>Referred elsewhere</td>
+<td>Another service or jurisdiction owns the issue</td>
+<td>Open referral</td>
+</tr>
+</tbody>
+</table>
+<p>The last three states are <strong>proposed</strong> and need endpoint/data-model approval.</p>
+<h2 id="6-resident-user-story-catalog">6. Resident user-story catalog</h2>
+<h3 id="summary-and-traceability">Summary and traceability</h3>
+<p>Acceptance criteria are addressed by story plus their displayed order: for example, the first criterion under <code>RES-US-003</code> is <code>RES-US-003-AC01</code>. Preserve these identifiers when criteria move into tickets or test management.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Epic</th>
+<th>Story outcome</th>
+<th style="text-align: right;">Priority</th>
+<th>Current state</th>
+<th>Primary API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RES-US-001</td>
+<td>Discovery</td>
+<td>Choose the correct service with scope, language, and privacy clarity</td>
+<td style="text-align: right;">P1</td>
+<td>Partial</td>
+<td>Public platform routes</td>
+</tr>
+<tr>
+<td>RES-US-002</td>
+<td>Identity</td>
+<td>Verify residency without an inaccessible automation dead end</td>
+<td style="text-align: right;">P0</td>
+<td>Partial/risky</td>
+<td><code>POST /api/verify-residency</code></td>
+</tr>
+<tr>
+<td>RES-US-003</td>
+<td>Account</td>
+<td>Register once with normalized, durable identity data</td>
+<td style="text-align: right;">P0</td>
+<td>Partial/risky</td>
+<td><code>POST /api/auth/register</code></td>
+</tr>
+<tr>
+<td>RES-US-004</td>
+<td>Verification</td>
+<td>Complete expiring, bounded email OTP verification</td>
+<td style="text-align: right;">P0</td>
+<td>Partial/risky</td>
+<td>Verify/resend routes</td>
+</tr>
+<tr>
+<td>RES-US-005</td>
+<td>Authentication</td>
+<td>Sign in only as an active verified resident</td>
+<td style="text-align: right;">P0</td>
+<td>Partial/risky</td>
+<td>Login and <code>/api/me</code></td>
+</tr>
+<tr>
+<td>RES-US-006</td>
+<td>Recovery</td>
+<td>Recover access through one consistent code contract</td>
+<td style="text-align: right;">P0</td>
+<td>UI drift</td>
+<td>Forgot/verify/reset routes</td>
+</tr>
+<tr>
+<td>RES-US-007</td>
+<td>Profile</td>
+<td>View and change only the resident’s own profile/security</td>
+<td style="text-align: right;">P0</td>
+<td>Critical risk</td>
+<td>User and password routes</td>
+</tr>
+<tr>
+<td>RES-US-008</td>
+<td>KYC</td>
+<td>Understand and optionally upgrade verification</td>
+<td style="text-align: right;">P1</td>
+<td><span class="badge badge-backend">Backend-only</span></td>
+<td>Resident KYC routes</td>
+</tr>
+<tr>
+<td>RES-US-009</td>
+<td>Draft/evidence</td>
+<td>Capture safe evidence and recover from interruption</td>
+<td style="text-align: right;">P0</td>
+<td>Partial</td>
+<td>Analyze/report multipart routes</td>
+</tr>
+<tr>
+<td>RES-US-010</td>
+<td>Location</td>
+<td>Confirm an accurate in-jurisdiction location without GPS dependency</td>
+<td style="text-align: right;">P0</td>
+<td>Partial</td>
+<td>Geocode/report routes</td>
+</tr>
+<tr>
+<td>RES-US-011</td>
+<td>AI/duplicate</td>
+<td>Treat AI and duplicate detection as reviewable assistance</td>
+<td style="text-align: right;">P0</td>
+<td>Partial</td>
+<td>Analyze/report routes</td>
+</tr>
+<tr>
+<td>RES-US-012</td>
+<td>Submission</td>
+<td>Receive one durable ticket and first event exactly once</td>
+<td style="text-align: right;">P0</td>
+<td>Partial</td>
+<td><code>POST /api/reports</code></td>
+</tr>
+<tr>
+<td>RES-US-013</td>
+<td>Tracking</td>
+<td>View owned reports and public-safe timeline truth</td>
+<td style="text-align: right;">P0</td>
+<td>Partial</td>
+<td>Report read/timeline routes</td>
+</tr>
+<tr>
+<td>RES-US-014</td>
+<td>Retraction</td>
+<td>Retract only permitted pre-work reports with clear consequences</td>
+<td style="text-align: right;">P1</td>
+<td>Implemented/risky</td>
+<td>Report cancel route</td>
+</tr>
+<tr>
+<td>RES-US-015</td>
+<td>Closeout</td>
+<td>Review proof, rate once, and request follow-up</td>
+<td style="text-align: right;">P0</td>
+<td>Backend-only/risky</td>
+<td>Report confirm route</td>
+</tr>
+<tr>
+<td>RES-US-016</td>
+<td>Updates</td>
+<td>Read, mark, and dismiss durable notifications/advisories</td>
+<td style="text-align: right;">P1</td>
+<td>UI drift</td>
+<td>Notification/advisory routes</td>
+</tr>
+<tr>
+<td>RES-US-017</td>
+<td>Assistance</td>
+<td>Get privacy-safe contextual help with deterministic fallback</td>
+<td style="text-align: right;">P1</td>
+<td>Partial</td>
+<td>AI assistant</td>
+</tr>
+<tr>
+<td>RES-US-018</td>
+<td>Inclusive use</td>
+<td>Complete all critical tasks across locale, theme, AT, and poor networks</td>
+<td style="text-align: right;">P0</td>
+<td>Partial</td>
+<td>Cross-cutting</td>
+</tr>
+</tbody>
+</table>
+<h3 id="res-us-001-discover-the-correct-resident-service">RES-US-001 — Discover the correct resident service</h3>
+<p><strong>As a</strong> visitor, <strong>I want</strong> to understand what PULSO handles and whether I am eligible <strong>so that</strong> I choose the correct action without exposing identity data unnecessarily.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li><strong>Given</strong> a first visit, <strong>when</strong> the page loads, <strong>then</strong> reporting, tracking, service area, emergency limitations, privacy summary, language, and staff sign-in separation are visible before marketing content.</li>
+<li><strong>Given</strong> Filipino is selected, <strong>when</strong> the visitor navigates to registration or sign-in, <strong>then</strong> the selection persists and the document language changes.</li>
+<li><strong>Given</strong> the visitor needs an emergency response, <strong>when</strong> they read reporting guidance, <strong>then</strong> the interface distinguishes PULSO from emergency channels and names the correct contact action.</li>
+<li><strong>Given</strong> app download is unavailable, <strong>then</strong> the web journey remains complete and the download action reports a truthful error.</li>
+</ul>
+<h3 id="res-us-002-verify-residency-with-recovery">RES-US-002 — Verify residency with recovery</h3>
+<p><strong>As a</strong> prospective resident, <strong>I want</strong> to prove service eligibility safely <strong>so that</strong> I can register without being stranded by OCR, camera, or disability barriers.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li><strong>Given</strong> valid front/back images for the supported jurisdiction, <strong>when</strong> verification succeeds, <strong>then</strong> extracted fields, uncertainty, data use, and the next step are shown before registration.</li>
+<li><strong>Given</strong> mismatch, outside jurisdiction, unreadable evidence, unsupported file, provider timeout, or low confidence, <strong>then</strong> each outcome has distinct plain-language instructions and preserves the usable draft.</li>
+<li><strong>Given</strong> camera permission is denied or unavailable, <strong>then</strong> file upload and assisted/manual review remain available.</li>
+<li><strong>Given</strong> repeated or abusive calls, <strong>then</strong> authenticated/rate-limited controls protect the identity processor without exposing whether a person exists.</li>
+<li><strong>Given</strong> verification is abandoned, <strong>then</strong> temporary identity images follow an approved deletion schedule.</li>
+</ul>
+<h3 id="res-us-003-create-one-complete-resident-account">RES-US-003 — Create one complete resident account</h3>
+<p><strong>As a</strong> verified applicant, <strong>I want</strong> my reviewed details saved consistently <strong>so that</strong> my account and jurisdiction are correct on every device.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>Required fields and rules are identical in web, mobile, API schema, and persistence, including normalized barangay, age/DOB policy, phone, email, and password.</li>
+<li><strong>Given</strong> duplicate email across any identity store, <strong>then</strong> registration fails safely without creating a second account.</li>
+<li><strong>Given</strong> SMTP fails after account creation, <strong>then</strong> retry/resend resumes the same account; it does not ask the resident to register again.</li>
+<li><strong>Given</strong> the same operation is retried, <strong>then</strong> an idempotency key returns the original result rather than creating another account.</li>
+<li>The response excludes secrets, raw OTP, identity image paths, and internal scoring metadata.</li>
+</ul>
+<h3 id="res-us-004-verify-email-with-a-bounded-otp">RES-US-004 — Verify email with a bounded OTP</h3>
+<p><strong>As an</strong> unverified resident, <strong>I want</strong> a reliable, expiring code flow <strong>so that</strong> I can activate my account securely.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>OTP is hashed at rest, single-use, expires at the displayed time, has bounded attempts, and has a server-enforced resend cooldown.</li>
+<li>Paste and one-time-code autofill work; errors preserve the email and entered context.</li>
+<li>A new OTP invalidates older codes and resend never reveals whether another account exists.</li>
+<li>Successful verification is idempotent and immediately permits sign-in.</li>
+<li>Delivery failure offers retry and assisted support without duplicating the resident.</li>
+</ul>
+<h3 id="res-us-005-establish-an-active-resident-session">RES-US-005 — Establish an active resident session</h3>
+<p><strong>As a</strong> verified resident, <strong>I want</strong> secure sign-in and session restoration <strong>so that</strong> only my active account reaches my data.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>Valid, verified, active residents receive a bounded session and land on the intended resident route.</li>
+<li>Invalid credentials return one non-enumerating message; unverified users receive a verification recovery action.</li>
+<li>Inactive, suspended, expired, revoked, or malformed sessions fail both at login and on every protected request.</li>
+<li>Production CAPTCHA cannot be bypassed by a client-provided literal.</li>
+<li>The client derives current role/capabilities from <code>/api/me</code>, not editable local-storage identity alone.</li>
+<li>Logout/recovery/security change invalidates the appropriate server sessions while preserving theme and language preferences.</li>
+</ul>
+<h3 id="res-us-006-recover-a-forgotten-password">RES-US-006 — Recover a forgotten password</h3>
+<p><strong>As a</strong> resident who lost access, <strong>I want</strong> one consistent recovery flow <strong>so that</strong> I can regain access without broken links or account disclosure.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>The supported flow is identifier → recovery code → code verification → new password → sign-in confirmation.</li>
+<li><code>/login</code>, <code>/reset-password</code>, web, and mobile use the same versioned payload; no client calls a nonexistent token-verification route.</li>
+<li>Codes are single-use, rate-limited, and expire; success revokes prior sessions.</li>
+<li>New password policy is server-enforced and reuse rules are explained.</li>
+<li>Provider failure, expired code, wrong code, and lost email access each have a documented next action.</li>
+</ul>
+<h3 id="res-us-007-protect-profile-and-security-changes">RES-US-007 — Protect profile and security changes</h3>
+<p><strong>As a</strong> resident, <strong>I want</strong> to see and edit only my profile <strong>so that</strong> another account can never be exposed or changed through an ID collision.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>Identity uses a globally unique subject or <code>(account_type, id)</code> pair on every authorization and foreign key.</li>
+<li>Owner checks cannot resolve an official record when a resident ID is numerically equal.</li>
+<li>Email changes require uniqueness and re-verification; security-sensitive changes require recent authentication.</li>
+<li>Current-password change rejects incorrect, reused, weak, or breached values according to policy.</li>
+<li>Every profile mutation has before/after audit metadata without storing secrets.</li>
+</ul>
+<h3 id="res-us-008-understand-and-upgrade-kyc">RES-US-008 — Understand and upgrade KYC</h3>
+<p><strong>As a</strong> resident, <strong>I want</strong> to understand optional verification levels <strong>so that</strong> I can make an informed choice and correct errors.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>The UI explains benefits, data use, retention, limitations, and whether the tier affects report handling.</li>
+<li>Declining optional KYC does not remove the basic reporting path unless a signed policy explicitly requires it.</li>
+<li>OCR/PhilSys results require identity match, confidence handling, correction, and manual-review routes.</li>
+<li>The upgrade, audit event, and resident-visible state commit atomically.</li>
+<li>Trust changes are explainable, bounded, appealable, and never silently penalize accessibility or low connectivity.</li>
+</ul>
+<h3 id="res-us-009-capture-and-retain-safe-evidence">RES-US-009 — Capture and retain safe evidence</h3>
+<p><strong>As a</strong> resident at an issue location, <strong>I want</strong> to capture or upload evidence safely <strong>so that</strong> interruption or validation failure does not erase my work.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>Safety guidance precedes camera use; camera denial offers file selection and later attachment.</li>
+<li>Client and server validate allowlisted type, actual file signature, size, dimensions, decoding, malicious content, metadata, and filename.</li>
+<li>Rejected evidence is not left in public or orphan storage.</li>
+<li>Upload progress, cancellation, retry, and background interruption preserve the draft.</li>
+<li>Evidence is served through authorized/signed access, never a guessable public static path.</li>
+</ul>
+<h3 id="res-us-010-confirm-location-and-jurisdiction">RES-US-010 — Confirm location and jurisdiction</h3>
+<p><strong>As a</strong> resident, <strong>I want</strong> to confirm where the issue is <strong>so that</strong> the correct city team receives a usable location.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>GPS is requested only after purpose explanation; search, manual pin, landmark, and textual description are equivalent alternatives.</li>
+<li>A default map center is never treated as resident confirmation.</li>
+<li>Inside, outside, unknown, checking, and provider-error states are distinct and accessible.</li>
+<li>Exact-location description is included in review, payload, persistence, government detail, and resident detail.</li>
+<li>Boundary version and address provenance are recorded; a provider outage can route to staff review.</li>
+</ul>
+<h3 id="res-us-011-review-ai-and-duplicate-assistance">RES-US-011 — Review AI and duplicate assistance</h3>
+<p><strong>As a</strong> resident, <strong>I want</strong> suggestions and related reports explained <strong>so that</strong> automation helps without making an unappealable civic decision.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>AI category/urgency is labeled as a suggestion and remains editable.</li>
+<li>Low confidence, quota, malformed output, or provider outage allows <strong>Submit for staff review</strong>.</li>
+<li>A duplicate response includes the canonical ticket, distance/reason, privacy-safe status, and option to contribute evidence or request review.</li>
+<li>Duplicate checking is transactional and returns the existing canonical identifier.</li>
+<li>AI moderation rejection gives a safe reason and review path; it never exposes model internals or discriminatory scoring.</li>
+</ul>
+<h3 id="res-us-012-submit-exactly-once-and-receive-a-durable-ticket">RES-US-012 — Submit exactly once and receive a durable ticket</h3>
+<p><strong>As a</strong> resident, <strong>I want</strong> proof that the city received my report <strong>so that</strong> I do not resubmit after a timeout.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>The final review contains evidence, category, description, exact location, contact preference, privacy notice, and explicit <strong>Submit report</strong> action.</li>
+<li>A client operation ID/idempotency key binds the report and attachments; replay returns the original ticket.</li>
+<li>Report, first public timeline event, and transactional notification/outbox commit as one operation.</li>
+<li>Success returns stable ticket, status, server timestamp, and next-step policy.</li>
+<li>Unknown network outcome triggers reconciliation before a new submission is offered.</li>
+</ul>
+<h3 id="res-us-013-track-owned-and-nearby-reports-truthfully">RES-US-013 — Track owned and nearby reports truthfully</h3>
+<p><strong>As a</strong> resident, <strong>I want</strong> a clear latest state and public-safe history <strong>so that</strong> I know what happened and whether I must act.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>Owned report list/detail and timeline reject cross-user access regardless of numeric ID collision.</li>
+<li>Every backend state maps to one approved resident label, explanation, and next action.</li>
+<li>Public reports remove reporter identity and sensitive evidence/location according to policy.</li>
+<li>Public timeline excludes internal notes and identifies freshness, actor unit where allowed, and source status.</li>
+<li>Loading, empty, filtered empty, stale, offline, 403, 404, and error are visually and semantically distinct.</li>
+</ul>
+<h3 id="res-us-014-retract-an-eligible-report">RES-US-014 — Retract an eligible report</h3>
+<p><strong>As a</strong> resident, <strong>I want</strong> to retract a report before work is committed <strong>so that</strong> I can correct a mistake without disrupting active work.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>The server owns the cancellable-state list; the UI shows retraction only when permitted.</li>
+<li>Confirmation names the ticket, consequence, any trust policy, and <strong>Keep report</strong> safe action.</li>
+<li>Concurrent government assignment wins safely and returns a conflict with the latest state.</li>
+<li>Retraction is idempotent, audited with the correct resident actor type, and does not erase history.</li>
+</ul>
+<h3 id="res-us-015-review-and-confirm-resolution-once">RES-US-015 — Review and confirm resolution once</h3>
+<p><strong>As a</strong> reporting resident, <strong>I want</strong> to inspect completion evidence and respond <strong>so that</strong> closure reflects the real outcome.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>Confirmation is accepted only for an owned report currently in <code>resolved</code>.</li>
+<li>Rating is an integer from 1–5; note length/content and sensitive-data handling are defined.</li>
+<li>A repeated request returns the original result and cannot repeat a trust reward.</li>
+<li>Low rating or <strong>Issue remains</strong> creates a visible governed follow-up path; it does not silently close or reopen.</li>
+<li>Completion evidence is authorized, safe, timestamped, and linked to the responsible work item.</li>
+</ul>
+<h3 id="res-us-016-manage-notifications-and-advisories">RES-US-016 — Manage notifications and advisories</h3>
+<p><strong>As a</strong> resident, <strong>I want</strong> reliable updates with meaningful destinations <strong>so that</strong> I can act without polling confusion.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>List, mark-one, mark-all, dismiss, and optional undo use the same paths/methods on web and mobile.</li>
+<li>Dismissed records are excluded from normal retrieval; read and hidden are separate durable states.</li>
+<li>Optimistic changes roll back on error and never hide an authentication or permission failure.</li>
+<li>Notifications carry structured report/advisory identifiers and public-safe lock-screen copy.</li>
+<li>Until push exists, copy states the actual polling/freshness behavior rather than “real time.”</li>
+</ul>
+<h3 id="res-us-017-receive-privacy-safe-assistance">RES-US-017 — Receive privacy-safe assistance</h3>
+<p><strong>As a</strong> resident, <strong>I want</strong> contextual help <strong>so that</strong> I can complete unfamiliar tasks without disclosing unnecessary personal data.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>The assistant names its limits and does not claim to decide eligibility, priority, approval, or emergency response.</li>
+<li>Context sent to external AI is minimized and disclosed; resident name is not injected unless necessary and consented.</li>
+<li>Timeout, quota, moderation, and malformed response have deterministic local help content.</li>
+<li>AI output cannot mutate reports, accounts, or government work without explicit review and authorized endpoints.</li>
+</ul>
+<h3 id="res-us-018-complete-critical-tasks-inclusively">RES-US-018 — Complete critical tasks inclusively</h3>
+<p><strong>As a</strong> resident using any supported language, theme, device, input, or network condition, <strong>I want</strong> functional parity <strong>so that</strong> presentation does not determine access.</p>
+<p>Acceptance criteria:</p>
+<ul>
+<li>Registration, verification, sign-in, recovery, reporting, tracking, and closeout pass WCAG 2.2 AA and manual keyboard/screen-reader testing.</li>
+<li>English and Filipino provide complete behavior/copy parity and correct document language.</li>
+<li>Light/dark/system themes preserve contrast, boundaries, map meaning, status meaning, and reduced-motion preference.</li>
+<li>Critical tasks reflow at 320 CSS px and 200% zoom without essential horizontal scrolling.</li>
+<li>Offline/background interruption preserves drafts and never represents mock data as live civic truth.</li>
+</ul>
+<h2 id="7-resident-endpoint-contract">7. Resident endpoint contract</h2>
+<p>Common current outcomes: malformed body/query is normally <code>422</code>; invalid bearer is <code>401</code>; role/ownership denial is <code>403</code>; absent object is <code>404</code>. Target APIs should use one structured error envelope and explicit <code>409</code> for state or concurrency conflict.</p>
+<h3 id="platform-identity-and-account">Platform, identity, and account</h3>
+<table>
+<thead>
+<tr>
+<th>Method and path</th>
+<th>Access</th>
+<th>Current purpose</th>
+<th>Contract state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>API status</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>GET /api/health</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Service health</td>
+<td>Implemented; needs dependency/readiness split</td>
+</tr>
+<tr>
+<td><code>GET /api/download/resident-app</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Resident APK</td>
+<td>Implemented if artifact exists</td>
+</tr>
+<tr>
+<td><code>GET /api/geo/caloocan-border</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Map boundary GeoJSON</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>GET /api/system/ip</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Local network IP for download links</td>
+<td>Implemented; production exposure decision required</td>
+</tr>
+<tr>
+<td><code>POST /api/verify-residency</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>ID OCR and jurisdiction gate</td>
+<td>Observed risk: sensitive/costly unauthenticated upload</td>
+</tr>
+<tr>
+<td><code>POST /api/auth/register</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Create unverified resident</td>
+<td>Partial; account commits before mail success</td>
+</tr>
+<tr>
+<td><code>POST /api/auth/verify-registration</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Verify email OTP</td>
+<td>Partial; no expiry/attempt controls</td>
+</tr>
+<tr>
+<td><code>POST /api/auth/resend-code</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Replace/send OTP</td>
+<td>Partial; no backend cooldown</td>
+</tr>
+<tr>
+<td><code>POST /api/auth/login</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>OAuth form sign-in</td>
+<td>Observed risk: <code>mobile_bypass</code> and stale account state</td>
+</tr>
+<tr>
+<td><code>POST /api/auth/forgot-password</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Create/send reset code</td>
+<td>Implemented with enumeration nuance</td>
+</tr>
+<tr>
+<td><code>POST /api/auth/verify-reset-code</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Validate reset code</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>POST /api/auth/reset-password</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Consume code and update password</td>
+<td>Implemented; session revocation absent</td>
+</tr>
+<tr>
+<td><code>GET /api/auth/verify-token/{token}</code></td>
+<td>—</td>
+<td>Called by <code>/reset-password</code></td>
+<td><strong>UI-contract gap: route does not exist</strong></td>
+</tr>
+<tr>
+<td><code>GET /api/me</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Resolve current identity</td>
+<td>Implemented; must enforce active state</td>
+</tr>
+<tr>
+<td><code>GET /api/users/{user_id}</code></td>
+<td>Bearer/self or official</td>
+<td>Fetch profile</td>
+<td>Observed cross-namespace ambiguity</td>
+</tr>
+<tr>
+<td><code>PATCH /api/users/{user_id}</code></td>
+<td>Bearer/self</td>
+<td>Update profile</td>
+<td><strong>P0 cross-namespace mutation risk</strong></td>
+</tr>
+<tr>
+<td><code>PATCH /api/auth/change-password</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Change current password</td>
+<td>Implemented; password/session policy incomplete</td>
+</tr>
+</tbody>
+</table>
+<h3 id="reports-location-and-closeout">Reports, location, and closeout</h3>
+<table>
+<thead>
+<tr>
+<th>Method and path</th>
+<th>Access</th>
+<th>Current purpose</th>
+<th>Contract state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /api/reports/analyze</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>AI preflight over description/evidence</td>
+<td>Implemented; no file hardening/manual fallback contract</td>
+</tr>
+<tr>
+<td><code>POST /api/reports</code></td>
+<td>Bearer, not resident-only</td>
+<td>Submit multipart report</td>
+<td>Implemented/risky; official IDs can enter <code>resident_id</code></td>
+</tr>
+<tr>
+<td><code>GET /api/reports/user/{user_id}</code></td>
+<td>Owner or official role</td>
+<td>List resident reports</td>
+<td>Implemented; owner namespace risk</td>
+</tr>
+<tr>
+<td><code>GET /api/reports/public</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Public-safe nearby reports</td>
+<td>Implemented; status/public-location policy incomplete</td>
+</tr>
+<tr>
+<td><code>GET /api/reports/{report_id}</code></td>
+<td>Bearer; resident owner</td>
+<td>Read report</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>GET /api/reports/{report_id}/timeline</code></td>
+<td>Bearer; resident owner gets public entries</td>
+<td>Read lifecycle</td>
+<td>Implemented; first entry may not commit</td>
+</tr>
+<tr>
+<td><code>POST</code> and <code>PATCH /api/reports/{report_id}/cancel</code></td>
+<td>Owner or authorized official</td>
+<td>Retract eligible report</td>
+<td>Implemented/risky actor namespace</td>
+</tr>
+<tr>
+<td><code>POST /api/reports/{report_id}/confirm</code></td>
+<td>Resident owner</td>
+<td>Rate and close</td>
+<td>Backend-only; missing state/rating/idempotency guards</td>
+</tr>
+<tr>
+<td><code>GET /api/geocode/reverse</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Coordinates to address</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>GET /api/geocode/search</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Address/place search</td>
+<td>Backend-only for current resident web</td>
+</tr>
+<tr>
+<td><code>GET /api/maps/directions</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Route lookup</td>
+<td>Shared/primarily operations</td>
+</tr>
+</tbody>
+</table>
+<h3 id="verification-updates-and-assistance">Verification, updates, and assistance</h3>
+<table>
+<thead>
+<tr>
+<th>Method and path</th>
+<th>Access</th>
+<th>Current purpose</th>
+<th>Contract state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /api/residents/kyc-status</code></td>
+<td>Resident</td>
+<td>View tier/trust</td>
+<td><span class="badge badge-backend">Backend-only</span></td>
+</tr>
+<tr>
+<td><code>POST /api/residents/upgrade-kyc</code></td>
+<td>Resident</td>
+<td>OCR-based KYC upgrade</td>
+<td>Backend-only; audit commit defect</td>
+</tr>
+<tr>
+<td><code>GET /api/advisories</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Read city advisories</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>GET /api/notifications/user/{user_id}</code></td>
+<td>Self</td>
+<td>List notifications</td>
+<td>Implemented; hidden filter defect</td>
+</tr>
+<tr>
+<td><code>PATCH /api/notifications/user/{user_id}/read</code></td>
+<td>Self</td>
+<td>Mark all read</td>
+<td>Implemented backend</td>
+</tr>
+<tr>
+<td><code>POST /api/notifications/user/{user_id}/read-all</code></td>
+<td>—</td>
+<td>Current web mark-all call</td>
+<td><strong>UI-contract gap: wrong method and path</strong></td>
+</tr>
+<tr>
+<td><code>PATCH /api/notifications/{notification_id}/read</code></td>
+<td>Owner</td>
+<td>Mark one read</td>
+<td><span class="badge badge-implemented">Implemented</span></td>
+</tr>
+<tr>
+<td><code>DELETE /api/notifications/{notification_id}</code></td>
+<td>Owner</td>
+<td>Dismiss notification</td>
+<td>Implemented as soft hide; retrieval ignores hide</td>
+</tr>
+<tr>
+<td><code>POST /api/ai/assistant</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Contextual AI help</td>
+<td>Implemented; privacy/degraded-mode decision required</td>
+</tr>
+</tbody>
+</table>
+<h3 id="resident-mobile-drift-that-contract-tests-must-close">Resident mobile drift that contract tests must close</h3>
+<p>Current mobile code advertises or calls nonexistent/wrong contracts for token refresh, PCN verification, notifications, profile update, password method, report list authentication, and map data. It also falls back to mock civic records and stores/logs sensitive session data. Mobile is not considered parity-complete until it passes the same endpoint fixtures and lifecycle tests as web.</p>
+<h2 id="8-resident-qa-strategy">8. Resident QA strategy</h2>
+<h3 id="test-layers">Test layers</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Required coverage</th>
+<th>Exit evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Schema/unit</td>
+<td>field rules, enum/state adjacency, rating bounds, ownership subject, trust calculations</td>
+<td>deterministic unit suite with boundary partitions</td>
+</tr>
+<tr>
+<td>API contract</td>
+<td>method/path/body/response/error/pagination/idempotency for web and mobile</td>
+<td>OpenAPI snapshot + generated/manual consumer contract suite</td>
+</tr>
+<tr>
+<td>Data integration</td>
+<td>transactions, FKs, unique identity, outbox, retention, audit/timeline side effects</td>
+<td>isolated database tests with rollback and concurrency</td>
+</tr>
+<tr>
+<td>Service integration</td>
+<td>SMTP, OCR, PhilSys, Maps, AI, storage</td>
+<td>stubs plus provider sandbox; timeout/quota/malformed cases</td>
+</tr>
+<tr>
+<td>Frontend component</td>
+<td>loading/empty/error/offline, validation, focus, theme, locale</td>
+<td>component fixtures and accessibility assertions</td>
+</tr>
+<tr>
+<td>End-to-end</td>
+<td>register, verify, recover, submit, track, retract, resolve feedback</td>
+<td>browser/device matrix with API and DB assertions</td>
+</tr>
+<tr>
+<td>Security/privacy</td>
+<td>BOLA/IDOR, token revocation, upload abuse, XSS, PII logs/exports</td>
+<td>threat-model cases and approved evidence report</td>
+</tr>
+<tr>
+<td>Accessibility</td>
+<td>keyboard, screen reader, zoom/reflow, contrast, errors, motion</td>
+<td>automated scan plus manual assistive-technology record</td>
+</tr>
+<tr>
+<td>Performance/resilience</td>
+<td>low-end device, slow network, retry/replay, provider outage</td>
+<td>agreed budgets and recovery measurements</td>
+</tr>
+<tr>
+<td>UAT</td>
+<td>real resident cohorts and assisted-service staff</td>
+<td>signed scenario outcomes and accepted residual risk</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mandatory-negative-and-boundary-suite">Mandatory negative and boundary suite</h3>
+<ul>
+<li>Missing, malformed, expired, revoked, inactive, unverified, and wrong-role sessions.</li>
+<li>Resident A attempting Resident B and Official B profile/report/notification/document IDs.</li>
+<li>Minimum/maximum/invalid field lengths, Unicode Filipino names, duplicate email, and normalized barangay variants.</li>
+<li>OTP expiry, replay, resend flood, attempt exhaustion, mail outage, and two-device race.</li>
+<li>GPS denied, inaccurate coordinates, boundary edge, geocoder outage, and manual location.</li>
+<li>Empty, oversized, MIME-spoofed, polyglot, corrupted, malicious, metadata-heavy, and duplicate files.</li>
+<li>AI timeout, quota, unsafe false positive, low confidence, malformed output, and manual-review continuation.</li>
+<li>Concurrent duplicate submissions, lost response, replay, cancellation-versus-dispatch race, and repeat confirmation.</li>
+<li>Notification optimistic update failure, hidden record refresh, polling staleness, and deep-link ownership.</li>
+<li>320 px/200% zoom, keyboard-only, screen reader, reduced motion, high contrast, light/dark, English/Filipino.</li>
+</ul>
+<h2 id="9-resident-sdlc">9. Resident SDLC</h2>
+<p>The SDLC governs future implementation; it does not authorize code changes now.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Required activities</th>
+<th>Controlled outputs</th>
+<th>Exit gate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0. Governance and safety</td>
+<td>Name product, resident service, security, privacy, accessibility, localization, backend, QA, and operations owners; classify data; decide manual-review/appeal</td>
+<td>RACI, data inventory, threat model, decision log</td>
+<td>P0 owners and decision dates assigned</td>
+</tr>
+<tr>
+<td>1. Discovery</td>
+<td>Observe resident/support journeys; validate cohorts, constraints, current metrics, support logs, provider failure</td>
+<td>research findings, journey/service blueprint, baseline measures</td>
+<td>Problems and outcomes signed by product/operations</td>
+</tr>
+<tr>
+<td>2. Requirements</td>
+<td>Approve stories, lifecycle enum/adjacency, actor permissions, NFRs, analytics/privacy</td>
+<td>baselined backlog, acceptance matrix, RTM</td>
+<td>Every P0 story has measurable acceptance and owner</td>
+</tr>
+<tr>
+<td>3. Experience/design</td>
+<td>Prototype light/dark, EN/FIL, responsive, offline/error/manual-review states; conduct usability/accessibility review</td>
+<td>Figma flows, content matrix, component/state specs</td>
+<td>Critical-task prototype success and accessibility review pass</td>
+</tr>
+<tr>
+<td>4. API/data design</td>
+<td>Version endpoints; unique subject model; idempotency; errors; outbox; retention; secure storage; migrations</td>
+<td>OpenAPI contract, ERD, state diagrams, ADRs, migration/rollback plan</td>
+<td>Consumer/provider contract approved; privacy/security sign-off</td>
+</tr>
+<tr>
+<td>5. Test design</td>
+<td>Create traceability, fixtures, role/ownership matrix, boundary/security/accessibility suites</td>
+<td>test plan, data factory, mocks, environment matrix</td>
+<td>No P0 acceptance criterion lacks a test</td>
+</tr>
+<tr>
+<td>6. Implementation</td>
+<td>Future vertical slices behind flags; characterize current behavior before replacement</td>
+<td>reviewed changes, unit/contract tests, observability</td>
+<td>Changed-scope tests pass; no unreviewed contract drift</td>
+</tr>
+<tr>
+<td>7. Integration and system QA</td>
+<td>Run full API/data/provider/browser/mobile/resilience/security suites</td>
+<td>defect reports, evidence pack, release candidate</td>
+<td>Zero open P0/P1; agreed P2 disposition</td>
+</tr>
+<tr>
+<td>8. UAT and operational readiness</td>
+<td>Resident cohort UAT; support runbooks; content/legal review; migration rehearsal</td>
+<td>signed UAT, training, runbooks, go/no-go record</td>
+<td>Service owner, QA, security/privacy, accessibility approve</td>
+</tr>
+<tr>
+<td>9. Release</td>
+<td>Staged cohort, feature flags, backups, dashboards, rollback rehearsal</td>
+<td>deployment record, smoke evidence, change notice</td>
+<td>SLOs and guardrails stable through observation window</td>
+</tr>
+<tr>
+<td>10. Operate and improve</td>
+<td>Monitor funnels/errors/dwell/duplicates/complaints; incident response; retrospectives</td>
+<td>service review, incident RCA, prioritized improvements</td>
+<td>Monthly/quarterly governance decision</td>
+</tr>
+<tr>
+<td>11. Retirement</td>
+<td>Export/retention/legal review, resident notice, token/key and storage cleanup</td>
+<td>retirement plan and deletion evidence</td>
+<td>Records/privacy owners approve closure</td>
+</tr>
+</tbody>
+</table>
+<h3 id="resident-delivery-accountability">Resident delivery accountability</h3>
+<table>
+<thead>
+<tr>
+<th>Owner</th>
+<th>Accountable for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Resident product/service owner</td>
+<td>outcomes, backlog, policy decisions, go/no-go</td>
+</tr>
+<tr>
+<td>Resident operations/support</td>
+<td>actual service process, assisted review, resident communications, UAT</td>
+</tr>
+<tr>
+<td>Design/content/research</td>
+<td>validated flows, Figma states, English/Filipino content, usability evidence</td>
+</tr>
+<tr>
+<td>Frontend/mobile</td>
+<td>contract-compliant, accessible, resilient client behavior</td>
+</tr>
+<tr>
+<td>Backend/data/platform</td>
+<td>identity, authorization, API/state/transaction/storage/migration truth</td>
+</tr>
+<tr>
+<td>QA lead</td>
+<td>traceability, independent evidence, defect decision, release recommendation</td>
+</tr>
+<tr>
+<td>Security/privacy/records</td>
+<td>threat/privacy review, access, retention, audit, incident requirements</td>
+</tr>
+<tr>
+<td>Accessibility/localization</td>
+<td>WCAG and language-parity acceptance</td>
+</tr>
+<tr>
+<td>Operations/on-call</td>
+<td>environments, deployment, observability, rollback, incident response</td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-environments-and-test-data">10. Environments and test data</h2>
+<table>
+<thead>
+<tr>
+<th>Environment</th>
+<th>Purpose</th>
+<th>Data rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Local/component</td>
+<td>Fast deterministic UI/unit work</td>
+<td>synthetic only; providers stubbed</td>
+</tr>
+<tr>
+<td>API integration</td>
+<td>Transactions, migrations, authorization, files</td>
+<td>isolated disposable DB and storage</td>
+</tr>
+<tr>
+<td>QA</td>
+<td>Full web/mobile/provider scenarios</td>
+<td>synthetic identities; sandbox providers; no production ID images</td>
+</tr>
+<tr>
+<td>Staging/UAT</td>
+<td>Release-like validation and staff/resident UAT</td>
+<td>controlled consented test cohort or synthetic records</td>
+</tr>
+<tr>
+<td>Production</td>
+<td>Staged release and monitoring</td>
+<td>least privilege; no test accounts with broad access unless governed</td>
+</tr>
+</tbody>
+</table>
+<p>Required data dimensions include each lifecycle state, each identity/KYC state, every ownership boundary, boundary/near-boundary locations, Filipino/Unicode/long text, supported/hostile files, duplicate/concurrent cases, and both themes/locales.</p>
+<h2 id="11-definition-of-ready">11. Definition of Ready</h2>
+<p>A resident implementation item is ready only when it has:</p>
+<ul>
+<li>linked story ID, user job, route/screen, owner, priority, and measurable outcome;</li>
+<li>current behavior and target behavior explicitly separated;</li>
+<li>approved endpoint/schema/error/state/permission contract;</li>
+<li>all loading, empty, partial, offline, denied, expired, validation, success, and recovery states;</li>
+<li>light/dark, responsive, English/Filipino, accessibility, privacy, analytics, and retention notes;</li>
+<li>test data, automated/manual acceptance, rollout flag, telemetry, and rollback;</li>
+<li>no unresolved P0 dependency or policy question.</li>
+</ul>
+<h2 id="12-definition-of-done-and-release-gates">12. Definition of Done and release gates</h2>
+<p>A resident story is done only when:</p>
+<ul>
+<li>every acceptance criterion is traceable to passing test evidence;</li>
+<li>backend authorization rejects all cross-subject and wrong-role cases;</li>
+<li>state transition and all side effects are atomic, ordered, idempotent, and observable;</li>
+<li>no sensitive file or data is publicly addressable or unnecessarily logged;</li>
+<li>web and supported mobile clients pass the same contract fixtures;</li>
+<li>critical tasks pass accessibility, EN/FIL, light/dark, reflow, low-network, and recovery tests;</li>
+<li>metrics, alerts, support content, runbooks, migration, rollback, and residual-risk approval exist;</li>
+<li>QA, product/service owner, backend, frontend/mobile, security/privacy, accessibility, and operations sign off.</li>
+</ul>
+<h3 id="automatic-no-go-conditions">Automatic no-go conditions</h3>
+<ul>
+<li>Any cross-user/cross-account access or modification.</li>
+<li>Any inactive/revoked session accessing protected data.</li>
+<li>Any illegal lifecycle jump or closure without required evidence.</li>
+<li>Report/account/evidence loss, duplicate ticket from replay, or false “success.”</li>
+<li>Public access to restricted identity, location, evidence, or documents.</li>
+<li>Broken registration, verification, recovery, submission, tracking, or closeout route.</li>
+<li>Critical task blocked for keyboard/screen-reader users or missing English/Filipino functional parity.</li>
+<li>Mobile/mock data presented as current city truth.</li>
+</ul>
+<h2 id="13-current-resident-release-blocking-defect-register">13. Current resident release-blocking defect register</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th style="text-align: right;">Severity</th>
+<th>Current defect</th>
+<th>Required proof of closure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RES-BLK-001</td>
+<td style="text-align: right;">P0</td>
+<td>A resident and official can share a numeric ID; profile PATCH resolves the official first</td>
+<td>Global-subject migration plus cross-account read/write suite</td>
+</tr>
+<tr>
+<td>RES-BLK-002</td>
+<td style="text-align: right;">P0</td>
+<td>Inactive residents and previously issued sessions are not rejected consistently</td>
+<td>Login and every protected-route revocation tests</td>
+</tr>
+<tr>
+<td>RES-BLK-003</td>
+<td style="text-align: right;">P0</td>
+<td>Generic report status and resident confirmation bypass lifecycle/rating/idempotency</td>
+<td>Central transition tests and repeat-confirm concurrency test</td>
+</tr>
+<tr>
+<td>RES-BLK-004</td>
+<td style="text-align: right;">P0</td>
+<td>Identity/report/resolution files lack complete server validation and uploads are publicly mounted</td>
+<td>Adversarial upload suite and direct-URL denial</td>
+</tr>
+<tr>
+<td>RES-BLK-005</td>
+<td style="text-align: right;">P1</td>
+<td><code>/reset-password</code> calls a nonexistent token route and sends the wrong reset payload</td>
+<td>Shared web/mobile recovery contract E2E</td>
+</tr>
+<tr>
+<td>RES-BLK-006</td>
+<td style="text-align: right;">P1</td>
+<td>Mark-all uses the wrong method/path; dismiss retrieval ignores <code>is_hidden</code>; one notification delete path uses an undefined token</td>
+<td>Notification contract/component/refresh/session tests</td>
+</tr>
+<tr>
+<td>RES-BLK-007</td>
+<td style="text-align: right;">P1</td>
+<td>Registration sends textual barangay/role fields absent from <code>ResidentCreate</code>; normalized barangay is lost</td>
+<td>Web/mobile/schema/persistence fixture</td>
+</tr>
+<tr>
+<td>RES-BLK-008</td>
+<td style="text-align: right;">P1</td>
+<td>Exact location description is shown in the form but omitted from report submission</td>
+<td>Field→review→request→DB→government/resident detail test</td>
+</tr>
+<tr>
+<td>RES-BLK-009</td>
+<td style="text-align: right;">P1</td>
+<td>Initial report timeline and KYC audit are appended after commit without a final commit</td>
+<td>Atomic transaction and rollback/retry tests</td>
+</tr>
+<tr>
+<td>RES-BLK-010</td>
+<td style="text-align: right;">P1</td>
+<td>AI analysis failure blocks resident submission rather than degrading to human review</td>
+<td>Provider-outage E2E with preserved draft</td>
+</tr>
+<tr>
+<td>RES-BLK-011</td>
+<td style="text-align: right;">P1</td>
+<td>Current report-detail handler is not connected from the report list and detail lacks a stable route</td>
+<td>Card/notification/deep-link/reload/back E2E</td>
+</tr>
+<tr>
+<td>RES-BLK-012</td>
+<td style="text-align: right;">P1</td>
+<td>Mobile calls wrong/missing endpoints, accepts CAPTCHA bypass, and can show mock civic data as real</td>
+<td>Shared API fixtures and production no-mock assertion</td>
+</tr>
+<tr>
+<td>RES-BLK-013</td>
+<td style="text-align: right;">P1</td>
+<td>Registration OTP lacks expiry, hashing, attempt limit, and server resend throttle</td>
+<td>OTP security/boundary/race tests</td>
+</tr>
+<tr>
+<td>RES-BLK-014</td>
+<td style="text-align: right;">P1</td>
+<td><code>POST /api/reports</code> accepts any bearer and can write an official ID into <code>resident_id</code></td>
+<td>Resident-only authorization and foreign-key tests</td>
+</tr>
+</tbody>
+</table>
+<h2 id="14-defect-severity-and-service-targets">14. Defect severity and service targets</h2>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Resident impact</th>
+<th>Example</th>
+<th>Release rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="badge badge-p0">P0</span></td>
+<td>Security/privacy breach, data corruption/loss, total critical-path failure, unsafe civic outcome</td>
+<td>IDOR, public ID image, duplicate/false ticket, illegal closure</td>
+<td>Immediate stop; no release</td>
+</tr>
+<tr>
+<td><span class="badge badge-p1">P1</span></td>
+<td>Major task blocked or misleading with no reasonable workaround</td>
+<td>recovery mismatch, inaccessible submit, wrong status</td>
+<td>Must fix before release</td>
+</tr>
+<tr>
+<td><span class="badge badge-p2">P2</span></td>
+<td>Material degradation with a safe workaround</td>
+<td>pagination/filter defect, delayed noncritical update</td>
+<td>Explicit owner/date required</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>Minor copy/visual issue without task or compliance impact</td>
+<td>isolated alignment/copy polish</td>
+<td>May defer with triage</td>
+</tr>
+</tbody>
+</table>
+<p>Initial targets for approval:</p>
+<ul>
+<li>100% success in moderated critical safety/auth/ownership scenarios;</li>
+<li>at least 85% unassisted resident completion for registration, report, and tracking studies;</li>
+<li>zero unrecovered critical accessibility errors;</li>
+<li>p95 API and upload targets measured separately by network class;</li>
+<li>one ticket per idempotent submission operation;</li>
+<li>one timeline, audit, and notification side-effect set per accepted transition.</li>
+</ul>
+<h2 id="15-traceability-template">15. Traceability template</h2>
+<pre><code class="language-text">Story / acceptance ID:
+Resident cohort and job:
+Current route and source evidence:
+Target Figma frame/component/version:
+API method/path/schema/error version:
+Identity/ownership and data classification:
+Source state → target state:
+Transaction, idempotency and concurrency rule:
+Web/mobile/light/dark/EN/FIL behavior:
+Accessibility and resilience checks:
+Automated tests and manual evidence:
+Telemetry/SLO/alert:
+Rollout flag and rollback:
+Owner, reviewers, decision record:
+</code></pre>
+<h2 id="16-required-decisions-before-resident-implementation">16. Required decisions before resident implementation</h2>
+<ol>
+<li>Approve one global identity/actor model and migration away from colliding resident/official IDs.</li>
+<li>Approve the canonical report state machine, exceptional states, and resident vocabulary.</li>
+<li>Approve identity/evidence retention, secure storage, PhilSys/OCR access, and manual-review/appeal policy.</li>
+<li>Decide the resident Trust/KYC policy, explanation, correction, appeal, and whether it affects service priority.</li>
+<li>Approve idempotency/offline draft and reconciliation behavior for web and mobile.</li>
+<li>Approve one versioned endpoint contract and parity plan for web/mobile.</li>
+<li>Confirm resident English/Filipino parity, assisted-service owner, and accessibility acceptance team.</li>
+<li>Decide notification delivery channels and describe polling honestly until push infrastructure exists.</li>
+</ol>
+<p>Related documents: <a href="./04-resident-experience-spec.md">resident experience specification</a>, <a href="./02-experience-framework.md">experience framework</a>, <a href="./06-implementation-plan.md">implementation plan</a>, and <a href="./14-end-to-end-system-lifecycle-and-api-contract.md">integrated lifecycle/API contract</a>.</p>
+    </div>
+</body>
+</html>

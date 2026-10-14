@@ -11,8 +11,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
     AlertTriangle, CheckCircle2, Clock, ChevronRight, ChevronDown,
     GitBranch, Building2, PackageCheck, ShieldCheck, BarChart2,
@@ -20,8 +20,17 @@ import {
     ClipboardList, ArrowRight, Plus, Bell, Map, FileCheck,
     TrendingUp, UserCog, BookOpen, Truck, RefreshCw, XCircle,
     CircleDot, AlertCircle, CheckSquare, Brain
-} from 'lucide-react';
+} from '../icons';
 import GovSidebar from '../components/GovSidebar';
+import GovBreadcrumb from '../components/GovBreadcrumb';
+import GovSystemBanner from '../components/GovSystemBanner';
+import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import './position-dashboard.css';
+import { useTheme } from '../contexts/ThemeContext';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
+import Spline from '@splinetool/react-spline';
 
 import { API_BASE_URL } from '../utils/apiBase';
 
@@ -32,8 +41,8 @@ const ROLE_CONFIG = {
     city_engineer: {
         label: 'City Engineer',
         division: 'Executive Leadership',
-        color: 'blue',
-        gradient: 'from-blue-600 to-indigo-700',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Oversees all operations of the City Engineering Office. Signs off on all major approvals.',
         myActions: [
             { label: 'Projects Pending Your Approval', endpoint: '/api/gov/projects?status=approved_by_city_engineer', icon: Map, urgency: 'high', action: 'Approve' },
@@ -42,11 +51,11 @@ const ROLE_CONFIG = {
             { label: 'OBO Permits to Issue', endpoint: '/api/gov/obo?status=inspection_complete', icon: ShieldCheck, urgency: 'medium', action: 'Issue Permit' },
         ],
         workflow: [
-            { step: 'Review Division Chief recommendations', color: 'blue' },
-            { step: 'Approve project designs & BoQ budgets', color: 'blue' },
-            { step: 'Sign procurement requests (RA 9184)', color: 'indigo' },
-            { step: 'Issue Building Permits (OBO)', color: 'indigo' },
-            { step: 'Sign Certificates of Completion', color: 'green' },
+            { step: 'Review Division Chief recommendations', color: 'orange' },
+            { step: 'Approve project designs & BoQ budgets', color: 'orange' },
+            { step: 'Sign procurement requests (RA 9184)', color: 'orange' },
+            { step: 'Issue Building Permits (OBO)', color: 'orange' },
+            { step: 'Sign Certificates of Completion', color: 'orange' },
         ],
         quickActions: [
             { label: 'Intelligence Analytics', to: '/gov/analytics', icon: Brain },
@@ -59,8 +68,8 @@ const ROLE_CONFIG = {
     asst_city_engineer: {
         label: 'Assistant City Engineer',
         division: 'Executive Leadership',
-        color: 'indigo',
-        gradient: 'from-indigo-600 to-blue-700',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Assists the City Engineer in day-to-day operations. Reviews project phases and issues Certificates of Completion.',
         myActions: [
             { label: 'New Project Requests to Review (Phase 1)', endpoint: '/api/gov/projects?status=request_received', icon: Map, urgency: 'high', action: 'Accept/Reject' },
@@ -68,11 +77,11 @@ const ROLE_CONFIG = {
             { label: 'Work Orders Pending Dispatch Approval', endpoint: '/api/gov/work-orders?status=open', icon: GitBranch, urgency: 'medium', action: 'Approve Dispatch' },
         ],
         workflow: [
-            { step: 'Receive & review project requests (Phase 1)', color: 'indigo' },
-            { step: 'Accept project requests → forward to survey', color: 'indigo' },
-            { step: 'Monitor project phase progress', color: 'blue' },
-            { step: 'Review completion report from Project Engineer', color: 'blue' },
-            { step: 'Issue Certificate of Completion (CoC, Phase 6)', color: 'green' },
+            { step: 'Receive & review project requests (Phase 1)', color: 'orange' },
+            { step: 'Accept project requests → forward to survey', color: 'orange' },
+            { step: 'Monitor project phase progress', color: 'orange' },
+            { step: 'Review completion report from Project Engineer', color: 'orange' },
+            { step: 'Issue Certificate of Completion (CoC, Phase 6)', color: 'orange' },
         ],
         quickActions: [
             { label: 'Intelligence Analytics', to: '/gov/analytics', icon: Brain },
@@ -85,8 +94,8 @@ const ROLE_CONFIG = {
     admin_officer: {
         label: 'Administrative Officer V',
         division: 'Administrative Division',
-        color: 'purple',
-        gradient: 'from-purple-600 to-purple-800',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Manages the office budget, HR, and validates procurement requests before forwarding to the City Engineer.',
         myActions: [
             { label: 'Procurement Requests to Validate', endpoint: '/api/gov/procurement?status=submitted', icon: PackageCheck, urgency: 'high', action: 'Validate' },
@@ -94,11 +103,11 @@ const ROLE_CONFIG = {
             { label: 'Posts for Advisory Approval', endpoint: null, icon: Megaphone, urgency: 'low', action: 'Review' },
         ],
         workflow: [
-            { step: 'Receive BoQ/Estimates from Project Engineer', color: 'purple' },
-            { step: 'Check budget availability (PPAS/AIP)', color: 'purple' },
-            { step: 'Validate Procurement Request letter', color: 'indigo' },
-            { step: 'Forward validated PR to City Engineer for signature', color: 'indigo' },
-            { step: 'Process internal procurement if below threshold', color: 'green' },
+            { step: 'Receive BoQ/Estimates from Project Engineer', color: 'orange' },
+            { step: 'Check budget availability (PPAS/AIP)', color: 'orange' },
+            { step: 'Validate Procurement Request letter', color: 'orange' },
+            { step: 'Forward validated PR to City Engineer for signature', color: 'orange' },
+            { step: 'Process internal procurement if below threshold', color: 'orange' },
         ],
         quickActions: [
             { label: 'Procurement Requests', to: '/gov/procurement', icon: PackageCheck },
@@ -111,7 +120,7 @@ const ROLE_CONFIG = {
         label: 'Administrative Clerk (Dispatcher)',
         division: 'Administrative Division',
         color: 'orange',
-        gradient: 'from-orange-500 to-orange-700',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'First responder in the command center. Monitors, verifies, and triages all incoming citizen reports.',
         myActions: [
             { label: 'Unverified Reports to Triage', endpoint: '/api/reports?status=unverified', icon: AlertTriangle, urgency: 'high', action: 'Verify / Reject' },
@@ -121,9 +130,9 @@ const ROLE_CONFIG = {
         workflow: [
             { step: 'Monitor incoming citizen reports (live feed)', color: 'orange' },
             { step: 'Verify authenticity (photos, location, AI score)', color: 'orange' },
-            { step: 'Reject spam OR forward to Division Chief queue', color: 'red' },
+            { step: 'Reject spam OR forward to Division Chief queue', color: 'orange' },
             { step: 'Log OBO applications & assign tracking number', color: 'orange' },
-            { step: 'Assist in dispatching approved work orders', color: 'blue' },
+            { step: 'Assist in dispatching approved work orders', color: 'orange' },
         ],
         quickActions: [
             { label: 'Command Center', to: '/dispatcher', icon: AlertTriangle },
@@ -135,19 +144,19 @@ const ROLE_CONFIG = {
     records_officer: {
         label: 'Records Officer',
         division: 'Administrative Division',
-        color: 'teal',
-        gradient: 'from-teal-500 to-teal-700',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Maintains all official documents of the City Engineering Office and manages the OBO permit application registry.',
         myActions: [
             { label: 'OBO Applications to Schedule', endpoint: '/api/gov/obo?status=application_received', icon: ShieldCheck, urgency: 'high', action: 'Schedule Inspection' },
             { label: 'Completed Inspections to Archive', endpoint: '/api/gov/obo?status=inspection_complete', icon: FileCheck, urgency: 'medium', action: 'Archive' },
         ],
         workflow: [
-            { step: 'Receive OBO permit applications from window/online', color: 'teal' },
-            { step: 'Assign OBO tracking number & log in registry', color: 'teal' },
-            { step: 'Schedule inspection → assign correct inspector', color: 'teal' },
-            { step: 'Receive inspector\'s report → update registry', color: 'blue' },
-            { step: 'Archive completed/issued permits', color: 'green' },
+            { step: 'Receive OBO permit applications from window/online', color: 'orange' },
+            { step: 'Assign OBO tracking number & log in registry', color: 'orange' },
+            { step: 'Schedule inspection → assign correct inspector', color: 'orange' },
+            { step: 'Receive inspector\'s report → update registry', color: 'orange' },
+            { step: 'Archive completed/issued permits', color: 'orange' },
         ],
         quickActions: [
             { label: 'OBO Registry', to: '/gov/obo', icon: ShieldCheck },
@@ -159,8 +168,8 @@ const ROLE_CONFIG = {
     division_chief: {
         label: 'Division Chief',
         division: 'Division Management',
-        color: 'slate',
-        gradient: 'from-slate-600 to-slate-800',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Manages division operations and is the key approval node between field engineers and executive leadership.',
         myActions: [
             { label: 'Verified Reports Awaiting WO Creation', endpoint: '/api/reports?status=pending_approval', icon: AlertTriangle, urgency: 'high', action: 'Create Work Order' },
@@ -168,11 +177,11 @@ const ROLE_CONFIG = {
             { label: 'Work Orders to Assign', endpoint: '/api/gov/work-orders?status=open', icon: GitBranch, urgency: 'high', action: 'Assign Engineer' },
         ],
         workflow: [
-            { step: 'Review verified reports from Admin Clerk', color: 'slate' },
-            { step: 'Create Work Order → assign to Project Engineer', color: 'slate' },
-            { step: 'Monitor project phase transitions', color: 'blue' },
-            { step: 'Review designs from Design Engineer', color: 'indigo' },
-            { step: 'Recommend approval to City Engineer', color: 'green' },
+            { step: 'Review verified reports from Admin Clerk', color: 'orange' },
+            { step: 'Create Work Order → assign to Project Engineer', color: 'orange' },
+            { step: 'Monitor project phase transitions', color: 'orange' },
+            { step: 'Review designs from Design Engineer', color: 'orange' },
+            { step: 'Recommend approval to City Engineer', color: 'orange' },
         ],
         quickActions: [
             { label: 'Command Center', to: '/dispatcher', icon: AlertTriangle },
@@ -184,19 +193,19 @@ const ROLE_CONFIG = {
     design_engineer: {
         label: 'Design Engineer',
         division: 'Design & Planning Division',
-        color: 'blue',
-        gradient: 'from-blue-500 to-blue-700',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Creates engineering plans and designs for all LGU infrastructure projects in Phase 3.',
         myActions: [
             { label: 'Projects Awaiting Design (Phase 3)', endpoint: '/api/gov/projects?status=survey_complete', icon: Ruler, urgency: 'high', action: 'Start Design' },
             { label: 'Designs to Submit for Review', endpoint: '/api/gov/projects?status=design_in_progress', icon: Map, urgency: 'medium', action: 'Submit Design' },
         ],
         workflow: [
-            { step: 'Receive survey report from Project Engineer', color: 'blue' },
-            { step: 'Create engineering plans & technical drawings', color: 'blue' },
-            { step: 'Coordinate with CAD Operator for drafting', color: 'blue' },
-            { step: 'Submit completed design to Division Chief', color: 'indigo' },
-            { step: 'Revise per Division Chief / City Engineer feedback', color: 'green' },
+            { step: 'Receive survey report from Project Engineer', color: 'orange' },
+            { step: 'Create engineering plans & technical drawings', color: 'orange' },
+            { step: 'Coordinate with CAD Operator for drafting', color: 'orange' },
+            { step: 'Submit completed design to Division Chief', color: 'orange' },
+            { step: 'Revise per Division Chief / City Engineer feedback', color: 'orange' },
         ],
         quickActions: [
             { label: 'Design Requests', to: '/gov/design-requests', icon: Ruler },
@@ -207,17 +216,17 @@ const ROLE_CONFIG = {
     cad_operator: {
         label: 'CAD Operator',
         division: 'Design & Planning Division',
-        color: 'cyan',
-        gradient: 'from-cyan-500 to-blue-600',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Produces technical drawings and CAD files based on designs from the Design Engineer.',
         myActions: [
             { label: 'Design Tasks Assigned to You', endpoint: '/api/gov/projects?status=design_in_progress', icon: Ruler, urgency: 'high', action: 'Work on Drawing' },
         ],
         workflow: [
-            { step: 'Receive design brief from Design Engineer', color: 'cyan' },
-            { step: 'Produce AutoCAD / technical drawings', color: 'cyan' },
-            { step: 'Submit drawings for Design Engineer review', color: 'blue' },
-            { step: 'Revise per feedback', color: 'blue' },
+            { step: 'Receive design brief from Design Engineer', color: 'orange' },
+            { step: 'Produce AutoCAD / technical drawings', color: 'orange' },
+            { step: 'Submit drawings for Design Engineer review', color: 'orange' },
+            { step: 'Revise per feedback', color: 'orange' },
         ],
         quickActions: [
             { label: 'Design Division', to: '/gov/design-requests', icon: Ruler },
@@ -228,8 +237,8 @@ const ROLE_CONFIG = {
     project_engineer: {
         label: 'Project Engineer',
         division: 'Survey / Construction Division',
-        color: 'emerald',
-        gradient: 'from-emerald-500 to-teal-600',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Conducts field surveys (Phase 2), manages active construction (Phase 6), and signs off on work order completion.',
         myActions: [
             { label: 'Projects to Survey (Phase 2)', endpoint: '/api/gov/projects?status=survey_in_progress', icon: Eye, urgency: 'high', action: 'Submit Survey Report' },
@@ -237,11 +246,11 @@ const ROLE_CONFIG = {
             { label: 'Work Orders In Progress', endpoint: '/api/gov/work-orders?status=in_progress', icon: Wrench, urgency: 'medium', action: 'Mark Complete' },
         ],
         workflow: [
-            { step: 'Receive work order assignment from Division Chief', color: 'emerald' },
-            { step: 'Conduct field survey / inspection', color: 'emerald' },
-            { step: 'Coordinate Foreman and Field Workers', color: 'teal' },
-            { step: 'Monitor daily construction progress', color: 'teal' },
-            { step: 'Submit completion report when done', color: 'green' },
+            { step: 'Receive work order assignment from Division Chief', color: 'orange' },
+            { step: 'Conduct field survey / inspection', color: 'orange' },
+            { step: 'Coordinate Foreman and Field Workers', color: 'orange' },
+            { step: 'Monitor daily construction progress', color: 'orange' },
+            { step: 'Submit completion report when done', color: 'orange' },
         ],
         quickActions: [
             { label: 'My Work Orders', to: '/gov/work-orders', icon: GitBranch },
@@ -253,8 +262,8 @@ const ROLE_CONFIG = {
     estimator: {
         label: 'Estimator / Quantity Surveyor',
         division: 'Survey & Estimation Division',
-        color: 'violet',
-        gradient: 'from-violet-500 to-purple-600',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Prepares Bill of Quantities and Procurement Requests for all LGU projects and work orders.',
         myActions: [
             { label: 'Projects Needing BoQ (Phase 4)', endpoint: '/api/gov/projects?status=survey_complete', icon: ClipboardList, urgency: 'high', action: 'Prepare BoQ' },
@@ -262,11 +271,11 @@ const ROLE_CONFIG = {
             { label: 'Submitted PRs Awaiting Validation', endpoint: '/api/gov/procurement?status=submitted', icon: Clock, urgency: 'low', action: 'Track' },
         ],
         workflow: [
-            { step: 'Receive survey report from Project Engineer', color: 'violet' },
-            { step: 'Prepare detailed Bill of Quantities (BoQ)', color: 'violet' },
-            { step: 'Draft Procurement Request letter', color: 'violet' },
-            { step: 'Submit PR to Administrative Officer V for validation', color: 'indigo' },
-            { step: 'Track PR through validation → City Engineer signature', color: 'green' },
+            { step: 'Receive survey report from Project Engineer', color: 'orange' },
+            { step: 'Prepare detailed Bill of Quantities (BoQ)', color: 'orange' },
+            { step: 'Draft Procurement Request letter', color: 'orange' },
+            { step: 'Submit PR to Administrative Officer V for validation', color: 'orange' },
+            { step: 'Track PR through validation → City Engineer signature', color: 'orange' },
         ],
         quickActions: [
             { label: 'My Procurement Requests', to: '/gov/procurement', icon: PackageCheck },
@@ -278,19 +287,19 @@ const ROLE_CONFIG = {
     construction_foreman: {
         label: 'Construction Foreman',
         division: 'Construction Division',
-        color: 'yellow',
-        gradient: 'from-yellow-500 to-orange-600',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Supervises daily construction activities and coordinates field workers on assigned work orders.',
         myActions: [
             { label: 'Active Work Orders Under My Supervision', endpoint: '/api/gov/work-orders?status=in_progress', icon: HardHat, urgency: 'high', action: 'Update Progress' },
             { label: 'Work Orders Assigned to Team', endpoint: '/api/gov/work-orders?status=assigned', icon: GitBranch, urgency: 'high', action: 'Begin Work' },
         ],
         workflow: [
-            { step: 'Receive dispatch from Project Engineer', color: 'yellow' },
-            { step: 'Brief field workers on the work assignment', color: 'yellow' },
+            { step: 'Receive dispatch from Project Engineer', color: 'orange' },
+            { step: 'Brief field workers on the work assignment', color: 'orange' },
             { step: 'Supervise daily construction activities on site', color: 'orange' },
             { step: 'Log daily progress and materials used', color: 'orange' },
-            { step: 'Report completion to Project Engineer', color: 'green' },
+            { step: 'Report completion to Project Engineer', color: 'orange' },
         ],
         quickActions: [
             { label: 'My Work Orders', to: '/gov/work-orders', icon: GitBranch },
@@ -301,16 +310,16 @@ const ROLE_CONFIG = {
     field_worker: {
         label: 'Field Worker / Laborer',
         division: 'Construction Division',
-        color: 'amber',
-        gradient: 'from-amber-500 to-yellow-600',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Executes construction and repair tasks as directed by the Construction Foreman.',
         myActions: [
             { label: 'Tasks Assigned to Me', endpoint: '/api/gov/work-orders?status=in_progress', icon: Wrench, urgency: 'high', action: 'View Details' },
         ],
         workflow: [
-            { step: 'Receive task assignment from Foreman', color: 'amber' },
-            { step: 'Execute assigned construction / repair work', color: 'amber' },
-            { step: 'Report task completion to Foreman', color: 'green' },
+            { step: 'Receive task assignment from Foreman', color: 'orange' },
+            { step: 'Execute assigned construction / repair work', color: 'orange' },
+            { step: 'Report task completion to Foreman', color: 'orange' },
         ],
         quickActions: [
             { label: 'Active Work Orders', to: '/gov/work-orders', icon: GitBranch },
@@ -320,19 +329,19 @@ const ROLE_CONFIG = {
     building_inspector: {
         label: 'Building Inspector',
         division: 'OBO — Office of the Building Official',
-        color: 'teal',
-        gradient: 'from-teal-500 to-cyan-700',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Conducts building structure inspections for permits and milestone inspections on LGU projects.',
         myActions: [
             { label: 'Scheduled Building Inspections', endpoint: '/api/gov/obo?status=inspection_scheduled&inspection_type=building', icon: Building2, urgency: 'high', action: 'Conduct & Report' },
             { label: 'Applications Awaiting Assignment', endpoint: '/api/gov/obo?status=application_received', icon: ShieldCheck, urgency: 'medium', action: 'Accept' },
         ],
         workflow: [
-            { step: 'Receive inspection assignment from Records Officer', color: 'teal' },
-            { step: 'Review permit application documents', color: 'teal' },
-            { step: 'Conduct on-site building inspection', color: 'teal' },
-            { step: 'File inspection report (COMPLIANT / NON-COMPLIANT)', color: 'blue' },
-            { step: 'Division Chief reviews → forward to City Engineer', color: 'green' },
+            { step: 'Receive inspection assignment from Records Officer', color: 'orange' },
+            { step: 'Review permit application documents', color: 'orange' },
+            { step: 'Conduct on-site building inspection', color: 'orange' },
+            { step: 'File inspection report (COMPLIANT / NON-COMPLIANT)', color: 'orange' },
+            { step: 'Division Chief reviews → forward to City Engineer', color: 'orange' },
         ],
         quickActions: [
             { label: 'OBO Inspections', to: '/gov/obo', icon: ShieldCheck },
@@ -343,18 +352,18 @@ const ROLE_CONFIG = {
     electrical_inspector: {
         label: 'Electrical Inspector',
         division: 'OBO — Office of the Building Official',
-        color: 'yellow',
-        gradient: 'from-yellow-500 to-amber-700',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Conducts electrical systems inspections for building permits and compliance.',
         myActions: [
             { label: 'Scheduled Electrical Inspections', endpoint: '/api/gov/obo?status=inspection_scheduled&inspection_type=electrical', icon: Building2, urgency: 'high', action: 'Conduct & Report' },
         ],
         workflow: [
-            { step: 'Receive assignment from Records Officer', color: 'yellow' },
-            { step: 'Review electrical plan/documents', color: 'yellow' },
-            { step: 'Conduct on-site electrical inspection', color: 'yellow' },
+            { step: 'Receive assignment from Records Officer', color: 'orange' },
+            { step: 'Review electrical plan/documents', color: 'orange' },
+            { step: 'Conduct on-site electrical inspection', color: 'orange' },
             { step: 'File findings report', color: 'orange' },
-            { step: 'Division Chief review → City Engineer signs permit', color: 'green' },
+            { step: 'Division Chief review → City Engineer signs permit', color: 'orange' },
         ],
         quickActions: [
             { label: 'OBO Inspections', to: '/gov/obo', icon: ShieldCheck },
@@ -364,18 +373,18 @@ const ROLE_CONFIG = {
     mechanical_inspector: {
         label: 'Mechanical Inspector',
         division: 'OBO — Office of the Building Official',
-        color: 'green',
-        gradient: 'from-green-500 to-emerald-700',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Conducts mechanical systems inspections (plumbing, HVAC, etc.) for building permits.',
         myActions: [
             { label: 'Scheduled Mechanical Inspections', endpoint: '/api/gov/obo?status=inspection_scheduled&inspection_type=mechanical', icon: Wrench, urgency: 'high', action: 'Conduct & Report' },
         ],
         workflow: [
-            { step: 'Receive assignment from Records Officer', color: 'green' },
-            { step: 'Review mechanical plan/documents', color: 'green' },
-            { step: 'Conduct on-site mechanical inspection', color: 'green' },
-            { step: 'File findings report', color: 'teal' },
-            { step: 'Division Chief review → City Engineer signs permit', color: 'emerald' },
+            { step: 'Receive assignment from Records Officer', color: 'orange' },
+            { step: 'Review mechanical plan/documents', color: 'orange' },
+            { step: 'Conduct on-site mechanical inspection', color: 'orange' },
+            { step: 'File findings report', color: 'orange' },
+            { step: 'Division Chief review → City Engineer signs permit', color: 'orange' },
         ],
         quickActions: [
             { label: 'OBO Inspections', to: '/gov/obo', icon: ShieldCheck },
@@ -385,16 +394,16 @@ const ROLE_CONFIG = {
     system_admin: {
         label: 'System Administrator',
         division: 'DICT / IT Services',
-        color: 'red',
-        gradient: 'from-red-600 to-orange-600',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Manages all system users, roles, and configurations. Full access to all modules.',
         myActions: [
             { label: 'All System Users', endpoint: '/api/gov/users', icon: Users, urgency: 'low', action: 'Manage Roles' },
             { label: 'Recent Audit Events', endpoint: '/api/gov/audit-logs', icon: BarChart2, urgency: 'low', action: 'Review' },
         ],
         workflow: [
-            { step: 'Create user accounts for new staff', color: 'red' },
-            { step: 'Assign Plantilla positions as roles', color: 'red' },
+            { step: 'Create user accounts for new staff', color: 'orange' },
+            { step: 'Assign Plantilla positions as roles', color: 'orange' },
             { step: 'Monitor audit logs for anomalies', color: 'orange' },
             { step: 'Maintain system configuration', color: 'orange' },
         ],
@@ -409,17 +418,17 @@ const ROLE_CONFIG = {
     manager: {
         label: 'Manager',
         division: 'Executive Leadership',
-        color: 'indigo',
-        gradient: 'from-indigo-500 to-blue-700',
+        color: 'orange',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Senior management access to all modules and approval queues.',
         myActions: [
             { label: 'Pending Approvals', endpoint: '/api/gov/work-orders?status=completed', icon: CheckSquare, urgency: 'high', action: 'Approve' },
             { label: 'Active Projects', endpoint: '/api/gov/projects', icon: Map, urgency: 'medium', action: 'Review' },
         ],
         workflow: [
-            { step: 'Review division reports', color: 'indigo' },
-            { step: 'Approve/reject escalated items', color: 'indigo' },
-            { step: 'Monitor overall system performance', color: 'blue' },
+            { step: 'Review division reports', color: 'orange' },
+            { step: 'Approve/reject escalated items', color: 'orange' },
+            { step: 'Monitor overall system performance', color: 'orange' },
         ],
         quickActions: [
             { label: 'Exec Overview', to: '/management', icon: TrendingUp },
@@ -432,7 +441,7 @@ const ROLE_CONFIG = {
         label: 'Dispatcher',
         division: 'Operations',
         color: 'orange',
-        gradient: 'from-orange-500 to-orange-700',
+        gradient: 'from-primary to-secondary animate-gradient-flow',
         description: 'Monitors and triages incoming citizen incident reports.',
         myActions: [
             { label: 'Unverified Reports', endpoint: '/api/reports?status=unverified', icon: AlertTriangle, urgency: 'high', action: 'Triage' },
@@ -441,7 +450,7 @@ const ROLE_CONFIG = {
         workflow: [
             { step: 'Monitor live incident feed', color: 'orange' },
             { step: 'Verify or reject incoming reports', color: 'orange' },
-            { step: 'Track active dispatched work orders', color: 'blue' },
+            { step: 'Track active dispatched work orders', color: 'orange' },
         ],
         quickActions: [
             { label: 'Command Center', to: '/dispatcher', icon: AlertTriangle },
@@ -450,26 +459,18 @@ const ROLE_CONFIG = {
     },
 };
 
-const URGENCY_COLORS = {
-    high: 'bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-800',
-    medium: 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800',
-    low: 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700',
-};
-
-const URGENCY_BADGE = {
-    high: 'bg-red-500 text-white',
-    medium: 'bg-orange-400 text-white',
-    low: 'bg-slate-400 text-white',
-};
-
-const COLOR_MAP = {
-    blue: 'text-blue-600 dark:text-blue-400', indigo: 'text-indigo-600 dark:text-indigo-400',
-    purple: 'text-purple-600 dark:text-purple-400', teal: 'text-teal-600 dark:text-teal-400',
-    emerald: 'text-emerald-600 dark:text-emerald-400', green: 'text-green-600 dark:text-green-400',
-    orange: 'text-orange-600 dark:text-orange-400', red: 'text-red-600 dark:text-red-400',
-    yellow: 'text-yellow-600 dark:text-yellow-400', violet: 'text-violet-600 dark:text-violet-400',
-    amber: 'text-amber-600 dark:text-amber-400', cyan: 'text-cyan-600 dark:text-cyan-400',
-    slate: 'text-slate-600 dark:text-slate-400',
+const actionTargetFor = (action) => {
+    if (!action.endpoint) {
+        return action.label.includes('Advisory') ? '/gov/operations?view=updates' : null;
+    }
+    if (action.endpoint.includes('/reports')) return '/gov/operations?view=reports';
+    if (action.endpoint.includes('/work-orders')) return '/gov/operations?view=work-orders';
+    if (action.endpoint.includes('/projects')) return '/gov/delivery?view=projects';
+    if (action.endpoint.includes('/procurement')) return '/gov/delivery?view=procurement';
+    if (action.endpoint.includes('/obo')) return '/gov/obo';
+    if (action.endpoint.includes('/users')) return '/gov/administration?view=staff';
+    if (action.endpoint.includes('/audit-logs')) return '/gov/records-workspace?view=audit';
+    return null;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -477,19 +478,20 @@ const COLOR_MAP = {
 // ─────────────────────────────────────────────────────────────────────────────
 const ActionCard = ({ action, token }) => {
     const [count, setCount] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
+    const [status, setStatus] = useState(action.endpoint ? 'loading' : 'unavailable');
 
     useEffect(() => {
-        if (!action.endpoint || !token) { setLoading(false); return; }
-        fetch(`${API_BASE_URL}${action.endpoint}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : {})
+        if (!action.endpoint || !token) return undefined;
+        const controller = new AbortController();
+        fetch(`${API_BASE_URL}${action.endpoint}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+        })
+            .then((response) => {
+                if (!response.ok) throw new Error(`Request failed with ${response.status}`);
+                return response.json();
+            })
             .then(data => {
-                // Handle different response formats:
-                // 1. Array: [...items]
-                // 2. Object with items: {items: [...], total: X}
-                // 3. Object with users: {users: [...], total: X}
-                // 4. Object with single value: {total: X} or {count: X}
                 if (Array.isArray(data)) {
                     setCount(data.length);
                 } else if (data.items) {
@@ -503,58 +505,48 @@ const ActionCard = ({ action, token }) => {
                 } else {
                     setCount(0);
                 }
+                setStatus('ready');
             })
-            .catch(() => setCount(null))
-            .finally(() => setLoading(false));
+            .catch((error) => {
+                if (error.name !== 'AbortError') {
+                    setCount(null);
+                    setStatus('error');
+                }
+            });
+
+        return () => controller.abort();
     }, [action.endpoint, token]);
 
     const Icon = action.icon;
-    const hasItems = count !== null && count > 0;
+    const navTarget = actionTargetFor(action);
+    const content = (
+        <>
+            <span className="gov-action-row__signal" aria-hidden="true" />
+            <span className="gov-action-row__icon" aria-hidden="true">
+                <Icon size={18} strokeWidth={1.8} />
+            </span>
+            <span className="gov-action-row__copy">
+                <strong>{action.label}</strong>
+                <span>{action.action}</span>
+            </span>
+            <span className="gov-action-row__state" aria-live="polite">
+                {status === 'loading' && <span className="gov-action-row__loading">Loading</span>}
+                {status === 'ready' && <strong>{count}</strong>}
+                {status === 'error' && <span className="is-error">Unavailable</span>}
+                {status === 'unavailable' && <span>Open</span>}
+            </span>
+            {navTarget && <ChevronRight size={17} aria-hidden="true" />}
+        </>
+    );
 
-    // Derive navigation target from endpoint pattern
-    const getNavTarget = () => {
-        if (!action.endpoint) return null;
-        if (action.endpoint.includes('/reports')) return '/dispatcher';
-        if (action.endpoint.includes('/work-orders')) return '/gov/work-orders';
-        if (action.endpoint.includes('/projects')) return '/gov/projects';
-        if (action.endpoint.includes('/procurement')) return '/gov/procurement';
-        if (action.endpoint.includes('/obo')) return '/gov/obo';
-        if (action.endpoint.includes('/users')) return '/gov/users';
-        if (action.endpoint.includes('/audit-logs')) return '/gov/audit-logs';
-        return null;
-    };
-
-    const navTarget = getNavTarget();
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            onClick={() => navTarget && navigate(navTarget)}
-            className={`rounded-2xl border p-4 flex items-center justify-between gap-4 transition-all hover:shadow-md ${URGENCY_COLORS[action.urgency]} ${navTarget ? 'cursor-pointer' : ''}`}
-        >
-            <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/60 dark:bg-slate-800/60 flex items-center justify-center shrink-0 shadow-sm">
-                    <Icon size={18} className={URGENCY_BADGE[action.urgency].replace('bg-', 'text-').replace('text-white', action.urgency === 'high' ? 'text-red-600' : action.urgency === 'medium' ? 'text-orange-500' : 'text-slate-500')} />
-                </div>
-                <div>
-                    <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight">{action.label}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{action.action}</div>
-                </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-                {loading ? (
-                    <div className="w-6 h-6 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
-                ) : count !== null ? (
-                    <span className={`text-lg font-black px-2 py-0.5 rounded-xl ${hasItems ? URGENCY_BADGE[action.urgency] : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
-                        {count}
-                    </span>
-                ) : (
-                    <span className="text-xs text-slate-400">—</span>
-                )}
-                {navTarget && <ChevronRight size={16} className="text-slate-400" />}
-            </div>
-        </motion.div>
+    return navTarget ? (
+        <Link to={navTarget} className="gov-action-row" data-urgency={action.urgency}>
+            {content}
+        </Link>
+    ) : (
+        <div className="gov-action-row" data-urgency={action.urgency}>
+            {content}
+        </div>
     );
 };
 
@@ -562,26 +554,14 @@ const ActionCard = ({ action, token }) => {
 // Workflow Step list
 // ─────────────────────────────────────────────────────────────────────────────
 const WorkflowGuide = ({ steps }) => (
-    <div className="space-y-2">
+    <ol className="gov-workflow-list">
         {steps.map((step, i) => (
-            <div key={i} className="flex items-start gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 mt-0.5 bg-gradient-to-br ${
-                    step.color === 'green' ? 'from-green-500 to-emerald-600' :
-                    step.color === 'red' ? 'from-red-500 to-red-600' :
-                    step.color === 'blue' ? 'from-blue-500 to-blue-700' :
-                    step.color === 'indigo' ? 'from-indigo-500 to-indigo-700' :
-                    step.color === 'orange' ? 'from-orange-400 to-orange-600' :
-                    step.color === 'teal' ? 'from-teal-500 to-teal-700' :
-                    step.color === 'violet' ? 'from-violet-500 to-violet-700' :
-                    step.color === 'purple' ? 'from-purple-500 to-purple-700' :
-                    'from-slate-500 to-slate-700'
-                }`}>
-                    {i + 1}
-                </div>
-                <div className="text-sm text-slate-700 dark:text-slate-300 leading-snug pt-0.5">{step.step}</div>
-            </div>
+            <li key={step.step}>
+                <span className="gov-workflow-list__step" aria-hidden="true">{i + 1}</span>
+                <span>{step.step}</span>
+            </li>
         ))}
-    </div>
+    </ol>
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -589,39 +569,80 @@ const WorkflowGuide = ({ steps }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 const StatsBar = ({ token }) => {
     const [stats, setStats] = useState(null);
+    const [status, setStatus] = useState('loading');
+    const [updatedAt, setUpdatedAt] = useState(null);
+    const [requestVersion, setRequestVersion] = useState(0);
+
     useEffect(() => {
-        if (!token) return;
-        fetch(`${API_BASE_URL}/api/gov/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : null)
-            .then(setStats)
-            .catch(() => {});
-    }, [token]);
+        if (!token) return undefined;
+        const controller = new AbortController();
+        fetch(`${API_BASE_URL}/api/gov/dashboard/stats`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+        })
+            .then((response) => {
+                if (!response.ok) throw new Error(`Request failed with ${response.status}`);
+                return response.json();
+            })
+            .then((data) => {
+                setStats(data);
+                setUpdatedAt(new Date());
+                setStatus('ready');
+            })
+            .catch((error) => {
+                if (error.name !== 'AbortError') setStatus('error');
+            });
 
-    const items = stats ? [
-        { label: 'Open Work Orders', value: stats.open_work_orders || 0, icon: GitBranch, color: 'text-blue-600' },
-        { label: 'Active Projects', value: stats.active_projects || 0, icon: Map, color: 'text-indigo-600' },
-        { label: 'Pending Procurement', value: stats.pending_procurement || 0, icon: PackageCheck, color: 'text-violet-600' },
-        { label: 'OBO Applications', value: stats.obo_pending || 0, icon: ShieldCheck, color: 'text-teal-600' },
-    ] : [];
+        return () => controller.abort();
+    }, [token, requestVersion]);
 
-    return stats ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            {items.map((item, i) => {
+    const items = [
+        { label: 'Open work orders', value: stats?.open_work_orders ?? null, icon: GitBranch },
+        { label: 'Active projects', value: stats?.active_projects ?? null, icon: Map },
+        { label: 'Pending procurement', value: stats?.pending_procurement ?? null, icon: PackageCheck },
+        { label: 'Permit applications', value: stats?.obo_pending ?? null, icon: ShieldCheck },
+    ];
+
+    if (status === 'error') {
+        return (
+            <GovSystemBanner
+                type="partial_data"
+                title="Work summary unavailable."
+                message="The workspaces are still available from navigation."
+                actionLabel="Retry"
+                onAction={() => {
+                    setStatus('loading');
+                    setRequestVersion((version) => version + 1);
+                }}
+            />
+        );
+    }
+
+    return (
+        <section className="gov-work-summary" aria-labelledby="work-summary-heading" aria-busy={status === 'loading'}>
+            <div className="gov-section-heading gov-section-heading--summary">
+                <div>
+                    <p className="gov-eyebrow">Office workload</p>
+                    <h2 id="work-summary-heading">Current work summary</h2>
+                </div>
+                <p>{updatedAt ? `Updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Loading current totals'}</p>
+            </div>
+            <div className="gov-work-summary__grid">
+                {items.map((item) => {
                 const Icon = item.icon;
                 return (
-                    <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                            <Icon size={18} className={item.color} />
-                        </div>
-                        <div>
-                            <div className="text-lg font-black text-slate-900 dark:text-white leading-tight">{item.value}</div>
-                            <div className="text-[10px] text-slate-500 font-bold">{item.label}</div>
-                        </div>
+                    <div key={item.label} className="gov-work-summary__item">
+                        <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+                        <strong className={item.value === null && status !== 'loading' ? 'is-unavailable' : undefined}>
+                            {status === 'loading' ? '…' : item.value ?? 'Not provided'}
+                        </strong>
+                        <span>{item.label}</span>
                     </div>
                 );
             })}
-        </div>
-    ) : null;
+            </div>
+        </section>
+    );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -629,10 +650,12 @@ const StatsBar = ({ token }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const PositionDashboard = () => {
     const navigate = useNavigate();
-    const [token] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
-    });
+    const [token] = useState(() => getAuthToken());
+    const [currentUser] = useState(() => getAuthUser());
+
+    const { theme } = useTheme();
+    const DARK_SCENE  = 'https://prod.spline.design/us1Y6xfaQLiI2cim/scene.splinecode';
+    const LIGHT_SCENE = 'https://prod.spline.design/nrFjYzbJnF7GU92z/scene.splinecode';
 
     useEffect(() => {
         if (!token || !currentUser) navigate('/gov');
@@ -640,26 +663,27 @@ const PositionDashboard = () => {
 
     const role = currentUser?.role || 'dispatcher';
     const config = ROLE_CONFIG[role] || ROLE_CONFIG['dispatcher'];
+    const firstName = currentUser?.full_name?.split(' ')[0] || 'Officer';
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-300 font-sans flex text-sm">
-            <GovSidebar currentUser={currentUser} />
+        <div className="gov-workspace-shell">
+            <GovSidebar currentUser={currentUser} activeTab="dashboard" />
 
-            <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                {/* Header */}
-                <header className="h-16 bg-white dark:bg-slate-900/80 flex items-center justify-between px-8 shrink-0 border-b border-slate-100 dark:border-slate-800 z-40">
-                    <div>
-                        <h1 className="font-black text-base text-slate-900 dark:text-white">
-                            {currentUser ? `Welcome, ${currentUser.full_name?.split(' ')[0] || 'Officer'}` : 'My Dashboard'}
-                        </h1>
-                        <p className="text-[11px] text-slate-500">
-                            {config.label} · {config.division}
-                        </p>
+            <div className="gov-workspace">
+                <GovSystemBanner autoOffline={true} />
+                <header className="gov-workspace-header relative z-50">
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb category="Staff Workspace" current="Assigned Tasks & Roles" />
+                        <h1>My work</h1>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className={`px-3 py-1 rounded-full text-[11px] font-black text-white bg-gradient-to-r ${config.gradient}`}>
-                            {config.division}
+                        <div className="gov-workspace-header__scope" aria-label="Current role and division">
+                            <span>{config.division}</span>
+                            <strong>{config.label}</strong>
                         </div>
+                        <ThemeToggle />
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 
@@ -671,9 +695,14 @@ const PositionDashboard = () => {
                         <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className={`rounded-2xl p-6 mb-6 bg-gradient-to-br ${config.gradient} text-white shadow-lg`}
+                            className={`relative overflow-hidden rounded-2xl p-6 mb-6 bg-gradient-to-br ${config.gradient} text-white shadow-lg`}
                         >
-                            <div className="flex items-center justify-between flex-wrap gap-4">
+                            {/* Spline Background */}
+                            <div className="absolute -top-10 -left-10 -right-20 -bottom-20 z-0 opacity-40 mix-blend-overlay pointer-events-none">
+                                <Spline scene={theme === 'dark' ? DARK_SCENE : LIGHT_SCENE} onError={(e) => console.warn('Spline background error:', e)} />
+                            </div>
+
+                            <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">
                                 <div>
                                     <div className="text-xs font-bold uppercase tracking-widest opacity-75 mb-1">{config.division}</div>
                                     <h2 className="text-xl font-black leading-tight">{config.label}</h2>
@@ -688,72 +717,54 @@ const PositionDashboard = () => {
                         {/* System-wide Stats */}
                         <StatsBar token={token} />
 
-                        {/* Two columns */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <Link to="/gov/analytics" className="block rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-800 hover:underline focus-visible:outline-3 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                            Open recorded operations analytics
+                        </Link>
 
-                            {/* Left column — My Pending Actions */}
-                            <div className="lg:col-span-2 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2">
-                                        <Bell size={16} className="text-red-500" />
-                                        My Pending Actions
-                                    </h3>
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Requires your action</span>
+                        <div className="gov-my-work__grid">
+                            <section className="gov-action-queue" aria-labelledby="pending-actions-heading">
+                                <div className="gov-section-heading">
+                                    <div>
+                                        <p className="gov-eyebrow">Personal queue</p>
+                                        <h2 id="pending-actions-heading">Needs your attention</h2>
+                                    </div>
+                                    <span>Based on your role</span>
                                 </div>
 
-                                <div className="space-y-2">
-                                    {config.myActions.map((action, i) => (
-                                        <ActionCard key={i} action={action} token={token} />
+                                <div className="gov-action-queue__list">
+                                    {config.myActions.map((action) => (
+                                        <ActionCard key={action.label} action={action} token={token} />
                                     ))}
                                     {config.myActions.length === 0 && (
-                                        <div className="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
-                                            <CheckCircle2 size={36} className="mx-auto mb-2 opacity-30" />
-                                            <p className="font-bold">No pending actions for this role.</p>
+                                        <div className="gov-queue-empty">
+                                            <CheckCircle2 size={26} aria-hidden="true" />
+                                            <div>
+                                                <strong>No pending actions</strong>
+                                                <p>Nothing currently requires this role.</p>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
+                            </section>
 
-                                {/* Quick Actions */}
-                                <div className="mt-4">
-                                    <h3 className="font-black text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                                        <ArrowRight size={16} className="text-indigo-500" />
-                                        Quick Actions
-                                    </h3>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        {config.quickActions.map((qa, i) => {
-                                            const Icon = qa.icon;
-                                            return (
-                                                <Link
-                                                    key={i}
-                                                    to={qa.to}
-                                                    className="flex items-center gap-2 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:border-indigo-400 dark:hover:border-indigo-600 hover:shadow-sm transition-all group"
-                                                >
-                                                    <Icon size={16} className="text-indigo-500 group-hover:text-indigo-600 shrink-0" />
-                                                    <span className="font-bold text-slate-700 dark:text-slate-300 text-xs leading-tight">{qa.label}</span>
-                                                </Link>
-                                            );
-                                        })}
+                            <aside className="gov-process-rail" aria-label="Role process guidance">
+                                <section aria-labelledby="workflow-heading">
+                                    <div className="gov-section-heading gov-section-heading--compact">
+                                        <div>
+                                            <p className="gov-eyebrow">Role guide</p>
+                                            <h2 id="workflow-heading">How your work moves</h2>
+                                        </div>
+                                        <Activity size={17} aria-hidden="true" />
                                     </div>
-                                </div>
-                            </div>
-
-                            {/* Right column — Workflow Guide */}
-                            <div className="space-y-4">
-                                <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2">
-                                    <Activity size={16} className="text-indigo-500" />
-                                    My Workflow
-                                </h3>
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Process Guide for {config.label}</p>
                                     <WorkflowGuide steps={config.workflow} />
-                                </div>
+                                </section>
 
-                                {/* Inter-position Approval Chain hint */}
-                                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-4">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2">Approval Chain</p>
+                                <section className="gov-approval-chain" aria-labelledby="approval-chain-heading">
+                                    <p className="gov-eyebrow">Handoff context</p>
+                                    <h2 id="approval-chain-heading">Approval chain</h2>
                                     <ApprovalChainHint role={role} />
-                                </div>
-                            </div>
+                                </section>
+                            </aside>
                         </div>
                     </div>
                 </main>
@@ -789,16 +800,14 @@ const APPROVAL_CHAINS = {
 const ApprovalChainHint = ({ role }) => {
     const chain = APPROVAL_CHAINS[role] || ['Standard LGU workflow applies'];
     return (
-        <div className="space-y-1">
-            {chain.map((step, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${step.startsWith('→ YOU') ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
-                    <span className={step.startsWith('→ YOU') ? 'font-black text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}>
-                        {step}
-                    </span>
-                </div>
+        <ol className="gov-approval-chain__list">
+            {chain.map((step) => (
+                <li key={step} className={step.startsWith('→ YOU') ? 'is-current' : undefined}>
+                    <span className="gov-approval-chain__marker" aria-hidden="true" />
+                    <span>{step.replace('→ YOU', 'Your action:')}</span>
+                </li>
             ))}
-        </div>
+        </ol>
     );
 };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Camera, CheckCircle, AlertCircle, 
   MapPin, Shield, HelpCircle, Save, Trash2
-} from 'lucide-react';
+} from '../icons';
 
 const PunchListMobile = ({ project, onBack }) => {
   const [items, setItems] = useState([

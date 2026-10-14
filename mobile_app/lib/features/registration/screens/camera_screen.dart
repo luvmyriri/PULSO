@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
@@ -157,7 +158,7 @@ class _CameraScreenState extends State<CameraScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
+              const PulsoIcon(
                 Icons.error_outline,
                 size: 64,
                 color: AppTheme.errorRed,
@@ -258,7 +259,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
+                      icon: const PulsoIcon(
                         Icons.close_rounded,
                         color: Colors.white,
                         size: 36,

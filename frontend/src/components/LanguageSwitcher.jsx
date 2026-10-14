@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Languages } from 'lucide-react';
+import { Languages } from '../icons';
 
 export default function LanguageSwitcher() {
     const { i18n } = useTranslation();

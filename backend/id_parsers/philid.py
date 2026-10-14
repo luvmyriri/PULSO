@@ -74,9 +74,13 @@ class PhilIDParser(BaseIDParser):
         # ----------------------------------------------------------------
         # 1. PCN — 16-digit PhilSys Card Number
         # ----------------------------------------------------------------
-        pcn_m = re.search(r'\b(\d{4}-\d{4}-\d{4}-\d{4})\b', full_upper)
+        pcn_m = re.search(r'\b(?:\d{4}[-\s]){3}\d{4}\b|\b\d{16}\b', full_upper)
         if pcn_m:
-            result['pcn'] = re.sub(r'\s', '-', pcn_m.group(1))
+            raw_pcn = re.sub(r'\D', '', pcn_m.group(0))
+            if len(raw_pcn) == 16:
+                formatted_pcn = f"{raw_pcn[0:4]}-{raw_pcn[4:8]}-{raw_pcn[8:12]}-{raw_pcn[12:16]}"
+                result['pcn'] = formatted_pcn
+                result['id_number'] = formatted_pcn
             
         # Extract postal code (usually 1421, 1420, etc. at end)
         pc_m = re.search(r'\b(14\d{2})\b', full_upper)

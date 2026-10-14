@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, FileText, AlertCircle } from 'lucide-react';
+import { Shield, FileText, AlertCircle } from '../icons';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**

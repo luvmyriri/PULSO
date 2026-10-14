@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
@@ -32,7 +33,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const PulsoIcon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -81,7 +82,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_none, size: 80, color: Colors.grey[400]),
+          PulsoIcon(Icons.notifications_none, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No notifications yet',
@@ -122,7 +123,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             color: _getTypeColor(type).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(_getTypeIcon(type), color: _getTypeColor(type)),
+          child: PulsoIcon(_getTypeIcon(type), color: _getTypeColor(type)),
         ),
         title: Text(
           notification['title'] ?? 'Notification',

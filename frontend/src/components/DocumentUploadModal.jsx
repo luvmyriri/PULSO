@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, File, FileText, CheckCircle, X, Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { UploadCloud, File, FileText, CheckCircle, X, Loader2, ShieldCheck, AlertCircle } from '../icons';
 
 import { API_BASE_URL } from '../utils/apiBase';
 const getToken = () => localStorage.getItem('pulso_token');

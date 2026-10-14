@@ -5,7 +5,14 @@ import os
 from dotenv import load_dotenv
 import logging
 
-load_dotenv()
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+local_env_path = os.path.join(os.path.dirname(__file__), ".env.local")
+if os.path.exists(local_env_path):
+    load_dotenv(local_env_path)
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+else:
+    load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/pulso_db")
 

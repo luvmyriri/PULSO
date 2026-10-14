@@ -1,0 +1,344 @@
+{
+  "process_diagrams": [
+    "RES-US-001",
+    "RES-US-002",
+    "RES-US-003",
+    "RES-US-004",
+    "RES-US-005",
+    "RES-US-006",
+    "RES-US-007",
+    "RES-US-008",
+    "RES-US-009",
+    "RES-US-010",
+    "RES-US-011",
+    "RES-US-012",
+    "RES-US-013",
+    "RES-US-014",
+    "RES-US-015",
+    "RES-US-016",
+    "RES-US-017",
+    "RES-US-018",
+    "GOV-US-001",
+    "GOV-US-002",
+    "GOV-US-003",
+    "GOV-US-004",
+    "GOV-US-005",
+    "GOV-US-006",
+    "GOV-US-007",
+    "GOV-US-008",
+    "GOV-US-009",
+    "GOV-US-010",
+    "GOV-US-011",
+    "GOV-US-012",
+    "GOV-US-013",
+    "GOV-US-014",
+    "GOV-US-015",
+    "GOV-US-016",
+    "GOV-US-017"
+  ],
+  "additional_diagrams": [
+    "PULSO_fulfillment_branches"
+  ],
+  "ui_sources": {
+    "RES-US-001": [
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/01-public-home.png",
+        "Public service entry screen",
+        "Register Now and View Portal Guide are visible. The observed entry choices do not yet match all target reporting/tracking requirements."
+      ]
+    ],
+    "RES-US-002": [
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/03-resident-registration.png",
+        "Identity verification component",
+        "Front/back file inputs, camera choices, agreement checkbox and Scan Document control. This captures the first registration stage only."
+      ]
+    ],
+    "RES-US-005": [
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/05-resident-login.png",
+        "Resident sign-in form",
+        "Email, password, CAPTCHA and recovery link. Local test configuration was used; the capture does not establish production authentication security."
+      ]
+    ],
+    "RES-US-007": [
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/15-resident-profile.png",
+        "Resident profile component",
+        "Synthetic test-resident identity, email and phone controls. The visible verification badge is observed UI, not proof of verified personal identity."
+      ],
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/16-resident-settings.png",
+        "Password change component",
+        "Current password, new password, confirmation and Update Password controls. This is a settings screen, not a completed recovery transaction."
+      ]
+    ],
+    "GOV-US-001": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/01-government-login.png",
+        "Government sign-in form",
+        "Government email and password inputs and staff-session entry. The figure is an observed local interface, not a passed authorization test."
+      ]
+    ],
+    "RES-US-009": [
+      [
+        "docs/ui-ux-audit/runtime-resident-lift-2026-08-30/02-report-evidence-mobile.png",
+        "Mobile evidence capture step",
+        "Real mobile capture with Take a photo or choose an image, Continue without photo, Continue and draft exit controls. The image area is an empty input, not submitted evidence."
+      ]
+    ],
+    "RES-US-010": [
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/08-report-form-english.png",
+        "Quick Report location and description inputs",
+        "Historical capture: the location is labeled Verified while using a default center. The proposed flow requires explicit confirmation and does not treat this label as verification."
+      ]
+    ],
+    "RES-US-011": [
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/09-report-ai-analysis.png",
+        "AI-assisted report form",
+        "Historical capture using an unrelated test illustration. Its GPS watermark and accepted AI classification were documented defects; the target requires true evidence and human-review recovery."
+      ]
+    ],
+    "RES-US-012": [
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/09-report-ai-analysis.png",
+        "Existing report submission control",
+        "Detail of the observed Finalize and Submit Report control and Cancel alternative. No successful submission or durable receipt was captured in this run.",
+        [
+          170,
+          613,
+          1258,
+          704
+        ]
+      ]
+    ],
+    "RES-US-013": [
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/10-my-reports-empty.png",
+        "My Reports filters and empty state",
+        "The seeded resident has no owned reports. Status filters and Submit a Report are present; this is not a loaded report-detail or resolution screen."
+      ],
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/11-nearby-hazard-map.png",
+        "Nearby issue map view",
+        "Observed map with sample issue markers. Any Live or Verified wording in the captured interface is not a validation of freshness or location."
+      ],
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/12-nearby-hazards-list.png",
+        "Nearby issue list alternative",
+        "Observed list alternative with category filters, status and barangay context. Records in the local capture are demonstration data."
+      ]
+    ],
+    "RES-US-016": [
+      [
+        "docs/ui-ux-audit/runtime-resident-2026-08-29/14-notification-history-empty.png",
+        "Notification history dialog",
+        "Actual All Notifications dialog and Mark all as read control in an empty state. Delivery, read-state persistence and deep links were not proven by this screenshot.",
+        [
+          294,
+          226,
+          986,
+          496
+        ]
+      ]
+    ],
+    "GOV-US-012": [
+      [
+        "docs/ui-ux-audit/runtime-resident-lift-2026-08-30/04-resident-updates-mobile.png",
+        "Resident advisory and update surface",
+        "Mobile Updates view with notification and city-advisory sections. The publishing/editor approval interface was not captured; the displayed content is local demonstration data."
+      ]
+    ],
+    "GOV-US-002": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-30-sidebar-light.png",
+        "Government queue and persistent navigation",
+        "Observed citizen-report table with search, filters, statuses and row actions. Role scope and server action eligibility remain subject to the acceptance tests."
+      ]
+    ],
+    "GOV-US-003": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-30-citizen-reports-light.png",
+        "Citizen report queue and selected docket",
+        "Search/filter controls, selected report, evidence region, location and history. The sample selected record has no evidence image."
+      ],
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/13-command-center-selected-report.png",
+        "Triage decision controls",
+        "Historical selected-report panel with AI review, location, proof and decision controls. The absence of evidence in this sample is visible and must not be treated as valid completion.",
+        [
+          916,
+          72,
+          1294,
+          902
+        ]
+      ]
+    ],
+    "GOV-US-004": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/14-command-center-approval-queue-empty.png",
+        "Approval queue mode",
+        "An observed empty approval queue with map context. The capture does not show a completed approval or dispatch; retained map selection was a documented continuity defect."
+      ]
+    ],
+    "GOV-US-005": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/15-command-center-fleet-manager.png",
+        "Fleet operations and dispatch context",
+        "The observed fleet view shows team cards and an empty dispatch queue. It is related operational UI, not evidence of a completed work order."
+      ]
+    ],
+    "GOV-US-007": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/10-projects-queue.png",
+        "Infrastructure project queue",
+        "Project search, status filter, project row and View action. Project records are sample local data; the screenshot does not prove sequential phase gating."
+      ]
+    ],
+    "GOV-US-008": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/21-procurement-pipeline.png",
+        "Procurement budget handshake",
+        "Observed Validation, ObR, Cash Availability, BAC and NTP progression above the request list."
+      ],
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/22-procurement-detail-gates.png",
+        "Procurement prerequisite controls",
+        "Enlarged existing request dialog showing statutory gate controls. Visible disabled controls do not establish server-side enforcement.",
+        [
+          380,
+          118,
+          914,
+          796
+        ]
+      ]
+    ],
+    "GOV-US-009": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/24-obo-five-point-review.png",
+        "OBO technical review component",
+        "Architectural, Civil/Structural, Electrical, Sanitary/Plumbing and Mechanical review controls. The captured immediate Approve buttons lack the complete proposed review and confirmation context.",
+        [
+          380,
+          230,
+          914,
+          682
+        ]
+      ]
+    ],
+    "GOV-US-010": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/19-document-registry.png",
+        "Document Registry and Archive",
+        "Observed classification, target, retention/restriction information and document actions. Authorization, legal hold and disposition still require execution testing."
+      ]
+    ],
+    "GOV-US-011": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/04-process-timeline.png",
+        "Case and project process timeline",
+        "Observed chronological status changes. The separate audit screen below was empty, so the timeline alone cannot prove audit-ledger reconciliation."
+      ],
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/20-audit-logs-empty.png",
+        "Audit log empty state",
+        "Actual filter controls and No audit logs found state from the same local audit. This illustrates the observed gap rather than a populated immutable ledger."
+      ]
+    ],
+    "GOV-US-013": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/17-executive-performance.png",
+        "Executive analytics components",
+        "Observed metric cards and chart regions with local sample values. Blank charts and real-time wording are not evidence of validated analytical output."
+      ]
+    ],
+    "GOV-US-014": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/06-predictive-asset-health.png",
+        "Predictive asset-health cards",
+        "Observed asset categories and health figures. Scores are demonstration/prototype output; the proposed process requires reproducible data, model provenance and human approval."
+      ]
+    ],
+    "GOV-US-015": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/23-government-account-management.png",
+        "Government accounts and role controls",
+        "Observed search, role selectors, account status and suspend controls with seeded accounts. The proposed flow adds consequence, reason, confirmation and session checks."
+      ]
+    ],
+    "GOV-US-016": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-28/18-records-registry-detail.png",
+        "Archived engineering record dialog",
+        "Actual finalized-record dialog with a sample record reference and project information. This thin view does not contain the complete proposed engineering docket.",
+        [
+          380,
+          278,
+          914,
+          633
+        ]
+      ]
+    ],
+    "RES-US-018": [
+      [
+        "docs/ui-ux-audit/runtime-resident-lift-2026-08-30/03-resident-home-mobile.png",
+        "Resident mobile navigation and active-report object",
+        "Observed mobile Home, My reports, Report, Updates and Account navigation. No active reports is a local empty state; screenshot review does not certify accessibility."
+      ]
+    ],
+    "GOV-US-017": [
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-30-citizen-reports-light.png",
+        "Government selected report in light mode",
+        "Observed light-theme queue/detail at 1280 x 720."
+      ],
+      [
+        "docs/ui-ux-audit/runtime-government-2026-08-30-citizen-reports-dark.png",
+        "Government selected report in dark mode",
+        "Observed dark-theme counterpart. Matching screenshots do not establish keyboard, screen-reader or contrast conformance."
+      ]
+    ]
+  },
+  "related_capture_limits": {
+    "RES-US-003": [
+      "RES-US-002",
+      "The captured registration screen shows the identity-evidence entry stage; account-details and account-created states were not captured."
+    ],
+    "RES-US-004": [
+      "RES-US-005",
+      "The actual resident sign-in surface is shown in the referenced section. No OTP-entry or activation-result screenshot is available in the recorded run."
+    ],
+    "RES-US-006": [
+      "RES-US-005",
+      "The sign-in capture contains the Forgot Password entry. The audit recorded a nonfunctional recovery entry, so no working reset sequence is illustrated as completed UI."
+    ],
+    "RES-US-008": [
+      "RES-US-007",
+      "The profile capture shows a verification badge, not an optional KYC-upgrade journey. The upgrade screens remain an uncaptured target contract."
+    ],
+    "RES-US-014": [
+      "RES-US-013",
+      "The available My Reports capture is empty; it contains no resident-owned record or eligible Retract control. The process image defines the proposed guarded action."
+    ],
+    "RES-US-015": [
+      "RES-US-013",
+      "No resident-owned resolved record was available in the recorded run. Completion-proof and rating controls therefore have no verified screen capture."
+    ],
+    "RES-US-017": [
+      "RES-US-009",
+      "The reporting screen provides task context, but no expanded assistant conversation was captured. The diagram specifies the assistance and privacy path without inventing a chat screen."
+    ],
+    "GOV-US-006": [
+      "GOV-US-005",
+      "The fleet view provides related dispatch context. An authenticated assigned-worker mobile update screen was not captured, so it is not represented as observed UI."
+    ]
+  },
+  "figma_inspection": {
+    "file": "1qPgPj4o3smElv8B2B1REi",
+    "page": "3:2",
+    "foundation": "6:937",
+    "result": "Only foundations page exposed; screenshot export returned 1 x 1. No Figma component or screen image is claimed."
+  }
+}

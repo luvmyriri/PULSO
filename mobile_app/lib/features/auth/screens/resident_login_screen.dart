@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 // ignore_for_file: use_build_context_synchronously
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -383,7 +384,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
             }),
             child: Row(
               children: [
-                Icon(Icons.arrow_back_ios_new, size: 16, color: text.withOpacity(0.5)),
+                PulsoIcon(Icons.arrow_back_ios_new, size: 16, color: text.withOpacity(0.5)),
                 const SizedBox(width: 4),
                 Text('Back', style: TextStyle(color: text.withOpacity(0.5), fontSize: 12, fontWeight: FontWeight.bold)),
               ],
@@ -402,7 +403,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
       children: [
         Row(
           children: [
-            Icon(Icons.graphic_eq, size: 16, color: AppTheme.primaryOrange),
+            PulsoIcon(Icons.graphic_eq, size: 16, color: AppTheme.primaryOrange),
             const SizedBox(width: 6),
             Text(
               'CITIZEN ACCESS PORTAL',
@@ -519,7 +520,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
                       : const Color(0xFFFED7AA),
                 ),
               ),
-              child: const Icon(Icons.person_outline_rounded, size: 36, color: Color(0xFFEA580C)),
+              child: const PulsoIcon(Icons.person_outline_rounded, size: 36, color: Color(0xFFEA580C)),
             ),
             const SizedBox(height: 16),
             Text('Login', style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: text, letterSpacing: -0.5)),
@@ -565,7 +566,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
           isDark: isDark, text: text,
           obscure: !_showPassword,
           suffix: IconButton(
-            icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: text.withOpacity(0.35)),
+            icon: PulsoIcon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: text.withOpacity(0.35)),
             onPressed: () => setState(() => _showPassword = !_showPassword),
           ),
           onSubmitted: (_) => _handleLogin(),
@@ -593,7 +594,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.green.withOpacity(0.2)),
                 ),
-                child: const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 40),
+                child: const PulsoIcon(Icons.check_circle_outline_rounded, color: Colors.green, size: 40),
               ),
               const SizedBox(height: 16),
               Text('Account Verified', style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: text, letterSpacing: -0.5)),
@@ -632,7 +633,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFFED7AA)),
               ),
-              child: const Icon(Icons.shield_outlined, size: 36, color: Color(0xFFEA580C)),
+              child: const PulsoIcon(Icons.shield_outlined, size: 36, color: Color(0xFFEA580C)),
             ),
             const SizedBox(height: 16),
             Text('Verify Account', style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: text, letterSpacing: -0.5)),
@@ -697,7 +698,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.arrow_back_rounded, size: 14, color: text.withOpacity(0.4)),
+                PulsoIcon(Icons.arrow_back_rounded, size: 14, color: text.withOpacity(0.4)),
                 const SizedBox(width: 4),
                 Text('Cancel Verification', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: text.withOpacity(0.4), letterSpacing: 2)),
               ],
@@ -723,7 +724,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08)),
               ),
-              child: const Icon(Icons.shield_outlined, size: 36, color: Color(0xFFEA580C)),
+              child: const PulsoIcon(Icons.shield_outlined, size: 36, color: Color(0xFFEA580C)),
             ),
             const SizedBox(height: 16),
             Text('Identity Retrieval', style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: text, letterSpacing: -0.5)),
@@ -838,7 +839,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
           isDark: isDark, text: text,
           obscure: !_showNewPass,
           suffix: IconButton(
-            icon: Icon(_showNewPass ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: text.withOpacity(0.3)),
+            icon: PulsoIcon(_showNewPass ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: text.withOpacity(0.3)),
             onPressed: () => setState(() => _showNewPass = !_showNewPass),
           ),
           onChanged: (_) => setState(() {}),
@@ -891,7 +892,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
           isDark: isDark, text: text,
           obscure: !_showConfirmPass,
           suffix: IconButton(
-            icon: Icon(_showConfirmPass ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: text.withOpacity(0.3)),
+            icon: PulsoIcon(_showConfirmPass ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: text.withOpacity(0.3)),
             onPressed: () => setState(() => _showConfirmPass = !_showConfirmPass),
           ),
         ),
@@ -913,7 +914,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
             Container(
               width: 72, height: 72,
               decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: Colors.green.withOpacity(0.2))),
-              child: const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 40),
+              child: const PulsoIcon(Icons.check_circle_outline_rounded, color: Colors.green, size: 40),
             ),
             const SizedBox(height: 16),
             Text('Reset Complete', style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: text, letterSpacing: -0.5)),
@@ -1021,7 +1022,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: text.withOpacity(0.2), fontSize: 13),
-        prefixIcon: Icon(prefix, color: text.withOpacity(0.3), size: 18),
+        prefixIcon: PulsoIcon(prefix, color: text.withOpacity(0.3), size: 18),
         suffixIcon: suffix,
         filled: true,
         fillColor: isDark
@@ -1072,7 +1073,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
                   Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.white, letterSpacing: 1)),
                   if (icon != null) ...[
                     const SizedBox(width: 4),
-                    Icon(icon, color: Colors.white, size: 20),
+                    PulsoIcon(icon, color: Colors.white, size: 20),
                   ],
                 ],
               ),
@@ -1094,7 +1095,7 @@ class _ResidentLoginScreenState extends State<ResidentLoginScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (icon != null) ...[Icon(icon, color: Colors.white, size: 16), const SizedBox(width: 6)],
+            if (icon != null) ...[PulsoIcon(icon, color: Colors.white, size: 16), const SizedBox(width: 6)],
             Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.white, letterSpacing: 1)),
           ],
         ),
@@ -1156,7 +1157,7 @@ class _ThemeToggle extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             boxShadow: active ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6)] : [],
           ),
-          child: Icon(icon, size: 14, color: active ? const Color(0xFFEA580C) : onSurface.withOpacity(0.3)),
+          child: PulsoIcon(icon, size: 14, color: active ? const Color(0xFFEA580C) : onSurface.withOpacity(0.3)),
         ),
       );
     }

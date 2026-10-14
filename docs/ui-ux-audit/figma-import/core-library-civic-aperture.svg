@@ -1,0 +1,393 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="2200" viewBox="0 0 1440 2200" fill="none">
+  <metadata id="impeccable-direction-contract"><![CDATA[
+THESIS: Field evidence becomes accountable public work; refuse generic card dashboards and ornamental cinematic effects.
+OWN-WORLD: Civic Aperture morning/night palette, open/ruled surfaces, one Field Aperture per viewport, Signal Cut, Archivo + Source Sans 3 + IBM Plex Mono.
+STORY: Residents see evidence, location, status, next event, and a thumb-visible report action; the shared library keeps both portals consistent.
+FIRST VIEWPORT: Resident evidence leads, then active record/location, authored lifecycle, report action, and five stable destinations. Foundations/library make light/dark parity and recovery explicit.
+FORM: Operate; user-pinned Civic Aperture v0.2; seed key not applicable because the user explicitly approved the generated direction.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+]]></metadata>
+  <title>PULSO Civic Aperture v0.2 — Core Library</title>
+  <desc>Editable component-library specimen sheet for PULSO Civic Aperture. It pairs light and dark variants for actions, fields, status, feedback, surfaces, evidence, records, progress, navigation, decisions, and system states.</desc>
+  <!--
+    THESIS: One governed component language serves calm resident action and accountable government operations; this board refuses generic equal-card component grids.
+    OWN-WORLD: Ruled field sheets, survey-night surfaces, two-pixel authored icons, semantic portal accents, evidence apertures, coordinate rails, and Signal Cut lifecycle geometry.
+    STORY: A frontend team can inspect behavior from primitives through evidence and operational states, with light/dark parity visible side by side.
+    FIRST VIEWPORT: Actions and fields establish the component API immediately beneath a civic record header; later bands move through status, evidence, navigation, and recovery.
+    FORM: Approved Civic Aperture v0.2 component language translated into editable SVG groups.
+    FINISH: Every requested component family appears with usage notes, semantic state, and a theme pair.
+  -->
+  <defs>
+    <style>
+      .display { font-family: "Archivo", "Arial Narrow", sans-serif; font-weight: 700; letter-spacing: -1px; }
+      .heading { font-family: "Archivo", "Arial Narrow", sans-serif; font-weight: 700; letter-spacing: -0.3px; }
+      .body { font-family: "Source Sans 3", "Segoe UI", sans-serif; font-weight: 400; }
+      .label { font-family: "Source Sans 3", "Segoe UI", sans-serif; font-weight: 700; letter-spacing: 0.35px; }
+      .mono { font-family: "IBM Plex Mono", Consolas, monospace; font-weight: 500; }
+      .ink { fill: #0C2436; }
+      .muted { fill: #465D6C; }
+      .night-ink { fill: #F4F7F2; }
+      .night-muted { fill: #B9C7CF; }
+      .rule { stroke: #C9D4D9; stroke-width: 1; }
+      .night-rule { stroke: #335166; stroke-width: 1; }
+      .stroke-ink { stroke: #0C2436; }
+      .stroke-night { stroke: #F4F7F2; }
+      .icon { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+    <filter id="raised" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#071A2B" flood-opacity="0.16"/>
+    </filter>
+    <pattern id="map-light" width="84" height="84" patternUnits="userSpaceOnUse">
+      <path d="M-8 22L94 58M12 -8L48 94M62 -8L24 94" stroke="#C9D4D9" stroke-width="2"/>
+      <path d="M-8 64L94 20" stroke="#82C7D8" stroke-width="5" opacity="0.55"/>
+    </pattern>
+    <pattern id="map-dark" width="84" height="84" patternUnits="userSpaceOnUse">
+      <path d="M-8 22L94 58M12 -8L48 94M62 -8L24 94" stroke="#335166" stroke-width="2"/>
+      <path d="M-8 64L94 20" stroke="#0B4F6C" stroke-width="5" opacity="0.8"/>
+    </pattern>
+  </defs>
+
+  <rect width="720" height="2200" fill="#F4F7F5"/>
+  <rect x="720" width="720" height="2200" fill="#071A2B"/>
+  <line x1="720" y1="0" x2="720" y2="2200" stroke="#335166"/>
+
+  <g id="Header">
+    <g id="Header-light" transform="translate(32 32)">
+      <circle cx="30" cy="30" r="27" stroke="#0C2436" stroke-width="3"/>
+      <path d="M6 31H17L22 20L28 45L35 13L41 37L47 26H55" stroke="#B9380B" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+      <text x="82" y="25" class="label" font-size="13" fill="#B9380B">PULSO CORE / v0.2</text>
+      <text x="82" y="58" class="display ink" font-size="38">Civic Aperture library</text>
+      <text x="0" y="96" class="body muted" font-size="15">Light theme / shared anatomy / portal and density variables</text>
+    </g>
+    <g id="Header-dark" transform="translate(752 32)">
+      <circle cx="30" cy="30" r="27" stroke="#F4F7F2" stroke-width="3"/>
+      <path d="M6 31H17L22 20L28 45L35 13L41 37L47 26H55" stroke="#FF8A3D" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+      <text x="82" y="25" class="label" font-size="13" fill="#82C7D8">PULSO CORE / v0.2</text>
+      <text x="82" y="58" class="display night-ink" font-size="38">Civic Aperture library</text>
+      <text x="0" y="96" class="body night-muted" font-size="15">Dark theme / shared anatomy / portal and density variables</text>
+    </g>
+    <path d="M32 158H646L658 153L666 168L676 143L686 158H752L764 153L772 168L782 143L792 158H1408" stroke="#FF8A3D" stroke-width="2"/>
+  </g>
+
+  <g id="Actions-and-fields" transform="translate(32 208)">
+    <text x="0" y="0" class="heading ink" font-size="28">Actions &amp; fields</text>
+    <text x="688" y="0" class="heading night-ink" font-size="28">Actions &amp; fields</text>
+    <text x="0" y="28" class="body muted" font-size="14">Action/Button · identical variants / 44 px target</text>
+    <text x="688" y="28" class="body night-muted" font-size="14">Action/Button · identical variants / 44 px target</text>
+    <line x1="0" y1="50" x2="656" y2="50" class="rule"/><line x1="688" y1="50" x2="1376" y2="50" class="night-rule"/>
+
+    <g id="Buttons-light" transform="translate(0 76)">
+      <g id="Button-primary-light">
+        <rect width="150" height="44" rx="8" fill="#B9380B"/>
+        <path d="M18 15V29M11 22H25" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+        <text x="38" y="27" class="label" font-size="14" fill="#FFFFFF">Portal primary</text>
+      </g>
+      <g id="Button-secondary-light" transform="translate(164 0)">
+        <rect width="140" height="44" rx="8" fill="#FFFFFF" stroke="#0B4F6C"/>
+        <path d="M16 15L26 22L16 29" stroke="#0B4F6C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="38" y="27" class="label" font-size="14" fill="#0B4F6C">View details</text>
+      </g>
+      <g id="Button-critical-light" transform="translate(318 0)">
+        <rect width="116" height="44" rx="8" fill="none" stroke="#B42318"/>
+        <text x="31" y="27" class="label" font-size="14" fill="#B42318">Critical</text>
+      </g>
+      <g id="Button-focus-light" transform="translate(448 0)">
+        <rect x="-3" y="-3" width="50" height="50" rx="11" fill="none" stroke="#2563EB" stroke-width="3"/>
+        <rect width="44" height="44" rx="8" fill="#FFFFFF" stroke="#0B4F6C"/>
+        <path d="M13 22H31M22 13V31" stroke="#0B4F6C" stroke-width="2" stroke-linecap="round"/>
+      </g>
+      <g id="Button-loading-light" transform="translate(510 0)">
+        <rect width="44" height="44" rx="8" fill="#E5EAE8"/>
+        <path d="M29 14A10 10 0 1 1 14 27" stroke="#465D6C" stroke-width="2" stroke-linecap="round"/>
+      </g>
+      <g id="Button-disabled-light" transform="translate(572 0)">
+        <rect width="44" height="44" rx="8" fill="#E5EAE8"/>
+        <path d="M14 22H30" stroke="#718794" stroke-width="2" stroke-linecap="round"/>
+      </g>
+    </g>
+
+    <g id="Buttons-dark" transform="translate(688 76)">
+      <g id="Button-primary-dark">
+        <rect width="150" height="44" rx="8" fill="#FF8A3D"/>
+        <path d="M18 15V29M11 22H25" stroke="#071A2B" stroke-width="2" stroke-linecap="round"/>
+        <text x="38" y="27" class="label" font-size="14" fill="#071A2B">Portal primary</text>
+      </g>
+      <g id="Button-secondary-dark" transform="translate(164 0)">
+        <rect width="140" height="44" rx="8" fill="none" stroke="#82C7D8"/>
+        <path d="M16 15L26 22L16 29" stroke="#82C7D8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="38" y="27" class="label" font-size="14" fill="#82C7D8">View details</text>
+      </g>
+      <g id="Button-critical-dark" transform="translate(318 0)">
+        <rect width="116" height="44" rx="8" fill="none" stroke="#FDA29B"/>
+        <text x="31" y="27" class="label" font-size="14" fill="#FDA29B">Critical</text>
+      </g>
+      <g id="Button-focus-dark" transform="translate(448 0)">
+        <rect x="-3" y="-3" width="50" height="50" rx="11" fill="none" stroke="#93C5FD" stroke-width="3"/>
+        <rect width="44" height="44" rx="8" fill="#15364D" stroke="#6A8495"/>
+        <path d="M13 22H31M22 13V31" stroke="#F4F7F2" stroke-width="2" stroke-linecap="round"/>
+      </g>
+      <g id="Button-loading-dark" transform="translate(510 0)">
+        <rect width="44" height="44" rx="8" fill="#15364D"/>
+        <path d="M29 14A10 10 0 1 1 14 27" stroke="#B9C7CF" stroke-width="2" stroke-linecap="round"/>
+      </g>
+      <g id="Button-disabled-dark" transform="translate(572 0)">
+        <rect width="44" height="44" rx="8" fill="#15364D"/>
+        <path d="M14 22H30" stroke="#6A8495" stroke-width="2" stroke-linecap="round"/>
+      </g>
+    </g>
+
+    <text x="0" y="142" class="mono muted" font-size="11">CONTROL BOUNDARY #718794 / 3.75:1 ON SURFACE</text>
+    <text x="688" y="142" class="mono night-muted" font-size="11">CONTROL BOUNDARY #6A8495 / 3.84:1 ON SURFACE</text>
+
+    <g id="Fields-light" transform="translate(0 164)">
+      <text x="0" y="0" class="label ink" font-size="14">Street or landmark</text>
+      <text x="0" y="22" class="body muted" font-size="12">Use a clear landmark or intersection.</text>
+      <rect x="0" y="38" width="310" height="44" rx="8" fill="#FFFFFF" stroke="#718794"/>
+      <path d="M18 56C18 50 26 47 30 52C34 57 24 68 24 68C24 68 18 61 18 56Z" stroke="#465D6C" stroke-width="2"/>
+      <text x="44" y="68" class="body muted" font-size="14">Near the barangay hall</text>
+      <text x="0" y="120" class="label" font-size="14" fill="#B42318">Location description</text>
+      <rect x="0" y="136" width="310" height="44" rx="8" fill="#FFFFFF" stroke="#B42318" stroke-width="2"/>
+      <text x="16" y="166" class="body ink" font-size="14">10th Ave.</text>
+      <text x="0" y="204" class="body" font-size="12" fill="#B42318">Add a landmark so the crew can find it.</text>
+      <g id="Field-select-light" transform="translate(350 38)">
+        <text x="0" y="-16" class="label ink" font-size="14">Issue category</text>
+        <rect width="210" height="44" rx="8" fill="#FFFFFF" stroke="#718794"/>
+        <text x="16" y="30" class="body ink" font-size="14">Road or bridge</text>
+        <path d="M184 20L190 26L196 20" stroke="#0C2436" stroke-width="2"/>
+      </g>
+      <g id="Field-checkbox-light" transform="translate(350 126)">
+        <rect width="20" height="20" rx="4" fill="#0B4F6C"/>
+        <path d="M5 10L9 14L16 6" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="32" y="15" class="body ink" font-size="14">I confirm the details are correct</text>
+      </g>
+    </g>
+
+    <g id="Fields-dark" transform="translate(688 164)">
+      <text x="0" y="0" class="label night-ink" font-size="14">Search reports</text>
+      <text x="0" y="22" class="body night-muted" font-size="12">Ticket, issue, barangay, or assignee.</text>
+      <rect x="0" y="38" width="310" height="44" rx="8" fill="#0E283E" stroke="#6A8495"/>
+      <circle cx="24" cy="59" r="7" stroke="#B9C7CF" stroke-width="2"/>
+      <path d="M29 64L35 70" stroke="#B9C7CF" stroke-width="2" stroke-linecap="round"/>
+      <text x="46" y="65" class="body night-muted" font-size="14">Search live queue</text>
+      <text x="0" y="114" class="label" font-size="14" fill="#FDA29B">Work-order title</text>
+      <rect x="0" y="130" width="310" height="44" rx="8" fill="#0E283E" stroke="#FDA29B" stroke-width="2"/>
+      <text x="16" y="157" class="body night-ink" font-size="14">Repair</text>
+      <text x="0" y="200" class="body" font-size="12" fill="#FDA29B">Name the specific repair, not the record.</text>
+      <g id="Field-select-dark" transform="translate(350 38)">
+        <text x="0" y="-16" class="label night-ink" font-size="14">Queue status</text>
+        <rect width="210" height="44" rx="8" fill="#0E283E" stroke="#6A8495"/>
+        <text x="16" y="27" class="body night-ink" font-size="14">Needs assignment</text>
+        <path d="M184 18L190 24L196 18" stroke="#F4F7F2" stroke-width="2"/>
+      </g>
+      <g id="Field-checkbox-dark" transform="translate(350 122)">
+        <rect width="20" height="20" rx="4" fill="none" stroke="#82C7D8"/>
+        <text x="32" y="15" class="body night-ink" font-size="14">Include resolved records</text>
+      </g>
+    </g>
+  </g>
+
+  <g id="Status-and-feedback" transform="translate(32 654)">
+    <line x1="0" y1="0" x2="656" y2="0" class="rule"/><line x1="688" y1="0" x2="1376" y2="0" class="night-rule"/>
+    <text x="0" y="44" class="heading ink" font-size="28">Status &amp; feedback</text>
+    <text x="688" y="44" class="heading night-ink" font-size="28">Status &amp; feedback</text>
+    <text x="0" y="72" class="body muted" font-size="14">Text + authored icon + shape; color reinforces meaning.</text>
+    <text x="688" y="72" class="body night-muted" font-size="14">Identical vocabulary and hierarchy in Survey Night.</text>
+
+    <g id="Status-light" transform="translate(0 104)">
+      <g id="Status-received-light" transform="translate(0 0)"><circle cx="10" cy="10" r="7" fill="#0B4F6C"/><text x="28" y="15" class="label ink" font-size="13">Received</text></g>
+      <g id="Status-verified-light" transform="translate(118 0)"><path d="M10 2L18 6V12C18 17 14 20 10 22C6 20 2 17 2 12V6L10 2Z" fill="#0B4F6C"/><path d="M6 11L9 14L14 8" stroke="#FFFFFF" stroke-width="2"/><text x="30" y="15" class="label ink" font-size="13">Verified</text></g>
+      <g id="Status-assigned-light" transform="translate(248 0)"><circle cx="10" cy="7" r="5" fill="#B9380B"/><path d="M2 22C3 15 17 15 18 22" fill="#B9380B"/><text x="30" y="15" class="label ink" font-size="13">Assigned</text></g>
+      <g id="Status-in-progress-light" transform="translate(376 0)"><circle cx="10" cy="10" r="8" fill="none" stroke="#B45309" stroke-width="2"/><path d="M10 5V11L14 14" stroke="#B45309" stroke-width="2"/><text x="30" y="15" class="label ink" font-size="13">In progress</text></g>
+      <g id="Status-resolved-light" transform="translate(520 0)"><circle cx="10" cy="10" r="8" fill="#0B756B"/><path d="M5 10L9 14L15 6" stroke="#FFFFFF" stroke-width="2"/><text x="30" y="15" class="label ink" font-size="13">Resolved</text></g>
+    </g>
+    <g id="Status-dark" transform="translate(688 104)">
+      <g id="Status-received-dark" transform="translate(0 0)"><circle cx="10" cy="10" r="7" fill="#82C7D8"/><text x="28" y="15" class="label night-ink" font-size="13">Received</text></g>
+      <g id="Status-verified-dark" transform="translate(118 0)"><path d="M10 2L18 6V12C18 17 14 20 10 22C6 20 2 17 2 12V6L10 2Z" fill="#82C7D8"/><path d="M6 11L9 14L14 8" stroke="#071A2B" stroke-width="2"/><text x="30" y="15" class="label night-ink" font-size="13">Verified</text></g>
+      <g id="Status-assigned-dark" transform="translate(248 0)"><circle cx="10" cy="7" r="5" fill="#FF8A3D"/><path d="M2 22C3 15 17 15 18 22" fill="#FF8A3D"/><text x="30" y="15" class="label night-ink" font-size="13">Assigned</text></g>
+      <g id="Status-in-progress-dark" transform="translate(376 0)"><circle cx="10" cy="10" r="8" fill="none" stroke="#FBBF24" stroke-width="2"/><path d="M10 5V11L14 14" stroke="#FBBF24" stroke-width="2"/><text x="30" y="15" class="label night-ink" font-size="13">In progress</text></g>
+      <g id="Status-resolved-dark" transform="translate(520 0)"><circle cx="10" cy="10" r="8" fill="#66D2C8"/><path d="M5 10L9 14L15 6" stroke="#071A2B" stroke-width="2"/><text x="30" y="15" class="label night-ink" font-size="13">Resolved</text></g>
+    </g>
+
+    <g id="Alerts-light" transform="translate(0 170)">
+      <g id="Alert-success-light" transform="translate(0 0)"><path d="M0 0H656" class="rule"/><circle cx="18" cy="28" r="9" fill="#0B756B"/><path d="M13 28L17 32L24 23" stroke="#FFFFFF" stroke-width="2"/><text x="42" y="24" class="label ink" font-size="14">Report submitted</text><text x="42" y="45" class="body muted" font-size="13">Ticket PUL-2026-0822 is ready to track.</text></g>
+      <g id="Alert-error-light" transform="translate(0 70)"><path d="M0 0H656" class="rule"/><path d="M18 18L29 38H7L18 18Z" fill="#B42318"/><path d="M18 24V31M18 35V36" stroke="#FFFFFF" stroke-width="2"/><text x="42" y="24" class="label ink" font-size="14">Photo upload failed</text><text x="42" y="45" class="body muted" font-size="13">Check your connection, then try the same photo again.</text></g>
+    </g>
+    <g id="Alerts-dark" transform="translate(688 170)">
+      <g id="Alert-success-dark" transform="translate(0 0)"><path d="M0 0H688" class="night-rule"/><circle cx="18" cy="28" r="9" fill="#66D2C8"/><path d="M13 28L17 32L24 23" stroke="#071A2B" stroke-width="2"/><text x="42" y="24" class="label night-ink" font-size="14">Assignment recorded</text><text x="42" y="45" class="body night-muted" font-size="13">Electrical Maintenance Team can now view this work order.</text></g>
+      <g id="Alert-error-dark" transform="translate(0 70)"><path d="M0 0H688" class="night-rule"/><path d="M18 18L29 38H7L18 18Z" fill="#FDA29B"/><path d="M18 24V31M18 35V36" stroke="#071A2B" stroke-width="2"/><text x="42" y="24" class="label night-ink" font-size="14">Status could not be saved</text><text x="42" y="45" class="body night-muted" font-size="13">Your note is retained. Reconnect and save again.</text></g>
+    </g>
+  </g>
+
+  <g id="Surface-evidence-record" transform="translate(32 986)">
+    <line x1="0" y1="0" x2="656" y2="0" class="rule"/><line x1="688" y1="0" x2="1376" y2="0" class="night-rule"/>
+    <text x="0" y="44" class="heading ink" font-size="28">Surface, evidence &amp; record</text>
+    <text x="688" y="44" class="heading night-ink" font-size="28">Surface, evidence &amp; record</text>
+    <text x="0" y="72" class="body muted" font-size="14">Contain only persistent work, focused dockets, and overlays.</text>
+    <text x="688" y="72" class="body night-muted" font-size="14">Tonal boundaries replace glowing outlines and decorative cards.</text>
+
+    <g id="Surface-light" transform="translate(0 104)">
+      <rect x="0" y="0" width="180" height="76" fill="#F4F7F5"/>
+      <text x="16" y="30" class="label ink" font-size="13">Surface/Open</text><text x="16" y="52" class="body muted" font-size="12">Spacing is the boundary.</text>
+      <rect x="198" y="0" width="204" height="76" fill="#FFFFFF" stroke="#C9D4D9"/>
+      <text x="214" y="30" class="label ink" font-size="13">Surface/Ruled</text><text x="214" y="52" class="body muted" font-size="12">Records and lists.</text>
+      <rect x="420" y="0" width="220" height="76" rx="12" fill="#FFFFFF" filter="url(#raised)"/>
+      <text x="436" y="30" class="label ink" font-size="13">Surface/Overlay</text><text x="436" y="52" class="body muted" font-size="12">Dialog, drawer, popover.</text>
+    </g>
+    <g id="Surface-dark" transform="translate(688 104)">
+      <rect x="0" y="0" width="180" height="76" fill="#071A2B"/>
+      <text x="16" y="30" class="label night-ink" font-size="13">Surface/Open</text><text x="16" y="52" class="body night-muted" font-size="12">Canvas continues.</text>
+      <rect x="198" y="0" width="204" height="76" fill="#0E283E" stroke="#335166"/>
+      <text x="214" y="30" class="label night-ink" font-size="13">Surface/Ruled</text><text x="214" y="52" class="body night-muted" font-size="12">Operational boundary.</text>
+      <rect x="420" y="0" width="220" height="76" rx="12" fill="#15364D" filter="url(#raised)"/>
+      <text x="436" y="30" class="label night-ink" font-size="13">Surface/FocusedDocket</text><text x="436" y="52" class="body night-muted" font-size="12">Selected case only.</text>
+    </g>
+
+    <g id="FieldAperture-light" transform="translate(0 214)">
+      <rect width="656" height="232" rx="12" fill="#FFFFFF" stroke="#C9D4D9"/>
+      <rect x="16" y="16" width="624" height="150" rx="8" fill="url(#map-light)"/>
+      <path d="M32 48V30H50M606 30H624V48M624 134V152H606M50 152H32V134" stroke="#0C2436" stroke-width="3"/>
+      <circle cx="394" cy="92" r="14" fill="#FFFFFF" stroke="#B9380B" stroke-width="3"/>
+      <path d="M394 80V104M382 92H406" stroke="#B9380B" stroke-width="2"/>
+      <g id="CoordinateRail-light">
+        <text x="28" y="194" class="mono ink" font-size="13">PUL-2026-0822 / FLOODED STREET</text>
+        <text x="28" y="216" class="mono muted" font-size="11">Metadata/CoordinateRail · BRGY 167 · 10TH AVE / 14.720712, 120.985134</text>
+      </g>
+      <text x="628" y="198" class="label" font-size="12" fill="#B9380B" text-anchor="end">FIELD APERTURE</text>
+    </g>
+    <g id="FieldAperture-dark" transform="translate(688 214)">
+      <rect width="688" height="232" rx="12" fill="#0E283E" stroke="#335166"/>
+      <rect x="16" y="16" width="656" height="150" rx="8" fill="url(#map-dark)"/>
+      <path d="M32 48V30H50M638 30H656V48M656 134V152H638M50 152H32V134" stroke="#F4F7F2" stroke-width="3"/>
+      <circle cx="414" cy="92" r="14" fill="#071A2B" stroke="#82C7D8" stroke-width="3"/>
+      <path d="M414 80V104M402 92H426" stroke="#82C7D8" stroke-width="2"/>
+      <g id="CoordinateRail-dark">
+        <text x="28" y="194" class="mono night-ink" font-size="13">PUL-2026-0822 / EXPOSED ELECTRICAL WIRE</text>
+        <text x="28" y="216" class="mono night-muted" font-size="11">Metadata/CoordinateRail · BRGY 176 · DEPARO ST / UPDATED 08:37</text>
+      </g>
+      <text x="660" y="198" class="label" font-size="12" fill="#82C7D8" text-anchor="end">FIELD APERTURE</text>
+    </g>
+
+    <g id="SignalCut-light" transform="translate(0 484)">
+      <text x="0" y="0" class="label ink" font-size="14">Progress/SignalCut · public lifecycle</text>
+      <path d="M0 44H116L128 39L136 53L146 29L156 44H656" stroke="#C9D4D9" stroke-width="2"/>
+      <path d="M0 44H146" stroke="#B9380B" stroke-width="2"/>
+      <g id="SignalCut-labels-light" class="body" font-size="12" fill="#465D6C"><text x="0" y="78">Received</text><text x="130" y="78">Verified</text><text x="260" y="78">Assigned</text><text x="390" y="78">On site</text><text x="530" y="78">Resolved</text></g>
+      <circle cx="0" cy="44" r="7" fill="#0B756B"/><circle cx="146" cy="44" r="8" fill="#F4F7F5" stroke="#B9380B" stroke-width="3"/><circle cx="276" cy="44" r="6" fill="#F4F7F5" stroke="#C9D4D9" stroke-width="2"/><circle cx="406" cy="44" r="6" fill="#F4F7F5" stroke="#C9D4D9" stroke-width="2"/><circle cx="546" cy="44" r="6" fill="#F4F7F5" stroke="#C9D4D9" stroke-width="2"/>
+    </g>
+    <g id="SignalCut-dark" transform="translate(688 484)">
+      <text x="0" y="0" class="label night-ink" font-size="14">Progress/SignalCut · internal lifecycle</text>
+      <path d="M0 44H116L128 39L136 53L146 29L156 44H688" stroke="#335166" stroke-width="2"/>
+      <path d="M0 44H406" stroke="#82C7D8" stroke-width="2"/>
+      <g id="SignalCut-labels-dark" class="body" font-size="12" fill="#B9C7CF"><text x="0" y="78">Received</text><text x="130" y="78">Verified</text><text x="260" y="78">Assigned</text><text x="390" y="78">On site</text><text x="530" y="78">Resolved</text></g>
+      <circle cx="0" cy="44" r="7" fill="#66D2C8"/><circle cx="146" cy="44" r="7" fill="#66D2C8"/><circle cx="276" cy="44" r="7" fill="#66D2C8"/><circle cx="406" cy="44" r="8" fill="#071A2B" stroke="#82C7D8" stroke-width="3"/><circle cx="546" cy="44" r="6" fill="#071A2B" stroke="#335166" stroke-width="2"/>
+    </g>
+  </g>
+
+  <g id="Navigation-and-decisions" transform="translate(32 1578)">
+    <line x1="0" y1="0" x2="656" y2="0" class="rule"/><line x1="688" y1="0" x2="1376" y2="0" class="night-rule"/>
+    <text x="0" y="44" class="heading ink" font-size="28">Navigation &amp; resident action</text>
+    <text x="688" y="44" class="heading night-ink" font-size="28">Navigation &amp; staff decisions</text>
+    <text x="0" y="72" class="body muted" font-size="14">Five stable destinations; the report action stays thumb-visible.</text>
+    <text x="688" y="72" class="body night-muted" font-size="14">Role-aware rail, queue context, and explicit decision language.</text>
+
+    <g id="Resident-bottom-nav-light" transform="translate(0 106)">
+      <rect width="656" height="94" rx="12" fill="#FFFFFF" stroke="#718794"/>
+      <g id="BottomNav-home-light" transform="translate(56 24)" class="stroke-ink icon"><path d="M0 18L14 6L28 18V34H18V24H10V34H0V18Z"/></g>
+      <text x="70" y="76" class="label" font-size="12" fill="#B9380B" text-anchor="middle">Home</text>
+      <g id="BottomNav-reports-light" transform="translate(174 28)" class="stroke-ink icon"><rect width="24" height="30" rx="3"/><path d="M6 8H18M6 15H18M6 22H14"/></g>
+      <text x="186" y="76" class="body ink" font-size="12" text-anchor="middle">My reports</text>
+      <circle cx="328" cy="40" r="32" fill="#B9380B"/>
+      <path d="M328 24V56M312 40H344" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+      <text x="328" y="82" class="label" font-size="11" fill="#B9380B" text-anchor="middle">Report</text>
+      <g id="BottomNav-updates-light" transform="translate(456 28)" class="stroke-ink icon"><path d="M4 22V13C4 5 20 5 20 13V22L24 26H0L4 22Z"/><path d="M9 29H15"/></g>
+      <text x="468" y="76" class="body ink" font-size="12" text-anchor="middle">Updates</text>
+      <g id="BottomNav-account-light" transform="translate(568 26)" class="stroke-ink icon"><circle cx="12" cy="9" r="7"/><path d="M0 31C2 20 22 20 24 31"/></g>
+      <text x="580" y="76" class="body ink" font-size="12" text-anchor="middle">Account</text>
+    </g>
+    <g id="Resident-bottom-nav-dark" transform="translate(0 212)">
+      <rect width="656" height="94" rx="12" fill="#0E283E" stroke="#6A8495"/>
+      <g id="BottomNav-home-dark" transform="translate(56 24)" class="icon" fill="none" stroke="#F4F7F2"><path d="M0 18L14 6L28 18V34H18V24H10V34H0V18Z"/></g>
+      <text x="70" y="76" class="label" font-size="12" fill="#FF8A3D" text-anchor="middle">Home</text>
+      <g id="BottomNav-reports-dark" transform="translate(174 28)" class="icon" fill="none" stroke="#F4F7F2"><rect width="24" height="30" rx="3"/><path d="M6 8H18M6 15H18M6 22H14"/></g>
+      <text x="186" y="76" class="body night-ink" font-size="12" text-anchor="middle">My reports</text>
+      <circle cx="328" cy="40" r="32" fill="#FF8A3D"/>
+      <path d="M328 24V56M312 40H344" stroke="#071A2B" stroke-width="3" stroke-linecap="round"/>
+      <text x="328" y="82" class="label" font-size="11" fill="#FF8A3D" text-anchor="middle">Report</text>
+      <g id="BottomNav-updates-dark" transform="translate(456 28)" class="icon" fill="none" stroke="#F4F7F2"><path d="M4 22V13C4 5 20 5 20 13V22L24 26H0L4 22Z"/><path d="M9 29H15"/></g>
+      <text x="468" y="76" class="body night-ink" font-size="12" text-anchor="middle">Updates</text>
+      <g id="BottomNav-account-dark" transform="translate(568 26)" class="icon" fill="none" stroke="#F4F7F2"><circle cx="12" cy="9" r="7"/><path d="M0 31C2 20 22 20 24 31"/></g>
+      <text x="580" y="76" class="body night-ink" font-size="12" text-anchor="middle">Account</text>
+    </g>
+
+    <g id="Gov-navigation-light" transform="translate(688 106)">
+      <g id="Gov-nav-rail-light">
+        <rect width="72" height="100" rx="8" fill="#FFFFFF" stroke="#718794"/>
+        <circle cx="36" cy="20" r="13" stroke="#0C2436" stroke-width="2"/>
+        <rect x="14" y="42" width="44" height="36" rx="6" fill="#0B4F6C"/>
+        <path d="M27 51H45V69H27V51ZM31 47H41" stroke="#FFFFFF" stroke-width="2"/>
+        <path d="M28 90H44" stroke="#465D6C" stroke-width="2" stroke-linecap="round"/>
+      </g>
+      <g id="Gov-nav-rail-annotation-light" transform="translate(88 0)">
+        <text x="0" y="15" class="label night-ink" font-size="13">Gov/NavRail + StickyDecisionBar · light</text>
+        <text x="0" y="35" class="body night-muted" font-size="12">Capability-driven actions; confirm destructive transitions.</text>
+      </g>
+      <g id="Gov-decision-action-bar-light" transform="translate(88 46)">
+        <rect width="600" height="54" rx="10" fill="#FFFFFF" stroke="#718794"/>
+        <rect x="10" y="9" width="162" height="36" rx="8" fill="#0B4F6C"/>
+        <text x="91" y="32" class="label" font-size="12" fill="#FFFFFF" text-anchor="middle">Assign work order</text>
+        <rect x="184" y="9" width="162" height="36" rx="8" fill="none" stroke="#0B4F6C"/>
+        <text x="265" y="32" class="label" font-size="12" fill="#0B4F6C" text-anchor="middle">Request changes</text>
+        <rect x="358" y="9" width="162" height="36" rx="8" fill="none" stroke="#B9380B"/>
+        <text x="439" y="32" class="label" font-size="12" fill="#B9380B" text-anchor="middle">Escalate</text>
+      </g>
+    </g>
+    <g id="Gov-navigation-dark" transform="translate(688 216)">
+      <g id="Gov-nav-rail-dark">
+        <rect width="72" height="100" rx="8" fill="#0E283E" stroke="#6A8495"/>
+        <circle cx="36" cy="20" r="13" stroke="#F4F7F2" stroke-width="2"/>
+        <rect x="14" y="42" width="44" height="36" rx="6" fill="#0B4F6C"/>
+        <path d="M27 51H45V69H27V51ZM31 47H41" stroke="#F4F7F2" stroke-width="2"/>
+        <path d="M28 90H44" stroke="#B9C7CF" stroke-width="2" stroke-linecap="round"/>
+      </g>
+      <g id="Gov-nav-rail-annotation-dark" transform="translate(88 0)">
+        <text x="0" y="15" class="label night-ink" font-size="13">Gov/NavRail + StickyDecisionBar · dark</text>
+        <text x="0" y="35" class="body night-muted" font-size="12">Same hierarchy, targets, decisions, and recovery.</text>
+      </g>
+      <g id="Gov-decision-action-bar-dark" transform="translate(88 46)">
+        <rect width="600" height="54" rx="10" fill="#0E283E" stroke="#6A8495"/>
+        <rect x="10" y="9" width="162" height="36" rx="8" fill="#82C7D8"/>
+        <text x="91" y="32" class="label" font-size="12" fill="#071A2B" text-anchor="middle">Assign work order</text>
+        <rect x="184" y="9" width="162" height="36" rx="8" fill="none" stroke="#82C7D8"/>
+        <text x="265" y="32" class="label" font-size="12" fill="#82C7D8" text-anchor="middle">Request changes</text>
+        <rect x="358" y="9" width="162" height="36" rx="8" fill="none" stroke="#FF8A3D"/>
+        <text x="439" y="32" class="label" font-size="12" fill="#FF8A3D" text-anchor="middle">Escalate</text>
+      </g>
+    </g>
+  </g>
+
+  <g id="System-states" transform="translate(32 1936)">
+    <line x1="0" y1="0" x2="656" y2="0" class="rule"/><line x1="688" y1="0" x2="1376" y2="0" class="night-rule"/>
+    <text x="0" y="42" class="heading ink" font-size="28">Recovery is part of the component</text>
+    <text x="688" y="42" class="heading night-ink" font-size="28">Recovery is part of the component</text>
+
+    <g id="States-light" transform="translate(0 76)">
+      <g id="State-loading-light" transform="translate(0 0)"><path d="M18 4A14 14 0 1 1 5 23" stroke="#0B4F6C" stroke-width="3" stroke-linecap="round"/><text x="48" y="14" class="label ink" font-size="13">Loading</text><text x="48" y="34" class="body muted" font-size="12">Keep the destination and task visible.</text></g>
+      <g id="State-empty-light" transform="translate(220 0)"><rect x="3" y="4" width="26" height="32" rx="3" fill="none" stroke="#465D6C" stroke-width="2"/><path d="M9 14H23M9 21H20" stroke="#465D6C" stroke-width="2"/><text x="48" y="14" class="label ink" font-size="13">Empty</text><text x="48" y="34" class="body muted" font-size="12">Invite the next useful action.</text></g>
+      <g id="State-error-light" transform="translate(438 0)"><path d="M18 3L34 35H2L18 3Z" fill="#B42318"/><path d="M18 12V23M18 28V29" stroke="#FFFFFF" stroke-width="2"/><text x="48" y="14" class="label ink" font-size="13">Error</text><text x="48" y="34" class="body muted" font-size="12">Name the problem and retry.</text></g>
+      <g id="State-offline-light" transform="translate(0 70)"><path d="M4 19C12 11 24 11 32 19M10 25C15 20 21 20 26 25M18 31H18" stroke="#B45309" stroke-width="2" stroke-linecap="round"/><path d="M2 4L34 36" stroke="#B45309" stroke-width="2"/><text x="48" y="14" class="label ink" font-size="13">Offline</text><text x="48" y="34" class="body muted" font-size="12">Retain evidence; send when connected.</text></g>
+      <g id="State-permission-light" transform="translate(328 70)"><rect x="4" y="16" width="28" height="20" rx="4" fill="none" stroke="#465D6C" stroke-width="2"/><path d="M10 16V11C10 1 26 1 26 11V16" stroke="#465D6C" stroke-width="2"/><text x="48" y="14" class="label ink" font-size="13">Permission limited</text><text x="48" y="34" class="body muted" font-size="12">Explain why and offer a safe route back.</text></g>
+    </g>
+    <g id="States-dark" transform="translate(688 76)">
+      <g id="State-loading-dark" transform="translate(0 0)"><path d="M18 4A14 14 0 1 1 5 23" stroke="#82C7D8" stroke-width="3" stroke-linecap="round"/><text x="48" y="14" class="label night-ink" font-size="13">Loading</text><text x="48" y="34" class="body night-muted" font-size="12">Skeletons preserve record structure.</text></g>
+      <g id="State-empty-dark" transform="translate(220 0)"><rect x="3" y="4" width="26" height="32" rx="3" fill="none" stroke="#B9C7CF" stroke-width="2"/><path d="M9 14H23M9 21H20" stroke="#B9C7CF" stroke-width="2"/><text x="48" y="14" class="label night-ink" font-size="13">Empty</text><text x="48" y="34" class="body night-muted" font-size="12">Clear filters or open another queue.</text></g>
+      <g id="State-error-dark" transform="translate(438 0)"><path d="M18 3L34 35H2L18 3Z" fill="#FDA29B"/><path d="M18 12V23M18 28V29" stroke="#071A2B" stroke-width="2"/><text x="48" y="14" class="label night-ink" font-size="13">Error</text><text x="48" y="34" class="body night-muted" font-size="12">Keep unsaved notes available.</text></g>
+      <g id="State-offline-dark" transform="translate(0 70)"><path d="M4 19C12 11 24 11 32 19M10 25C15 20 21 20 26 25M18 31H18" stroke="#FBBF24" stroke-width="2" stroke-linecap="round"/><path d="M2 4L34 36" stroke="#FBBF24" stroke-width="2"/><text x="48" y="14" class="label night-ink" font-size="13">Offline</text><text x="48" y="34" class="body night-muted" font-size="12">Show freshness and last synchronized time.</text></g>
+      <g id="State-permission-dark" transform="translate(328 70)"><rect x="4" y="16" width="28" height="20" rx="4" fill="none" stroke="#B9C7CF" stroke-width="2"/><path d="M10 16V11C10 1 26 1 26 11V16" stroke="#B9C7CF" stroke-width="2"/><text x="48" y="14" class="label night-ink" font-size="13">Permission limited</text><text x="48" y="34" class="body night-muted" font-size="12">Name the required capability, never the role guess.</text></g>
+    </g>
+  </g>
+
+  <g id="Footer" transform="translate(32 2170)">
+    <text x="0" y="0" class="mono muted" font-size="11">FIGMA IMPORT / GROUPS ARE SEMANTICALLY NAMED / BIND TO PULSO CORE VARIABLES AFTER IMPORT</text>
+    <text x="1376" y="0" class="mono night-muted" font-size="11" text-anchor="end">LIGHT ↔ DARK PARITY / WCAG 2.2 AA / 1440 × 2200</text>
+  </g>
+</svg>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import ReportDensityLayer from '../components/maps/ReportDensityLayer';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -9,15 +10,21 @@ import {
     CheckCircle, XCircle, Info, Loader2, Search, Filter,
     PieChart, LineChart as LineChartIcon, Globe, Navigation,
     AlertCircle, Package, ChevronDown, X, RotateCcw
-} from 'lucide-react';
-import { GoogleMap, useJsApiLoader, HeatmapLayer, CircleF, MarkerF, PolygonF } from '@react-google-maps/api';
+} from '../icons';
+import { GoogleMap, CircleF, MarkerF, PolygonF } from '@react-google-maps/api';
+import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import GovSidebar from '../components/GovSidebar';
-import { useTheme } from '../contexts/ThemeContext';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
+import OrangeSelect from '../components/OrangeSelect';
 import ThemeToggle from '../components/ThemeToggle';
-
+import { useTheme } from '../contexts/ThemeContext';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
-const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const LIBRARIES = ['places', 'geometry', 'visualization'];
+import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
+import SearchInput from '../components/SearchInput';
 
 const CATEGORY_LABELS = {
     'roads_bridges': 'Roads & Bridges',
@@ -26,6 +33,8 @@ const CATEGORY_LABELS = {
     'public_safety_regulatory': 'Public Safety & Regulatory',
     'public_facilities': 'Public Facilities'
 };
+
+const MAP_CENTER = { lat: 14.7000, lng: 121.0000 };
 
 // ─── Theme Constants ─────────────────────────────────────────────────────────
 const THREAT_CONFIG = {
@@ -36,22 +45,42 @@ const THREAT_CONFIG = {
 };
 
 const DARK_MAP_STYLE = [
-    { elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#334155' }] },
-    { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#475569' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0c4a6e' }] },
     { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+    { elementType: 'geometry', stylers: [{ color: '#0c1322' }] },
+    { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#0c1322' }] },
+    { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#090f1a' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#070b14' }] },
+    { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+    { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#1e293b' }, { weight: 1 }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.stroke', stylers: [{ color: '#0c1322' }, { weight: 3 }] },
+    { featureType: 'administrative.neighborhood', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+    { featureType: 'administrative.neighborhood', elementType: 'labels.text.stroke', stylers: [{ color: '#0c1322' }, { weight: 2 }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#162030' }, { weight: 0.8 }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#25354d' }, { weight: 1.5 }] },
+    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#8193aa' }] },
+    { featureType: 'road.highway', elementType: 'labels.text.stroke', stylers: [{ color: '#0c1322' }, { weight: 3 }] },
+    { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#1c283a' }, { weight: 1.2 }] },
+    { featureType: 'road.arterial', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+    { featureType: 'road.arterial', elementType: 'labels.text.stroke', stylers: [{ color: '#0c1322' }, { weight: 3 }] },
+    { featureType: 'road.local', elementType: 'geometry', stylers: [{ color: '#141d2c' }, { weight: 0.8 }] },
+    { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#55657a' }] },
+    { featureType: 'road.local', elementType: 'labels.text.stroke', stylers: [{ color: '#0c1322' }, { weight: 2 }] },
 ];
 
 const LIGHT_MAP_STYLE = [
-    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#f8fafc' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
     { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+    { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e0f2fe' }] },
+    { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+    { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#cbd5e1' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#fed7aa' }] },
+    { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#f1f5f9' }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
 ];
 
 // ─── KPI Card ────────────────────────────────────────────────────────────────
@@ -62,12 +91,12 @@ const KPICard = ({ label, value, sub, icon: Icon, color = 'indigo', trend }) => 
             <Icon size={20} className={`text-${color}-600 dark:text-${color}-400`} />
         </div>
         <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">{label}</p>
-            <p className="text-xl font-black text-slate-900 dark:text-white leading-tight truncate">{value ?? '—'}</p>
-            {sub && <p className="text-[10px] text-slate-500 mt-0.5 font-medium truncate">{sub}</p>}
+            <p className="text-[10px] font-bold text-black dark:text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
+            <p className="text-xl font-black text-black dark:text-white leading-tight truncate">{value ?? '—'}</p>
+            {sub && <p className="text-[10px] text-black dark:text-slate-400 mt-0.5 font-medium truncate">{sub}</p>}
         </div>
         {trend !== undefined && (
-            <div className={`shrink-0 flex items-center gap-1 text-xs font-bold ${trend > 0 ? 'text-red-500' : trend < 0 ? 'text-green-500' : 'text-slate-400'}`}>
+            <div className={`shrink-0 flex items-center gap-1 text-xs font-bold ${trend > 0 ? 'text-red-500' : trend < 0 ? 'text-green-500' : 'text-black dark:text-slate-400'}`}>
                 {trend > 0 ? <TrendingUp size={14}/> : trend < 0 ? <TrendingDown size={14}/> : <Minus size={14}/>}
                 {Math.abs(trend)}%
             </div>
@@ -100,20 +129,20 @@ const ClusterCard = ({ cluster, onSelect, selected }) => {
                     <p className="font-black text-slate-900 dark:text-white text-sm mt-1.5 leading-tight">
                         {CATEGORY_LABELS[cluster.dominant_category] || cluster.dominant_category.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    <p className="text-xs text-black dark:text-slate-400 mt-0.5 font-medium">
                         Barangay {cluster.barangay} · {cluster.radius_meters.toFixed(0)}m radius
                     </p>
                 </div>
                 <div className="shrink-0 text-right">
                     <p className="text-xl font-black text-slate-900 dark:text-white">{cluster.report_count}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Reports</p>
+                    <p className="text-[10px] font-bold text-black dark:text-slate-400 uppercase">Reports</p>
                 </div>
             </div>
             <div className="flex items-center justify-between mt-2">
                 <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 truncate pr-2" title={cluster.estimated_cost_formatted}>
                     {cluster.estimated_cost_formatted}
                 </p>
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold shrink-0">
+                <div className="flex items-center gap-1.5 text-[10px] text-black dark:text-slate-400 font-bold shrink-0">
                     <span className="opacity-70 whitespace-nowrap">Recurrence: {(cluster.recurrence_score * 100).toFixed(0)}%</span>
                     <ChevronRight size={12} className="opacity-50" />
                 </div>
@@ -123,17 +152,46 @@ const ClusterCard = ({ cluster, onSelect, selected }) => {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function GovAnalyticsPage() {
+export default function GovAnalyticsPage({ workspace }) {
     const { theme } = useTheme();
-    const isDarkMode = theme === 'system' 
-        ? window.matchMedia('(prefers-color-scheme: dark)').matches 
-        : theme === 'dark';
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        if (typeof document !== 'undefined') {
+            return document.documentElement.classList.contains('dark') ||
+                theme === 'dark' ||
+                (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        }
+        return false;
+    });
+
+    useEffect(() => {
+        const updateTheme = () => {
+            const isDark = document.documentElement.classList.contains('dark') ||
+                theme === 'dark' ||
+                (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            setIsDarkMode(isDark);
+        };
+        updateTheme();
+
+        const observer = new MutationObserver(updateTheme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        mediaQuery.addEventListener('change', updateTheme);
+
+        return () => {
+            observer.disconnect();
+            mediaQuery.removeEventListener('change', updateTheme);
+        };
+    }, [theme]);
     const navigate = useNavigate();
-    const token = localStorage.getItem('pulso_token');
+    const token = getAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     const [summary, setSummary] = useState(null);
     const [clusters, setClusters] = useState([]);
+    const [clusteringLoading, setClusteringLoading] = useState(true);
+    const [clusteringError, setClusteringError] = useState(null);
+    const [clusterRetryTrigger, setClusterRetryTrigger] = useState(0);
     const [forecast, setForecast] = useState([]);
     const [recurrence, setRecurrence] = useState([]);
     const [heatmapData, setHeatmapData] = useState(null);
@@ -144,6 +202,7 @@ export default function GovAnalyticsPage() {
     const [reportStatusFilter, setReportStatusFilter] = useState('');
     const [reportCategoryFilter, setReportCategoryFilter] = useState('');
     const [showNorthBorder, setShowNorthBorder] = useState(true);
+    const [showSouthBorder, setShowSouthBorder] = useState(true);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('map');
     const [selectedCluster, setSelectedCluster] = useState(null);
@@ -156,37 +215,39 @@ export default function GovAnalyticsPage() {
     const [categoryFilter, setCategoryFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [mapRef, setMapRef] = useState(null);
-    const [currentUser] = useState(() => JSON.parse(localStorage.getItem('pulso_user') || '{}'));
+    const [currentUser] = useState(() => getAuthUser() || {});
     const [toast, setToast] = useState(null);
     const [fetchError, setFetchError] = useState(null);
     const [generatingBrief, setGeneratingBrief] = useState(false);
     const [aiBrief, setAiBrief] = useState(null);
     const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
 
-    const { isLoaded: mapsLoaded } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: GOOGLE_MAPS_KEY || '',
-        libraries: LIBRARIES,
-    });
+    useEffect(() => {
+        if (mapRef) {
+            mapRef.setOptions({
+                styles: isDarkMode ? DARK_MAP_STYLE : LIGHT_MAP_STYLE,
+            });
+        }
+    }, [mapRef, isDarkMode]);
 
-    // ── Fetch All Data ──────────────────────────────────────────────────────
+    const { isLoaded: mapsLoaded } = useGoogleMaps();
+
+    // ── Fetch General Analytics Data (KPIs, Forecast, Recurrence, Heatmap, Border) ──
     const fetchData = useCallback(async () => {
         setLoading(true);
         setFetchError(null);
         try {
-            const sectorParam = '?sector=North';
-
-            const [summaryRes, clustersRes, forecastRes, recurrenceRes, heatmapRes, borderRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/gov/analytics/summary`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/clusters?days_back=${daysBack}${categoryFilter ? `&category=${categoryFilter}` : ''}`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/forecast`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/recurrence`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers }),
-                fetch(`${API_BASE_URL}/api/geo/caloocan-border${sectorParam}`, { headers }),
+            const currentToken = getAuthToken();
+            const authHeaders = { Authorization: `Bearer ${currentToken}` };
+            const [summaryRes, forecastRes, recurrenceRes, heatmapRes, borderRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/gov/analytics/summary`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/forecast`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/recurrence`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/geo/caloocan-border`, { headers: authHeaders }),
             ]);
             if (summaryRes.ok)    setSummary(await summaryRes.json());
             else throw new Error(`Summary: ${summaryRes.status}`);
-            if (clustersRes.ok)   setClusters((await clustersRes.json()).clusters || []);
             if (forecastRes.ok)   setForecast(await forecastRes.json());
             if (recurrenceRes.ok) setRecurrence((await recurrenceRes.json()).recurrence_events || []);
             if (heatmapRes.ok)    setHeatmapData(await heatmapRes.json());
@@ -197,7 +258,70 @@ export default function GovAnalyticsPage() {
         } finally {
             setLoading(false);
         }
-    }, [daysBack, categoryFilter, showNorthBorder]);
+    }, [daysBack]);
+
+    // ── Fetch DBSCAN Spatial Clusters (Isolated lifecycle with 15s timeout & AbortController) ──
+    useEffect(() => {
+        let isCancelled = false;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort(new Error('Clustering request timed out after 15 seconds'));
+        }, 15000);
+
+        setClusteringLoading(true);
+        setClusteringError(null);
+
+        const runClustering = async () => {
+            try {
+                const authToken = getAuthToken();
+                const clusterHeaders = { Authorization: `Bearer ${authToken}` };
+                const params = new URLSearchParams({
+                    days_back: String(daysBack),
+                    min_points: '3',
+                    eps: '100',
+                });
+                if (categoryFilter) {
+                    params.set('category', categoryFilter);
+                }
+
+                const res = await fetch(`${API_BASE_URL}/api/gov/analytics/clusters?${params.toString()}`, {
+                    headers: clusterHeaders,
+                    signal: controller.signal,
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
+                }
+
+                const data = await res.json();
+                if (!isCancelled) {
+                    setClusters(Array.isArray(data.clusters) ? data.clusters : []);
+                }
+            } catch (err) {
+                if (isCancelled) return;
+                if (err.name === 'AbortError' || controller.signal.aborted) {
+                    console.error('DBSCAN clustering aborted or timed out (15s limit):', err);
+                    setClusteringError('Analysis timed out. Please check connection and try again.');
+                } else {
+                    console.error('DBSCAN clustering failed:', err);
+                    setClusteringError(err.message || 'Failed to complete spatial clustering');
+                }
+            } finally {
+                clearTimeout(timeoutId);
+                if (!isCancelled) {
+                    setClusteringLoading(false);
+                }
+            }
+        };
+
+        runClustering();
+
+        return () => {
+            isCancelled = true;
+            clearTimeout(timeoutId);
+            controller.abort();
+        };
+    }, [daysBack, categoryFilter, clusterRetryTrigger]);
 
     // ── Fetch Live Reports ──────────────────────────────────────────────────
     const fetchLiveReports = useCallback(async () => {
@@ -221,24 +345,17 @@ export default function GovAnalyticsPage() {
     useEffect(() => { fetchData(); }, [fetchData]);
     useEffect(() => { if (activeTab === 'reports') fetchLiveReports(); }, [activeTab, fetchLiveReports]);
 
-    // Refetch borders only when map toggles change (Strict Pipeline Requirement)
-    useEffect(() => {
-        const fetchBordersOnly = async () => {
-            const sectorParam = '?sector=North';
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/geo/caloocan-border${sectorParam}`, { headers });
-                if (res.ok) setBorderData(await res.json());
-            } catch(e) { console.error("Border reload failed", e); }
-        };
-        fetchBordersOnly();
-    }, [showNorthBorder]);
-
     // Auto-fit map to visible boundaries
     useEffect(() => {
         if (borderData?.features?.length > 0 && mapRef) {
             const bounds = new window.google.maps.LatLngBounds();
             let hasPoints = false;
             borderData.features.forEach(f => {
+                const sector = f.properties?.sector || 'Caloocan';
+                const isNorth = sector === 'North';
+                if (isNorth && !showNorthBorder) return;
+                if (!isNorth && !showSouthBorder) return;
+
                 if (f.geometry?.type === 'Polygon') {
                     f.geometry.coordinates[0].forEach(c => { bounds.extend({lng: c[0], lat: c[1]}); hasPoints = true; });
                 } else if (f.geometry?.type === 'MultiPolygon') {
@@ -247,9 +364,11 @@ export default function GovAnalyticsPage() {
                     });
                 }
             });
-            if (hasPoints) mapRef.fitBounds(bounds);
+            if (hasPoints && !selectedCluster) {
+                mapRef.fitBounds(bounds);
+            }
         }
-    }, [borderData, mapRef]);
+    }, [borderData, mapRef, showNorthBorder, showSouthBorder]);
 
     // ── Export CSV ───────────────────────────────────────────────────────
     const exportCSV = (type) => {
@@ -386,14 +505,17 @@ export default function GovAnalyticsPage() {
         if (c.includes('light') || c.includes('electr')) return '#eab308';
         if (c.includes('structural')) return '#ef4444';
         if (c.includes('garbage')) return '#8b5cf6';
+        if (c.includes('other')) return '#8b5cf6';
         return '#6366f1';
     };
 
-    const filteredClusters = clusters.filter(c =>
-        !searchTerm ||
-        c.barangay?.includes(searchTerm) ||
-        c.dominant_category?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredClusters = useMemo(() => {
+        return (clusters || []).filter(c =>
+            !searchTerm ||
+            c.barangay?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.dominant_category?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [clusters, searchTerm]);
 
     const TABS = [
         { key: 'map',        label: 'Intelligence Map',  icon: Globe },
@@ -425,26 +547,28 @@ export default function GovAnalyticsPage() {
             <GovSidebar currentUser={currentUser} activeTab="analytics" />
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Header */}
-                <div className={`border-b px-8 py-4 flex items-center justify-between shrink-0 backdrop-blur-md ${isDarkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white/80 border-slate-200'}`}>
-                    <div>
-                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
-                            <Brain size={12}/> Infrastructure Intelligence Engine
-                        </div>
-                        <h1 className={`text-2xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Analytics Command Center</h1>
+                <div className={`border-b px-8 py-4 flex items-center justify-between shrink-0 backdrop-blur-md relative z-50 ${isDarkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white/80 border-slate-200'}`}>
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb category="Operations" current="Analytics & Threat Intelligence" />
+                        <h1 className={`text-xl sm:text-2xl font-heading font-black tracking-tight mt-0.5 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Analytics Command Center</h1>
                         <p className="text-slate-400 text-sm mt-0.5">Data-driven insights for budget justification and resource allocation</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <select
+                        <OrangeSelect
                             value={daysBack}
-                            onChange={e => setDaysBack(Number(e.target.value))}
-                            className={`border text-sm rounded-xl px-4 py-2 font-semibold focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}
-                        >
-                            <option value={30}>Last 30 days</option>
-                            <option value={60}>Last 60 days</option>
-                            <option value={90}>Last 90 days</option>
-                            <option value={180}>Last 6 months</option>
-                            <option value={365}>Last year</option>
-                        </select>
+                            onChange={val => setDaysBack(Number(val))}
+                            size="md"
+                            minWidth="160px"
+                            searchable={false}
+                            placeholder="Select period"
+                            options={[
+                                { value: 30, label: 'Last 30 days' },
+                                { value: 60, label: 'Last 60 days' },
+                                { value: 90, label: 'Last 90 days' },
+                                { value: 180, label: 'Last 6 months' },
+                                { value: 365, label: 'Last year' }
+                            ]}
+                        />
                         <button onClick={fetchData}
                             className={`flex items-center gap-2 border font-bold text-sm px-4 py-2 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}>
                             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -454,8 +578,12 @@ export default function GovAnalyticsPage() {
                             className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded-xl transition-colors shadow-lg shadow-emerald-500/10">
                             <Download size={15} /> Export CSV
                         </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </div>
+
+                {workspace && <GovernmentWorkspaceTabs workspace={workspace} currentUser={currentUser} />}
 
                 <div className="flex-1 flex flex-col overflow-hidden">
                     {/* KPI Strip */}
@@ -490,20 +618,20 @@ export default function GovAnalyticsPage() {
                         <div className="px-8 mt-4 shrink-0">
                             {!aiBrief ? (
                                 <button onClick={generateBrief} disabled={generatingBrief || clusters.length === 0}
-                                    className="flex items-center gap-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-700/50 text-indigo-300 font-bold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-40">
-                                    {generatingBrief ? <><Loader2 size={15} className="animate-spin" /> Generating Intelligence Brief...</> : <><Brain size={15} /> Generate AI Intelligence Brief</>}
+                                    className="flex items-center gap-2.5 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400/50 text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+                                    {generatingBrief ? <><Loader2 size={16} className="animate-spin text-white" /> Generating Intelligence Brief...</> : <><Brain size={16} className="text-white" /> Generate AI Intelligence Brief</>}
                                 </button>
                             ) : (
                                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                                    className="bg-indigo-950/30 border border-indigo-800/40 rounded-2xl p-5">
+                                    className="bg-orange-50/60 dark:bg-slate-900 border border-orange-200 dark:border-orange-800/50 rounded-2xl p-5 shadow-sm">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-2">
-                                            <Brain size={16} className="text-indigo-400" />
-                                            <p className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Executive Intelligence Brief</p>
+                                            <Brain size={16} className="text-orange-600 dark:text-orange-400" />
+                                            <p className="text-xs font-black text-orange-600 dark:text-orange-400 uppercase tracking-wider">Executive Intelligence Brief</p>
                                         </div>
-                                        <button onClick={() => setAiBrief(null)} className="text-slate-500 hover:text-white"><X size={14} /></button>
+                                        <button onClick={() => setAiBrief(null)} className="text-slate-500 dark:text-slate-400 hover:text-black dark:hover:text-white p-1 rounded-lg hover:bg-orange-100 dark:hover:bg-slate-800 transition-colors"><X size={16} /></button>
                                     </div>
-                                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{aiBrief}</p>
+                                    <p className="text-sm text-black dark:text-slate-200 leading-relaxed whitespace-pre-wrap font-medium">{aiBrief}</p>
                                 </motion.div>
                             )}
                         </div>
@@ -516,10 +644,10 @@ export default function GovAnalyticsPage() {
                                 onClick={() => setActiveTab(tab.key)}
                                 className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors ${
                                     activeTab === tab.key
-                                        ? 'border-indigo-500 text-indigo-400'
+                                        ? 'border-orange-600 text-orange-600 dark:border-orange-500 dark:text-orange-400'
                                         : isDarkMode 
-                                            ? 'border-transparent text-slate-500 hover:text-slate-300'
-                                            : 'border-transparent text-slate-400 hover:text-slate-600'
+                                            ? 'border-transparent text-slate-400 hover:text-white'
+                                            : 'border-transparent text-black hover:text-orange-600'
                                 }`}>
                                 <tab.icon size={15} /> {tab.label}
                             </button>
@@ -532,29 +660,47 @@ export default function GovAnalyticsPage() {
                             {/* Cluster List Sidebar */}
                             <div className={`w-80 border-r flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
                                 <div className={`p-4 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                                    <div className="relative">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                        <input
-                                            type="text" placeholder="Search barangay or category..."
-                                            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                            className={`w-full border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 ${
-                                                isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'
-                                            }`}
-                                        />
-                                    </div>
-                                    <p className="text-xs text-slate-500 font-bold mt-2">{filteredClusters.length} stress zone{filteredClusters.length !== 1 ? 's' : ''} detected</p>
+                                    <SearchInput
+                                        value={searchTerm}
+                                        onChange={setSearchTerm}
+                                        placeholder="Search barangay or category"
+                                        ariaLabel="Search barangay or category"
+                                        onClear={() => setSearchTerm('')}
+                                        className="w-full"
+                                    />
+                                    <p className="text-xs text-slate-500 font-bold mt-2">
+                                        {clusteringLoading 
+                                            ? '- stress zones detected' 
+                                            : `${filteredClusters.length} stress zone${filteredClusters.length !== 1 ? 's' : ''} detected`
+                                        }
+                                    </p>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                                    {loading ? (
+                                    {clusteringLoading ? (
                                         <div className="text-center py-12 text-slate-500">
-                                            <Loader2 size={24} className="animate-spin mx-auto mb-2" />
-                                            Running DBSCAN clustering...
+                                            <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-500" />
+                                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Running DBSCAN clustering...</p>
+                                            <p className="text-xs text-slate-400 mt-1">Analyzing spatial density (100m radius)</p>
+                                        </div>
+                                    ) : clusteringError ? (
+                                        <div className="text-center py-10 px-4 text-slate-500">
+                                            <AlertTriangle size={32} className="mx-auto mb-2 text-rose-500 opacity-80" />
+                                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">We couldn't analyze this right now.</p>
+                                            <p className="text-xs text-slate-400 mt-1 max-w-[200px] mx-auto mb-3">{clusteringError}</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setClusterRetryTrigger(prev => prev + 1)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer shadow-sm"
+                                            >
+                                                <RotateCcw size={13} />
+                                                Retry
+                                            </button>
                                         </div>
                                     ) : filteredClusters.length === 0 ? (
                                         <div className="text-center py-12 text-slate-500">
                                             <Target size={32} className="mx-auto mb-2 opacity-30" />
-                                            <p className="text-sm font-bold">No stress zones detected</p>
-                                            <p className="text-xs mt-1">Try a wider date range</p>
+                                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No stress zones found for the selected period.</p>
+                                            <p className="text-xs text-slate-400 mt-1">Try a wider date range or clear filters</p>
                                         </div>
                                     ) : filteredClusters.map(c => (
                                         <ClusterCard key={c.cluster_id} cluster={c}
@@ -575,7 +721,8 @@ export default function GovAnalyticsPage() {
                                 <div className="flex-1 relative">
                                     {mapsLoaded ? (
                                         <GoogleMap
-                                            center={mapCenter}
+                                            key={`analytics-map-${isDarkMode ? 'dark' : 'light'}`}
+                                            center={MAP_CENTER}
                                             zoom={selectedCluster ? 16 : 14}
                                             mapContainerStyle={{ width: '100%', height: '100%' }}
                                             options={{ 
@@ -585,13 +732,15 @@ export default function GovAnalyticsPage() {
                                                 zoomControl: true, 
                                                 streetViewControl: false, 
                                                 fullscreenControl: false,
-                                                mapId: isDarkMode ? null : (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || '42e0e28462d4a298b3b3eb3f')
-            }}
-                                            onLoad={map => setMapRef(map)}
+                                            }}
+                                            onLoad={map => {
+                                                setMapRef(map);
+                                                map.setOptions({ styles: isDarkMode ? DARK_MAP_STYLE : LIGHT_MAP_STYLE });
+                                            }}
                                         >
                                             {/* Heatmap layer */}
-                                            {heatmapData?.raw_points?.length > 0 && window.google?.maps?.visualization && (
-                                                <HeatmapLayer
+                                            {heatmapData?.raw_points?.length > 0 && (
+                                                <ReportDensityLayer
                                                     data={heatmapData.raw_points.map(p =>
                                                         ({ location: new window.google.maps.LatLng(p.lat, p.lng), weight: p.weight || 1 })
                                                     )}
@@ -626,38 +775,15 @@ export default function GovAnalyticsPage() {
                                                     options={{ zIndex: 20 }}
                                                 />
                                             )}
-                                            {/* Caloocan City Borders — North (Orange) & South (Blue) */}
-                                            {borderData?.features?.map((feature, i) => {
-                                                const props = feature.properties || {};
-                                                const sector = props.sector || 'Caloocan';
-                                                const isNorth = sector === 'North';
-                                                // Respect toggle
-                                                if (!showNorthBorder) return null;
-
-                                                const polygonOptions = {
-                                                    strokeColor: isNorth ? '#f97316' : '#3b82f6',
-                                                    strokeOpacity: isNorth ? 1.0 : 0.85,
-                                                    strokeWeight: isNorth ? 3.0 : 2.5,
-                                                    fillColor: isNorth ? '#f97316' : '#3b82f6',
-                                                    fillOpacity: isNorth
-                                                        ? (isDarkMode ? 0.10 : 0.06)
-                                                        : (isDarkMode ? 0.07 : 0.04),
-                                                    clickable: false,
-                                                    zIndex: isNorth ? 2 : 1,
-                                                };
-
-                                                const paths = feature.geometry.type === 'MultiPolygon'
-                                                    ? feature.geometry.coordinates.map(poly => poly[0].map(c => ({ lng: c[0], lat: c[1] })))
-                                                    : [feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))];
-
-                                                return paths.map((path, pi) => (
-                                                    <PolygonF
-                                                        key={`border-${i}-${pi}`}
-                                                        paths={path}
-                                                        options={polygonOptions}
-                                                    />
-                                                ));
-                                            })}
+                                            {/* Caloocan City Borders — Unified Single Orange Style */}
+                                            {(showNorthBorder || showSouthBorder) && (
+                                                <CaloocanBoundaryLayer
+                                                    activeSector={showNorthBorder && showSouthBorder ? 'all' : showNorthBorder ? 'north' : 'south'}
+                                                    isDarkMode={isDarkMode}
+                                                    showBarangays={true}
+                                                    showLabels={true}
+                                                />
+                                            )}
                                         </GoogleMap>
                                     ) : (
                                         <div className={`w-full h-full flex items-center justify-center text-slate-500 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
@@ -676,10 +802,21 @@ export default function GovAnalyticsPage() {
                                         ))}
                                         <div className="border-t border-slate-800 pt-2 mt-2 space-y-1.5">
                                             <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5">City Boundaries</p>
-                                            <button onClick={() => setShowNorthBorder(v => !v)}
-                                                className={`flex items-center gap-2 text-xs w-full transition-opacity ${showNorthBorder ? '' : 'opacity-40'}`}>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setShowNorthBorder(v => !v)}
+                                                className={`flex items-center gap-2 text-xs w-full transition-opacity cursor-pointer ${showNorthBorder ? '' : 'opacity-40'}`}
+                                            >
                                                 <span className="w-3 h-1.5 rounded-sm shrink-0" style={{ background: '#f97316' }} />
                                                 <span className={`font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>North Caloocan Jurisdiction</span>
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setShowSouthBorder(v => !v)}
+                                                className={`flex items-center gap-2 text-xs w-full transition-opacity cursor-pointer ${showSouthBorder ? '' : 'opacity-40'}`}
+                                            >
+                                                <span className="w-3 h-1.5 rounded-sm shrink-0" style={{ background: '#ff6b00' }} />
+                                                <span className={`font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>South Caloocan Jurisdiction</span>
                                             </button>
                                         </div>
                                     </div>
@@ -762,13 +899,13 @@ export default function GovAnalyticsPage() {
 
                                             {/* AI Narrative */}
                                             {narrative && (
-                                                <div className="bg-indigo-950/40 border border-indigo-900/50 rounded-xl p-4">
+                                                <div className="bg-orange-50/70 dark:bg-slate-900 border border-orange-200 dark:border-orange-900/50 rounded-xl p-4 shadow-sm">
                                                     <div className="flex items-center gap-2 mb-3">
-                                                        <Brain size={15} className="text-indigo-400" />
-                                                        <p className="text-xs font-bold text-indigo-400 uppercase tracking-wider">AI Engineering Assessment</p>
+                                                        <Brain size={15} className="text-orange-600 dark:text-orange-400" />
+                                                        <p className="text-xs font-black text-orange-600 dark:text-orange-400 uppercase tracking-wider">AI Engineering Assessment</p>
                                                     </div>
-                                                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{narrative.narrative}</p>
-                                                    <p className="text-[10px] text-indigo-500 mt-3 font-bold">Generated by PULSO Intelligence Engine · {new Date(narrative.generated_at).toLocaleString('en-PH')}</p>
+                                                    <p className="text-xs text-black dark:text-slate-200 leading-relaxed whitespace-pre-wrap font-medium">{narrative.narrative}</p>
+                                                    <p className="text-[10px] text-orange-600 dark:text-orange-400 mt-3 font-bold">Generated by PULSO Intelligence Engine · {new Date(narrative.generated_at).toLocaleString('en-PH')}</p>
                                                 </div>
                                             )}
 
@@ -884,7 +1021,8 @@ export default function GovAnalyticsPage() {
                                         { value: 'water_drainage', label: 'Water & Drainage' },
                                         { value: 'street_lighting', label: 'Street Lighting' },
                                         { value: 'public_safety_regulatory', label: 'Public Safety & Regulatory' },
-                                        { value: 'public_facilities', label: 'Public Facilities' }
+                                        { value: 'public_facilities', label: 'Public Facilities' },
+                                        { value: 'other', label: 'Others' }
                                     ].map(c => (
                                         <option key={c.value} value={c.value}>{c.label}</option>
                                     ))}
@@ -1030,25 +1168,32 @@ export default function GovAnalyticsPage() {
                                     <input type="text" placeholder="Search zones..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                                         className="w-full bg-slate-900 border border-slate-700 text-slate-300 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
                                 </div>
-                                <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
-                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 ${
-                                        isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'
-                                    }`}>
-                                    <option value="">All Categories</option>
-                                    {[
+                                <OrangeSelect
+                                    value={categoryFilter}
+                                    onChange={setCategoryFilter}
+                                    size="md"
+                                    minWidth="170px"
+                                    searchable={false}
+                                    placeholder="All Categories"
+                                    options={[
+                                        { value: '', label: 'All Categories' },
                                         { value: 'roads_bridges', label: 'Roads & Bridges' },
                                         { value: 'water_drainage', label: 'Water & Drainage' },
                                         { value: 'street_lighting', label: 'Street Lighting' },
                                         { value: 'public_safety_regulatory', label: 'Public Safety & Regulatory' },
-                                        { value: 'public_facilities', label: 'Public Facilities' }
-                                    ].map(c => (
-                                        <option key={c.value} value={c.value}>{c.label}</option>
-                                    ))}
-                                </select>
+                                        { value: 'public_facilities', label: 'Public Facilities' },
+                                        ...['pothole','road_damage','drainage','flooding','streetlight','structural','sidewalk','garbage'].map(c => ({
+                                            value: c,
+                                            label: c.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())
+                                        }))
+                                    ]}
+                                />
                             </div>
                             <div className={`border rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                                 <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-                                    <span className="font-bold text-slate-300">{filteredClusters.length} Infrastructure Stress Zones</span>
+                                    <span className="font-bold text-slate-300">
+                                        {clusteringLoading ? '-' : filteredClusters.length} Infrastructure Stress Zone{filteredClusters.length !== 1 ? 's' : ''}
+                                    </span>
                                     <span className="text-xs text-slate-500 font-semibold">Sorted by threat severity</span>
                                 </div>
                                 <table className="w-full">
@@ -1065,7 +1210,39 @@ export default function GovAnalyticsPage() {
                                         </tr>
                                     </thead>
                                     <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                        {filteredClusters.map(c => (
+                                        {clusteringLoading ? (
+                                            <tr>
+                                                <td colSpan={8} className="p-10 text-center text-slate-500">
+                                                    <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-500" />
+                                                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Running DBSCAN clustering...</p>
+                                                    <p className="text-xs text-slate-400 mt-1">Analyzing spatial density within 100m</p>
+                                                </td>
+                                            </tr>
+                                        ) : clusteringError ? (
+                                            <tr>
+                                                <td colSpan={8} className="p-10 text-center text-slate-500">
+                                                    <AlertTriangle size={28} className="mx-auto mb-2 text-rose-500" />
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">We couldn't analyze this right now.</p>
+                                                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto mb-3">{clusteringError}</p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setClusterRetryTrigger(prev => prev + 1)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
+                                                    >
+                                                        <RotateCcw size={13} />
+                                                        Retry
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ) : filteredClusters.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={8} className="p-10 text-center text-slate-500">
+                                                    <Target size={32} className="mx-auto mb-2 opacity-30" />
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No stress zones found for the selected period.</p>
+                                                    <p className="text-xs text-slate-400 mt-1">Try expanding the date filter or clearing filters</p>
+                                                </td>
+                                            </tr>
+                                        ) : filteredClusters.map(c => (
                                             <tr key={c.cluster_id} className={`transition-colors cursor-pointer ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}`}
                                                 onClick={() => { setActiveTab('map'); setSelectedCluster(c); }}>
                                                 <td className="p-4"><ThreatBadge level={c.threat_level} /></td>

@@ -1,0 +1,81 @@
+name: Database bootstrap
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgis:
+        image: postgis/postgis:18-3.6
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: pulso_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pulso_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/pulso_ci
+      PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - name: Install backend requirements
+        run: python -m pip install -r backend/requirements.txt
+      - name: Bootstrap blank database
+        run: bash scripts/bootstrap_db.sh
+      - name: Confirm Alembic head
+        working-directory: backend
+        run: |
+          python -m alembic -c alembic.ini current
+          python ../scripts/db_schema.py assert-revision a9c6e4b2d1f0
+      - name: Compare normalized schema inventory
+        run: |
+          python scripts/db_schema.py inventory --output "$RUNNER_TEMP/head-inventory.json"
+          python - "$RUNNER_TEMP/head-inventory.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          expected = json.loads(Path("backend/schema/head_a9c6e4b2d1f0.inventory.json").read_text())
+          actual = json.loads(Path(sys.argv[1]).read_text())
+          assert actual == expected, "Normalized schema inventory differs from the checked-in manifest"
+          print("Normalized schema inventory: PASS")
+          PY
+      - name: Report Alembic model drift
+        continue-on-error: true
+        working-directory: backend
+        run: |
+          set +e
+          python -m alembic -c alembic.ini check > "$RUNNER_TEMP/alembic-check.log" 2>&1
+          status=$?
+          set -e
+          count=$(grep -c 'INFO  \[alembic.autogenerate.compare\] Detected ' "$RUNNER_TEMP/alembic-check.log" || true)
+          echo "Alembic drift count: $count"
+          if [ "$status" -ne 0 ] && [ "$count" -eq 0 ]; then
+            sed -n '1,20p' "$RUNNER_TEMP/alembic-check.log"
+          fi
+          exit "$status"
+      - name: Run existing backend tests
+        continue-on-error: true
+        run: |
+          python -m pip install pytest==8.4.2
+          set +e
+          python -m pytest backend/tests -q > "$RUNNER_TEMP/backend-tests.log" 2>&1
+          status=$?
+          set -e
+          tail -n 1 "$RUNNER_TEMP/backend-tests.log"
+          exit "$status"

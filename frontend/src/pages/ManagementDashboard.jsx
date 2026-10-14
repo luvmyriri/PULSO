@@ -42,21 +42,26 @@ import {
     ArrowRight,
     Layers,
     ShoppingCart
-} from 'lucide-react';
+} from '../icons';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import GovSidebar from '../components/GovSidebar';
+import GovBreadcrumb from '../components/GovBreadcrumb';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
+import { formatTicketId } from '../utils/reportWorkflow';
 
 import { API_BASE_URL } from '../utils/apiBase';
 
-const ManagementDashboard = () => {
+const ManagementDashboard = ({ workspace }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [token] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser] = useState(() => {
-        const storedUser = localStorage.getItem('pulso_user');
-        return storedUser ? JSON.parse(storedUser) : null;
-    });
+    const [token] = useState(() => getAuthToken() || localStorage.getItem('pulso_token'));
+    const [currentUser] = useState(() => getAuthUser() || (() => {
+        try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
+    })());
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'overview');
 
 
@@ -254,23 +259,55 @@ const ManagementDashboard = () => {
         { label: 'Total Reports', value: dashStats?.total_reports ?? '—', trend: dashStats?.total_trend ?? '0%', icon: Activity, color: 'blue' },
         { label: 'Resolved', value: dashStats?.resolved ?? '—', trend: dashStats?.resolved_trend ?? '0%', icon: CheckCircle2, color: 'green' },
         { label: 'Pending Audit', value: dashStats?.pending_approval ?? '—', trend: 'LGU Queue', icon: Clock, color: 'orange' },
-        { label: 'LGU Personnel', value: dashStats?.total_officials ?? '—', trend: 'Active', icon: HardHat, color: 'indigo' },
+        { label: 'LGU Personnel', value: dashStats?.total_officials ?? '—', trend: 'Active', icon: Users, color: 'indigo' },
     ];
 
     return (
-        <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 overflow-hidden">
-            <GovSidebar activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} />
+        <div className="min-h-screen bg-neutral-bg dark:bg-[#070a12] text-neutral-text dark:text-slate-100 font-sans flex text-sm transition-colors duration-150">
             
-            <div className="flex-1 flex flex-col min-w-0">
-                <header className="h-16 bg-white dark:bg-slate-900/50 border-b dark:border-slate-800 flex items-center justify-between px-8 shrink-0 relative z-40">
-                    <h1 className="text-xl font-black">{
-                        activeTab === 'overview' ? 'Management Dashboard' :
-                        activeTab === 'archive' ? 'Reports Archive' :
-                        activeTab === 'documents' ? 'Document Registry' :
-                        activeTab === 'audit' ? 'Audit Command' : 
-                        activeTab === 'timeline' ? 'Process Timeline' :
-                        activeTab.charAt(0).toUpperCase() + activeTab.slice(1)
-                    }</h1>
+            {/* Unified Left Sidebar Navigation — role-aware */}
+            <GovSidebar
+                currentUser={currentUser}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+            />
+
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                
+                {/* Top Header */}
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 relative z-50 border-b border-neutral-border dark:border-slate-800 transition-colors duration-150">
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb
+                            category="Executive"
+                            current={
+                                activeTab === 'overview' ? 'Executive Performance Overview' :
+                                activeTab === 'approvals' ? 'Work Order Approvals' :
+                                activeTab === 'procurement' ? 'Public Bidding Pipeline' :
+                                activeTab === 'permits' ? 'OBO Permit Tracking' :
+                                activeTab === 'predictive' ? 'AI Predictive Maintenance' :
+                                activeTab === 'advisories' ? 'Public Advisory' :
+                                activeTab === 'users' ? 'User Directory' :
+                                activeTab === 'archive' ? 'Reports Archive' :
+                                activeTab === 'documents' ? 'Document Registry' :
+                                activeTab === 'audit' ? 'Audit Command' :
+                                activeTab === 'timeline' ? 'Process Timeline' : 'Executive Command Overview'
+                            }
+                        />
+                        <h1 className="text-xl sm:text-2xl font-heading font-black tracking-tight text-neutral-text dark:text-white mt-0.5 leading-none">
+                            {activeTab === 'overview' && 'Executive Performance Overview'}
+                            {activeTab === 'approvals' && 'Engineering Work Order Approvals'}
+                            {activeTab === 'procurement' && 'Public Bidding Pipeline (RA 9184)'}
+                            {activeTab === 'permits' && 'OBO Permit Tracking Masterlist'}
+                            {activeTab === 'predictive' && 'AI Predictive Maintenance Alerts'}
+                            {activeTab === 'advisories' && 'Post a Public Advisory'}
+                            {activeTab === 'users' && 'Registered Users'}
+                            {activeTab === 'archive' && 'Reports Archive'}
+                            {activeTab === 'documents' && 'Document Registry'}
+                            {activeTab === 'audit' && 'Audit Command'}
+                            {activeTab === 'timeline' && 'Process Timeline'}
+                        </h1>
+                    </div>
                     
                     <div className="flex items-center gap-4">
                         <select value={dateRange} onChange={e => setDateRange(e.target.value)} className="bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-xs font-bold">
@@ -281,11 +318,12 @@ const ManagementDashboard = () => {
                             <Download size={14} /> Export Audit
                         </button>
                         <ThemeToggle />
-                        <button onClick={() => { localStorage.clear(); navigate('/gov'); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
-                            <LogOut size={18} />
-                        </button>
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
+
+                {workspace && <GovernmentWorkspaceTabs workspace={workspace} currentUser={currentUser} />}
 
                 <main className="flex-1 overflow-y-auto p-8">
                     <AnimatePresence mode="wait">
@@ -394,7 +432,7 @@ const ManagementDashboard = () => {
                                         {loadingTab ? <tr><td colSpan="4" className="py-20 text-center"><Loader2 size={24} className="animate-spin mx-auto text-indigo-500" /></td></tr> : 
                                             reportsArchive.length > 0 ? reportsArchive.map(rpt => (
                                             <tr key={rpt.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                                <td className="px-6 py-4 font-black text-indigo-500">{rpt.ticket_id}</td>
+                                                <td className="px-6 py-4 font-black text-indigo-500">{formatTicketId(rpt.ticket_id, rpt.id, true)}</td>
                                                 <td className="px-6 py-4 opacity-70 truncate max-w-md">{rpt.description}</td>
                                                 <td className="px-6 py-4 text-center"><span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] font-black uppercase">resolved</span></td>
                                                 <td className="px-6 py-4 text-right opacity-50">{new Date(rpt.updated_at).toLocaleDateString()}</td>

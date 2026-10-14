@@ -14,12 +14,14 @@ Covers:
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime,
-    Float, ForeignKey, Text, Enum, JSON, Date
+    Float, ForeignKey, Text, Enum, JSON, Date, UniqueConstraint
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from geoalchemy2 import Geometry
 from database import Base
 import uuid
+from datetime import datetime, timezone
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -49,7 +51,8 @@ class WorkOrder(Base):
     tied to a citizen Report or a ProjectRequest.
 
     Status flow:
-      open → assigned → in_progress → completed | cancelled
+      open → assigned → in_progress → completed_pending_review → completed
+      Inspection failure requests rework before another submission.
     """
     __tablename__ = "work_orders"
 
@@ -75,7 +78,7 @@ class WorkOrder(Base):
     # "standard" | "preemptive" (FR-11)
     wo_type        = Column(String, default="standard", index=True)
 
-    # open | assigned | in_progress | completed | cancelled
+    # open | assigned | in_progress | completed_pending_review | completed | rework_required | blocked | cancelled
     status         = Column(String, default="open", index=True)
 
     priority       = Column(String, default="normal", index=True)   # low | normal | high | critical
@@ -109,6 +112,8 @@ class WorkOrder(Base):
     barangay_ref   = relationship("Barangay", foreign_keys=[barangay_id])
     approvals      = relationship("WorkOrderApproval", back_populates="work_order", cascade="all, delete-orphan")
     updates        = relationship("WorkOrderUpdate", back_populates="work_order", cascade="all, delete-orphan")
+    blockers       = relationship("WorkOrderBlocker", back_populates="work_order", cascade="all, delete-orphan")
+    inspections    = relationship("WorkOrderInspection", back_populates="work_order", cascade="all, delete-orphan")
 
 
 # Work Order Approval  (FR-11 — Approval Workflow)
@@ -150,6 +155,66 @@ class WorkOrderUpdate(Base):
 
     work_order      = relationship("WorkOrder", back_populates="updates")
     official        = relationship("Official")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Work Order Blockers (Delay Tracking & Reason Codes)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class WorkOrderBlocker(Base):
+    """
+    Tracks structured blockers preventing work order progression.
+    Captures standard municipal delay reasons and estimated downtime.
+    """
+    __tablename__ = "work_order_blockers"
+
+    id                   = Column(Integer, primary_key=True, index=True)
+    work_order_id        = Column(Integer, ForeignKey("work_orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Reason codes: weather | utility | permit | materials | security | access | other
+    reason_code          = Column(String, nullable=False, index=True)
+    delay_days           = Column(Float, default=1.0)
+    notes                = Column(Text, nullable=True)
+    
+    blocked_by_id        = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    is_resolved          = Column(Boolean, default=False, index=True)
+    
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
+    resolved_at          = Column(DateTime(timezone=True), nullable=True)
+    resolved_by_id       = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    resolution_notes     = Column(Text, nullable=True)
+
+    # Relationships
+    work_order           = relationship("WorkOrder", back_populates="blockers")
+    blocked_by           = relationship("Official", foreign_keys=[blocked_by_id])
+    resolved_by          = relationship("Official", foreign_keys=[resolved_by_id])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Work Order Inspections (Independent Quality Audit & Separation of Duties)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class WorkOrderInspection(Base):
+    """
+    Immutable record of an independent quality inspection conducted on a completed
+    or awaiting-verification work order. Enforces Separation of Duties.
+    """
+    __tablename__ = "work_order_inspections"
+
+    id                   = Column(Integer, primary_key=True, index=True)
+    work_order_id        = Column(Integer, ForeignKey("work_orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    inspector_id         = Column(Integer, ForeignKey("officials.id"), nullable=False, index=True)
+    
+    inspection_date      = Column(DateTime(timezone=True), server_default=func.now())
+    checklist_results    = Column(JSON, nullable=True)
+    passed               = Column(Boolean, nullable=False, default=False)
+    notes                = Column(Text, nullable=True)
+    evidence_photo_url   = Column(String, nullable=True)
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    work_order           = relationship("WorkOrder", back_populates="inspections")
+    inspector            = relationship("Official", foreign_keys=[inspector_id])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -218,6 +283,39 @@ class ProcessTimeline(Base):
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
     actor          = relationship("Official", foreign_keys=[actor_id])
+
+
+class CommandReceipt(Base):
+    """Result of a keyed report command, committed with its civic record."""
+    __tablename__ = "command_receipts"
+    __table_args__ = (UniqueConstraint(
+        "actor_id", "operation", "report_id", "idempotency_key",
+        name="uq_command_receipt_actor_operation_report_key",
+    ),)
+
+    id = Column(Integer, primary_key=True)
+    actor_id = Column(Integer, ForeignKey("officials.id"), nullable=False)
+    operation = Column(String(64), nullable=False)
+    report_id = Column(Integer, ForeignKey("reports.id"), nullable=False)
+    idempotency_key = Column(String(128), nullable=False)
+    request_hash = Column(String(64), nullable=False)
+    resource_id = Column(Integer, nullable=False)
+    result_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class OutboxEvent(Base):
+    """Committed intent for one resident in-app notification."""
+    __tablename__ = "outbox_events"
+
+    id = Column(Integer, primary_key=True)
+    event_key = Column(String(128), nullable=False, unique=True)
+    event_type = Column(String(64), nullable=False)
+    payload = Column(JSON, nullable=False)
+    status = Column(String(20), nullable=False, default="pending", server_default="pending", index=True)
+    attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -526,6 +624,7 @@ class InfrastructureAsset(Base):
     asset_name           = Column(String, index=True)
     category             = Column(String) # Road, Bridge, Drainage, Building, Light
     gps_coordinates      = Column(JSON, nullable=True) # GeoJSON representation
+    geom                 = Column(Geometry(geometry_type="GEOMETRY", srid=4326), nullable=True) # Point, LineString, or Polygon
     material_type        = Column(String) # Asphalt, Concrete, Steel, etc.
     date_completed       = Column(Date, nullable=True)
     design_life          = Column(Integer, default=20) # Expected life in years
@@ -534,6 +633,10 @@ class InfrastructureAsset(Base):
     barangay             = Column(String, nullable=True) # Legacy string
     # 3NF: FK to canonical barangays lookup
     barangay_id          = Column(Integer, ForeignKey("barangays.id"), nullable=True, index=True)
+    condition_score      = Column(Float, default=100.0, nullable=True)
+    status               = Column(String, default="operational", index=True) # operational, maintenance_needed, under_repair, critical, decommissioned
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     maintenance_logs     = relationship("MaintenanceHistory", back_populates="asset")
@@ -621,6 +724,141 @@ class SystemDocument(Base):
     uploaded_at      = Column(DateTime(timezone=True), server_default=func.now())
     
     uploader         = relationship("Official", foreign_keys=[uploader_id])
+
+
+# =============================================================================
+# Governed Announcements & Public Notices (R6 Architecture)
+# =============================================================================
+
+def _gen_announcement_id():
+    """Generates canonical identifier e.g. 'ANN-2026-891240'"""
+    return f"ANN-{datetime.now(timezone.utc).year}-{str(uuid.uuid4().int)[:6]}"
+
+
+class Announcement(Base):
+    """
+    Central authoritative government announcement record supporting
+    a 6-stage lifecycle, bilingual fields, and linked engineering records.
+    """
+    __tablename__ = "announcements"
+
+    id                   = Column(Integer, primary_key=True, index=True)
+    announcement_id      = Column(String, unique=True, index=True, default=_gen_announcement_id)
+
+    # ── Bilingual Content ────────────────────────────────────────────────────
+    title_en             = Column(String, nullable=False, index=True)
+    title_fil            = Column(String, nullable=True)
+    content_en           = Column(Text, nullable=False)
+    content_fil          = Column(Text, nullable=True)
+
+    # ── Classification & Governance ──────────────────────────────────────────
+    category             = Column(String, default="general_notice", index=True)
+    priority             = Column(String, default="normal", index=True)
+    status               = Column(String, default="draft", index=True)
+
+    # ── Scope & Geographic Targeting ─────────────────────────────────────────
+    target_audience      = Column(String, default="public", index=True)
+    target_districts     = Column(JSON, nullable=True, default=list)
+    target_barangays     = Column(JSON, nullable=True, default=list)
+    district_id          = Column(Integer, ForeignKey("districts.id"), nullable=True, index=True)
+    barangay_id          = Column(Integer, ForeignKey("barangays.id"), nullable=True, index=True)
+
+    # Delivery channels configured: e.g. ["web", "sms", "email"]
+    channels             = Column(JSON, nullable=False, default=lambda: ["web"])
+
+    # ── Timing & Lifecycle Gates ─────────────────────────────────────────────
+    scheduled_at         = Column(DateTime(timezone=True), nullable=True, index=True)
+    published_at         = Column(DateTime(timezone=True), nullable=True, index=True)
+    expires_at           = Column(DateTime(timezone=True), nullable=True, index=True)
+
+    # ── Workflow Actors & Sign-Offs ──────────────────────────────────────────
+    author_id            = Column(Integer, ForeignKey("officials.id"), nullable=False, index=True)
+    reviewer_id          = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    approved_by_id       = Column(Integer, ForeignKey("officials.id"), nullable=True, index=True)
+    approved_at          = Column(DateTime(timezone=True), nullable=True)
+
+    # ── Formal Withdrawal Audit ──────────────────────────────────────────────
+    withdrawal_reason    = Column(Text, nullable=True)
+    withdrawn_at         = Column(DateTime(timezone=True), nullable=True)
+    withdrawn_by_id      = Column(Integer, ForeignKey("officials.id"), nullable=True)
+
+    # ── Linked Engineering Records (Provenance) ──────────────────────────────
+    source_report_id     = Column(Integer, ForeignKey("reports.id"), nullable=True, index=True)
+    source_work_order_id = Column(Integer, ForeignKey("work_orders.id"), nullable=True, index=True)
+    source_project_id    = Column(Integer, ForeignKey("project_requests.id"), nullable=True, index=True)
+    source_asset_id      = Column(String, ForeignKey("infrastructure_assets.asset_id"), nullable=True, index=True)
+    image_url            = Column(String, nullable=True)
+
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # ── Relationships ────────────────────────────────────────────────────────
+    author               = relationship("Official", foreign_keys=[author_id])
+    reviewer             = relationship("Official", foreign_keys=[reviewer_id])
+    approved_by          = relationship("Official", foreign_keys=[approved_by_id])
+    withdrawn_by         = relationship("Official", foreign_keys=[withdrawn_by_id])
+    district_ref         = relationship("District", foreign_keys=[district_id])
+    barangay_ref         = relationship("Barangay", foreign_keys=[barangay_id])
+
+    corrections          = relationship(
+        "AnnouncementCorrection",
+        back_populates="announcement",
+        cascade="all, delete-orphan",
+        order_by="AnnouncementCorrection.created_at.desc()"
+    )
+    deliveries           = relationship(
+        "AnnouncementDelivery",
+        back_populates="announcement",
+        cascade="all, delete-orphan",
+        order_by="AnnouncementDelivery.channel"
+    )
+
+
+class AnnouncementCorrection(Base):
+    """
+    Immutable timestamped revision and errata notice for published announcements.
+    Captures prior content snapshot to preserve historical record integrity.
+    """
+    __tablename__ = "announcement_corrections"
+
+    id                   = Column(Integer, primary_key=True, index=True)
+    announcement_id      = Column(Integer, ForeignKey("announcements.id"), nullable=False, index=True)
+    editor_id            = Column(Integer, ForeignKey("officials.id"), nullable=False, index=True)
+    
+    correction_summary   = Column(Text, nullable=False)
+    reason               = Column(Text, nullable=False)
+    previous_content     = Column(JSON, nullable=True)
+
+    created_at           = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    # ── Relationships ────────────────────────────────────────────────────────
+    announcement         = relationship("Announcement", back_populates="corrections")
+    editor               = relationship("Official", foreign_keys=[editor_id])
+
+
+class AnnouncementDelivery(Base):
+    """
+    Per-channel delivery tracking record accounting for Web, SMS, and Email transport.
+    """
+    __tablename__ = "announcement_deliveries"
+
+    id                   = Column(Integer, primary_key=True, index=True)
+    announcement_id      = Column(Integer, ForeignKey("announcements.id"), nullable=False, index=True)
+    channel              = Column(String, nullable=False, index=True)  # "web", "sms", "email"
+    status               = Column(String, default="pending", index=True)  # "pending", "in_progress", "delivered", "failed"
+    recipient_count      = Column(Integer, default=0)
+    delivered_count      = Column(Integer, default=0)
+    failed_count         = Column(Integer, default=0)
+    error_message        = Column(Text, nullable=True)
+    last_attempted_at    = Column(DateTime(timezone=True), nullable=True)
+    delivered_at         = Column(DateTime(timezone=True), nullable=True)
+
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # ── Relationships ────────────────────────────────────────────────────────
+    announcement         = relationship("Announcement", back_populates="deliveries")
+
 
 # Import models at the end to resolve circular dependency for relationships
 import models

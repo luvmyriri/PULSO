@@ -1,0 +1,48 @@
+{
+  "title": "Choose the PULSO cross-portal UI family",
+  "question": "Each option now shows the full journey from public hero through separate resident and government sign-in to both authenticated workspaces. Choose the family that should become the Figma direction.",
+  "options": [
+    {
+      "id": "signal-observatory",
+      "label": "Signal Observatory",
+      "kicker": "THE ROLL",
+      "lineage": "city operations observatory and measured signal field",
+      "thesis": "The city appears as a calm living signal, with PULSO translating place into accountable action.",
+      "palette": ["#071A2B", "#F4F7F5", "#FF8A3D", "#82C7D8", "#335166"],
+      "materials": ["deep survey-blue field", "thin luminous route trace", "opaque civic instruments"],
+      "viewport": "A dark cinematic city horizon spans the hero while a single measured Signal Cut moves through mapped districts; copy and two resident tasks sit quietly in the foreground.",
+      "risk": "The signal field must remain meaningful and restrained or it becomes generic sci-fi decoration.",
+      "comp": ".impeccable/mocks/decision/resident-signal-observatory-family.png"
+    },
+    {
+      "id": "civic-horizon",
+      "label": "Civic Horizon",
+      "lineage": "cinematic city title sequence and public-service monumentality",
+      "thesis": "North Caloocan itself is the hero; PULSO arrives as the clear civic action layer over a composed urban horizon.",
+      "palette": ["#F4F7F5", "#0C2436", "#B9380B", "#C9D4D9", "#0B756B"],
+      "materials": ["true-color city photography", "mineral field sheet", "precise ember rule"],
+      "viewport": "A wide architectural city image owns the right two-thirds while a minimal typographic statement and Report / Track actions occupy the left; government access is a separate quiet gate.",
+      "risk": "Weak or generic photography would reduce the direction to a municipal campaign page.",
+      "comp": ".impeccable/mocks/decision/resident-civic-horizon-family.png"
+    },
+    {
+      "id": "living-atlas",
+      "label": "Living City Atlas",
+      "lineage": "local cartography, transit diagrams, and responsive civic maps",
+      "thesis": "Residents enter through a living map of their city, then choose whether to report, track, or explore verified updates.",
+      "palette": ["#F4F7F5", "#0C2436", "#B9380B", "#0B4F6C", "#C9D4D9"],
+      "materials": ["local road geometry", "barangay labels", "solid operational panels"],
+      "viewport": "A precise Caloocan atlas becomes the hero canvas, with one active Signal Cut and restrained location labels; a compact task dock holds Report, Track, and Resident sign-in.",
+      "risk": "The map must be locally accurate and accessible, not an abstract network graphic.",
+      "comp": ".impeccable/mocks/decision/resident-living-atlas-family.png"
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  },
+  "steer": true
+}

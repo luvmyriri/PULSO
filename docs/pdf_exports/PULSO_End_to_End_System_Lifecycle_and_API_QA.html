@@ -1,0 +1,2749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>End-to-End System Lifecycle & API QA Contract</title>
+    <style>
+        
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@page {
+    size: A4 portrait;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-center {
+        content: counter(page);
+    }
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.55;
+    color: #1e293b;
+    background-color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+/* Document Header & Cover */
+.doc-cover {
+    page-break-after: always;
+    padding: 40px 20px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 90vh;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 30px;
+}
+
+.pulse-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 2px solid #f97316;
+    border-radius: 10px;
+    color: #f97316;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-title {
+    font-size: 16pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #0f172a;
+    text-transform: uppercase;
+}
+
+.brand-sub {
+    font-size: 8.5pt;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.cover-main {
+    margin: 40px 0;
+}
+
+.cover-badge {
+    display: inline-block;
+    padding: 5px 14px;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.cover-title {
+    font-size: 26pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+}
+
+.cover-subtitle {
+    font-size: 12pt;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.6;
+    max-width: 650px;
+    margin-bottom: 30px;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 24px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.meta-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+}
+
+.meta-value {
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.cover-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8pt;
+    color: #64748b;
+}
+
+/* Headings */
+h1 {
+    font-size: 17pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-top: 28px;
+    margin-bottom: 14px;
+    letter-spacing: -0.3px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h2 {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    border-left: 3.5px solid #f97316;
+    padding-left: 10px;
+    letter-spacing: -0.2px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h4, h5, h6 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #475569;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+p {
+    margin: 0 0 10px 0;
+}
+
+/* Lists */
+ul, ol {
+    margin: 0 0 12px 0;
+    padding-left: 22px;
+}
+
+li {
+    margin-bottom: 4px;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 18px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+thead {
+    display: table-header-group;
+}
+
+tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid #1e293b;
+    letter-spacing: 0.2px;
+}
+
+td {
+    padding: 7px 10px;
+    border: 1px solid #e2e8f0;
+    vertical-align: top;
+    color: #334155;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+tbody tr:hover {
+    background-color: #f1f5f9;
+}
+
+/* Blockquotes / Callouts */
+blockquote {
+    margin: 14px 0;
+    padding: 10px 16px;
+    background-color: #f8fafc;
+    border-left: 4px solid #3b82f6;
+    border-radius: 0 6px 6px 0;
+    color: #334155;
+    font-size: 9pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* Code & Preformatted */
+code {
+    font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+    font-size: 8.2pt;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+pre {
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 8pt;
+    line-height: 1.45;
+    margin: 12px 0 16px 0;
+    border: 1px solid #334155;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+    border: none;
+    font-size: inherit;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.badge-implemented {
+    background-color: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.badge-proposed {
+    background-color: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
+.badge-broken {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.badge-risk {
+    background-color: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.badge-gap {
+    background-color: #faf5ff;
+    color: #6b21a8;
+    border: 1px solid #e9d5ff;
+}
+
+.badge-decision {
+    background-color: #fff1f2;
+    color: #9f1239;
+    border: 1px solid #fecdd3;
+}
+
+.badge-backend {
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+
+.badge-live {
+    background-color: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.badge-public {
+    background-color: #f0f9ff;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+}
+
+.badge-bearer {
+    background-color: #f5f3ff;
+    color: #5b21b6;
+    border: 1px solid #ddd6fe;
+}
+
+.badge-owner {
+    background-color: #fdf2f8;
+    color: #9d174d;
+    border: 1px solid #fbcfe8;
+}
+
+.badge-gov {
+    background-color: #f0fdfa;
+    color: #115e59;
+    border: 1px solid #99f6e4;
+}
+
+.badge-capability {
+    background-color: #fff7ed;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+}
+
+.badge-p0 {
+    background-color: #dc2626;
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.badge-p1 {
+    background-color: #ea580c;
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.badge-p2 {
+    background-color: #64748b;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* Print Utilities */
+.page-break {
+    page-break-before: always;
+}
+
+.no-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 20px 0;
+}
+
+/* User Story Cards */
+.story-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.story-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.story-id {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+    </style>
+</head>
+<body>
+    
+    <div class="doc-cover">
+        <div class="cover-brand">
+            <div class="pulse-logo">P</div>
+            <div class="brand-text">
+                <span class="brand-title">PULSO PLATFORM</span>
+                <span class="brand-sub">Civic Operations & Engineering</span>
+            </div>
+        </div>
+        <div class="cover-main">
+            <span class="cover-badge">SYSTEM LIFECYCLE & API CONTRACT</span>
+            <h1 class="cover-title">End-to-End System Lifecycle & API QA Contract</h1>
+            <div class="cover-subtitle">Cross-system service blueprint, complete 154-operation endpoint catalog, data lineage, idempotency rules, and integration quality gates.</div>
+            <div class="meta-grid">
+                
+        <div class="meta-item">
+            <span class="meta-label">Document type</span>
+            <span class="meta-value">Cross-system service blueprint + current endpoint inventory + target contract</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Status</span>
+            <span class="meta-value">Current implementation inventoried; target contract proposed for approval</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Version</span>
+            <span class="meta-value">1.0</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Last validated</span>
+            <span class="meta-value">23 August 2026</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Scope</span>
+            <span class="meta-value">Resident web/mobile, government web/field operations, backend, database, evidence, identity, notifications, analytics, records, and external providers</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Implementation</span>
+            <span class="meta-value">Not started; this document changes no application code</span>
+        </div>
+        
+            </div>
+        </div>
+        <div class="cover-footer">
+            <span>City Government of Caloocan &bull; Engineering & Resident Operations</span>
+            <span>CONFIDENTIAL &bull; STYLIZED QA SPECIFICATION</span>
+        </div>
+    </div>
+    
+    <div class="content-body">
+        <h2 id="1-purpose-and-quality-position">1. Purpose and quality position</h2>
+<p>This document connects the separate <a href="./12-resident-user-stories-and-sdlc.md">resident user stories and SDLC</a> and <a href="./13-government-user-stories-and-sdlc.md">government user stories and SDLC</a> into one auditable service cycle.</p>
+<p>It deliberately separates:</p>
+<ul>
+<li><strong>observed implementation</strong> — routes and behavior present in the repository today;</li>
+<li><strong>current defects/gaps</strong> — behavior that is broken, under-authorized, inconsistent, or unsafe;</li>
+<li><strong>target contract</strong> — the approved future behavior that design, frontend, backend, mobile, QA, data, security, records, and operations must implement together.</li>
+</ul>
+<p>Static inspection found <strong>155 decorated operations / 154 unique method-path pairs</strong> across the six backend route modules. One government project-mapping operation is registered twice. Route presence is not proof of runtime correctness; several present endpoints are deterministically broken by schema/model mismatches. The integrated authenticated flows were not fully executed because the checked-in backend environment is not runnable on this workstation, as recorded in the dossier <a href="./README.md#audit-method-and-limitations">README</a>.</p>
+<h2 id="2-source-of-truth-and-status-legend">2. Source of truth and status legend</h2>
+<h3 id="source-hierarchy">Source hierarchy</h3>
+<ol>
+<li>Backend decorators, authorization dependencies, schemas, models, persistence, and migrations.</li>
+<li>Frontend/mobile route declarations and actual HTTP calls.</li>
+<li>Approved target contracts in this dossier.</li>
+<li>Older walkthroughs and API catalogs as historical material only.</li>
+</ol>
+<h3 id="labels">Labels</h3>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="badge badge-live">Live route</span></td>
+<td>Decorated method/path exists; may still contain defects.</td>
+</tr>
+<tr>
+<td><span class="badge badge-public">Public</span></td>
+<td>No authentication dependency in the current implementation.</td>
+</tr>
+<tr>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Any JWT-resolved resident or official unless an additional check is stated.</td>
+</tr>
+<tr>
+<td><span class="badge badge-owner">Resident/owner</span></td>
+<td>Current code checks resident role and/or numeric ownership.</td>
+</tr>
+<tr>
+<td><span class="badge badge-gov">Government role</span></td>
+<td>Current static role group or expanded legacy role dependency.</td>
+</tr>
+<tr>
+<td><span class="badge badge-capability">Dynamic capability</span></td>
+<td><code>roles_service</code> module/action check.</td>
+</tr>
+<tr>
+<td><span class="badge badge-broken">Broken</span></td>
+<td>Deterministic decorator, schema, field, or response mismatch.</td>
+</tr>
+<tr>
+<td><span class="badge badge-risk">Observed risk</span></td>
+<td>Reachable but fails a target security, lifecycle, audit, privacy, or integrity requirement.</td>
+</tr>
+<tr>
+<td><span class="badge badge-gap">UI-contract gap</span></td>
+<td>A client calls an endpoint/method/payload not present in current routes.</td>
+</tr>
+<tr>
+<td><span class="badge badge-proposed">Proposed</span></td>
+<td>Future contract only.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="route-source-map">Route-source map</h3>
+<table>
+<thead>
+<tr>
+<th>Prefix/domain</th>
+<th>Authority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Root, auth, users, reports, KYC, maps, advisories, notifications, legacy WOs</td>
+<td><a href="../../backend/main.py#L49">backend/main.py</a></td>
+</tr>
+<tr>
+<td>Government operations</td>
+<td><a href="../../backend/gov_router.py#L37">backend/gov_router.py</a></td>
+</tr>
+<tr>
+<td>Government analytics</td>
+<td><a href="../../backend/analytics_router.py#L37">backend/analytics_router.py</a></td>
+</tr>
+<tr>
+<td>Predictive maintenance</td>
+<td><a href="../../backend/predictive_router.py#L14">backend/predictive_router.py</a></td>
+</tr>
+<tr>
+<td>Document management</td>
+<td><a href="../../backend/document_router.py#L15">backend/document_router.py</a>, mounted at <a href="../../backend/main.py#L237">main.py</a></td>
+</tr>
+<tr>
+<td>PhilSys</td>
+<td><a href="../../backend/philsys_router.py#L25">backend/philsys_router.py</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-whole-system-service-cycle">3. Whole-system service cycle</h2>
+<pre><code class="language-text">Resident discovers PULSO and jurisdiction
+→ identity/residency check and informed consent
+→ registration creates an unverified resident
+→ OTP verification activates the account
+→ sign-in establishes a current active subject/session
+→ resident captures evidence, exact location, and description
+→ optional AI/geocode suggestions are reviewed by the resident
+→ jurisdiction and duplicate checks run
+→ idempotent submission creates ticket + first public event
+→ scoped government triage verifies/rejects/refers/requests information
+→ authorized approval selects WO, OBO, or Project/Procurement branch
+→ eligible staff execute work and attach governed evidence
+→ completion/FQA/inspection validates proof exactly once
+→ report becomes resident-visible resolved and notification is delivered
+→ resident confirms/rates or opens a governed follow-up
+→ case, evidence, audit, retention, asset history, and analytics persist
+</code></pre>
+<h3 id="stage-by-stage-contract">Stage-by-stage contract</h3>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Primary actor</th>
+<th>Current endpoint(s)</th>
+<th>Atomic system result required</th>
+<th>Failure/recovery contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Discover</td>
+<td>Visitor</td>
+<td><code>GET /</code>, <code>/api/health</code>, <code>/api/geo/caloocan-border</code>, downloads</td>
+<td>Truthful scope and available channel</td>
+<td>Web remains complete if APK/boundary/provider fails</td>
+</tr>
+<tr>
+<td>2. Eligibility</td>
+<td>Prospective resident</td>
+<td><code>POST /api/verify-residency</code>; optional PhilSys family</td>
+<td>Minimal verified eligibility evidence with policy metadata</td>
+<td>Distinct mismatch/outside/uncertain/provider failure; manual review</td>
+</tr>
+<tr>
+<td>3. Register</td>
+<td>Prospective resident</td>
+<td><code>POST /api/auth/register</code></td>
+<td>One unverified globally unique subject</td>
+<td>Idempotent retry; mail failure resumes verification, not registration</td>
+</tr>
+<tr>
+<td>4. Verify</td>
+<td>Unverified resident</td>
+<td><code>POST /verify-registration</code>, <code>/resend-code</code></td>
+<td>OTP consumed; account activated; audit/outbox</td>
+<td>Expiry/attempt/cooldown and accessible resend/support</td>
+</tr>
+<tr>
+<td>5. Authenticate</td>
+<td>Resident or official</td>
+<td><code>POST /api/auth/login</code>, <code>GET /api/me</code></td>
+<td>Active current subject, capability/jurisdiction, bounded session</td>
+<td>Revoked/inactive/suspended rejected on every request</td>
+</tr>
+<tr>
+<td>6. Prepare report</td>
+<td>Resident</td>
+<td><code>/reports/analyze</code>, geocode/search/reverse</td>
+<td>Preserved draft with editable suggestions</td>
+<td>AI/GPS/geocode/upload failure keeps manual path and draft</td>
+</tr>
+<tr>
+<td>7. Submit</td>
+<td>Resident</td>
+<td><code>POST /api/reports</code></td>
+<td>Report, attachment reference, ticket, first timeline, outbox in one operation</td>
+<td>Operation ID reconciles timeout/replay; duplicate returns canonical ticket</td>
+</tr>
+<tr>
+<td>8. Triage</td>
+<td>Dispatcher</td>
+<td>report list/detail/status/reject routes</td>
+<td>Valid decision, next owner, timeline, audit, notification</td>
+<td>Version conflict returns latest record; no partial side effects</td>
+</tr>
+<tr>
+<td>9. Approve/branch</td>
+<td>Approver/dispatcher</td>
+<td>budget approval, create WO/OBO/project</td>
+<td>One authorized fulfillment branch with evidence/cost/assignee</td>
+<td>Missing gate is structured; no alternate bypass</td>
+</tr>
+<tr>
+<td>10A. Simple work</td>
+<td>Field team</td>
+<td>gov WO and agent routes</td>
+<td>Assigned→in progress→proof-complete</td>
+<td>Offline operation queue/version reconciliation</td>
+</tr>
+<tr>
+<td>10B. Project</td>
+<td>Project/design/finance</td>
+<td>project, procurement, document routes</td>
+<td>Sequential deliverables, approvals, funds, NTP, FQA</td>
+<td>No state skip; evidence and financial transaction rollback/recovery</td>
+</tr>
+<tr>
+<td>10C. OBO</td>
+<td>Inspectors/approvers</td>
+<td>OBO routes</td>
+<td>Inspection/review/payment/notice/permit record</td>
+<td>Failed review/appeal/reinspection follows approved branch</td>
+</tr>
+<tr>
+<td>11. Resolve</td>
+<td>Authorized completion actor</td>
+<td>report resolve or canonical linked completion service</td>
+<td>Valid proof, one resolved transition/event/outbox</td>
+<td>Idempotent; no proofless WO/OBO/project shortcut</td>
+</tr>
+<tr>
+<td>12. Notify/track</td>
+<td>System/resident</td>
+<td>timeline, notifications, advisories</td>
+<td>Public-safe update and durable deep link</td>
+<td>Retry/outbox; read/hidden remain consistent</td>
+</tr>
+<tr>
+<td>13. Resident closeout</td>
+<td>Resident owner</td>
+<td><code>POST /reports/{id}/confirm</code></td>
+<td>One bounded rating/response and terminal state/follow-up</td>
+<td>Only resolved; replay safe; low rating visible to owner</td>
+</tr>
+<tr>
+<td>14. Retain/learn</td>
+<td>Records/auditor/planner</td>
+<td>DMS, records, audit, analytics, predictive</td>
+<td>Classified immutable record, retention/legal hold, privacy-scoped insight</td>
+<td>No hard purge of audit; model/export provenance and access log</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-entity-ownership-and-data-lineage">4. Entity, ownership, and data lineage</h2>
+<pre><code class="language-text">District
+└─ Barangay
+   ├─ Resident subject
+   │  ├─ Verification / KYC evidence
+   │  ├─ Report
+   │  │  ├─ Evidence attachment(s)
+   │  │  ├─ Notification(s)
+   │  │  ├─ Public/internal ProcessTimeline events
+   │  │  ├─ immutable AuditLog events
+   │  │  ├─ WorkOrder(s)
+   │  │  │  ├─ updates / approvals / evidence
+   │  │  │  ├─ ProcurementRequest ─ BoQItem(s)
+   │  │  │  └─ InfrastructureAsset ─ MaintenanceHistory
+   │  │  ├─ ProjectRequest
+   │  │  │  ├─ ProcurementRequest ─ BoQItem(s)
+   │  │  │  ├─ WorkOrder(s)
+   │  │  │  ├─ SystemDocument(s)
+   │  │  │  └─ InfrastructureAsset
+   │  │  └─ OBOInspection
+   │  └─ PasswordResetToken (currently email-linked)
+   └─ Official subject
+      ├─ SystemRole + capabilities + jurisdiction
+      ├─ assignment / approval / delegation
+      ├─ AgentLocation
+      ├─ Notification(s)
+      ├─ AuditLog / ProcessTimeline actor
+      └─ SystemDocument uploader/access event
+</code></pre>
+<p>Model evidence: residents/officials <a href="../../backend/models.py#L59">models.py</a>, reports/notifications <a href="../../backend/models.py#L198">models.py</a>, work/audit/timeline <a href="../../backend/gov_models.py#L46">gov_models.py</a>, procurement/projects/OBO <a href="../../backend/gov_models.py#L227">gov_models.py</a>, and assets/documents <a href="../../backend/gov_models.py#L485">gov_models.py</a>.</p>
+<h3 id="target-identity-rule">Target identity rule</h3>
+<p>Current <code>Resident.id</code> and <code>Official.id</code> are independent integer namespaces, while authorization and several foreign keys treat them as one namespace. The target must use one immutable global subject identifier, or every reference must include both <code>subject_type</code> and <code>subject_id</code>. Numeric equality alone must never establish ownership, assignment, actor, uploader, or notification recipient.</p>
+<h3 id="target-transaction-boundaries">Target transaction boundaries</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Must commit together</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Register</td>
+<td>subject + verification challenge + delivery outbox</td>
+</tr>
+<tr>
+<td>Submit report</td>
+<td>report + attachment metadata + first timeline + audit where policy requires + delivery outbox</td>
+</tr>
+<tr>
+<td>Change status</td>
+<td>entity version/status + accurate timeline + audit + notification/outbox + linked entity sync</td>
+</tr>
+<tr>
+<td>Create/assign WO</td>
+<td>WO + assignment + source report transition + timeline/audit/outbox</td>
+</tr>
+<tr>
+<td>Financial gate</td>
+<td>PR/project flag/state + approving authority + source document + audit/outbox</td>
+</tr>
+<tr>
+<td>Resolve</td>
+<td>completion evidence + WO/project/OBO state + report state + asset/maintenance effect + timeline/audit/outbox</td>
+</tr>
+<tr>
+<td>Resident confirm</td>
+<td>terminal/follow-up state + one feedback record + one bounded trust effect + timeline/audit</td>
+</tr>
+<tr>
+<td>Account suspension/role</td>
+<td>account/role/capability + session revocation + audit + admin notification</td>
+</tr>
+<tr>
+<td>Legal hold/disposition</td>
+<td>record state + actor/reason/authority + immutable retention event</td>
+</tr>
+</tbody>
+</table>
+<h3 id="external-dependencies-and-degraded-modes">External dependencies and degraded modes</h3>
+<table>
+<thead>
+<tr>
+<th>Dependency</th>
+<th>Current use</th>
+<th>Target failure ownership</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PostgreSQL / SQLAlchemy</td>
+<td>All durable identities, cases, work, records, and audit</td>
+<td>Readiness fails closed; transactions roll back; backup/restore and migration SLO owned by platform/data</td>
+</tr>
+<tr>
+<td>Google Vertex/Gemini</td>
+<td>Report analysis, assistance, advisories, narratives, maintenance plans</td>
+<td>Core manual workflows remain available; quota/timeout/malformed output is explicit; no fabricated result</td>
+</tr>
+<tr>
+<td>Google Maps services</td>
+<td>Reverse/forward geocode and directions</td>
+<td>Preserve entered location; offer manual address/pin/text; record provider/freshness</td>
+</tr>
+<tr>
+<td>Google reCAPTCHA</td>
+<td>Resident sign-in risk control</td>
+<td>Production fails according to approved risk policy; no client literal bypass</td>
+</tr>
+<tr>
+<td>Google Cloud Vision / OCR.space</td>
+<td>Identity OCR fallback chain</td>
+<td>Preserve evidence securely and route uncertainty/outage to governed manual review</td>
+</tr>
+<tr>
+<td>PSA PhilSys Check / QR verification</td>
+<td>National-ID verification</td>
+<td>Authenticated, rate-limited, audited, minimized; provider result never becomes an unreviewable dead end</td>
+</tr>
+<tr>
+<td>Gmail SMTP / Semaphore SMS</td>
+<td>OTP, recovery, and operational messaging</td>
+<td>Transactional outbox, retry/deduplication, delivery status, alternate/assisted channel</td>
+</tr>
+<tr>
+<td>Evidence/document storage</td>
+<td>Current local filesystem and public static mount</td>
+<td>Private durable storage, scan/quarantine, signed access, retention/legal hold, orphan cleanup</td>
+</tr>
+<tr>
+<td>DBSCAN/haversine clustering</td>
+<td>Duplicate/analytics grouping</td>
+<td>Versioned parameters, deterministic fixtures, reviewable canonical match, no silent merge</td>
+</tr>
+<tr>
+<td>Client connectivity/device services</td>
+<td>Camera, GPS, resident and field sync</td>
+<td>Draft/operation queue, version reconciliation, no false success or duplicate side effect</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-canonical-target-state-contracts">5. Canonical target state contracts</h2>
+<p>These tables are proposed for approval. Current APIs do not enforce all adjacency, evidence, actor, and idempotency rules.</p>
+<h3 id="report">Report</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Allowed target</th>
+<th>Authorized actor</th>
+<th>Required data/gates</th>
+<th>Required effects</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>—</td>
+<td><code>received</code></td>
+<td>Resident submission service</td>
+<td>valid subject, jurisdiction, evidence policy, operation ID</td>
+<td>ticket, first public event, receipt</td>
+</tr>
+<tr>
+<td><code>received</code></td>
+<td><code>under_review</code></td>
+<td>Triage capability</td>
+<td>record version and scope</td>
+<td>public/internal event, next owner</td>
+</tr>
+<tr>
+<td><code>under_review</code></td>
+<td><code>needs_information</code></td>
+<td>Triage capability</td>
+<td>structured request/reason/deadline policy</td>
+<td>resident action + notification</td>
+</tr>
+<tr>
+<td><code>needs_information</code></td>
+<td><code>under_review</code></td>
+<td>Resident/support + triage service</td>
+<td>requested data, ownership</td>
+<td>versioned evidence event</td>
+</tr>
+<tr>
+<td><code>under_review</code></td>
+<td><code>duplicate</code></td>
+<td>Triage capability</td>
+<td>canonical ticket/reason</td>
+<td>evidence link, resident notification</td>
+</tr>
+<tr>
+<td><code>under_review</code></td>
+<td><code>outside_scope</code></td>
+<td>Triage capability</td>
+<td>referral owner/reason</td>
+<td>referral event and resident guidance</td>
+</tr>
+<tr>
+<td><code>under_review</code></td>
+<td><code>rejected</code></td>
+<td>Triage capability</td>
+<td>reason/evidence</td>
+<td>audit and resident explanation</td>
+</tr>
+<tr>
+<td><code>under_review</code></td>
+<td><code>approved_for_action</code></td>
+<td>Approval capability</td>
+<td>technical/budget gate as applicable</td>
+<td>next branch/owner</td>
+</tr>
+<tr>
+<td><code>approved_for_action</code></td>
+<td><code>assigned</code></td>
+<td>Dispatch capability</td>
+<td>eligible assignee and WO/OBO/project</td>
+<td>assignment and notification</td>
+</tr>
+<tr>
+<td><code>assigned</code></td>
+<td><code>in_progress</code></td>
+<td>Assigned field/project actor</td>
+<td>work start evidence/version</td>
+<td>linked state/event</td>
+</tr>
+<tr>
+<td><code>in_progress</code></td>
+<td><code>resolved</code></td>
+<td>Completion capability</td>
+<td>canonical validated completion proof</td>
+<td>proof, audit, public event/outbox</td>
+</tr>
+<tr>
+<td><code>resolved</code></td>
+<td><code>closed_by_resident</code></td>
+<td>Resident owner</td>
+<td>rating 1–5 or explicit accept; idempotency</td>
+<td>terminal feedback/event</td>
+</tr>
+<tr>
+<td><code>resolved</code></td>
+<td><code>follow_up_required</code></td>
+<td>Resident owner/authorized reviewer</td>
+<td>structured unresolved reason</td>
+<td>owned follow-up, no invisible reopen</td>
+</tr>
+<tr>
+<td>Pre-lock states</td>
+<td><code>retracted</code></td>
+<td>Resident owner/authorized official</td>
+<td>reason and latest version</td>
+<td>audit/public event; no deletion</td>
+</tr>
+</tbody>
+</table>
+<p>Target public labels can map these canonical names to approved resident copy. A migration map must preserve legacy values such as <code>pending</code>, <code>pending_approval</code>, <code>approved_internal</code>, <code>dispatched</code>, <code>resolved</code>, <code>closed_by_citizen</code>, <code>unverified</code>, <code>validated</code>, and <code>cancelled</code>.</p>
+<h3 id="work-order">Work order</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Allowed target</th>
+<th>Gate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>—</td>
+<td><code>open</code></td>
+<td>valid source/scope/creator</td>
+</tr>
+<tr>
+<td><code>open</code></td>
+<td><code>assigned</code></td>
+<td>eligible active assignee/team and jurisdiction</td>
+</tr>
+<tr>
+<td><code>assigned</code></td>
+<td><code>in_progress</code></td>
+<td>assigned actor accepts/starts work</td>
+</tr>
+<tr>
+<td><code>assigned</code> or <code>in_progress</code></td>
+<td><code>blocked</code></td>
+<td>reason, dependency, owner, follow-up date</td>
+</tr>
+<tr>
+<td><code>blocked</code></td>
+<td><code>in_progress</code></td>
+<td>blocker resolution evidence</td>
+</tr>
+<tr>
+<td><code>in_progress</code></td>
+<td><code>completed_pending_review</code></td>
+<td>validated completion evidence and cost</td>
+</tr>
+<tr>
+<td><code>completed_pending_review</code></td>
+<td><code>completed</code></td>
+<td>independent approval where required</td>
+</tr>
+<tr>
+<td><code>completed_pending_review</code></td>
+<td><code>changes_requested</code></td>
+<td>structured reason</td>
+</tr>
+<tr>
+<td>approved preterminal states</td>
+<td><code>cancelled</code></td>
+<td>authorized reason and source-report consequence</td>
+</tr>
+<tr>
+<td><code>open</code>/approved preterminal</td>
+<td><code>promoted_to_project</code></td>
+<td>project ID and handoff; do not ambiguously reuse <code>cancelled</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="infrastructure-project">Infrastructure project</h3>
+<p>The current thirteen states may be retained internally if operations approves them. Each step must have exact previous state, role/capability, required artifacts, financial gate, resident visibility, and rollback/correction policy:</p>
+<pre><code class="language-text">request_received → survey_in_progress → survey_complete → design_in_progress
+→ boq_submitted → pending_budget_check → budget_confirmed
+→ approved_by_city_engineer → dispatched → in_progress
+→ milestone_inspections → resolved → closed_completion_certified
+</code></pre>
+<p>Direct metadata update must not accept <code>status</code> or <code>current_phase</code>. One transition service and one FQA/certificate completion service must own state changes.</p>
+<h3 id="procurement">Procurement</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Target</th>
+<th>Minimum gate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>—</td>
+<td><code>draft</code></td>
+<td>authorized request owner and source project/WO</td>
+</tr>
+<tr>
+<td><code>draft</code></td>
+<td><code>submitted</code></td>
+<td>valid positive BoQ and purpose</td>
+</tr>
+<tr>
+<td><code>submitted</code></td>
+<td><code>validated</code></td>
+<td>authorized validation and completeness</td>
+</tr>
+<tr>
+<td><code>validated</code></td>
+<td><code>funding_certified</code></td>
+<td>budget authority + unique ObR + source document</td>
+</tr>
+<tr>
+<td><code>funding_certified</code></td>
+<td><code>cash_released</code></td>
+<td>finance authority and reconciliation</td>
+</tr>
+<tr>
+<td><code>cash_released</code></td>
+<td><code>bac_scheduled</code></td>
+<td>BAC authority and valid future schedule</td>
+</tr>
+<tr>
+<td><code>bac_scheduled</code></td>
+<td><code>sent_to_procurement</code></td>
+<td>approved BAC prerequisites</td>
+</tr>
+<tr>
+<td><code>sent_to_procurement</code></td>
+<td><code>ntp_issued</code></td>
+<td>contract/procurement completion and executive authority</td>
+</tr>
+<tr>
+<td><code>ntp_issued</code></td>
+<td><code>procured</code></td>
+<td>receipt/award/mobilization evidence</td>
+</tr>
+<tr>
+<td>Approved review states</td>
+<td><code>rejected</code></td>
+<td>reason and appeal/correction policy</td>
+</tr>
+</tbody>
+</table>
+<p>If flags remain parallel to the simpler existing status enum, the API must still enforce their prerequisite graph and expose one computed canonical stage.</p>
+<h3 id="obo">OBO</h3>
+<pre><code class="language-text">application_received → inspection_scheduled → inspection_complete
+→ technical_review_complete → payment_confirmed
+→ permit_issued OR notice_issued → re_inspection_scheduled → cleared
+</code></pre>
+<p>Clearance requires the approved review set, payment, assigned inspection evidence, and executive rule. Appeals form an explicit versioned branch; they do not overwrite the original finding.</p>
+<h2 id="6-current-endpoint-inventory">6. Current endpoint inventory</h2>
+<p>This inventory records route existence and current access intent, not release approval. “GET and POST” means both method/path pairs exist. Full request/response field definitions remain in the linked Pydantic schemas.</p>
+<h3 id="61-platform-authentication-identity-and-shared-users">6.1 Platform, authentication, identity, and shared users</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Current access</th>
+<th>Purpose / current note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>API status</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/health</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Core health only; no dependency readiness detail</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/download/agent-app</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Agent APK or 404</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/download/resident-app</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Resident APK or 404</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/geo/caloocan-border</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Optional sector-filtered GeoJSON</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/system/ip</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Server LAN IP; production exposure decision</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/ai/rate-limits</code></td>
+<td>Manager-expanded</td>
+<td>AI usage status</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ai/assistant</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>AI help; injects current name/role into context</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/verify-residency</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>ID OCR/residency; sensitive/costly and unthrottled</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/register</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Create unverified resident</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/login</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>OAuth form, optional CAPTCHA token</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/verify-registration</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Verify resident OTP</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/resend-code</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Replace/resend OTP</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/forgot-password</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Create/send reset code</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/verify-reset-code</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Validate reset code</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/auth/reset-password</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Consume code/change password</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/auth/change-password</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Current-password change</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/me</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Current resident/official profile</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/users</code></td>
+<td>Manager-expanded</td>
+<td>Resident list despite shared schema</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/users/{user_id}</code></td>
+<td>Bearer with current numeric checks</td>
+<td>Shared profile; identity namespace risk</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/users/{user_id}</code></td>
+<td>Bearer/self numeric ID</td>
+<td>Shared profile mutation; <strong>P0 official-first IDOR risk</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Current source: <a href="../../backend/main.py#L286">main.py identity routes</a>, <a href="../../backend/auth.py#L12">auth.py</a>, and <a href="../../backend/schemas.py#L14">schemas.py</a>.</p>
+<h3 id="62-reports-maps-resident-closeout-advisories-and-notifications">6.2 Reports, maps, resident closeout, advisories, and notifications</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Current access</th>
+<th>Purpose / current note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/reports/stats</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>Status counts; sparse response risk</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/reports</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>All reports with optional status filter</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/reports/user/{user_id}</code></td>
+<td>Bearer owner or dispatcher/manager</td>
+<td>Resident report list</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/reports/public</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Selected public statuses; resident names anonymized</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/reports/{report_id}</code></td>
+<td>Bearer; resident owner</td>
+<td>Report detail</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/reports/{report_id}/timeline</code></td>
+<td>Bearer; owner public-only</td>
+<td>Report timeline</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/reports/analyze</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Multipart AI preflight</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/reports</code></td>
+<td>Bearer, not resident-only</td>
+<td>Multipart create; jurisdiction/moderation/duplicate checks</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/reports/{report_id}/confirm</code></td>
+<td>Resident owner</td>
+<td>Close/rate; missing state/range/idempotency checks</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/residents/kyc-status</code></td>
+<td>Resident</td>
+<td>KYC/trust status</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/residents/upgrade-kyc</code></td>
+<td>Resident</td>
+<td>KYC OCR upgrade; audit commit defect</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/geocode/reverse</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Reverse geocode</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/geocode/search</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Forward geocode/place search</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/maps/directions</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Directions proxy</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/reports/{report_id}/status</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>Arbitrary status/budget/date mutation</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/reports/{report_id}/reject</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>Reject report</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/reports/{report_id}/dispatch</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>Requires <code>approved_internal</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/reports/{report_id}/cancel</code></td>
+<td>Owner or dispatcher/manager</td>
+<td>Cancel alias</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/reports/{report_id}/cancel</code></td>
+<td>Owner or dispatcher/manager</td>
+<td>Cancel alias</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/reports/{report_id}/resolve</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>Requires dispatched + proof image</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/reports/{report_id}</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>Hard-purges related work/audit/timeline</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/advisories</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Resident/shared advisory list</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/advisories</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>Create advisory</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/advisories/{advisory_id}</code></td>
+<td>Manager-expanded</td>
+<td>Delete advisory</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/advisories/generate/{report_id}</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>AI advisory draft</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/notifications/user/{user_id}</code></td>
+<td>Bearer/self</td>
+<td>Notification list; hidden records not filtered</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/notifications/user/{user_id}/read</code></td>
+<td>Bearer/self</td>
+<td>Mark all read</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/notifications/{notification_id}/read</code></td>
+<td>Bearer/owned recipient</td>
+<td>Mark one read</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/notifications/{notification_id}</code></td>
+<td>Bearer/owned recipient</td>
+<td>Sets hidden flag; route wording says delete</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/work-orders</code></td>
+<td>Legacy government roles</td>
+<td>Legacy WO list</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/work-orders</code></td>
+<td>Dispatcher/manager-expanded</td>
+<td>Legacy WO create; auto-dispatches linked report</td>
+</tr>
+</tbody>
+</table>
+<p>Current source: <a href="../../backend/main.py#L837">main.py reports</a>, <a href="../../backend/main.py#L1230">main.py mutations</a>, <a href="../../backend/main.py#L1362">main.py updates</a>, and <a href="../../backend/crud.py#L285">crud.py</a>.</p>
+<h3 id="63-government-dashboard-work-orders-timelines-and-legacy-document-list">6.3 Government dashboard, work orders, timelines, and legacy document list</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Current access</th>
+<th>Purpose / current note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/dashboard/stats</code></td>
+<td><span class="badge badge-public">Public</span></td>
+<td>Government KPIs; missing auth dependency</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/work-orders</code></td>
+<td>Field roles</td>
+<td>Create WO</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/dispatch/suggest-agent/{report_id}</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Rank agents; missing government role/resource scope</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/work-orders</code></td>
+<td>Gov roles</td>
+<td>List/filter WOs</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/work-orders/{wo_id}</code></td>
+<td>Gov roles</td>
+<td>WO detail</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/work-orders/{wo_id}</code></td>
+<td>Field roles</td>
+<td>General update; arbitrary status risk</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/work-orders/{wo_id}/updates</code></td>
+<td>Field roles</td>
+<td><strong>Broken <code>user_id</code>/<code>official_id</code> fields</strong></td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/work-orders/{wo_id}/status</code></td>
+<td>Field roles</td>
+<td>Status update; general adjacency absent</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/work-orders/{wo_id}/approval</code></td>
+<td>Approval role list</td>
+<td>Approve/reject; previous-state logging defect</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/work-orders/{wo_id}/approvals</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Approval list; under-authorized</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/timeline</code></td>
+<td>Gov roles</td>
+<td>Global timeline</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/timeline/report/{report_id}</code></td>
+<td>Bearer with resident handling</td>
+<td>Report timeline</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/timeline/work-order/{wo_id}</code></td>
+<td>Gov roles</td>
+<td>WO timeline</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/timeline/project/{project_id}</code></td>
+<td>Gov roles</td>
+<td>Project timeline</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/documents</code></td>
+<td>Senior roles</td>
+<td>Legacy document rows, separate from DMS</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/work-orders/{wo_id}/promote</code></td>
+<td>Senior operations</td>
+<td>Promote WO to project</td>
+</tr>
+</tbody>
+</table>
+<p>Current source: <a href="../../backend/gov_router.py#L104">gov_router.py work orders</a> and <a href="../../backend/gov_crud.py#L303">gov_crud.py</a>.</p>
+<h3 id="64-procurement-and-boq">6.4 Procurement and BoQ</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Current access</th>
+<th>Purpose / current note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/procurement</code></td>
+<td>Procurement roles</td>
+<td>Create draft PR and items</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/procurement</code></td>
+<td>Gov roles</td>
+<td>List/filter PRs</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/procurement/{pr_id}</code></td>
+<td>Gov roles</td>
+<td>PR detail/BoQ</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/procurement/{pr_id}/status</code></td>
+<td>Varies by target</td>
+<td>Target label/role checked; adjacency not checked</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/procurement/{pr_id}/funding-certification</code></td>
+<td>Admin/manager/budget roles</td>
+<td>Funding/ObR; linked project advance may fail</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/procurement/{pr_id}/cash-release</code></td>
+<td>Admin/manager/finance roles</td>
+<td>Cash flag; no funding prerequisite</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/procurement/{pr_id}/bac-schedule</code></td>
+<td>Admin/manager/BAC roles</td>
+<td>BAC date; prerequisites incomplete</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/procurement/{pr_id}/ntp-issuance</code></td>
+<td>Executive roles</td>
+<td>NTP flag; false body can still advance project</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/procurement/{pr_id}/items</code></td>
+<td>Procurement roles</td>
+<td>Add BoQ item; positive validators absent</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/gov/procurement/{pr_id}/items/{item_id}</code></td>
+<td>Procurement roles</td>
+<td>Delete item; parent-child path ownership not checked</td>
+</tr>
+</tbody>
+</table>
+<p>Current source: <a href="../../backend/gov_router.py#L390">gov_router.py procurement</a>, contracts <a href="../../backend/gov_schemas.py#L195">gov_schemas.py</a>, and persistence <a href="../../backend/gov_crud.py#L938">gov_crud.py</a>.</p>
+<h3 id="65-projects-projectreport-mapping-and-obo">6.5 Projects, project/report mapping, and OBO</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Current access</th>
+<th>Purpose / current note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/projects</code></td>
+<td>City engineer/admin clerk/manager/admin</td>
+<td>Create project</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/projects</code></td>
+<td>Gov roles</td>
+<td>List/filter projects</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/projects/{proj_id}</code></td>
+<td>Gov roles</td>
+<td>Project detail</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/projects/{proj_id}</code></td>
+<td>Senior roles</td>
+<td>Metadata plus status/phase bypass</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/projects/{proj_id}/advance</code></td>
+<td>Gov roles + internal gates</td>
+<td>Advance phase; response/enricher mismatch</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/projects/{proj_id}/certificate</code></td>
+<td>Executive roles</td>
+<td>Certificate; commits before FQA and has model defect</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/reports/{report_id}/project-mapping</code></td>
+<td>Gov roles</td>
+<td>First registered mapping implementation</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/reports/{report_id}/project-mapping</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Duplicate later registration; broken attributes/unreachable</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/projects/{project_id}/issue-certificate</code></td>
+<td>Dispatcher/manager/admin</td>
+<td>Competing FQA completion route</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/reports/{report_id}/approve-with-budget</code></td>
+<td>Dispatcher/manager/admin</td>
+<td><strong>Broken report relationship</strong></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/obo</code></td>
+<td>Clerk/inspector roles</td>
+<td>Create OBO inspection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/obo</code></td>
+<td>Gov roles</td>
+<td>List/filter OBO</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/obo/{obo_id}</code></td>
+<td>Gov roles</td>
+<td>OBO detail</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/obo/{obo_id}</code></td>
+<td>Inspectors/executive by target</td>
+<td>General update; adjacency absent</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/obo/{obo_id}/technical-review</code></td>
+<td>Inspector roles</td>
+<td>Review result; raw strings</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/obo/{obo_id}/appeal</code></td>
+<td>Inspector roles</td>
+<td>Appeal evidence URL</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/obo/{obo_id}/order-of-payment</code></td>
+<td>Executive/clerk</td>
+<td>Set fee/payment document data</td>
+</tr>
+</tbody>
+</table>
+<p>Current source: <a href="../../backend/gov_router.py#L613">gov_router.py projects</a>, <a href="../../backend/gov_router.py#L779">gov_router.py OBO</a>, and <a href="../../backend/gov_crud.py#L1246">gov_crud.py project transitions</a>.</p>
+<h3 id="66-users-roles-departmental-projections-agents-and-government-advisories">6.6 Users, roles, departmental projections, agents, and government advisories</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Current access</th>
+<th>Purpose / current note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/users/stats</code></td>
+<td>System admin</td>
+<td>Account counts</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/users</code></td>
+<td>Admin/city engineer/asst</td>
+<td>Filtered user envelope; default officials only</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/users/{user_id}/status</code></td>
+<td>Decorated as system-admin role update</td>
+<td><strong>Broken: status handler unreachable</strong></td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/users/{user_id}/role</code></td>
+<td>System admin</td>
+<td>Change official role; target role validation absent</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/design-requests</code></td>
+<td>Gov roles</td>
+<td>Project design projection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/analysis</code></td>
+<td>Gov roles</td>
+<td>Structural-analysis projection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/surveys</code></td>
+<td>Gov roles</td>
+<td>WO/project survey projection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/boq</code></td>
+<td>Gov roles</td>
+<td>BoQ projection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/estimation</code></td>
+<td>Gov roles</td>
+<td>Estimate projection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/reports</code></td>
+<td>Gov roles</td>
+<td>Active report projection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/reports-archive</code></td>
+<td>Senior roles</td>
+<td>Resolved/rejected/legacy <code>closed</code> projection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/records</code></td>
+<td>Gov roles</td>
+<td>Finalized records projection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/document-registry</code></td>
+<td>Gov roles</td>
+<td><strong>Broken model-field projection</strong></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/agents/locations</code></td>
+<td>Dispatch/senior/supervisor</td>
+<td>All tracked agent locations</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/agents/{agent_id}/location</code></td>
+<td>Dispatch/senior</td>
+<td>Single location</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/agents/location</code></td>
+<td>Bearer in practice</td>
+<td>Self GPS/status; role check falls through</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/agents/work-orders</code></td>
+<td>Dispatch/senior</td>
+<td>Agent workload projection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/agents/my-work-orders</code></td>
+<td>Bearer numeric ID</td>
+<td>Assigned WOs; resident/official collision risk</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/agents/field-report</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td><strong>Broken Report field and filename safety</strong></td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/gov/agents/work-orders/{wo_id}/status</code></td>
+<td>Assigned bearer numeric ID</td>
+<td>Enforces limited open/assigned→in-progress→completed</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/roles</code></td>
+<td>Dynamic <code>admin:roles</code></td>
+<td>Role catalog</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/roles/templates</code></td>
+<td>Dynamic <code>admin:roles</code></td>
+<td>Role templates</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/roles</code></td>
+<td>Dynamic <code>admin:roles</code></td>
+<td>Create role</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/gov/roles/{role_id}</code></td>
+<td>Dynamic <code>admin:roles</code></td>
+<td>Replace/update role</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/gov/advisories</code></td>
+<td>Senior roles</td>
+<td>Create advisory</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gov/advisories</code></td>
+<td>Gov roles</td>
+<td>Government advisory list</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/gov/advisories/{advisory_id}</code></td>
+<td>Senior roles</td>
+<td>Delete advisory</td>
+</tr>
+</tbody>
+</table>
+<p>Current source: <a href="../../backend/gov_router.py#L916">gov_router.py users</a>, <a href="../../backend/gov_router.py#L1109">projections</a>, <a href="../../backend/gov_router.py#L1514">agents</a>, and <a href="../../backend/gov_router.py#L1901">roles/advisories</a>.</p>
+<h3 id="67-analytics">6.7 Analytics</h3>
+<p>All paths use prefix <code>/api/gov/analytics</code>. Current access is a static analytics allowlist rather than the requested module/action; some permission exceptions can be converted to <code>500</code>, and procurement conversion does not separately require procurement authority.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Suffix</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/summary</code></td>
+<td>KPI summary</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/clusters</code></td>
+<td>Spatial clusters with time/category inputs</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/clusters/{cluster_id}</code></td>
+<td>Cluster detail</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/heatmap</code></td>
+<td>Heatmap points</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/forecast</code></td>
+<td>Issue forecast</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/recurrence</code></td>
+<td>Recurring patterns</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/reports</code></td>
+<td>Analytics report projection with PII/exact coordinates</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/narrative</code></td>
+<td>AI cluster narrative and BoQ draft</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/estimate</code></td>
+<td>Cluster estimate/BoQ</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/create-procurement</code></td>
+<td>Convert analytics result to draft PR</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/export/clusters</code></td>
+<td>Clusters CSV</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/export/forecast</code></td>
+<td>Forecast CSV</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/export/recurrence</code></td>
+<td>Recurrence CSV</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/export/full-report</code></td>
+<td>Full report CSV</td>
+</tr>
+</tbody>
+</table>
+<p>Current source: <a href="../../backend/analytics_router.py#L83">analytics_router.py</a>.</p>
+<h3 id="68-predictive-maintenance">6.8 Predictive maintenance</h3>
+<p>All paths use prefix <code>/api/gov/predictive</code> and a narrow static senior allowlist. Some current health, probability, date, schedule, and cost outputs use random/mock values.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Suffix</th>
+<th>Purpose / current note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/summary</code></td>
+<td>Asset-health summary</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/health</code></td>
+<td>Per-asset health data</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/schedule</code></td>
+<td>Generated 90-day schedule</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/risk-map</code></td>
+<td>Barangay asset risk</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/ai-plan</code></td>
+<td>AI maintenance plan</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/convert-to-work-order</code></td>
+<td>Direct preemptive WO insert; bypasses canonical side effects</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/export</code></td>
+<td>Predictive CSV</td>
+</tr>
+</tbody>
+</table>
+<p>Current source: <a href="../../backend/predictive_router.py#L35">predictive_router.py</a>.</p>
+<h3 id="69-document-management">6.9 Document management</h3>
+<p>All paths use prefix <code>/api/gov/documents</code>. Extension/MIME allowlists and a 50 MB post-read limit exist, but authorization and physical-storage controls are incomplete.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Suffix</th>
+<th>Current access</th>
+<th>Purpose / current note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/upload</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Upload/hash/register; resident and arbitrary target allowed</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/get/{document_id}</code></td>
+<td>Bearer + confidentiality checks</td>
+<td>Protected file response</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/target/{model}/{target_id}</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Raw target metadata; no resource/confidentiality filter</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/registry</code></td>
+<td>Bearer; capability for officials</td>
+<td>Filtered registry; resident public metadata</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/registry/counts</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Global counts without confidentiality filter</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/{document_id}/legal-hold</code></td>
+<td>Intended admin/chief</td>
+<td>Role-case mismatch blocks actual slugs</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/{document_id}</code></td>
+<td><span class="badge badge-bearer">Bearer</span></td>
+<td>Any bearer can delete a non-held document</td>
+</tr>
+</tbody>
+</table>
+<p>All <code>uploads/</code> are also mounted publicly at <code>/api/uploads</code>, which can bypass protected DMS/report retrieval. Current source: <a href="../../backend/document_router.py#L90">document_router.py</a> and <a href="../../backend/main.py#L55">main.py</a>.</p>
+<h3 id="610-philsys">6.10 PhilSys</h3>
+<p>All current PhilSys routes are <span class="badge badge-public">Public</span>; the router imports auth but does not apply it.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose / current note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/philsys/status</code></td>
+<td>Provider mode, credential presence, endpoint</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/philsys/verify</code></td>
+<td>PhilID images and manual OCR overrides</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/philsys/verify-manual</code></td>
+<td>PSN/name/DOB/sex verification</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/philsys/verify-qr</code></td>
+<td>Raw QR verification</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/philsys/scan-qr-image</code></td>
+<td>Placeholder result; scanning not implemented</td>
+</tr>
+</tbody>
+</table>
+<p>These sensitive/costly routes lack authentication, rate limiting, durable access audit, and upload hardening. Current source: <a href="../../backend/philsys_router.py#L33">philsys_router.py</a>.</p>
+<h2 id="7-current-uiapi-contract-gap-register">7. Current UI/API contract-gap register</h2>
+<table>
+<thead>
+<tr>
+<th>Gap ID</th>
+<th style="text-align: right;">Severity</th>
+<th>Current mismatch or defect</th>
+<th>Lifecycle consequence</th>
+<th>Required target decision/test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>API-GAP-001</td>
+<td style="text-align: right;">P0</td>
+<td>Shared numeric resident/official IDs with opposite lookup orders</td>
+<td>Cross-account read/write/actor ambiguity</td>
+<td>Global subject migration + BOLA suite</td>
+</tr>
+<tr>
+<td>API-GAP-002</td>
+<td style="text-align: right;">P0</td>
+<td>Inactive/suspended state not checked on token resolution</td>
+<td>Revoked staff/resident continues access</td>
+<td>Per-request active/revocation tests</td>
+</tr>
+<tr>
+<td>API-GAP-003</td>
+<td style="text-align: right;">P0</td>
+<td>Generic report/WO/project/OBO mutations accept arbitrary status/phase</td>
+<td>Illegal skips and false civic truth</td>
+<td>Central state services/adjacency suite</td>
+</tr>
+<tr>
+<td>API-GAP-004</td>
+<td style="text-align: right;">P0</td>
+<td>Resident confirm accepts any report state/rating and can repeat reward</td>
+<td>Pending case can close; trust inflation</td>
+<td>Resolved-only, 1–5, idempotency tests</td>
+</tr>
+<tr>
+<td>API-GAP-005</td>
+<td style="text-align: right;">P0</td>
+<td>WO/OBO linked completion can resolve report without direct proof requirement</td>
+<td>Proof gate bypass</td>
+<td>One canonical completion transaction</td>
+</tr>
+<tr>
+<td>API-GAP-006</td>
+<td style="text-align: right;">P0</td>
+<td>Public upload mount plus weak file checks</td>
+<td>Restricted evidence/document exposure</td>
+<td>Private storage/signed access/adversarial uploads</td>
+</tr>
+<tr>
+<td>API-GAP-007</td>
+<td style="text-align: right;">P0</td>
+<td>Any bearer can delete any non-held DMS document</td>
+<td>Records loss</td>
+<td>Target RBAC/retention/tombstone suite</td>
+</tr>
+<tr>
+<td>API-GAP-008</td>
+<td style="text-align: right;">P0</td>
+<td>Report hard delete removes audit/timeline</td>
+<td>“Immutable” history erased</td>
+<td>Append-only/tombstone/retention contract</td>
+</tr>
+<tr>
+<td>API-GAP-009</td>
+<td style="text-align: right;">P0</td>
+<td>Government user-status decorator targets role handler</td>
+<td>Suspension/deactivation UI cannot work</td>
+<td>Separate schemas/routes + revocation E2E</td>
+</tr>
+<tr>
+<td>API-GAP-010</td>
+<td style="text-align: right;">P1</td>
+<td>Web reset screen calls <code>GET /auth/verify-token/{token}</code> and wrong reset payload</td>
+<td>Link recovery fails</td>
+<td>One code/link strategy and consumer contracts</td>
+</tr>
+<tr>
+<td>API-GAP-011</td>
+<td style="text-align: right;">P1</td>
+<td>Web mark-all calls <code>POST .../read-all</code>; server exposes <code>PATCH .../read</code></td>
+<td>Optimistic UI lies/fails</td>
+<td>Versioned notification contract</td>
+</tr>
+<tr>
+<td>API-GAP-012</td>
+<td style="text-align: right;">P1</td>
+<td>Hidden notifications are not filtered</td>
+<td>Dismissed update returns</td>
+<td>List/read/hide contract tests</td>
+</tr>
+<tr>
+<td>API-GAP-013</td>
+<td style="text-align: right;">P1</td>
+<td>Registration textual barangay/role absent from schema</td>
+<td>Normalized jurisdiction lost</td>
+<td>Shared registration schema/persistence test</td>
+</tr>
+<tr>
+<td>API-GAP-014</td>
+<td style="text-align: right;">P1</td>
+<td>First report timeline and KYC audit appended after commit without final commit</td>
+<td>Missing audit/process event</td>
+<td>Atomic transaction test</td>
+</tr>
+<tr>
+<td>API-GAP-015</td>
+<td style="text-align: right;">P1</td>
+<td>Initial evidence saved before AI moderation and lacks hardening</td>
+<td>Orphan/unsafe file</td>
+<td>Staged scan then atomic finalize</td>
+</tr>
+<tr>
+<td>API-GAP-016</td>
+<td style="text-align: right;">P1</td>
+<td>Audit UIs call <code>/api/gov/audit</code> and <code>/audit-logs</code>; no route</td>
+<td>Auditors see failure/false empty</td>
+<td>One paginated audit API</td>
+</tr>
+<tr>
+<td>API-GAP-017</td>
+<td style="text-align: right;">P1</td>
+<td>FQA UI omits <code>/api/gov</code>; server call uses wrong parameter; duplicate certificate routes</td>
+<td>Completion action fails/competes</td>
+<td>One canonical FQA endpoint</td>
+</tr>
+<tr>
+<td>API-GAP-018</td>
+<td style="text-align: right;">P1</td>
+<td>WO update and agent field report use nonexistent model fields</td>
+<td>Field workflow returns 500</td>
+<td>Schema/model contract tests</td>
+</tr>
+<tr>
+<td>API-GAP-019</td>
+<td style="text-align: right;">P1</td>
+<td>Budget approval uses nonexistent report relationship</td>
+<td>Project/budget promotion fails</td>
+<td>Relationship contract/integration test</td>
+</tr>
+<tr>
+<td>API-GAP-020</td>
+<td style="text-align: right;">P1</td>
+<td>Dashboard stats and all PhilSys endpoints lack expected auth</td>
+<td>Data/identity service exposed</td>
+<td>Authentication/capability/rate tests</td>
+</tr>
+<tr>
+<td>API-GAP-021</td>
+<td style="text-align: right;">P1</td>
+<td>Document legal-hold checks title-case roles</td>
+<td>Authorized hold cannot execute</td>
+<td>Capability-based hold contract</td>
+</tr>
+<tr>
+<td>API-GAP-022</td>
+<td style="text-align: right;">P1</td>
+<td>Agent location and self-WO routes accept broad bearers/numeric IDs</td>
+<td>Resident/spoof/other-agent access risk</td>
+<td>Assignment/subject/resource authorization</td>
+</tr>
+<tr>
+<td>API-GAP-023</td>
+<td style="text-align: right;">P1</td>
+<td>Analytics permission helper ignores requested module/action for conversion</td>
+<td>Analytics viewer may create procurement</td>
+<td>Separate capabilities and negative tests</td>
+</tr>
+<tr>
+<td>API-GAP-024</td>
+<td style="text-align: right;">P1</td>
+<td>Predictive data contains random/mock values and conversion bypasses WO service</td>
+<td>Prototype result becomes operational truth</td>
+<td>Deterministic model + canonical command</td>
+</tr>
+<tr>
+<td>API-GAP-025</td>
+<td style="text-align: right;">P1</td>
+<td>CORS wildcard+credentials, hardcoded JWT fallback, 7-day no-revocation bearer, <code>mobile_bypass</code></td>
+<td>Production session perimeter unsafe</td>
+<td>Deployment security baseline</td>
+</tr>
+<tr>
+<td>API-GAP-026</td>
+<td style="text-align: right;">P1</td>
+<td>No idempotency/version/outbox/offline sync protocol</td>
+<td>Duplicate reports and repeated side effects</td>
+<td>Operation ID + version conflict + outbox</td>
+</tr>
+<tr>
+<td>API-GAP-027</td>
+<td style="text-align: right;">P1</td>
+<td>Runtime <code>create_all</code> models conflict with Alembic legacy users schema</td>
+<td>Environment cannot reproduce data model</td>
+<td>Clean migration/upgrade/rollback test</td>
+</tr>
+<tr>
+<td>API-GAP-028</td>
+<td style="text-align: right;">P2</td>
+<td>Users UI sends <code>offset</code>; API accepts <code>skip</code></td>
+<td>Repeated first page</td>
+<td>One pagination envelope</td>
+</tr>
+<tr>
+<td>API-GAP-029</td>
+<td style="text-align: right;">P2</td>
+<td>Status/filter vocabularies omit or invent entity states</td>
+<td>Records disappear/wrong counts/actions</td>
+<td>Canonical enums and migration mapping</td>
+</tr>
+<tr>
+<td>API-GAP-030</td>
+<td style="text-align: right;">P2</td>
+<td>Mobile calls multiple wrong/missing APIs and displays mock data as fallback</td>
+<td>Resident parity and truth fail</td>
+<td>Shared contract fixtures; no false mock production data</td>
+</tr>
+<tr>
+<td>API-GAP-031</td>
+<td style="text-align: right;">P1</td>
+<td>Current tests are mostly live scripts/stale payloads; no CI, authorization matrix, contract snapshot, concurrency, upload-security, migration-from-zero, or coverage gate was found</td>
+<td>Defects can recur without detection</td>
+<td>Reproducible automated test pyramid and protected CI release gates</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-target-api-framework">8. Target API framework</h2>
+<h3 id="versioning-and-naming">Versioning and naming</h3>
+<ul>
+<li>Introduce an approved version prefix such as <code>/api/v1</code>; keep legacy routes behind measured compatibility adapters only during migration.</li>
+<li>Use one resource name and one command style. Avoid parallel legacy/current work-order and advisory APIs.</li>
+<li>Prefer nouns for resources and explicit commands only when a domain action is not a simple resource state update.</li>
+<li>Generate frontend/mobile clients or validate them against the same OpenAPI snapshot in CI.</li>
+</ul>
+<h3 id="authentication-and-authorization">Authentication and authorization</h3>
+<ul>
+<li>One global immutable <code>sub</code>; short-lived access token, refresh rotation, <code>jti</code>, issuer/audience, revocation/session records, key rotation.</li>
+<li>Account active/suspended/deactivated and current capability version checked on every protected request.</li>
+<li>Backend policy evaluates subject, module/action, jurisdiction, assignment, field classification, state, amount, and delegation.</li>
+<li>Default deny; no static frontend role array can grant security access.</li>
+<li>Rate limit by subject/device/IP/risk as appropriate; never accept a literal CAPTCHA bypass in production.</li>
+</ul>
+<h3 id="request-integrity-idempotency-and-concurrency">Request integrity, idempotency, and concurrency</h3>
+<p>Every mutation needs:</p>
+<ul>
+<li>client operation ID / <code>Idempotency-Key</code> with subject and request-hash binding;</li>
+<li>entity version through <code>If-Match</code>, explicit <code>version</code>, or equivalent optimistic lock;</li>
+<li>transaction boundary covering entity and database side effects;</li>
+<li>transactional outbox for mail/SMS/push/provider work;</li>
+<li>safe replay response returning the original result;</li>
+<li><code>409</code> with current version/state for conflict;</li>
+<li>no file finalized until validation and database transaction are ready.</li>
+</ul>
+<h3 id="target-response-conventions">Target response conventions</h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Target convention</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Create</td>
+<td><code>201 Created</code> with resource ID/location and operation ID</td>
+</tr>
+<tr>
+<td>Read</td>
+<td><code>200</code> with typed resource/envelope and version</td>
+</tr>
+<tr>
+<td>Accepted async</td>
+<td><code>202</code> with job/status endpoint</td>
+</tr>
+<tr>
+<td>Empty delete/tombstone command</td>
+<td><code>204</code> only when no response body is needed</td>
+</tr>
+<tr>
+<td>Validation</td>
+<td><code>422</code> with stable field codes</td>
+</tr>
+<tr>
+<td>Authentication</td>
+<td><code>401</code> without account enumeration</td>
+</tr>
+<tr>
+<td>Authorization</td>
+<td><code>403</code> with safe capability/scope reason code</td>
+</tr>
+<tr>
+<td>Missing</td>
+<td><code>404</code> without leaking inaccessible object existence</td>
+</tr>
+<tr>
+<td>State/version/idempotency conflict</td>
+<td><code>409</code> with safe current state/version and recovery action</td>
+</tr>
+<tr>
+<td>Rate limit</td>
+<td><code>429</code> with retry metadata</td>
+</tr>
+<tr>
+<td>Provider unavailable</td>
+<td><code>503</code> with degraded/retry contract and correlation ID</td>
+</tr>
+</tbody>
+</table>
+<p>Suggested error fields: <code>code</code>, <code>message</code>, <code>field_errors</code>, <code>correlation_id</code>, <code>retryable</code>, <code>retry_after</code>, <code>current_version</code>, and <code>next_action</code>. Human copy may be localized client-side from stable codes; the backend message must remain safe and useful.</p>
+<h3 id="pagination-filters-and-exports">Pagination, filters, and exports</h3>
+<ul>
+<li>Choose cursor pagination for volatile operational queues or one consistent offset/limit contract for stable lists.</li>
+<li>Response includes items, count when affordable, next cursor/page, applied sort/filter, freshness, and scope.</li>
+<li>Filter before pagination in the database; never paginate then filter in application memory.</li>
+<li>Stable enum/date/jurisdiction semantics across list, count, dashboard, export, and UI URL.</li>
+<li>Large exports are asynchronous, authorization is rechecked at generation/download, CSV injection is neutralized, file expires, and access is audited.</li>
+</ul>
+<h3 id="files-and-documents">Files and documents</h3>
+<ul>
+<li>Private object storage or non-public filesystem; authorized signed/streamed downloads only.</li>
+<li>Stream size enforcement, extension + MIME + magic-byte + decoding validation, malware/archive scanning, safe generated filename, metadata policy, checksum.</li>
+<li>Target existence and resource permission before upload; quarantine until scan completes.</li>
+<li>Classification, retention, expiry, legal hold, version, uploader global subject, access events, disposition/tombstone.</li>
+<li>Report evidence, resolution proof, identity images, and official records use distinct policies.</li>
+</ul>
+<h2 id="9-security-privacy-records-and-model-gates">9. Security, privacy, records, and model gates</h2>
+<h3 id="mandatory-securityprivacy-gates">Mandatory security/privacy gates</h3>
+<ul>
+<li>Threat model covers identity/OCR/PhilSys, BOLA/IDOR, uploads, storage bypass, JWT/session, CORS/CSRF/XSS, exports, GPS, AI prompt/data leakage, and admin privilege escalation.</li>
+<li>No production fallback secrets/test CAPTCHA, wildcard credentialed CORS, sensitive request/response logging, or plain HTTP mobile default.</li>
+<li>Encryption in transit and at rest, secrets management, least privilege, dependency locking/scanning, backups, restore rehearsal, and incident notification rules.</li>
+<li>Data protection assessment identifies purpose, legal basis/authority, minimization, retention, processors, data-subject correction/appeal, and breach handling.</li>
+</ul>
+<h3 id="recordsaudit-gates">Records/audit gates</h3>
+<ul>
+<li>Audit append-only store with actor global subject, source, correlation, before/after or event payload, timestamp, and integrity control.</li>
+<li>Public timeline is a deliberate projection; internal notes never leak through public flags or exports.</li>
+<li>Business deletion is archive/tombstone/disposition; audit is never cascaded away.</li>
+<li>Legal hold overrides automated retention and is immediately auditable.</li>
+</ul>
+<h3 id="aianalyticspredictive-gates">AI/analytics/predictive gates</h3>
+<ul>
+<li>Human remains accountable for identity exception, civic priority, rejection, budget, procurement, assignment, permit, and completion.</li>
+<li>Model/provider/version, input window, confidence, limitations, source records, override reason, and degraded state are visible where decisions depend on output.</li>
+<li>Deterministic tests, drift/equity/error monitoring, fallback, kill switch, and rollback.</li>
+<li>Demo/random/mock results cannot be mixed with operational records.</li>
+</ul>
+<h2 id="10-cross-system-qa-and-traceability-framework">10. Cross-system QA and traceability framework</h2>
+<h3 id="required-test-matrix">Required test matrix</h3>
+<pre><code class="language-text">story and acceptance criterion
+× actor/capability/jurisdiction/assignment
+× identity/session state
+× entity source/target state and version
+× happy/alternate/error/retry/replay/concurrency
+× database/audit/timeline/outbox/storage/provider effects
+× web/mobile/field client
+× 320 px/desktop/zoom/keyboard/screen reader
+× light/dark/system and English/Filipino
+× privacy/retention/export classification
+</code></pre>
+<h3 id="end-to-end-golden-scenarios">End-to-end golden scenarios</h3>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Required assertions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Resident simple repair</td>
+<td>One subject/account/ticket; triage→WO→proof→resolved→one feedback; all events reconcile</td>
+</tr>
+<tr>
+<td>Duplicate incident</td>
+<td>Second operation links to canonical ticket without exposing reporter or duplicating work</td>
+</tr>
+<tr>
+<td>Information needed</td>
+<td>Resident receives structured request, submits correction, and case returns to review with history</td>
+</tr>
+<tr>
+<td>Project/procurement</td>
+<td>Report/project/BoQ/funds/BAC/NTP/work/FQA/asset/closeout all meet sequential gates</td>
+</tr>
+<tr>
+<td>OBO complaint</td>
+<td>Inspection/reviews/payment/notice or permit/appeal/reinspection/clearance synchronize safely</td>
+</tr>
+<tr>
+<td>Offline field/resident replay</td>
+<td>Same operation IDs yield one ticket/transition/evidence set after reconnect</td>
+</tr>
+<tr>
+<td>Authorization</td>
+<td>Resident and every wrong role/jurisdiction/assignment fail at UI and API without object leakage</td>
+</tr>
+<tr>
+<td>Suspension/role change</td>
+<td>Existing session loses access immediately; audit records before/after and actor</td>
+</tr>
+<tr>
+<td>Legal hold/disposition</td>
+<td>Held file cannot delete; approved disposition tombstones without erasing audit</td>
+</tr>
+<tr>
+<td>Provider/model outage</td>
+<td>Core manual workflow remains truthful; no false success, mock data, or orphan side effect</td>
+</tr>
+</tbody>
+</table>
+<h3 id="traceability-record">Traceability record</h3>
+<pre><code class="language-text">Story/acceptance ID:
+Business process and owner:
+Actor/capability/jurisdiction/assignment:
+Entity and source→target state/version:
+Endpoint/OpenAPI operation ID:
+Request/response/error/idempotency contract:
+Data classification/retention/legal hold:
+Audit/timeline/outbox/provider effects:
+Figma frame/component/version and content locale:
+Automated tests and manual evidence:
+SLO/telemetry/alert:
+Feature flag/cohort/migration/rollback:
+Decision/ADR and signatories:
+</code></pre>
+<h2 id="11-integrated-sdlc-gates">11. Integrated SDLC gates</h2>
+<p>The role-specific SDLCs govern their streams. These cross-system gates prevent one side from shipping against a contradictory contract.</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Required approval/evidence</th>
+<th>Blocks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G0 — Product/process baseline</td>
+<td>Signed service blueprint, owners, outcome/guardrail metrics</td>
+<td>design freeze</td>
+</tr>
+<tr>
+<td>G1 — Identity/security/privacy</td>
+<td>Global subject, session/RBAC, data inventory, threat/DPIA, retention</td>
+<td>API/data implementation</td>
+</tr>
+<tr>
+<td>G2 — Lifecycle</td>
+<td>Report/WO/project/procurement/OBO adjacency, evidence, actor, exception map</td>
+<td>workflow design and backend mutation</td>
+</tr>
+<tr>
+<td>G3 — API/data</td>
+<td>Versioned OpenAPI, errors, pagination, idempotency/version/outbox, ERD/migrations</td>
+<td>frontend/mobile integration</td>
+</tr>
+<tr>
+<td>G4 — Design</td>
+<td>Figma flows for happy/alternate/failure/denied/offline/light/dark/locale/accessibility</td>
+<td>UI implementation acceptance</td>
+</tr>
+<tr>
+<td>G5 — Test readiness</td>
+<td>RTM, fixtures, role/state matrix, provider stubs, environments</td>
+<td>release candidate</td>
+</tr>
+<tr>
+<td>G6 — System/security QA</td>
+<td>Contract/integration/E2E/concurrency/upload/PII/a11y/performance passes</td>
+<td>UAT</td>
+</tr>
+<tr>
+<td>G7 — Operational UAT</td>
+<td>Resident and every staff role scenario, SOP/runbook/training</td>
+<td>production go/no-go</td>
+</tr>
+<tr>
+<td>G8 — Release/rollback</td>
+<td>Clean migration/backup/restore/rollback/flags/monitoring/on-call</td>
+<td>production deployment</td>
+</tr>
+<tr>
+<td>G9 — Observation</td>
+<td>SLOs, guardrails, reconciliation, incidents stable for approved window</td>
+<td>broad rollout</td>
+</tr>
+</tbody>
+</table>
+<h2 id="12-definition-of-system-release-readiness">12. Definition of system release readiness</h2>
+<p>PULSO is ready for a frontend implementation release only when:</p>
+<ul>
+<li>resident and government stories agree on one report lifecycle and public/internal vocabulary;</li>
+<li>every current endpoint in scope is retained, versioned/migrated, or explicitly retired with consumer evidence;</li>
+<li>no known P0/P1 contract gap remains open;</li>
+<li>backend authorization and resource/field scope pass the full role matrix;</li>
+<li>identity/session, state/version, idempotency/outbox, audit/retention, and secure-file contracts are executable;</li>
+<li>web, mobile, field, backend, database, provider, and record side effects reconcile in golden scenarios;</li>
+<li>critical tasks pass accessibility, responsive, light/dark, English/Filipino, low-network, and provider-outage testing;</li>
+<li>a clean database can be migrated reproducibly and a supported prior version can upgrade/rollback safely;</li>
+<li>telemetry, SLOs, alerts, support/SOP, incident response, feature flags, cohort rollout, and rollback are owned;</li>
+<li>product/service, resident operations, government operations, QA, frontend/mobile, backend/data, security/privacy, records/legal, accessibility/localization, finance/procurement where applicable, and on-call owners sign the go/no-go record.</li>
+</ul>
+<h2 id="13-decisions-required-before-design-or-implementation-freeze">13. Decisions required before design or implementation freeze</h2>
+<ol>
+<li>Global identity/actor namespace and migration strategy.</li>
+<li>Canonical report lifecycle, resident labels, exceptional states, and archive/stat mapping.</li>
+<li>Canonical WO, project/FQA, procurement, and OBO transition services and proof rules.</li>
+<li>Backend-authoritative capabilities, jurisdiction, assignment, PII/field/export scopes, delegation, and emergency access.</li>
+<li>API v1 naming/version, response/error/pagination, idempotency/version conflict, and outbox conventions.</li>
+<li>Secure evidence/identity/document storage, retention, legal hold, access audit, and disposition.</li>
+<li>Resident manual-review/appeal, KYC/trust policy, and assisted-service owner.</li>
+<li>Finance/ObR/BAC/NTP/segregation rules and approval thresholds.</li>
+<li>Analytics PII/export policy and predictive/AI model governance.</li>
+<li>Offline resident/field sync and replay/reconciliation protocol.</li>
+<li>Migration baseline, test environments/data, production topology, dependency lock, CI gates, backup/restore/rollback.</li>
+<li>Named owners and approval dates for every decision above.</li>
+</ol>
+    </div>
+</body>
+</html>

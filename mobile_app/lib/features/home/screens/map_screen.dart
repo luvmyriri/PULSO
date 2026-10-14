@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 /// map_screen.dart
 /// PULSO Mobile — Live Incident Map
 ///
@@ -259,7 +260,7 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.map_rounded, color: AppTheme.primaryOrange, size: 22),
+                        const PulsoIcon(Icons.map_rounded, color: AppTheme.primaryOrange, size: 22),
                         const SizedBox(width: 10),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,7 +483,7 @@ class _LocationFab extends StatelessWidget {
             ),
           ],
         ),
-        child: const Icon(Icons.my_location_rounded,
+        child: const PulsoIcon(Icons.my_location_rounded,
             color: AppTheme.primaryOrange, size: 22),
       ),
     );
@@ -552,7 +553,7 @@ class _ReportPopup extends StatelessWidget {
               const Spacer(),
               GestureDetector(
                 onTap: onClose,
-                child: const Icon(Icons.close, color: Colors.white38, size: 18),
+                child: const PulsoIcon(Icons.close, color: Colors.white38, size: 18),
               ),
             ],
           ),
@@ -577,7 +578,7 @@ class _ReportPopup extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.location_on_rounded, color: Colors.white38, size: 13),
+              const PulsoIcon(Icons.location_on_rounded, color: Colors.white38, size: 13),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -593,7 +594,7 @@ class _ReportPopup extends StatelessWidget {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.auto_awesome, color: Colors.indigoAccent, size: 12),
+                const PulsoIcon(Icons.auto_awesome, color: Colors.indigoAccent, size: 12),
                 const SizedBox(width: 4),
                 Text(
                   'AI Urgency: ${report['ai_urgency']}',

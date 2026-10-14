@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
     GitBranch, Map, Building2, ShieldCheck, PackageCheck,
     ClipboardList, Ruler, Eye, HardHat, Wrench, FileBarChart2,
@@ -14,15 +14,23 @@ import {
     BookOpen, UserCog, Settings, FlaskConical, Bell, Globe,
     Shield, Database, RefreshCw, Monitor, Lock, Server, User,
     ChevronDown, Check, X, Download, ExternalLink, FileText,
-    Banknote, CalendarRange, Landmark, Coins
-} from 'lucide-react';
+    Banknote, CalendarRange, Landmark, Coins,
+    ChevronLeft, CloudUpload, Trash2, Loader2, XCircle, Info
+} from '../icons';
 import GovSidebar from '../components/GovSidebar';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import OrangeSelect from '../components/OrangeSelect';
 import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
+import SearchInput from '../components/SearchInput';
 import DocumentUploadModal from '../components/DocumentUploadModal';
 import ComplianceReminder from '../components/ComplianceReminder';
+import './planning-delivery-workspace.css';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { getAuthToken, getAuthUser } from '../utils/authSession';
 
 // Section 4.6 - Final Turnover & Audit Components
 import PunchListMobile from './PunchListMobile';
@@ -36,15 +44,15 @@ const PAGE_CONFIG = {
         title: 'Work Orders',
         subtitle: 'Track and manage all engineering work orders assigned across field teams.',
         icon: GitBranch,
-        color: 'blue',
+        color: 'orange',
         apiPath: '/api/gov/work-orders',
         statuses: ['pending','assigned','in_progress','completed','cancelled'],
     },
     '/gov/projects': {
-        title: 'LGU Infrastructure Projects',
-        subtitle: 'Monitor all 6-phase infrastructure projects from request to certified completion.',
+        title: 'Projects',
+        subtitle: 'Manage infrastructure projects from request through completion.',
         icon: Map,
-        color: 'indigo',
+        color: 'orange',
         apiPath: '/api/gov/projects',
         statuses: ['request_received','survey_in_progress','design_in_progress','approved_by_city_engineer','in_progress','resolved','closed_completion_certified'],
     },
@@ -52,15 +60,15 @@ const PAGE_CONFIG = {
         title: 'OBO Inspections',
         subtitle: 'Office of the Building Official — building, electrical & mechanical permit applications.',
         icon: ShieldCheck,
-        color: 'teal',
+        color: 'orange',
         apiPath: '/api/gov/obo',
         statuses: ['application_received','inspection_scheduled','inspection_complete','permit_issued','failed_inspection'],
     },
     '/gov/procurement': {
-        title: 'Procurement Requests',
-        subtitle: 'RA 9184 compliant procurement workflow from draft to awarded bid.',
+        title: 'Procurement',
+        subtitle: 'Manage procurement requests from draft through endorsement.',
         icon: PackageCheck,
-        color: 'violet',
+        color: 'orange',
         apiPath: '/api/gov/procurement',
         statuses: ['draft','submitted','validated','sent_to_procurement'],
     },
@@ -76,7 +84,7 @@ const PAGE_CONFIG = {
         title: 'Audit Logs',
         subtitle: 'Immutable audit trail for all government actions in the system (FR-10).',
         icon: FileCheck,
-        color: 'red',
+        color: 'orange',
         apiPath: '/api/gov/audit-logs',
         statuses: [],
     },
@@ -84,48 +92,48 @@ const PAGE_CONFIG = {
         title: 'Records & Registry',
         subtitle: 'Administrative records management for the City Engineering Office.',
         icon: BookOpen,
-        color: 'purple',
+        color: 'orange',
         apiPath: '/api/gov/records',
         statuses: [],
     },
 
     '/gov/design-requests': {
-        title: 'Design Requests',
-        subtitle: 'Active design and planning requests across infrastructure project phases.',
+        title: 'Design work',
+        subtitle: 'Manage design requests, drawings, and review work for active projects.',
         icon: Ruler,
-        color: 'indigo',
+        color: 'orange',
         apiPath: '/api/gov/design-requests',
         statuses: ['request_received','survey_in_progress','design_in_progress','approved_by_city_engineer'],
     },
     '/gov/analysis': {
-        title: 'Structure Analysis',
-        subtitle: 'Structural and civil engineering analysis queue from active project phases.',
+        title: 'Engineering analysis',
+        subtitle: 'Review structural and civil engineering analysis for active projects.',
         icon: FlaskConical,
-        color: 'blue',
+        color: 'orange',
         apiPath: '/api/gov/analysis',
         statuses: ['survey_in_progress','design_in_progress','approved_by_city_engineer'],
     },
     '/gov/surveys': {
-        title: 'Field Surveys',
-        subtitle: 'Geodetic and civil engineering field survey assignments and results.',
+        title: 'Field surveys',
+        subtitle: 'Manage survey assignments, field observations, and submitted results.',
         icon: Eye,
-        color: 'green',
+        color: 'orange',
         apiPath: '/api/gov/surveys',
         statuses: ['assigned','in_progress','survey_in_progress'],
     },
     '/gov/boq': {
-        title: 'Bill of Quantities',
-        subtitle: 'Material and labor cost estimates across all active procurement requests.',
+        title: 'Bill of quantities',
+        subtitle: 'Prepare material, labor, and equipment quantities for active projects.',
         icon: ClipboardList,
-        color: 'amber',
+        color: 'orange',
         apiPath: '/api/gov/boq',
         statuses: [],
     },
     '/gov/estimation': {
-        title: 'Cost Estimation',
-        subtitle: 'Aggregated BoQ cost estimates per procurement request. RA 9184 compliant.',
+        title: 'Cost planning',
+        subtitle: 'Review project quantities and cost estimates before procurement.',
         icon: PackageCheck,
-        color: 'violet',
+        color: 'orange',
         apiPath: '/api/gov/estimation',
         statuses: ['draft','submitted','validated','sent_to_procurement'],
     },
@@ -141,7 +149,7 @@ const PAGE_CONFIG = {
         title: 'Reports Archive',
         subtitle: 'Closed, resolved, and rejected citizen infrastructure reports for administrative records.',
         icon: FileBarChart2,
-        color: 'purple',
+        color: 'orange',
         apiPath: '/api/gov/reports-archive',
         statuses: ['resolved','rejected','closed'],
     },
@@ -157,7 +165,7 @@ const PAGE_CONFIG = {
         title: 'Role Management',
         subtitle: 'Assign and manage Plantilla position roles for all LGU system users.',
         icon: UserCog,
-        color: 'slate',
+        color: 'orange',
         apiPath: '/api/gov/users',
         statuses: [],
     },
@@ -165,7 +173,7 @@ const PAGE_CONFIG = {
         title: 'System Settings',
         subtitle: 'Configure system parameters for the PULSO platform.',
         icon: Settings,
-        color: 'slate',
+        color: 'orange',
         apiPath: null,
         statuses: [],
     },
@@ -187,17 +195,27 @@ const PAGE_CONFIG = {
     },
 };
 
+const DELIVERY_VIEWS = [
+    { key: 'projects', label: 'Projects', shortLabel: 'Projects', path: '/gov/projects', icon: Map },
+    { key: 'design', label: 'Design work', shortLabel: 'Design', path: '/gov/design-requests', icon: Ruler, roles: ['design_engineer', 'cad_operator', 'division_chief', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'analysis', label: 'Engineering analysis', shortLabel: 'Analysis', path: '/gov/analysis', icon: FlaskConical, roles: ['design_engineer', 'division_chief', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'surveys', label: 'Field surveys', shortLabel: 'Surveys', path: '/gov/surveys', icon: Eye, roles: ['project_engineer', 'estimator', 'division_chief', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'estimation', label: 'Cost planning', shortLabel: 'Costs', path: '/gov/estimation', icon: Coins, roles: ['estimator', 'project_engineer', 'division_chief', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'quantities', label: 'Bill of quantities', shortLabel: 'Quantities', path: '/gov/boq', icon: ClipboardList, roles: ['estimator', 'project_engineer', 'division_chief', 'admin_officer', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+    { key: 'procurement', label: 'Procurement', shortLabel: 'Procurement', path: '/gov/procurement', icon: PackageCheck, roles: ['estimator', 'project_engineer', 'division_chief', 'admin_officer', 'city_engineer', 'asst_city_engineer', 'manager', 'system_admin'] },
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Budget Pipeline Component (Digital Handshake Visualizer)
-const BudgetPipeline = ({ item }) => {
-    if (!item || !['/gov/procurement', '/gov/estimation'].includes(window.location.pathname)) return null;
+const BudgetPipeline = ({ item, path }) => {
+    if (!item || !['/gov/procurement', '/gov/estimation'].includes(path)) return null;
 
     const steps = [
         { id: 'validation', label: 'Validation', icon: CheckCircle2, completed: item.status === 'validated' || item.funding_certified || item.cash_released || item.bac_meeting_date },
-        { id: 'funding', label: 'ObR Posting', icon: Banknote, completed: item.funding_certified, sub: item.obr_number },
-        { id: 'cash', label: 'Cash Availability', icon: Coins, completed: item.cash_released },
-        { id: 'bac', label: 'BAC Scheduled', icon: CalendarRange, completed: !!item.bac_meeting_date, sub: item.bac_meeting_date ? new Date(item.bac_meeting_date).toLocaleDateString() : null },
-        { id: 'ntp', label: 'NTP Issued', icon: Shield, completed: item.ntp_issued }
+        { id: 'funding', label: 'Funding record', icon: Banknote, completed: item.funding_certified, sub: item.obr_number },
+        { id: 'cash', label: 'Cash confirmed', icon: Coins, completed: item.cash_released },
+        { id: 'bac', label: 'BAC meeting', icon: CalendarRange, completed: !!item.bac_meeting_date, sub: item.bac_meeting_date ? new Date(item.bac_meeting_date).toLocaleDateString() : null },
+        { id: 'ntp', label: 'Notice to proceed', icon: Shield, completed: item.ntp_issued }
     ];
 
     const currentStep = steps.findLastIndex(s => s.completed);
@@ -208,9 +226,9 @@ const BudgetPipeline = ({ item }) => {
                 <div>
                     <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
                         <Landmark className="text-indigo-500" size={20} />
-                        Budget Handshake Pipeline
+                        Funding and procurement progress
                     </h3>
-                    <p className="text-xs text-slate-500 font-medium">Real-time status of procurement funding and scheduling (RA 9184).</p>
+                    <p className="text-xs text-slate-500 font-medium">Current funding, cash, BAC schedule, and notice-to-proceed status.</p>
                 </div>
                 <div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-black uppercase tracking-wider">
                     {item.pr_number || 'TR-2026-X'}
@@ -223,7 +241,7 @@ const BudgetPipeline = ({ item }) => {
                 <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: currentStep >= 0 ? `${(currentStep / (steps.length - 1)) * 80 + 10}%` : '0%' }}
-                    className="absolute left-10 top-5 h-0.5 bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000"
+                    className="absolute left-10 top-5 h-0.5 bg-indigo-500 transition-all duration-500"
                 />
 
                 {steps.map((step, idx) => (
@@ -237,8 +255,8 @@ const BudgetPipeline = ({ item }) => {
                         }`}>
                             <step.icon size={18} />
                         </div>
-                        <div className="absolute top-12 whitespace-nowrap flex flex-col items-center">
-                            <span className={`text-[10px] font-black uppercase tracking-wider ${step.completed ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
+                        <div className="absolute top-12 w-24 flex flex-col items-center text-center">
+                            <span className={`text-[10px] leading-3 font-black uppercase tracking-wider ${step.completed ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
                                 {step.label}
                             </span>
                             {step.sub && (
@@ -275,10 +293,16 @@ const STATUS_COLORS = {
     inspection_complete: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
     permit_issued: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
     failed_inspection: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    draft: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    draft: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
     submitted: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
     validated: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     sent_to_procurement: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+    dispatched: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    approved_internal: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+    pending_approval: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    received: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+    report_received: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+    survey_complete: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
 };
 
 const colorMap = {
@@ -349,7 +373,7 @@ const ItemRow = ({ item, path, onView }) => {
         const priorityClass = priorityColors[item.priority] || 'bg-slate-500 text-white';
 
         return (
-            <tr onClick={() => onView?.(item)} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer border-l-4 border-l-transparent hover:border-l-orange-500">
+            <tr onClick={() => onView?.(item)} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer border-b border-slate-100 dark:border-slate-800">
                 <td className="p-4 font-mono font-bold text-orange-600 dark:text-orange-400 text-xs">{item.advisory_id || `ADV-${item.id}`}</td>
                 <td className="p-4">
                     <div className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-xs">{item.title}</div>
@@ -413,7 +437,7 @@ const TimelineEvent = ({ entry }) => {
 
     if (entry.report_id) {
         contextLabel = `Citizen Report #${entry.report_id}`;
-        contextColor = 'bg-rose-500';
+        contextColor = 'bg-orange-500';
     } else if (entry.work_order_id) {
         contextLabel = `Work Order #${entry.work_order_id}`;
         contextColor = 'bg-blue-500';
@@ -422,6 +446,8 @@ const TimelineEvent = ({ entry }) => {
         contextColor = 'bg-indigo-500';
     }
 
+    const normalizedStatus = (entry.status || '').toLowerCase();
+    const statusClass = STATUS_COLORS[normalizedStatus] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
     const statusText = (entry.status || '').replace(/_/g, ' ').toUpperCase();
     const dateObj = entry.created_at ? new Date(entry.created_at) : new Date();
     const dateStr = dateObj.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -443,9 +469,11 @@ const TimelineEvent = ({ entry }) => {
                         <span className={`px-2 py-0.5 rounded-md text-[9px] font-black tracking-widest uppercase text-white ${contextColor}`}>
                             {contextLabel}
                         </span>
-                        <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
                             <span className="text-slate-300 dark:text-slate-700">→</span>
-                            <span className="text-slate-900 dark:text-slate-200">{statusText}</span>
+                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black tracking-widest uppercase ${statusClass}`}>
+                                {statusText}
+                            </span>
                         </span>
                     </div>
                     <div className="sm:hidden text-[10px] font-medium text-slate-400">
@@ -552,17 +580,44 @@ const AuditRow = ({ entry, index }) => {
         return text.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     };
 
+    const getTypeColor = (type) => {
+        const t = (type || '').toLowerCase();
+        if (t.includes('procurement')) return 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400';
+        if (t.includes('status')) return 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400';
+        if (t.includes('maintenance') || t.includes('update')) return 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400';
+        if (t.includes('auth') || t.includes('login')) return 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400';
+        if (t.includes('report') || t.includes('citizen')) return 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400';
+        if (t.includes('work') || t.includes('order')) return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400';
+        if (t.includes('project')) return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400';
+        if (t.includes('create') || t.includes('insert')) return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
+        if (t.includes('delete') || t.includes('remove')) return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400';
+        return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
+    };
+
+    const badgeColor = getTypeColor(entry.trigger_type);
+
     return (
-        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors text-xs border-b border-slate-50 dark:border-slate-800/50 last:border-0">
-            <td className="p-3 font-mono text-slate-400 text-[10px] w-12">{index}</td>
-            <td className="p-3">
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-[9px] uppercase tracking-wider">
+        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors text-xs border-b border-slate-50 dark:border-slate-800/50 last:border-0 group cursor-default">
+            <td className="p-4 font-mono font-bold text-slate-400 dark:text-slate-500 text-[10px] w-12">{index}</td>
+            <td className="p-4">
+                <span className={`px-2.5 py-1 rounded-full font-black text-[9px] uppercase tracking-wider ${badgeColor}`}>
                     {toTitleCase(entry.trigger_type)}
                 </span>
             </td>
-            <td className="p-3 font-semibold text-slate-900 dark:text-slate-100 min-w-[300px]">{beautifyAction(entry.action)}</td>
-            <td className="p-3 text-slate-700 dark:text-slate-300 font-medium">{getActorName()}</td>
-            <td className="p-3 text-slate-400 dark:text-slate-500 whitespace-nowrap italic">{entry.created_at ? new Date(entry.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+            <td className="p-4 font-bold text-slate-800 dark:text-slate-200 min-w-[300px] leading-relaxed">
+                {beautifyAction(entry.action)}
+            </td>
+            <td className="p-4">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black text-slate-500 dark:text-slate-400 shrink-0">
+                        {getActorName().charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-slate-600 dark:text-slate-300 font-medium text-xs">{getActorName()}</span>
+                </div>
+            </td>
+            <td className="p-4 text-slate-400 dark:text-slate-500 text-xs font-medium">
+                {entry.created_at ? new Date(entry.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+            </td>
         </tr>
     );
 };
@@ -570,13 +625,18 @@ const AuditRow = ({ entry, index }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Page Component
 // ─────────────────────────────────────────────────────────────────────────────
-const GovDivisionPage = () => {
+const GovDivisionPage = ({ workspace, activePathOverride }) => {
     const location = useLocation();
     const navigate = useNavigate();
-    const [token] = useState(() => localStorage.getItem('pulso_token'));
-    const [currentUser] = useState(() => {
+    const [token] = useState(() => getAuthToken() || localStorage.getItem('pulso_token'));
+    const [currentUser] = useState(() => getAuthUser() || (() => {
         try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
-    });
+    })());
+    const isDeliveryWorkspace = location.pathname === '/gov/delivery';
+    const requestedDeliveryView = new URLSearchParams(location.search).get('view') || 'projects';
+    const availableDeliveryViews = DELIVERY_VIEWS.filter((view) => !view.roles || view.roles.includes(currentUser?.role));
+    const activeDeliveryView = availableDeliveryViews.find((view) => view.key === requestedDeliveryView) || availableDeliveryViews[0] || DELIVERY_VIEWS[0];
+    const activePath = activePathOverride || (isDeliveryWorkspace ? activeDeliveryView.path : location.pathname);
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
@@ -631,11 +691,11 @@ const GovDivisionPage = () => {
 
     // Fetch documents when a project is selected
     useEffect(() => {
-        if (selectedItem && location.pathname === '/gov/projects' && selectedItem.id) {
+        if (selectedItem && activePath === '/gov/projects' && selectedItem.id) {
             fetchProjectDocuments(selectedItem.id);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedItem, location.pathname]);
+    }, [selectedItem, activePath]);
     
     // Sync temporary states for procurement modal
     useEffect(() => {
@@ -905,7 +965,7 @@ const GovDivisionPage = () => {
     const ITEMS_PER_PAGE = 10;
 
 
-    const config = PAGE_CONFIG[location.pathname] || {
+    const config = PAGE_CONFIG[activePath] || {
         title: 'Division Page',
         subtitle: 'City Engineering Office module',
         icon: HardHat,
@@ -916,6 +976,7 @@ const GovDivisionPage = () => {
 
     const colors = colorMap[config.color] || colorMap.slate;
     const Icon = config.icon;
+    const HeaderIcon = isDeliveryWorkspace ? Map : Icon;
 
     useEffect(() => {
         if (!token || !currentUser) { navigate('/gov'); return; }
@@ -950,7 +1011,7 @@ const GovDivisionPage = () => {
         }, search ? 400 : 0);
 
         return () => clearTimeout(handler);
-    }, [location.pathname, statusFilter, search, token, config.apiPath]);
+    }, [activePath, statusFilter, search, token, config.apiPath]);
 
     const filtered = items.filter(item => {
         const s = search.toLowerCase();
@@ -998,14 +1059,14 @@ const GovDivisionPage = () => {
     });
 
 
-    const isAuditLog = location.pathname === '/gov/audit-logs';
-    const isTimeline = location.pathname === '/gov/timeline';
-    const isRecords = location.pathname === '/gov/records';
+    const isAuditLog = activePath === '/gov/audit-logs';
+    const isTimeline = activePath === '/gov/timeline';
+    const isRecords = activePath === '/gov/records';
     const isStatic = !config.apiPath;
-    const isSettings = location.pathname === '/gov/settings';
-    const isAgentApp = location.pathname === '/gov/agent-app';
-    const isUsers = location.pathname === '/gov/users';
-    const isAdvisory = location.pathname === '/gov/advisories';
+    const isSettings = activePath === '/gov/settings';
+    const isAgentApp = activePath === '/gov/agent-app';
+    const isUsers = activePath === '/gov/users';
+    const isAdvisory = activePath === '/gov/advisories';
 
     // Pagination — computed after route flags are known
     const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
@@ -1024,7 +1085,7 @@ const GovDivisionPage = () => {
     useEffect(() => { 
         setPage(1); 
         setItems([]);
-    }, [location.pathname, statusFilter, search, token, config.apiPath]);
+    }, [activePath, statusFilter, search, token, config.apiPath]);
 
     const activeFilterCount = [roleFilter, trustFilter].filter(Boolean).length;
 
@@ -1050,26 +1111,31 @@ const GovDivisionPage = () => {
     const saveSettings = () => { setSettingsSaved(true); setTimeout(() => setSettingsSaved(false), 2500); };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-300 font-sans flex text-sm">
+        <div className="min-h-screen bg-neutral-bg dark:bg-[#070a12] text-neutral-text dark:text-slate-100 font-sans flex text-sm transition-colors duration-150">
             <GovSidebar currentUser={currentUser} />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 {/* Header */}
-                <header className="h-16 bg-white dark:bg-slate-900 flex items-center justify-between px-8 shrink-0 border-b border-slate-200 dark:border-slate-800 z-40 shadow-sm">
+                <header className="h-16 bg-white dark:bg-[#090e1a] flex items-center justify-between px-8 shrink-0 border-b border-neutral-border dark:border-slate-800 relative z-50 transition-colors duration-150">
                     <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${colors.icon}`}>
-                            <Icon size={18} />
+                            <HeaderIcon size={18} />
                         </div>
-                        <div>
-                            <h1 className="text-base font-black text-slate-900 dark:text-white leading-tight">{config.title}</h1>
-                            <p className="text-[11px] text-slate-500 hidden sm:block">{config.subtitle}</p>
+                        <div className="flex flex-col text-left">
+                            <GovBreadcrumb category="Organization" current={isDeliveryWorkspace ? 'Projects and delivery' : config.title} />
+                            <h1 className="text-base sm:text-lg font-heading font-black text-neutral-text dark:text-white leading-tight mt-0.5">
+                                {isDeliveryWorkspace ? 'Projects and delivery' : config.title}
+                            </h1>
+                            <p className="text-[11px] text-neutral-muted dark:text-slate-400 hidden sm:block">
+                                {isDeliveryWorkspace ? 'Plan, survey, design, cost, and procure in one workspace.' : config.subtitle}
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
                         <button
                             onClick={() => { setLoading(true); fetch(`${API_BASE_URL}${config.apiPath}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.ok ? r.json() : []).then(data => setItems(Array.isArray(data) ? data : [])).catch(() => setItems([])).finally(() => setLoading(false)); }}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-600 hover:text-indigo-600 transition-all"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500 hover:text-[#ff6b00] transition-all"
                             title="Refresh"
                         >
                             <RefreshCw size={14} />
@@ -1077,17 +1143,69 @@ const GovDivisionPage = () => {
                         {config.apiPath && !isAuditLog && !isTimeline && (
                             <button
                                 onClick={() => setShowNewModal(true)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors bg-indigo-600 hover:bg-indigo-700`}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors bg-[#ff6b00] hover:bg-[#e65c00]`}
                             >
                                 <Plus size={14} /> New
                             </button>
                         )}
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
+
+                {isDeliveryWorkspace && (
+                    <nav className="delivery-workspace-tabs" aria-label="Projects and delivery functions">
+                        {availableDeliveryViews.map((view) => {
+                            const ViewIcon = view.icon;
+                            const isActive = view.key === activeDeliveryView.key;
+                            return (
+                                <Link
+                                    key={view.key}
+                                    to={`/gov/delivery?view=${view.key}`}
+                                    className={`delivery-workspace-tab${isActive ? ' is-active' : ''}`}
+                                    aria-current={isActive ? 'page' : undefined}
+                                    onClick={() => {
+                                        setSearch('');
+                                        setStatusFilter('');
+                                        setSelectedItem(null);
+                                        setPage(1);
+                                    }}
+                                >
+                                    <ViewIcon size={15} strokeWidth={1.8} aria-hidden="true" />
+                                    <span className="delivery-workspace-tab__long">{view.label}</span>
+                                    <span className="delivery-workspace-tab__short">{view.shortLabel}</span>
+                                </Link>
+                            );
+                        })}
+                    </nav>
+                )}
+
+                {workspace && !isDeliveryWorkspace && (
+                    <GovernmentWorkspaceTabs
+                        workspace={workspace}
+                        currentUser={currentUser}
+                        onViewChange={() => {
+                            setSearch('');
+                            setStatusFilter('');
+                            setSelectedItem(null);
+                            setPage(1);
+                        }}
+                    />
+                )}
 
                 {/* Main Content */}
                 <main className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full mx-auto space-y-4">
+
+                        {isDeliveryWorkspace && (
+                            <section className="delivery-workspace-context" aria-labelledby="delivery-view-heading">
+                                <div>
+                                    <h2 id="delivery-view-heading">{config.title}</h2>
+                                    <p>{config.subtitle}</p>
+                                </div>
+                                <span>{activeDeliveryView.label}</span>
+                            </section>
+                        )}
 
                         {/* Settings Page — Full UI */}
                         {isSettings && (
@@ -1257,8 +1375,8 @@ const GovDivisionPage = () => {
                                             </div>
                                         </div>
 
-                                        <div className="mt-8 p-4 bg-indigo-50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20">
-                                            <h3 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-2">
+                                        <div className="mt-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                            <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-2">
                                                 <ShieldCheck size={14} /> Installation Note
                                             </h3>
                                             <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -1329,17 +1447,14 @@ const GovDivisionPage = () => {
                                 <div className="flex items-center gap-3 flex-wrap">
 
                                     {/* Search */}
-
-                                    <div className="relative flex-1 min-w-48">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            placeholder={isUsers ? 'Search by name, email, role, barangay…' : `Search ${config.title.toLowerCase()}...`}
-                                            value={search}
-                                            onChange={e => setSearch(e.target.value)}
-                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-orange-500 transition-colors"
-                                        />
-                                    </div>
+                                    <SearchInput
+                                        value={search}
+                                        onChange={setSearch}
+                                        placeholder={isUsers ? 'Search name, email, role or barangay' : `Search ${config.title.toLowerCase()}`}
+                                        ariaLabel={isUsers ? 'Search name, email, role or barangay' : `Search ${config.title.toLowerCase()}`}
+                                        onClear={() => setSearch('')}
+                                        className="w-full sm:w-[320px] md:w-[360px]"
+                                    />
                                     
                                     {/* J-ABAC Jurisdiction Toggle (Engineers Only) */}
                                     {['project_engineer', 'design_engineer', 'estimator', 'cad_operator', 'construction_foreman', 'building_inspector', 'electrical_inspector', 'mechanical_inspector'].includes(currentUser?.role) && currentUser?.barangay && (
@@ -1481,7 +1596,7 @@ const GovDivisionPage = () => {
 
 
                                 {/* Budget Pipeline - Only for Procurement/Estimation */}
-                                <BudgetPipeline item={selectedItem || filtered[0]} />
+                                <BudgetPipeline item={selectedItem || filtered[0]} path={activePath} />
 
                                 {/* Table */}
                                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-md shadow-orange-100/60 dark:shadow-orange-900/10 overflow-hidden">
@@ -1507,11 +1622,11 @@ const GovDivisionPage = () => {
                                                     <tr>
                                                         {isAuditLog ? (
                                                             <>
-                                                                <th className="p-3">ID</th>
-                                                                <th className="p-3">Type</th>
-                                                                <th className="p-3">Action</th>
-                                                                <th className="p-3">Actor</th>
-                                                                <th className="p-3">Timestamp</th>
+                                                                <th className="p-4">ID</th>
+                                                                <th className="p-4">Type</th>
+                                                                <th className="p-4">Action</th>
+                                                                <th className="p-4">Actor</th>
+                                                                <th className="p-4">Timestamp</th>
                                                             </>
                                                         ) : isRecords ? (
                                                             <>
@@ -1654,7 +1769,7 @@ const GovDivisionPage = () => {
                                                                 </td>
                                                             </tr>
                                                         ) :
-                                                        <ItemRow key={item.id} item={item} path={location.pathname} onView={setSelectedItem} />
+                                                        <ItemRow key={item.id} item={item} path={activePath} onView={setSelectedItem} />
                                                     )}
                                                 </tbody>
                                             </table>
@@ -1681,7 +1796,7 @@ const GovDivisionPage = () => {
 
                                             >
 
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                                                <ChevronLeft size={14} />
 
                                             </button>
 
@@ -1749,7 +1864,7 @@ const GovDivisionPage = () => {
 
                                             >
 
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                                                <ChevronRight size={14} />
 
                                             </button>
 
@@ -2087,7 +2202,7 @@ const GovDivisionPage = () => {
                             )}
 
                             {/* Document & Advance Panel for Projects */}
-                            {location.pathname === '/gov/projects' && (
+                            {activePath === '/gov/projects' && (
                                 <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Phase Completion Gate</div>
@@ -2097,11 +2212,11 @@ const GovDivisionPage = () => {
                                     <div className="mb-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+                                                <CloudUpload size={14} />
                                                 Document Vault
                                             </div>
                                             <button onClick={() => setShowDocUploadModal(true)} className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                                                <Plus size={14} />
                                                 Upload Document
                                             </button>
                                         </div>
@@ -2114,7 +2229,7 @@ const GovDivisionPage = () => {
                                                     <div key={doc.id || idx} className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-600 dark:text-indigo-400"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                                                <FileText size={14} className="text-indigo-600 dark:text-indigo-400" />
                                                             </div>
                                                             <div>
                                                                 <div className="text-xs font-bold text-slate-700 dark:text-slate-300">{doc.document_type?.replace(/_/g, ' ').toUpperCase()}</div>
@@ -2124,7 +2239,7 @@ const GovDivisionPage = () => {
                                                         <div className="flex items-center gap-2">
                                                             <div className="text-[10px] text-slate-400 font-mono">{doc.sha256_hash?.substring(0, 8)}...</div>
                                                             <button onClick={() => deleteDocument(doc.id, selectedItem?.id)} className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete document">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                                                <Trash2 size={14} />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -2228,7 +2343,7 @@ const GovDivisionPage = () => {
                                                 {hasMissingDocs && (
                                                     <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
                                                         <div className="text-xs font-bold text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-2">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                                                            <AlertTriangle size={14} />
                                                             Missing Required Documents
                                                         </div>
                                                         <div className="flex flex-wrap gap-1">
@@ -2243,13 +2358,13 @@ const GovDivisionPage = () => {
                                                 <button 
                                                     onClick={() => handleAdvancePhase(selectedItem.id)}
                                                     disabled={advancingPhase || hasMissingDocs}
-                                                    className={`w-full relative overflow-hidden group text-white py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 mt-2 ${hasMissingDocs ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 disabled:from-indigo-400 disabled:to-indigo-400'}`}
+                                                    className={`w-full relative overflow-hidden group text-white py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 mt-2 ${hasMissingDocs ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed' : 'bg-[#0b4f6c] hover:bg-[#083e55] disabled:bg-slate-400'}`}
                                                 >
                                                     {advancingPhase ? 'Executing Compliance Gates...' : hasMissingDocs ? 'Documents Required' : 'Advance to Next Phase'}
                                                     {advancingPhase ? (
-                                                        <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                                                        <Loader2 size={16} className="animate-spin" />
                                                     ) : (
-                                                        <svg className={`group-hover:translate-x-1 transition-transform ${hasMissingDocs ? 'hidden' : ''}`} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                                                        <ChevronRight size={16} className={`group-hover:translate-x-1 transition-transform ${hasMissingDocs ? 'hidden' : ''}`} />
                                                     )}
                                                 </button>
                                             </>
@@ -2264,7 +2379,7 @@ const GovDivisionPage = () => {
                             <button onClick={() => setSelectedItem(null)} className="flex-1 py-2 rounded-xl font-bold text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                 Close
                             </button>
-                            {location.pathname === '/gov/work-orders' && selectedItem?.status === 'open' && (
+                            {activePath === '/gov/work-orders' && selectedItem?.status === 'open' && (
                                 <>
                                     <button onClick={() => { setApprovalAction('approve'); setShowApprovalModal(true); }} className="flex-1 py-2 rounded-xl font-bold text-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors">
                                         Approve
@@ -2274,9 +2389,9 @@ const GovDivisionPage = () => {
                                     </button>
                                 </>
                             )}
-                            {(location.pathname === '/gov/work-orders' || location.pathname === '/gov/projects') && (
-                                <button onClick={() => { setSelectedItem(null); navigate(location.pathname === '/gov/work-orders' ? '/dispatcher' : '/gov/projects'); }} className="flex-1 py-2 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
-                                    {location.pathname === '/gov/work-orders' ? 'Open in Command Center' : 'View Timeline'}
+                            {(activePath === '/gov/work-orders' || activePath === '/gov/projects') && (
+                                <button onClick={() => { setSelectedItem(null); navigate(activePath === '/gov/work-orders' ? '/dispatcher' : '/gov/delivery?view=projects'); }} className="flex-1 py-2 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+                                    {activePath === '/gov/work-orders' ? 'Open in reports and dispatch' : 'Return to projects'}
                                 </button>
                             )}
                         </div>
@@ -2315,14 +2430,14 @@ const GovDivisionPage = () => {
                             )}
 
                             <form id="new-record-form" onSubmit={handleCreateRecord} className="space-y-4 pt-1">
-                                {location.pathname === '/gov/work-orders' && (
+                                {activePath === '/gov/work-orders' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Title</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, title: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Description</label><textarea required onChange={e => setNewRecordForm({...newRecordForm, description: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" rows={3}></textarea></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Type</label><OrangeSelect value={newRecordForm.wo_type || 'standard'} onChange={v => setNewRecordForm({...newRecordForm, wo_type: v})} options={[{value:'standard',label:'Standard'},{value:'preemptive',label:'Preemptive'}]} className="w-full" /></div>
                                     </>
                                 )}
-                                {location.pathname === '/gov/projects' && (
+                                {activePath === '/gov/projects' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Project Title</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, title: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Description</label><textarea required onChange={e => setNewRecordForm({...newRecordForm, description: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" rows={3}></textarea></div>
@@ -2368,20 +2483,20 @@ const GovDivisionPage = () => {
                                         </div>
                                     </>
                                 )}
-                                {location.pathname === '/gov/obo' && (
+                                {activePath === '/gov/obo' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Applicant Name</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, applicant_name: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Property Address</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, property_address: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Inspection Type</label><OrangeSelect value={newRecordForm.inspection_type || 'building'} onChange={v => setNewRecordForm({...newRecordForm, inspection_type: v})} options={[{value:'building',label:'Building'},{value:'electrical',label:'Electrical'},{value:'mechanical',label:'Mechanical'}]} className="w-full" /></div>
                                     </>
                                 )}
-                                {location.pathname === '/gov/procurement' && (
+                                {activePath === '/gov/procurement' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Request Title</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, title: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Purpose</label><textarea required onChange={e => setNewRecordForm({...newRecordForm, purpose: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" rows={3}></textarea></div>
                                     </>
                                 )}
-                                {location.pathname === '/gov/advisories' && (
+                                {activePath === '/gov/advisories' && (
                                     <>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Advisory Title</label><input type="text" required onChange={e => setNewRecordForm({...newRecordForm, title: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" placeholder="e.g., Scheduled Power Interruption" /></div>
                                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Description</label><textarea required onChange={e => setNewRecordForm({...newRecordForm, description: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm" rows={3} placeholder="Provide details about the advisory..."></textarea></div>
@@ -2424,7 +2539,7 @@ const GovDivisionPage = () => {
                                         </div>
                                     </>
                                 )}
-                                {!['/gov/work-orders', '/gov/projects', '/gov/obo', '/gov/procurement', '/gov/advisories'].includes(location.pathname) && (
+                                {!['/gov/work-orders', '/gov/projects', '/gov/obo', '/gov/procurement', '/gov/advisories'].includes(activePath) && (
                                     <div className="text-sm text-slate-500 py-4 text-center">Form is not available for this module.</div>
                                 )}
                             </form>
@@ -2433,7 +2548,7 @@ const GovDivisionPage = () => {
                         
                         <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                             <button type="button" onClick={() => setShowNewModal(false)} className="flex-1 py-3 rounded-xl font-bold text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors">Cancel</button>
-                            <button type="submit" form="new-record-form" disabled={isSubmitting || !['/gov/work-orders', '/gov/projects', '/gov/obo', '/gov/procurement', '/gov/advisories'].includes(location.pathname)} className="flex-1 py-3 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50">
+                            <button type="submit" form="new-record-form" disabled={isSubmitting || !['/gov/work-orders', '/gov/projects', '/gov/obo', '/gov/procurement', '/gov/advisories'].includes(activePath)} className="flex-1 py-3 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50">
                                 {isSubmitting ? 'Saving...' : 'Create Record'}
                             </button>
                         </div>
@@ -2519,11 +2634,11 @@ const GovDivisionPage = () => {
                             'bg-blue-100 dark:bg-blue-900 text-blue-600'
                         }`}>
                             {showNotification.type === 'success' ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                <Check size={24} />
                             ) : showNotification.type === 'error' ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                                <XCircle size={24} />
                             ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                <Info size={24} />
                             )}
                         </div>
                         <p className={`text-sm font-bold ${

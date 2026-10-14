@@ -1,0 +1,71 @@
+/**
+ * gov-reports-header.css
+ * Container queries and resilient spacing for Two-Tier Government Headers.
+ * Ensures title block is never crushed or truncated regardless of sidebar state.
+ */
+
+.gov-admin-header-container {
+    container-type: inline-size;
+    container-name: govheader;
+}
+
+/* Tier 1 Global App Bar */
+.gov-tier1-bar {
+    min-height: 54px;
+}
+
+.gov-tier1-search {
+    flex: 1 1 280px;
+    min-width: 200px;
+    max-width: 420px;
+}
+
+/* Tier 2 Page Header */
+.gov-tier2-header {
+    min-height: 60px;
+}
+
+.gov-tier2-title-block {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.gov-tier2-title {
+    flex-shrink: 0;
+    min-width: max-content;
+}
+
+.gov-tier2-subtitle {
+    /* At least 4.5:1 contrast against dark (#090e1a) and white (#ffffff) */
+    color: #475569;
+}
+:is(.dark) .gov-tier2-subtitle {
+    color: #cbd5e1;
+}
+
+.gov-tier2-actions {
+    flex-shrink: 0;
+}
+
+/* Container query responsiveness: adapts based on actual available space inside layout */
+@container govheader (max-width: 860px) {
+    .gov-tier2-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.75rem !important;
+    }
+    .gov-tier1-search {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    .gov-tier2-actions {
+        width: 100% !important;
+        justify-content: flex-start !important;
+    }
+}
+
+@container govheader (max-width: 520px) {
+    .gov-tier1-search {
+        min-width: 150px !important;
+    }
+}

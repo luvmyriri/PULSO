@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, User, MapPin, Phone, Lock, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, User, MapPin, Phone, Lock, CheckCircle2, ShieldCheck } from '../icons';
 import Branding from '../components/Branding';
 
 export default function AuthModal({ view, onNavigate }) {

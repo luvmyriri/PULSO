@@ -1,6 +1,6 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, text
 from sqlalchemy import pool
 
 from alembic import context
@@ -20,11 +20,40 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import Base
+from database import Base, DATABASE_URL
 import models # Ensure models are loaded
 import gov_models # Include government models
 
 target_metadata = Base.metadata
+config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
+
+
+def include_object(object, name, type_, reflected, compare_to):
+    """Exclude only the PostGIS extension's own spatial_ref_sys table."""
+    if type_ != "table" or not reflected or name != "spatial_ref_sys":
+        return True
+
+    schema = object.schema or "public"
+    return not context.get_bind().execute(
+        text(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_class cls
+                JOIN pg_namespace ns ON ns.oid = cls.relnamespace
+                JOIN pg_depend dep ON dep.classid = 'pg_class'::regclass
+                                  AND dep.objid = cls.oid
+                                  AND dep.refclassid = 'pg_extension'::regclass
+                                  AND dep.deptype = 'e'
+                JOIN pg_extension ext ON ext.oid = dep.refobjid
+                WHERE ns.nspname = :schema
+                  AND cls.relname = 'spatial_ref_sys'
+                  AND ext.extname = 'postgis'
+            )
+            """
+        ),
+        {"schema": schema},
+    ).scalar()
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -48,6 +77,7 @@ def run_migrations_offline() -> None:
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        include_object=include_object,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -71,7 +101,8 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, target_metadata=target_metadata,
+            include_object=include_object,
         )
 
         with context.begin_transaction():

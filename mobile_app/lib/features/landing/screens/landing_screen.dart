@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -68,7 +69,7 @@ class _LandingScreenState extends State<LandingScreen> {
               child: const Center(child: PulsoBranding(scale: 0.8)),
             ),
             ListTile(
-              leading: Icon(Icons.home, color: brandOrange),
+              leading: PulsoIcon(Icons.home, color: brandOrange),
               title: Text(
                 l10n.home,
                 style: GoogleFonts.outfit(
@@ -85,7 +86,7 @@ class _LandingScreenState extends State<LandingScreen> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.dashboard, color: brandOrange),
+              leading: PulsoIcon(Icons.dashboard, color: brandOrange),
               title: Text(
                 l10n.platform,
                 style: GoogleFonts.outfit(
@@ -98,7 +99,7 @@ class _LandingScreenState extends State<LandingScreen> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.timeline, color: brandOrange),
+              leading: PulsoIcon(Icons.timeline, color: brandOrange),
               title: Text(
                 l10n.howItWorks,
                 style: GoogleFonts.outfit(
@@ -111,7 +112,7 @@ class _LandingScreenState extends State<LandingScreen> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.lightbulb, color: brandOrange),
+              leading: PulsoIcon(Icons.lightbulb, color: brandOrange),
               title: Text(
                 l10n.solutions,
                 style: GoogleFonts.outfit(
@@ -124,7 +125,7 @@ class _LandingScreenState extends State<LandingScreen> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.business, color: brandOrange),
+              leading: PulsoIcon(Icons.business, color: brandOrange),
               title: Text(
                 l10n.aboutLgu,
                 style: GoogleFonts.outfit(
@@ -152,7 +153,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   Row(
                     children: [
                       IconButton(
-                        icon: Icon(
+                        icon: PulsoIcon(
                           Icons.light_mode,
                           color: settings.themeMode == ThemeMode.light
                               ? brandOrange
@@ -162,7 +163,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         onPressed: () => settings.setThemeMode(ThemeMode.light),
                       ),
                       IconButton(
-                        icon: Icon(
+                        icon: PulsoIcon(
                           Icons.dark_mode,
                           color: settings.themeMode == ThemeMode.dark
                               ? brandOrange
@@ -172,7 +173,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         onPressed: () => settings.setThemeMode(ThemeMode.dark),
                       ),
                       IconButton(
-                        icon: Icon(
+                        icon: PulsoIcon(
                           Icons.settings_brightness,
                           color: settings.themeMode == ThemeMode.system
                               ? brandOrange
@@ -266,7 +267,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 Builder(
                   builder: (context) {
                     return IconButton(
-                      icon: Icon(
+                      icon: PulsoIcon(
                         Icons.menu,
                         color: isDark ? Colors.white : brandOrange,
                         size: 28,
@@ -382,7 +383,7 @@ class _LandingScreenState extends State<LandingScreen> {
               : Colors.transparent,
           borderRadius: BorderRadius.circular(15),
         ),
-        child: Icon(
+        child: PulsoIcon(
           icon,
           size: 14,
           color: isSelected
@@ -598,7 +599,7 @@ class PlatformSection extends StatelessWidget {
               color: brandOrange.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: brandOrange, size: 28),
+            child: PulsoIcon(icon, color: brandOrange, size: 28),
           ),
           const SizedBox(height: 20),
           Text(
@@ -643,7 +644,7 @@ class TimelineSection extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
+                    PulsoIcon(
                       Icons.assignment_outlined,
                       color: brandOrange,
                       size: 16,
@@ -764,7 +765,7 @@ class TimelineSection extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: Icon(icon, color: Colors.white, size: 30),
+                      child: PulsoIcon(icon, color: Colors.white, size: 30),
                     ),
                     Transform.translate(
                       offset: const Offset(8, -8),
@@ -965,7 +966,7 @@ class SolutionsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 32),
+          PulsoIcon(icon, color: color, size: 32),
           const SizedBox(height: 16),
           Text(
             title,
@@ -990,7 +991,7 @@ class SolutionsSection extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline, color: color, size: 14),
+                  PulsoIcon(Icons.check_circle_outline, color: color, size: 14),
                   const SizedBox(width: 8),
                   Text(
                     item,
@@ -1027,7 +1028,7 @@ class ServicesSection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.open_in_new, size: 14, color: brandOrange),
+                PulsoIcon(Icons.open_in_new, size: 14, color: brandOrange),
                 const SizedBox(width: 8),
                 Text(
                   l10n.cityServicesBadge,
@@ -1140,7 +1141,7 @@ class ServicesSection extends StatelessWidget {
           FadeInUp(
             child: OutlinedButton.icon(
               onPressed: () => _launchUrl('https://caloocanservices.online/'),
-              icon: const Icon(Icons.open_in_new, size: 18),
+              icon: const PulsoIcon(Icons.open_in_new, size: 18),
               label: Text(
                 l10n.visitPortal,
                 style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
@@ -1199,7 +1200,7 @@ class ServicesSection extends StatelessWidget {
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 28),
+            child: PulsoIcon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 16),
           Text(
@@ -1227,7 +1228,7 @@ class ServicesSection extends StatelessWidget {
                 onTap: () => _launchUrl(item['url']!),
                 child: Row(
                   children: [
-                    Icon(Icons.radio_button_checked, color: color, size: 12),
+                    PulsoIcon(Icons.radio_button_checked, color: color, size: 12),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1270,7 +1271,7 @@ class AboutLguSection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.people, color: brandOrange, size: 16),
+                PulsoIcon(Icons.people, color: brandOrange, size: 16),
                 const SizedBox(width: 8),
                 Text(
                   l10n.aboutBadge,
@@ -1341,7 +1342,7 @@ class AboutLguSection extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Icon(Icons.bar_chart, color: brandOrange),
+                    PulsoIcon(Icons.bar_chart, color: brandOrange),
                   ],
                 ),
                 const SizedBox(height: 25),
