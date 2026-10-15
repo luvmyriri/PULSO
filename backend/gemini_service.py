@@ -475,7 +475,7 @@ Severity Guidelines:
    b) NON-INFRASTRUCTURE CONTENT: If the image shows food, animals, random objects, memes, indoor rooms, screenshots, or any content clearly unrelated to city public works and infrastructure, set:
       - "is_infrastructure": false
       - "is_inappropriate": true  
-      - "rejection_reason": "We couldn't clearly see a city infrastructure issue in this photo. Please take a photo showing the actual problem (such as a pothole, broken streetlight, or drainage hazard)."
+      - "rejection_reason": "We couldn't clearly see a city infrastructure issue in this photo. Please take a photo showing the actual problem."
       - "category": "Inappropriate Content"
    c) VALID INFRASTRUCTURE images:
       - "is_infrastructure": true

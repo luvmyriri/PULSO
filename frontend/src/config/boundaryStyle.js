@@ -43,7 +43,8 @@ export function getSectorPolygonStyle({
     activeSector = 'all',
     isDarkMode = true,
     isHovered = false,
-    customOrange = null
+    customOrange = null,
+    interactive = true
 } = {}) {
     const orange = customOrange || getPulsoOrange();
     const isSelected = activeSector === 'all' || activeSector?.toLowerCase() === sector?.toLowerCase();
@@ -52,24 +53,24 @@ export function getSectorPolygonStyle({
         return {
             strokeColor: orange,
             strokeOpacity: 1.0,
-            strokeWeight: isHovered ? 3.0 : 2.5,
+            strokeWeight: isHovered && interactive ? 3.0 : 2.0,
             fillColor: orange,
-            fillOpacity: isHovered
+            fillOpacity: isHovered && interactive
                 ? (isDarkMode ? 0.16 : 0.14)
-                : (isDarkMode ? 0.10 : 0.08),
-            clickable: true,
+                : (isDarkMode ? 0.08 : 0.08),
+            clickable: interactive,
             zIndex: 10,
         };
     }
 
-    // Dimmed unselected sector — same orange, reduced weight & opacity
+    // Dimmed unselected sector — same orange, 40% opacity per spec
     return {
         strokeColor: orange,
-        strokeOpacity: 0.35,
+        strokeOpacity: 0.40,
         strokeWeight: 1.5,
         fillColor: orange,
         fillOpacity: isDarkMode ? 0.03 : 0.02,
-        clickable: true,
+        clickable: interactive,
         zIndex: 5,
     };
 }
@@ -78,8 +79,7 @@ export function getSectorPolygonStyle({
  * Returns Google Maps PolygonOptions for internal Barangay boundaries.
  *
  * Spec:
- * - Barangay lines: same orange, 1 px, 60% to 70% opacity (0.65).
- * - Fade in from medium zoom level.
+ * - Barangay lines: PULSO orange (1.2px) by default, matching outer perimeter.
  * - Dimmed in unselected sector.
  */
 export function getBarangayPolygonStyle({
@@ -87,33 +87,46 @@ export function getBarangayPolygonStyle({
     activeSector = 'all',
     isDarkMode = true,
     isHovered = false,
-    customOrange = null
+    customOrange = null,
+    grayStyle = false
 } = {}) {
     const orange = customOrange || getPulsoOrange();
     const isSelected = activeSector === 'all' || activeSector?.toLowerCase() === sector?.toLowerCase();
 
+    if (grayStyle) {
+        return {
+            strokeColor: orange,
+            strokeOpacity: isSelected ? 0.70 : 0.30,
+            strokeWeight: 1.1,
+            fillColor: orange,
+            fillOpacity: 0,
+            clickable: false,
+            zIndex: 15,
+        };
+    }
+
     if (isSelected) {
         return {
             strokeColor: orange,
-            strokeOpacity: 0.65,
-            strokeWeight: 1.0,
+            strokeOpacity: 0.75,
+            strokeWeight: 1.2,
             fillColor: orange,
             fillOpacity: isHovered
-                ? (isDarkMode ? 0.12 : 0.09)
-                : (isDarkMode ? 0.06 : 0.04),
+                ? (isDarkMode ? 0.08 : 0.06)
+                : 0,
             clickable: false,
-            zIndex: 2,
+            zIndex: 15,
         };
     }
 
     return {
         strokeColor: orange,
-        strokeOpacity: 0.25,
-        strokeWeight: 0.8,
+        strokeOpacity: 0.35,
+        strokeWeight: 0.9,
         fillColor: orange,
-        fillOpacity: 0.01,
+        fillOpacity: 0,
         clickable: false,
-        zIndex: 1,
+        zIndex: 14,
     };
 }
 
@@ -137,6 +150,55 @@ export function getSectorLabelSvg({
             <rect x="2" y="2" width="130" height="28" rx="8" fill="${bgFill}" fill-opacity="${bgOpacity}" stroke="${orange}" stroke-width="1.5" />
             <circle cx="16" cy="16" r="4" fill="${orange}" />
             <text x="70" y="20" fill="${textFill}" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.3">${label}</text>
+        </svg>
+    `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
+
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(rawSvg)}`;
+}
+
+/**
+ * Builds the SVG Data URL for the City Hall Landmark Marker badge.
+ * Sleek, modern badge without a teardrop pin, containing only the refined City Hall icon.
+ * Theme-aware: light mode has crisp white surface and dark/orange border; dark mode has deep navy and orange border.
+ */
+export function getCityHallMarkerSvg({
+    sector = 'north',
+    isDarkMode = true,
+    orangeColor = null
+} = {}) {
+    const isNorth = sector?.toLowerCase() !== 'south';
+    const orange = orangeColor || (isDarkMode ? '#ff6b00' : '#d95700');
+    const bgFill = isDarkMode ? '#0c1424' : '#ffffff';
+    const bgOpacity = isDarkMode ? '0.96' : '0.98';
+    const shadowSlope = isDarkMode ? '0.5' : '0.22';
+    const filterId = isNorth ? 'chIconShadowNorth' : 'chIconShadowSouth';
+
+    const rawSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 38 38">
+            <defs>
+                <filter id="${filterId}" x="-25%" y="-25%" width="150%" height="150%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="2.5" />
+                    <feOffset dx="0" dy="2" result="offsetblur" />
+                    <feComponentTransfer><feFuncA type="linear" slope="${shadowSlope}"/></feComponentTransfer>
+                    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+            </defs>
+            <circle cx="19" cy="19" r="16" fill="${bgFill}" fill-opacity="${bgOpacity}" stroke="${orange}" stroke-width="1.8" filter="url(#${filterId})" />
+            
+            <!-- City Hall Landmark Facade Icon Centered -->
+            <g transform="translate(9, 9)" stroke="${orange}" stroke-linecap="round" stroke-linejoin="round">
+                <!-- Classical Pediment Roof -->
+                <polygon points="10 1, 19 6.5, 1 6.5" fill="${orange}" fill-opacity="0.28" stroke-width="1.3" />
+                <line x1="1" y1="7.2" x2="19" y2="7.2" stroke-width="1.5" />
+                <!-- 4 Stately Columns -->
+                <line x1="3.8" y1="8.5" x2="3.8" y2="14.5" stroke-width="1.8" />
+                <line x1="7.9" y1="8.5" x2="7.9" y2="14.5" stroke-width="1.8" />
+                <line x1="12.1" y1="8.5" x2="12.1" y2="14.5" stroke-width="1.8" />
+                <line x1="16.2" y1="8.5" x2="16.2" y2="14.5" stroke-width="1.8" />
+                <!-- Steps / Foundation -->
+                <line x1="2" y1="15.5" x2="18" y2="15.5" stroke-width="1.4" />
+                <line x1="0.5" y1="18" x2="19.5" y2="18" stroke-width="1.8" />
+            </g>
         </svg>
     `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
 

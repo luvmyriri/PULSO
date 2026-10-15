@@ -818,19 +818,19 @@ export default function MobileAppTutorial({
         <button
           type="button"
           onClick={handleNext}
-          className={`w-full min-h-[50px] sm:min-h-[52px] rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] pulso-btn-text font-semibold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer text-[#0B1630] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-offset-2 ${
+          className={`w-full min-h-[50px] sm:min-h-[52px] rounded-2xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] pulso-btn-text font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer text-white focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-offset-2 ${
             isDark
               ? 'focus-visible:ring-offset-[#080D19] focus-visible:ring-[#ff6b00]'
               : 'focus-visible:ring-offset-[#EAF2FF] focus-visible:ring-[#ff6b00]'
           }`}
         >
-          <span className="text-[#0B1630] font-semibold">
+          <span className="text-white font-bold">
             {currentStep === totalSteps ? (returnToProfile ? 'Back to Settings' : 'Register') : 'Next'}
           </span>
           <PulsoIcon
             name="next"
             size={20}
-            className="text-[#0B1630]"
+            className="text-white"
           />
         </button>
 

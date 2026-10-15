@@ -12,7 +12,9 @@ const PRECACHE_ASSETS = [
   '/city-engineering-logo.png',
   '/apple-touch-icon.png',
   '/pulso-bg-dark.svg',
-  '/pulso-bg-light.svg'
+  '/pulso-bg-light.svg',
+  '/flags/ph.svg',
+  '/flags/us.svg'
 ];
 
 self.addEventListener('install', (event) => {

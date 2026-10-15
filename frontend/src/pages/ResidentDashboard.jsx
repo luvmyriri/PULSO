@@ -27,7 +27,6 @@ import {
     Camera,
     MapPin,
     PhoneCall,
-    Globe,
     Star,
     Share2,
     Search,
@@ -89,6 +88,7 @@ import {
     RotateCcw,
     CameraOff,
     Copy,
+    Link2,
     Layers,
     Crosshair,
     Navigation,
@@ -97,7 +97,8 @@ import {
     HelpCircle,
     History,
     Trash2,
-    Signpost
+    Signpost,
+    Globe
 } from 'lucide-react';
 
 import PulseAIMarkdown from '../components/PulseAIMarkdown';
@@ -122,7 +123,14 @@ import { watermarkEvidenceFile } from '../utils/watermark';
 import AvatarCropModal, { validateAvatarFile } from '../components/AvatarCropModal';
 import ReportDensityLayer from '../components/maps/ReportDensityLayer';
 import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
+import NearbyIssuesMapModal from '../components/NearbyIssuesMapModal';
+import QuickReportWizardModal from '../components/QuickReportWizardModal';
+import { getCityHallMarkerSvg } from '../config/boundaryStyle';
 import UserMenu from '../components/UserMenu';
+import LatestReportCard from '../components/LatestReportCard';
+import HomeHeader from '../components/HomeHeader';
+import BrandHeader from '../components/BrandHeader';
+import SettingsRow from '../components/SettingsRow';
 
 import {
     NORTH_CALOOCAN_PATH,
@@ -149,8 +157,10 @@ import {
     formatFullAddress,
     formatCardAddress,
     formatNearbyAddress,
+    formatNearbyIssueLocation,
     isMinimumViableAddress
 } from '../utils/philippineAddress';
+import { isUsingNameFallback } from '../utils/greetingHelper';
 
 export const formatAddress = (addr) => {
     if (!addr || typeof addr !== 'string') return '';
@@ -162,20 +172,21 @@ export const formatAddress = (addr) => {
 
 export const formatFriendlyNotice = (reason) => {
     if (!reason) {
-        return "We couldn't clearly spot a city problem in this photo. Please upload a clear photo of the actual damage (such as a pothole, broken streetlight, or water leak).";
+        return "We couldn't clearly spot a city problem in this photo. Please upload a clear photo of the actual damage.";
     }
     let clean = String(reason).trim();
     clean = clean.replace(/^(AI Safety Warning:\s*)+/i, '');
     clean = clean.replace(/^(Image rejected:\s*)+/i, '');
     clean = clean.replace(/^(Report rejected:\s*)+/i, '');
     clean = clean.replace(/^Report rejected by AI Safety Filter:\s*/i, '');
+    clean = clean.replace(/\s*\(?such as a pothole,\s*broken streetlight,\s*or (?:drainage hazard|water leak|leak)\.?\)?/gi, '');
 
     const lower = clean.toLowerCase();
     if (lower.includes('selfie') || lower.includes('portrait')) {
         return "This looks like a personal photo or selfie. Please take a photo showing the actual damage or problem instead.";
     }
     if (lower.includes('infrastructure issue') || lower.includes('valid infrastructure') || lower.includes('hazard or damage')) {
-        return "We couldn't clearly spot a community issue in this photo. Please take or upload a photo showing the actual problem (such as a pothole, broken streetlight, or leak).";
+        return "We couldn't clearly spot a community issue in this photo. Please take or upload a photo showing the actual problem.";
     }
     return clean;
 };
@@ -250,6 +261,11 @@ const REPORT_CATEGORIES = (t) => [
     { value: 'Others', label: t('landing.solutions.s6_title', { defaultValue: 'Others' }) },
 ];
 
+const MAP_CATEGORY_CHIPS = (t) => [
+    { id: 'all', label: t('dashboard.map.allIncidents', { defaultValue: 'All Incidents' }) },
+    ...REPORT_CATEGORIES(t).map(c => ({ id: c.value, label: c.label }))
+];
+
 const SIMULATED_HAZARDS = [
     { id: 1, category: 'Flooding', title: 'Deep Puddles on Highway', lat: 14.7566, lng: 121.0450, status: 'pending', time: '10 mins ago', distance: '1.2 km' },
     { id: 2, category: 'Road Issue', title: 'Cracked Surface', lat: 14.7610, lng: 121.0480, status: 'unverified', time: '1 hr ago', distance: '2.5 km' },
@@ -276,11 +292,11 @@ const QUICK_FUNCTIONS_DATA = (t) => [
 ];
 
 const NAV_ITEMS = (t) => [
-    { id: 'overview', icon: <Home size={22} strokeWidth={2} />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
-    { id: 'reports', icon: <FileText size={22} strokeWidth={2} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
-    { id: 'report', icon: <Plus size={24} strokeWidth={3} />, label: t('dashboard.sidebar.report', { defaultValue: 'Report' }), isAction: true },
-    { id: 'updates', icon: <Bell size={22} strokeWidth={2} />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
-    { id: 'profile', icon: <User size={22} strokeWidth={2} />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
+    { id: 'overview', icon: <Home size={22} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
+    { id: 'reports', icon: <FileText size={22} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
+    { id: 'report', icon: <Plus size={24} strokeWidth={3} aria-hidden="true" />, label: t('dashboard.sidebar.report', { defaultValue: 'Report' }), isAction: true },
+    { id: 'updates', icon: <History size={22} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
+    { id: 'profile', icon: <User size={22} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
 ];
 
 const LGU_SERVICES_LIST = (t) => [
@@ -362,12 +378,12 @@ export const UserAvatar = ({
     );
 };
 
-const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogout, t }) => {
+const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogout, t, unreadCount, unreadBadgeText }) => {
     const navDestinations = [
-        { id: 'overview', icon: <Home size={19} strokeWidth={2} />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
-        { id: 'reports', icon: <FileText size={19} strokeWidth={2} />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
-        { id: 'updates', icon: <Bell size={19} strokeWidth={2} />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
-        { id: 'profile', icon: <User size={19} strokeWidth={2} />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
+        { id: 'overview', icon: <Home size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
+        { id: 'reports', icon: <FileText size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
+        { id: 'updates', icon: <History size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
+        { id: 'profile', icon: <User size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
     ];
 
     return (
@@ -434,6 +450,14 @@ const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogo
                                     {item.icon}
                                 </span>
                                 <span className="truncate">{item.label}</span>
+                                {item.id === 'updates' && unreadCount > 0 && (
+                                    <span
+                                        className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#f05a00] text-white tabular-nums shadow-xs"
+                                        aria-label={`${unreadCount} unread`}
+                                    >
+                                        {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
+                                    </span>
+                                )}
                             </button>
                         );
                     })}
@@ -518,7 +542,7 @@ const RightSidebar = ({
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start">
                                     <h4 className="font-bold text-[14px] text-slate-900 dark:text-white truncate pr-2 group-hover:text-orange-500 transition-colors">{hazard.title}</h4>
-                                    <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-lg shrink-0 border border-blue-100 dark:border-blue-800/50 shadow-sm">
+                                    <span className="text-[10px] font-mono font-extrabold text-black dark:text-white bg-white/60 dark:bg-slate-800/50 backdrop-blur-md px-2 py-0.5 rounded-full shrink-0 border border-slate-200/80 dark:border-white/10 shadow-xs">
                                         {hazard.dynamicDistance || hazard.distance}
                                     </span>
                                 </div>
@@ -614,12 +638,16 @@ const ResidentHomeView = ({
     const currentStepIndex = latestReport ? getReportWorkflowIndex(latestReport?.status) : -1;
 
     // 3. Nearby Issues Data
-    const nearbyList = (processedHazards || []).slice(0, 3).map(issue => ({
-        ...issue,
-        address: formatNearbyAddress(issue.location_string || issue.location || issue.address),
-        distance: issue.dynamicDistance || 'Location unavailable',
-        icon: MapPin
-    }));
+    const nearbyList = (processedHazards || []).slice(0, 3).map(issue => {
+        const loc = formatNearbyIssueLocation(issue);
+        return {
+            ...issue,
+            title: loc.primary,
+            address: loc.secondary,
+            distance: issue.dynamicDistance || 'Location unavailable',
+            icon: MapPin
+        };
+    });
 
     // 4. Services & Emergency Contacts Data
     const emergencyContacts = [
@@ -645,83 +673,6 @@ const ResidentHomeView = ({
                 {/* ── LEFT COLUMN (Primary, ~65-70% on desktop) ── */}
                 <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6 sm:gap-7 lg:gap-8 w-full">
 
-                    {/* Priority Advisory Banner (Sentences hidden until 'Read Advisory' is clicked) */}
-                    {topAlert && (
-                        <div
-                            role="region"
-                            aria-label="Priority Advisory"
-                            className="w-full p-4 sm:p-5 rounded-2xl bg-red-50/95 dark:bg-red-950/40 border-l-4 border-l-red-600 border-y border-r border-red-200/90 dark:border-red-900/60 shadow-xs hover:shadow-sm transition-all"
-                        >
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 sm:gap-4">
-                                <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
-                                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-red-600/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 shadow-2xs">
-                                        <AlertTriangle size={22} className="text-red-600 dark:text-red-400" />
-                                    </div>
-                                    <div className="min-w-0 flex-1 flex flex-col">
-                                        <div className="mb-0.5">
-                                            <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-600 text-white shadow-2xs">
-                                                Priority Advisory
-                                            </span>
-                                        </div>
-                                        <h4 className="font-heading font-black text-xs sm:text-sm md:text-base text-red-950 dark:text-red-100 tracking-wide uppercase leading-snug">
-                                            {topAlert.title}
-                                        </h4>
-                                    </div>
-                                </div>
-
-                                {/* Read Advisory Trigger Button */}
-                                <button
-                                    type="button"
-                                    onClick={() => setIsAdvisoryExpanded(prev => !prev)}
-                                    title={isAdvisoryExpanded ? "Collapse advisory details" : "Read advisory details"}
-                                    aria-expanded={isAdvisoryExpanded}
-                                    className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/80 text-xs font-bold text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-white hover:bg-red-50/60 dark:hover:bg-red-950/50 shrink-0 shadow-2xs transition-all self-end sm:self-auto min-h-[40px] sm:min-h-[44px] cursor-pointer"
-                                >
-                                    <span>{isAdvisoryExpanded ? 'Hide Advisory' : 'Read Advisory'}</span>
-                                    {isAdvisoryExpanded ? (
-                                        <ChevronUp size={15} />
-                                    ) : (
-                                        <ChevronDown size={15} />
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* Sentences are only shown when "Read Advisory" is clicked */}
-                            <AnimatePresence>
-                                {isAdvisoryExpanded && (
-                                    <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="pt-3.5 mt-3 border-t border-red-200/80 dark:border-red-900/60">
-                                            <p className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 font-medium leading-relaxed mb-3">
-                                                {topAlert.description}
-                                            </p>
-                                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-red-100 dark:border-red-900/40">
-                                                <span className="text-[11px] font-mono text-red-700/80 dark:text-red-300/80">
-                                                    Bulletin Ref: <strong>{topAlert.advisory_id || 'ADV-2026-0723'}</strong>
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setSelectedPost(topAlert);
-                                                        setActiveModal('post-details');
-                                                    }}
-                                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-white hover:underline cursor-pointer"
-                                                >
-                                                    <span>View Official Bulletin Modal</span>
-                                                    <ChevronRight size={13} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    )}
                     {/* 2. Latest Report Card / Loading Skeleton / First-Use Empty State */}
                     {loadingReports ? (
                         <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs animate-pulse">
@@ -736,106 +687,12 @@ const ResidentHomeView = ({
                             <div className="h-9 bg-slate-100 dark:bg-slate-800/40 rounded-lg w-full" />
                         </div>
                     ) : latestReport ? (
-                        <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-                            <div className="p-5 sm:p-6">
-                                {/* Header: Title, Ticket ID, Status Badge, and + New Report link */}
-                                <div className="flex items-start justify-between gap-3 mb-6 sm:mb-7">
-                                    <div>
-                                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1.5">
-                                            Latest report
-                                        </span>
-                                        <h3 className="font-mono-data font-black text-base sm:text-xl text-slate-900 dark:text-white tracking-wide whitespace-nowrap">
-                                            {formatTicketId ? formatTicketId(latestReport.ticket_id || latestReport.id) : (latestReport.ticket_id || `PUL-${latestReport.id}`)}
-                                        </h3>
-                                    </div>
-                                    <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-orange-50 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800/80 text-orange-600 dark:text-orange-400 text-xs font-bold capitalize">
-                                        <User size={13} className="shrink-0" />
-                                        <span>{latestStatus?.label || 'Submitted'}</span>
-                                    </div>
-                                </div>
-
-                                {/* Step Horizontal Tracker with generous breathing room */}
-                                <div className="w-full py-4 sm:py-6 px-1 sm:px-4">
-                                    <div className="flex items-start w-full">
-                                        {trackerSteps.map((step, idx) => {
-                                            const isCompleted = idx < currentStepIndex;
-                                            const isCurrent = idx === currentStepIndex;
-                                            return (
-                                                <React.Fragment key={step.id}>
-                                                    {/* Step Node */}
-                                                    <div className="flex flex-col items-center shrink-0">
-                                                        <div
-                                                            className={`w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all ${
-                                                                isCompleted
-                                                                    ? 'bg-[#ff6b00] text-white shadow-xs'
-                                                                    : isCurrent
-                                                                        ? 'bg-white dark:bg-slate-900 border-2 border-[#ff6b00] text-[#ff6b00] ring-3 sm:ring-4 ring-orange-500/20'
-                                                                        : 'bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-transparent'
-                                                            }`}
-                                                        >
-                                                            {isCompleted ? (
-                                                                <Check size={14} strokeWidth={3} className="sm:w-4 sm:h-4" />
-                                                            ) : isCurrent ? (
-                                                                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#ff6b00]" />
-                                                            ) : null}
-                                                        </div>
-                                                        <span
-                                                            className={`text-[10px] sm:text-xs mt-2.5 sm:mt-3 text-center leading-tight max-w-[56px] sm:max-w-none break-words ${
-                                                                idx <= currentStepIndex
-                                                                    ? 'text-slate-900 dark:text-white font-bold'
-                                                                    : 'text-slate-500 dark:text-slate-400 font-medium'
-                                                            }`}
-                                                        >
-                                                            {step.label}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Connector segment between steps — no circle overlap */}
-                                                    {idx < trackerSteps.length - 1 && (
-                                                        <div className="flex-1 mt-[13px] sm:mt-[17px] mx-1 sm:mx-1.5 h-[3px] rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
-                                                            <div
-                                                                className="h-full bg-[#ff6b00] rounded-full transition-all duration-500"
-                                                                style={{ width: isCompleted ? '100%' : '0%' }}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Location Footer Strip with Explicit Affordance and clear division */}
-                            <div
-                                onClick={() => setActiveModal('map')}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveModal('map'); } }}
-                                title="Click to view this reported incident and assigned crews on the interactive municipal map"
-                                className="px-5 py-4 sm:py-4.5 bg-slate-50/90 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800/80 flex flex-col xs:flex-row xs:items-center justify-between gap-3 sm:gap-4 text-xs cursor-pointer group hover:bg-orange-50/60 dark:hover:bg-orange-950/20 transition-all min-h-[52px]"
-                            >
-                                <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
-                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-100 dark:bg-orange-950/60 text-[#ff6b00] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
-                                        <MapPin size={17} className="text-[#ff6b00]" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block leading-tight mb-0.5">
-                                            Reported Incident Location
-                                        </span>
-                                        <span className="font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 break-words block text-xs sm:text-[13px] group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors leading-snug select-text">
-                                            {formatCardAddress(latestReport.location_string || latestReport.address) || 'Caloocan City'}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="inline-flex items-center self-start xs:self-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-[#ff6b00] group-hover:border-orange-300 dark:group-hover:border-orange-800/60 transition-all shrink-0 shadow-2xs min-h-[40px]">
-                                    <MapIcon size={13} className="text-[#ff6b00]" />
-                                    <span>View on Map</span>
-                                    <ChevronRight size={14} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-transform" />
-                                </div>
-                            </div>
-                        </div>
+                        <LatestReportCard
+                            report={latestReport}
+                            headerLabel="LATEST REPORT"
+                            onOpenReport={() => handleSetTab('reports')}
+                            onOpenMap={() => setActiveModal('map')}
+                        />
                     ) : (
                         /* Clean First-Use Empty State for New Account / Zero Reports */
                         <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
@@ -843,14 +700,11 @@ const ResidentHomeView = ({
                                 <div className="w-14 h-14 rounded-2xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200/60 dark:border-orange-900/40 text-[#ff6b00] flex items-center justify-center mb-3.5 shadow-2xs">
                                     <FileText size={26} strokeWidth={2.2} />
                                 </div>
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-                                    Citizen Reports
-                                </span>
                                 <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white mb-2">
                                     No reports filed yet
                                 </h3>
                                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md leading-relaxed mb-6">
-                                    Help maintain Caloocan's public infrastructure. Notice a damaged road, broken streetlight, clogged drainage, or water leak in your barangay? Submit your first report for direct engineering evaluation.
+                                    Help maintain Caloocan's public infrastructure by easily reporting neighborhood issues directly to the Local Government Unit.
                                 </p>
                                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                                     <button
@@ -883,9 +737,9 @@ const ResidentHomeView = ({
                     {/* 4. Nearby Issues Card */}
                     <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
                         <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2.5">
-                            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-wrap">
                                 <MapPin size={20} className="text-[#ff6b00] shrink-0" />
-                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white truncate">
+                                <h3 className="font-heading font-extrabold text-sm sm:text-base md:text-lg text-slate-900 dark:text-white whitespace-nowrap shrink-0">
                                     Nearby issues
                                 </h3>
                                 <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
@@ -895,10 +749,10 @@ const ResidentHomeView = ({
                             <button
                                 type="button"
                                 onClick={() => setActiveModal('map')}
-                                className="text-xs font-bold text-[#ff6b00] hover:underline flex items-center gap-1.5 cursor-pointer min-h-[44px] px-2.5 py-1 shrink-0 whitespace-nowrap"
+                                className="text-xs font-bold text-black dark:text-white hover:underline flex items-center gap-1.5 cursor-pointer min-h-[44px] px-2.5 py-1 shrink-0 whitespace-nowrap"
                             >
                                 <span>View map</span>
-                                <ChevronRight size={14} />
+                                <ChevronRight size={14} className="text-black dark:text-white" />
                             </button>
                         </div>
 
@@ -920,22 +774,22 @@ const ResidentHomeView = ({
                                             <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0 group-hover:text-[#ff6b00] transition-colors shadow-2xs">
                                                 <ItemIcon size={19} />
                                             </div>
-                                            <div className="min-w-0 flex-1 pr-2">
-                                                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white line-clamp-2 break-words group-hover:text-[#ff6b00] transition-colors leading-snug">
+                                            <div className="min-w-0 flex-1 pr-1.5">
+                                                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white break-words group-hover:text-[#ff6b00] transition-colors leading-snug">
                                                     {item.title}
                                                 </h4>
-                                                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-1 break-words mt-1">
+                                                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 break-words mt-0.5 leading-snug">
                                                     {item.address}
                                                 </p>
                                             </div>
                                         </div>
-                                        {/* High-Contrast Scannable Distance Pill with ample breathing room */}
+                                        {/* Glassmorphic Distance Pill with black text */}
                                         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-2">
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-mono font-extrabold bg-orange-100 dark:bg-orange-950/70 text-orange-900 dark:text-orange-200 border border-orange-200 dark:border-orange-800/60 shadow-2xs whitespace-nowrap">
-                                                <MapPin size={11} className="text-orange-600 dark:text-orange-400 shrink-0" />
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-mono font-extrabold bg-white/60 dark:bg-slate-800/50 backdrop-blur-md text-black dark:text-white border border-slate-200/80 dark:border-white/10 shadow-xs whitespace-nowrap">
+                                                <MapPin size={11} className="text-black dark:text-white shrink-0" />
                                                 {item.distance}
                                             </span>
-                                            <ChevronRight size={16} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                            <ChevronRight size={16} className="text-black dark:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
                                         </div>
                                     </div>
                                 );
@@ -968,7 +822,7 @@ const ResidentHomeView = ({
                                 <Radio size={22} />
                             </div>
                             <div className="space-y-0.5">
-                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors leading-snug">
+                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white leading-snug">
                                     City updates
                                 </h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -979,23 +833,24 @@ const ResidentHomeView = ({
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleSetTab('updates'); }}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] hover:bg-[#ff6b00] hover:text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs group-hover:bg-[#ff6b00] group-hover:text-white min-h-[44px]"
+                            className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs min-h-[44px]"
                         >
                             <span>View all</span>
-                            <ChevronRight size={14} />
+                            <ChevronRight size={14} className="text-black dark:text-white" />
                         </button>
                     </div>
 
                     {/* 2. Services & Emergency Contacts Grid (High-urgency Call Affordance) */}
-                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-5 sm:p-6">
-                        <div className="flex items-center justify-between mb-4 sm:mb-5">
-                            <div className="flex items-center gap-2.5">
-                                <PhoneCall size={20} className="text-red-500" />
-                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
-                                    Services &amp; emergency contacts
+                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-4 sm:p-6">
+                        <div className="flex items-center justify-between gap-2 mb-4 sm:mb-5">
+                            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                                <PhoneCall size={18} className="text-red-500 shrink-0 sm:w-5 sm:h-5" />
+                                <h3 className="font-heading font-extrabold text-[13px] min-[360px]:text-[14px] sm:text-base md:text-lg text-slate-900 dark:text-white leading-tight">
+                                    <span className="block sm:inline">Services &amp;</span>{' '}
+                                    <span className="block sm:inline whitespace-nowrap">emergency contacts</span>
                                 </h3>
                             </div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 px-2.5 py-0.5 rounded-full border border-red-200 dark:border-red-900/60 whitespace-nowrap shrink-0">
+                            <span className="text-[9px] min-[360px]:text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 px-2 min-[360px]:px-2.5 py-0.5 rounded-full border border-red-200 dark:border-red-900/60 whitespace-nowrap shrink-0">
                                 24/7 Hotlines
                             </span>
                         </div>
@@ -1282,7 +1137,7 @@ const LguFeed = ({
                 </div>
             ) : filteredUpdates.length === 0 ? (
                 <div className="text-center text-slate-400 py-20 bg-white dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 p-8 max-w-xl mx-auto">
-                    <Bell className="mx-auto mb-3 opacity-20 text-orange-500" size={48} />
+                    <History className="mx-auto mb-3 opacity-20 text-orange-500" size={48} aria-hidden="true" />
                     <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">No updates in this category</p>
                     <p className="text-xs text-slate-500 mt-1">Check back later or select "All Updates" to view other notices.</p>
                 </div>
@@ -1380,8 +1235,8 @@ const StatusBadge = ({ status }) => {
     const descriptor = getStatusDescriptor(status);
     const StatusIcon = descriptor.icon;
     return (
-        <span className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider border ${descriptor.badgeClass} shrink-0 whitespace-nowrap`}>
-            <StatusIcon size={11} aria-hidden="true" className="shrink-0" />
+        <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider bg-white/60 dark:bg-slate-800/50 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white shadow-xs shrink-0 whitespace-nowrap">
+            <StatusIcon size={11} aria-hidden="true" className="shrink-0 text-black dark:text-white" />
             <span>{descriptor.label}</span>
         </span>
     );
@@ -1648,19 +1503,17 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
     const daysWaiting = daysBetween(report.created_at, new Date().toISOString());
     const isStale = !isLatest && isPending && daysWaiting >= 14;
 
+    const [copiedTicket, setCopiedTicket] = useState(false);
+
     return (
         <div
-            className={`group bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden transition-all duration-200 ease-out shadow-xs hover:shadow-md ${
+            className={`group bg-white dark:bg-[#0c1427] border rounded-2xl overflow-hidden transition-all duration-200 ease-out shadow-xs hover:shadow-md ${
                 showDetails
                     ? 'ring-2 ring-orange-500/20 border-orange-400 dark:border-orange-500/50'
-                    : isLatest
-                        ? 'border-orange-200/90 dark:border-orange-950/60 hover:border-orange-300 dark:hover:border-orange-800'
-                        : isStale
-                            ? 'border-amber-200/90 dark:border-amber-950/60 hover:border-amber-300 dark:hover:border-amber-800'
-                            : 'border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    : 'border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
             }`}
         >
-            {/* ── Compact Card (Single Tap Zone: 90-110px height on mobile) ── */}
+            {/* ── Compact Card Header (Single Tap Zone to toggle) ── */}
             <div
                 role="button"
                 tabIndex={0}
@@ -1673,10 +1526,10 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                 }}
                 aria-label={`Report ${report.ticket_id}: ${report.category || 'Civic Issue'}, status ${report.status}. Click to ${showDetails ? 'collapse' : 'view full'} details.`}
                 aria-expanded={showDetails}
-                className="w-full p-3 sm:p-3.5 flex items-center justify-between gap-3 sm:gap-4 cursor-pointer select-none active:scale-[0.99] hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-all outline-none focus-visible:ring-2 focus-visible:ring-orange-500 min-h-[88px] sm:min-h-[96px]"
+                className="w-full p-2.5 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-4 cursor-pointer select-none active:scale-[0.99] hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-all outline-none focus-visible:ring-2 focus-visible:ring-orange-500 min-h-[76px] sm:min-h-[96px]"
             >
-                {/* Left: Square/Rounded Thumbnail (56-64px) */}
-                <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-center shadow-2xs">
+                {/* Left: Square/Rounded Thumbnail (48px mobile, 64px desktop) */}
+                <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-center shadow-2xs">
                     {report.image_url ? (
                         <img
                             src={`${API_BASE_URL}${report.image_url}`}
@@ -1686,49 +1539,77 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-850">
-                            <CameraOff size={20} strokeWidth={1.75} />
+                            <CameraOff size={18} strokeWidth={1.75} />
                         </div>
                     )}
                 </div>
 
                 {/* Middle: Condensed essentials at a glance */}
                 <div className="flex-1 min-w-0 flex flex-col justify-center gap-1 overflow-hidden">
-                    {/* Row 1: Title */}
-                    <div className="min-w-0">
-                        <h4 className="text-[13px] sm:text-[14.5px] font-bold tracking-tight text-slate-900 dark:text-white truncate min-w-0">
-                            {report.category || report.ai_category || 'Civic Infrastructure Report'}
-                        </h4>
-                    </div>
+                    {showDetails ? (
+                        <>
+                            <div className="flex items-center gap-1.5 text-[11px] sm:text-[13px] font-mono text-slate-900 dark:text-white whitespace-nowrap flex-nowrap overflow-hidden">
+                                <span className="font-extrabold tracking-tight text-slate-900 dark:text-white shrink-0 whitespace-nowrap">
+                                    {report.ticket_id}
+                                </span>
+                                <span className="text-slate-400 dark:text-slate-600 font-normal shrink-0">•</span>
+                                <span className="text-[10.5px] sm:text-xs font-normal text-slate-500 dark:text-slate-400 shrink-0 whitespace-nowrap">
+                                    {new Date(report.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                            </div>
+                            {report.location_string && (
+                                <div className="flex items-start gap-1 text-[10.5px] sm:text-xs text-slate-500 dark:text-slate-400 min-w-0">
+                                    <MapPin size={11} className="text-orange-500 shrink-0 mt-0.5" />
+                                    <span className="min-w-0 break-words leading-tight">
+                                        {report.location_string}
+                                    </span>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <div className="min-w-0">
+                                <h4 className="text-[13px] sm:text-[14.5px] font-bold tracking-tight text-slate-900 dark:text-white truncate min-w-0">
+                                    {report.category || report.ai_category || 'Civic Infrastructure Report'}
+                                </h4>
+                            </div>
 
-                    {/* Row 2: Report ID + Date on strictly ONE line on any mobile screen */}
-                    <div className="flex items-center gap-1.5 text-[10.5px] sm:text-[11px] font-mono text-slate-500 dark:text-slate-400 min-w-0 whitespace-nowrap overflow-hidden">
-                        <span className="font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap shrink-0 tracking-tight">
-                            {report.ticket_id}
-                        </span>
-                        <span className="shrink-0 text-slate-400 dark:text-slate-600">•</span>
-                        <span className="truncate shrink min-w-0">
-                            {new Date(report.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                    </div>
+                            <div className="flex items-center gap-1.5 text-[10.5px] sm:text-[11px] font-mono text-slate-500 dark:text-slate-400 min-w-0 whitespace-nowrap flex-nowrap overflow-hidden">
+                                <span className="font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap shrink-0 tracking-tight">
+                                    {report.ticket_id}
+                                </span>
+                                <span className="shrink-0 text-slate-400 dark:text-slate-600">•</span>
+                                <span className="whitespace-nowrap shrink-0">
+                                    {new Date(report.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                            </div>
 
-                    {/* Row 3: Micro Location preview */}
-                    {report.location_string && (
-                        <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] text-slate-500 dark:text-slate-400 min-w-0 truncate">
-                            <MapPin size={11} className="text-orange-500 shrink-0" />
-                            <span className="truncate min-w-0">
-                                {formatCardAddress(report.location_string)}
-                            </span>
-                        </div>
+                            {report.location_string && (
+                                <div className="flex items-start gap-1 text-[10.5px] sm:text-[11px] text-slate-500 dark:text-slate-400 min-w-0">
+                                    <MapPin size={11} className="text-orange-500 shrink-0 mt-0.5" />
+                                    <span className="min-w-0 break-words leading-tight">
+                                        {report.location_string}
+                                    </span>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 
-                {/* Right: Expand affordance */}
-                <div className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 dark:text-slate-500 group-hover:text-orange-500 group-hover:bg-orange-50 dark:group-hover:bg-orange-950/30 transition-all">
-                    <ChevronDown
-                        size={17}
-                        strokeWidth={2.5}
-                        className={`transform transition-transform duration-200 ${showDetails ? 'rotate-180 text-orange-500' : ''}`}
-                    />
+                {/* Right: Status badge (when collapsed) + Chevron */}
+                <div className="shrink-0 flex items-center gap-2.5">
+                    {!showDetails && (
+                        <div className="hidden xs:flex items-center">
+                            <StatusBadge status={report.status} />
+                        </div>
+                    )}
+                    <div className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 dark:text-slate-500 group-hover:text-orange-500 group-hover:bg-orange-50 dark:group-hover:bg-orange-950/30 transition-all">
+                        <ChevronDown
+                            size={17}
+                            strokeWidth={2.5}
+                            className={`transform transition-transform duration-200 ${showDetails ? 'rotate-180 text-orange-500' : ''}`}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -1742,15 +1623,36 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                         transition={{ duration: 0.25, ease: 'easeOut' }}
                         className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 p-4 sm:p-5 overflow-hidden space-y-4"
                     >
-                        {/* Stale Report Signal (if pending >= 14 days) */}
-                        {isStale && (
+                        {/* Top Meta Badges & Copy Ticket ID row (Matching Image 1) */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 shadow-2xs">
-                                    <Clock size={11} className="text-amber-500" />
-                                    <span>Pending ({daysWaiting}d)</span>
-                                </span>
+                                {(report.is_claimed || report.claimed_at) && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/60 dark:bg-slate-800/50 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white shadow-xs">
+                                        <Link2 size={12} className="text-black dark:text-white" />
+                                        CLAIMED TICKET
+                                    </span>
+                                )}
+                                {isStale && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/60 dark:bg-slate-800/50 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white shadow-xs">
+                                        <Clock size={11} className="text-black dark:text-white" />
+                                        Pending ({daysWaiting}d)
+                                    </span>
+                                )}
                             </div>
-                        )}
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard?.writeText(report.ticket_id || report.id);
+                                    setCopiedTicket(true);
+                                    setTimeout(() => setCopiedTicket(false), 2000);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            >
+                                <Copy size={12} />
+                                <span>{copiedTicket ? 'Copied!' : 'Copy Ticket ID'}</span>
+                            </button>
+                        </div>
 
                         {/* Main Content Area: Responsive Stacked (<lg) vs 2-Column (>=lg) */}
                         {report.image_url ? (
@@ -1907,7 +1809,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                             {/* Collapse button */}
                             <button
                                 type="button"
-                                onClick={() => setShowDetails(false)}
+                                onClick={handleToggle}
                                 className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 ml-auto py-2 px-3 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors cursor-pointer min-h-[44px] flex items-center gap-1"
                             >
                                 <span>Collapse</span>
@@ -2407,74 +2309,6 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
     );
 };
 
-const SettingsRow = ({
-    icon: IconComponent,
-    label,
-    value,
-    onClick,
-    isDestructive = false,
-    showChevron = true,
-    ariaLabel
-}) => (
-    <div
-        role="button"
-        tabIndex={0}
-        onClick={onClick}
-        onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onClick();
-            }
-        }}
-        aria-label={ariaLabel || label}
-        className={`w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800 focus-visible:ring-2 focus-visible:ring-orange-500 ${
-            isDestructive
-                ? 'text-red-600 dark:text-red-400 hover:bg-red-50/70 dark:hover:bg-red-950/30'
-                : 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-        }`}
-    >
-        <div className="flex items-center gap-3.5 min-w-0">
-            {IconComponent && (
-                <IconComponent
-                    size={20}
-                    className={`shrink-0 ${
-                        isDestructive
-                            ? 'text-red-500'
-                            : 'text-slate-400 dark:text-slate-500'
-                    }`}
-                />
-            )}
-            <span
-                className={`text-[14px] font-semibold truncate ${
-                    isDestructive
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-slate-800 dark:text-slate-200'
-                }`}
-            >
-                {label}
-            </span>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-            {value && (
-                <span className="text-[13px] font-medium text-slate-400 dark:text-slate-500">
-                    {value}
-                </span>
-            )}
-            {showChevron && (
-                <ChevronRight
-                    size={18}
-                    className={`shrink-0 ${
-                        isDestructive
-                            ? 'text-red-400/80 dark:text-red-500/80'
-                            : 'text-slate-300 dark:text-slate-600'
-                    }`}
-                />
-            )}
-        </div>
-    </div>
-);
-
 const ProfileView = ({
     user,
     setUser,
@@ -2502,15 +2336,19 @@ const ProfileView = ({
     const handleSwitchLanguage = (lang) => {
         if (activeI18n?.changeLanguage) {
             activeI18n.changeLanguage(lang);
-            if (showToast) {
-                showToast(lang === 'tl' ? 'Pinalitan ang wika sa Filipino' : 'Language switched to English');
-            }
         }
     };
 
     const [internalSubView, setInternalSubView] = useState('settings');
     const activeSubView = propSubView !== undefined ? propSubView : internalSubView;
     const changeSubView = propSetSubView || setInternalSubView;
+
+    // Default to top when entering profile settings
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+    }, [activeSubView]);
     const [editingField, setEditingField] = useState(null); // 'email' | 'phone' | null
     const [tempValues, setTempValues] = useState({ email: user.email || '', phone: user.phone || '' });
     const [activeTooltip, setActiveTooltip] = useState(null); // 'verified' | 'name' | 'barangay' | 'address' | null
@@ -2542,8 +2380,6 @@ const ProfileView = ({
         return defaultCats;
     });
 
-    const [isLanguageSheetOpen, setIsLanguageSheetOpen] = useState(false);
-    const [isThemeSheetOpen, setIsThemeSheetOpen] = useState(false);
     const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
     const [isRateModalOpen, setIsRateModalOpen] = useState(false);
@@ -2608,23 +2444,36 @@ const ProfileView = ({
         }
     };
 
-    const handleSelectLanguage = (lang) => {
-        handleSwitchLanguage(lang);
-        handleSavePreference('language', lang);
-        setIsLanguageSheetOpen(false);
+    const [languageAnnouncement, setLanguageAnnouncement] = useState('');
+
+    const handleToggleLanguage = async () => {
+        const prevLang = isFilipino ? 'tl' : 'en';
+        const nextLang = isFilipino ? 'en' : 'tl';
+        try {
+            handleSwitchLanguage(nextLang);
+            await handleSavePreference('language', nextLang);
+            const announcementText = nextLang === 'tl' ? 'Language changed to Tagalog' : 'Language changed to English';
+            setLanguageAnnouncement(announcementText);
+        } catch (err) {
+            console.error('Failed to save language preference:', err);
+            handleSwitchLanguage(prevLang);
+            setLanguageAnnouncement(prevLang === 'tl' ? 'Language changed to Tagalog' : 'Language changed to English');
+            if (showToast) {
+                showToast("We couldn't change the language. Please try again.", 'error');
+            }
+        }
     };
 
     const [themeAnnouncement, setThemeAnnouncement] = useState('');
 
-    const handleSelectTheme = (thm) => {
-        changeTheme(thm);
-        handleSavePreference('theme', thm);
-        setIsThemeSheetOpen(false);
-        const announcementText = thm === 'system' ? 'Match my phone theme on' : thm === 'dark' ? 'Dark theme on' : 'Light theme on';
+    const handleToggleDarkMode = () => {
+        const nextTheme = theme === 'dark' ? 'light' : 'dark';
+        changeTheme(nextTheme);
+        handleSavePreference('theme', nextTheme);
+        const announcementText = nextTheme === 'dark'
+            ? t('dashboard.profile.darkModeOn', { defaultValue: 'Dark mode on' })
+            : t('dashboard.profile.lightModeOn', { defaultValue: 'Light mode on' });
         setThemeAnnouncement(announcementText);
-        if (showToast) {
-            showToast(thm === 'system' ? 'Appearance set to Match my phone' : thm === 'dark' ? 'Dark mode enabled' : 'Light mode enabled');
-        }
     };
 
     const hasLength = passwords.new.length >= 8;
@@ -2964,16 +2813,30 @@ const ProfileView = ({
                                     />
                                     <SettingsRow
                                         icon={Globe}
-                                        label="Language"
-                                        value={isFilipino ? 'Filipino' : 'English'}
-                                        onClick={() => setIsLanguageSheetOpen(true)}
+                                        label={isFilipino ? "Tagalog" : "English"}
+                                        isLanguageSwitch={true}
+                                        isChecked={isFilipino}
+                                        onClick={handleToggleLanguage}
+                                        ariaLabel={isFilipino ? "Language: Tagalog" : "Language: English"}
                                     />
+                                    {/* Accessible screen reader announcement for language changes */}
+                                    <div className="sr-only" aria-live="polite" aria-atomic="true">
+                                        {languageAnnouncement}
+                                    </div>
                                     <SettingsRow
-                                        icon={Sun}
-                                        label="Theme"
-                                        value={theme === 'system' ? 'Match my phone' : theme === 'light' ? 'Light' : 'Dark'}
-                                        onClick={() => setIsThemeSheetOpen(true)}
+                                        icon={theme === 'dark' ? Moon : Sun}
+                                        label={theme === 'dark'
+                                            ? t('dashboard.profile.darkMode', { defaultValue: 'Dark mode' })
+                                            : t('dashboard.profile.lightMode', { defaultValue: 'Light mode' })
+                                        }
+                                        isSwitch={true}
+                                        isChecked={theme === 'dark'}
+                                        onClick={handleToggleDarkMode}
                                     />
+                                    {/* Accessible screen reader announcement for theme changes */}
+                                    <div className="sr-only" aria-live="polite" aria-atomic="true">
+                                        {themeAnnouncement}
+                                    </div>
                                 </div>
                             </div>
 
@@ -3596,6 +3459,12 @@ const ProfileView = ({
                                                         <span className="truncate">{user.fullName}</span>
                                                         <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-2" />
                                                     </div>
+                                                    {isUsingNameFallback(user) && (
+                                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 pt-0.5">
+                                                            <Info size={12} className="text-orange-500 shrink-0" />
+                                                            <span>Check how your name appears.</span>
+                                                        </p>
+                                                    )}
                                                 </div>
 
                                                 {/* Barangay */}
@@ -3966,195 +3835,7 @@ const ProfileView = ({
                 )}
             </AnimatePresence>
 
-            {/* Language Modal (Centered on Mobile & Desktop) */}
-            {typeof document !== 'undefined' &&
-                createPortal(
-                    <AnimatePresence>
-                        {isLanguageSheetOpen && (
-                            <div
-                                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
-                                onClick={() => setIsLanguageSheetOpen(false)}
-                            >
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ duration: 0.15 }}
-                                    role="dialog"
-                                    aria-modal="true"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 relative"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                                                Select Language
-                                            </h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                                Choose your preferred display language
-                                            </p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsLanguageSheetOpen(false)}
-                                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                                            aria-label="Close"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
 
-                                    <div className="space-y-2 pt-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSelectLanguage('en')}
-                                            className={`w-full p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer ${
-                                                !isFilipino
-                                                    ? 'border-orange-500 bg-orange-500/10 dark:bg-orange-500/15'
-                                                    : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                                            }`}
-                                        >
-                                            <div>
-                                                <div className="text-sm font-bold text-slate-900 dark:text-white">
-                                                    English
-                                                </div>
-                                                <div className="text-xs text-slate-500 dark:text-slate-400">
-                                                    Default (United States)
-                                                </div>
-                                            </div>
-                                            {!isFilipino && (
-                                                <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0">
-                                                    <Check size={14} strokeWidth={3} />
-                                                </div>
-                                            )}
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSelectLanguage('tl')}
-                                            className={`w-full p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer ${
-                                                isFilipino
-                                                    ? 'border-orange-500 bg-orange-500/10 dark:bg-orange-500/15'
-                                                    : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                                            }`}
-                                        >
-                                            <div>
-                                                <div className="text-sm font-bold text-slate-900 dark:text-white">
-                                                    Filipino
-                                                </div>
-                                                <div className="text-xs text-slate-500 dark:text-slate-400">
-                                                    Tagalog
-                                                </div>
-                                            </div>
-                                            {isFilipino && (
-                                                <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0">
-                                                    <Check size={14} strokeWidth={3} />
-                                                </div>
-                                            )}
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )}
-                    </AnimatePresence>,
-                    document.body
-                )}
-
-            {/* Theme & Appearance Modal (Centered on Mobile & Desktop) */}
-            {typeof document !== 'undefined' &&
-                createPortal(
-                    <AnimatePresence>
-                        {isThemeSheetOpen && (
-                            <div
-                                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
-                                onClick={() => setIsThemeSheetOpen(false)}
-                            >
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ duration: 0.15 }}
-                                    role="dialog"
-                                    aria-modal="true"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 relative"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                                                Appearance
-                                            </h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                                Select your interface theme
-                                            </p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsThemeSheetOpen(false)}
-                                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                                            aria-label="Close"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-
-                                    {/* Accessible screen reader announcement for theme changes */}
-                                    <div className="sr-only" aria-live="polite" aria-atomic="true">
-                                        {themeAnnouncement}
-                                    </div>
-
-                                    <div
-                                        className="space-y-2 pt-1"
-                                        role="radiogroup"
-                                        aria-label="Select interface theme"
-                                    >
-                                        {[
-                                            { id: 'system', label: 'Match my phone', desc: 'Sync with system daylight & night mode', icon: Monitor },
-                                            { id: 'light', label: 'Light', desc: 'Morning Field Sheet — crisp mineral canvas', icon: Sun },
-                                            { id: 'dark', label: 'Dark', desc: 'Night Inspection — deep survey slate & high contrast', icon: Moon }
-                                        ].map((item) => {
-                                            const ItemIcon = item.icon;
-                                            const isSelected = theme === item.id;
-                                            return (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    role="radio"
-                                                    aria-checked={isSelected}
-                                                    tabIndex={0}
-                                                    onClick={() => handleSelectTheme(item.id)}
-                                                    className={`w-full p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
-                                                        isSelected
-                                                            ? 'border-orange-500 bg-orange-500/10 dark:bg-orange-500/15'
-                                                            : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <ItemIcon size={18} className={isSelected ? 'text-orange-500' : 'text-slate-400'} />
-                                                        <div>
-                                                            <div className="text-sm font-bold text-slate-900 dark:text-white">
-                                                                {item.label}
-                                                            </div>
-                                                            <div className="text-xs text-slate-500 dark:text-slate-400">
-                                                                {item.desc}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    {isSelected && (
-                                                        <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0">
-                                                            <Check size={14} strokeWidth={3} />
-                                                        </div>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )}
-                    </AnimatePresence>,
-                    document.body
-                )}
 
             {/* About PULSO Modal */}
             {typeof document !== 'undefined' &&
@@ -5277,7 +4958,7 @@ const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disab
 };
 
 const ResidentModals = ({
-    activeModal, setActiveModal, selectedPost, setSelectedPost, isLoaded, map, setMap, panorama, setPanorama, reportLocation, setReportLocation,
+    activeModal, setActiveModal, selectedPost, setSelectedPost, isLoaded, loadError, map, setMap, panorama, setPanorama, reportLocation, setReportLocation,
     locationAddress, setLocationAddress, plusCode, setPlusCode, geocodingAddress, structuredAddress, setStructuredAddress, reportCategory, setReportCategory, reportNotes, setReportNotes, selectedImage, setSelectedImage,
     submittingReport, handleFileReport, isSelectingLocation, setIsSelectingLocation, isIDCameraOpen, setIsIDCameraOpen, checkJurisdiction,
     reverseGeocode, mapOptions, pulseRadius, processedHazards, selectedHazard, setSelectedHazard, svLocation, handleStreetViewClick,
@@ -5294,7 +4975,10 @@ const ResidentModals = ({
     mapCategoryFilter, setMapCategoryFilter,
     heatmapPoints, mapFilteredHazards,
     showToast,
-    t
+    t,
+    handleQuickReportSubmit,
+    currentUser,
+    setActiveTab
 }) => {
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
@@ -5475,1384 +5159,77 @@ const ResidentModals = ({
     const isOthersSelected = reportCategory.includes('Others');
     const isNotesValidForOthers = !isOthersSelected || reportNotes.trim().length >= 10;
 
-    const getLocatingStatusText = () => {
-        if (geocodingAddress) return "Pinpointing street & landmark...";
-        if (locatingStep === 0) return "Getting your exact location...";
-        if (locatingStep === 1) return "Refining GPS accuracy radius...";
-        return "Almost there, finalizing coordinates...";
-    };
-
-    const isLocationLoading = (isLocating || geocodingAddress || (!reportLocation && !locationPermissionDenied)) && !locationPermissionDenied;
-    const isLocationResolved = !isLocating && !geocodingAddress && Boolean(reportLocation?.lat && locationAddress);
-    const isLocationFailed = !isLocationLoading && (!reportLocation || locationPermissionDenied);
-    const isLocationReady = Boolean(reportLocation?.lat && reportLocation?.lng && !isLocating && !geocodingAddress);
+    const isLocationReady = Boolean(reportLocation?.lat && reportLocation?.lng);
+    const isLocationResolved = Boolean(reportLocation?.lat && locationAddress);
+    const isLocationFailed = !reportLocation && locationPermissionDenied;
 
     return (
         <AnimatePresence>
-        {activeModal && (
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto"
-                onClick={() => setActiveModal(null)}
-            >
+            {activeModal === 'file-report' && (
+                <QuickReportWizardModal
+                    isOpen={activeModal === 'file-report'}
+                    onClose={() => setActiveModal(null)}
+                    theme={theme}
+                    reportLocation={reportLocation}
+                    locationAddress={locationAddress}
+                    plusCode={plusCode}
+                    structuredAddress={structuredAddress}
+                    requestDeviceLocation={requestDeviceLocation}
+                    isLocating={isLocating}
+                    locationPermissionDenied={locationPermissionDenied}
+                    onOpenLocationPicker={() => {
+                        setIsSelectingLocation(true);
+                        setActiveModal('map');
+                    }}
+                    onSubmitReport={handleQuickReportSubmit}
+                    onTrackReport={(trackingId) => {
+                        setActiveTab('reports');
+                    }}
+                    currentUser={currentUser}
+                />
+            )}
+
+            {activeModal === 'map' && (
+                <NearbyIssuesMapModal
+                    isOpen={activeModal === 'map'}
+                    onClose={() => {
+                        setActiveModal(isSelectingLocation ? 'file-report' : null);
+                        setIsSelectingLocation(false);
+                    }}
+                    theme={theme}
+                    isLoaded={isLoaded}
+                    loadError={loadError}
+                    reports={processedHazards}
+                    reportLocation={reportLocation}
+                    setReportLocation={setReportLocation}
+                    reverseGeocode={reverseGeocode}
+                    checkJurisdiction={checkJurisdiction}
+                    isLocating={isLocating}
+                    requestDeviceLocation={requestDeviceLocation}
+                    locationPermissionDenied={locationPermissionDenied}
+                    isSelectingLocation={isSelectingLocation}
+                    onOpenReportDetail={(report) => {
+                        setSelectedHazard(report);
+                    }}
+                    photoPinIcons={photoPinIcons}
+                />
+            )}
+
+            {activeModal && activeModal !== 'file-report' && activeModal !== 'map' && (
                 <motion.div
-                    initial={{ scale: 0.96, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.96, opacity: 0 }}
-                    className={`pointer-events-auto transition-colors w-full ${
-                        activeModal === 'map'
-                            ? (isSvFullscreen
-                                ? 'fixed inset-0 z-[100] w-screen h-[100dvh] flex flex-col bg-slate-950 rounded-none border-0 shadow-none'
-                                : 'max-w-7xl h-[88dvh] sm:h-[90vh] flex flex-col my-auto bg-white dark:bg-slate-900 backdrop-blur-xl rounded-2xl sm:rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden'
-                              )
-                            : activeModal === 'file-report'
-                                ? 'bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 max-w-4xl max-h-[94dvh] sm:max-h-[92vh] my-auto'
-                                : 'max-w-xl flex flex-col my-auto bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90dvh]'
-                    }`}
-                    onClick={e => e.stopPropagation()}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto"
+                    onClick={() => setActiveModal(null)}
                 >
-                    {activeModal === 'file-report' && (
-                        <div className="flex flex-col h-full p-3.5 sm:p-6 overflow-hidden">
-                            {/* Modal Header */}
-                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 ${isAnalyzing ? 'animate-pulse' : ''}`}>
-                                        {isAnalyzing ? <Zap size={20} className="animate-spin" /> : <FileText size={20} />}
-                                    </div>
-                                    <div>
-                                        <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 dark:text-white flex items-center gap-2">
-                                            <span>{t('dashboard.quickReport.title', { defaultValue: 'Quick Report' })}</span>
-                                            {isAnalyzing && (
-                                                <span className="text-[10px] bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 px-2 py-0.5 rounded-full font-bold animate-pulse uppercase tracking-wider">
-                                                    AI Scanning...
-                                                </span>
-                                            )}
-                                        </h3>
-                                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                                            {aiFeedback ? `AI Assessment: ${aiFeedback.category}` : 'Submit an infrastructure hazard for LGU verification & dispatch.'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setActiveModal(null);
-                                        setAiFeedback(null);
-                                        setSelectedImage(null);
-                                        setReportNotes('');
-                                        setReportCategory([]);
-                                    }}
-                                    className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-full transition-all cursor-pointer"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
-
-                            {/* Scrollable Form Body */}
-                            <div className="flex-1 overflow-y-auto pr-1 space-y-4 custom-scrollbar min-h-0">
-
-                                {/* Location Banner with Automated Multi-Sample Accuracy */}
-                                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl transition-all shadow-xs">
-                                    {isLocationLoading ? (
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[64px]">
-                                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                <div className="w-10 h-10 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center shrink-0">
-                                                    <Loader2 size={20} className="animate-spin text-orange-500" />
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
-                                                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                                                            {getLocatingStatusText()}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-2 animate-pulse">
-                                                        <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full w-48" />
-                                                        <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full w-24" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center flex-wrap gap-2 shrink-0">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setActiveModal('map'); setIsSelectingLocation(true); }}
-                                                    className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                                                    title="Pinpoint manually on map"
-                                                >
-                                                    <MapPin size={14} />
-                                                    <span>Pinpoint on Map</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : isLocationFailed ? (
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[64px]">
-                                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                <div className="w-10 h-10 bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center shrink-0">
-                                                    <AlertTriangle size={20} />
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-bold text-rose-600 dark:text-rose-400">
-                                                        Unable to acquire GPS location
-                                                    </p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                                        Location permission was denied or signal is unavailable. Please retry or pinpoint manually on the map.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center flex-wrap gap-2 shrink-0">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => requestDeviceLocation(true)}
-                                                    className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                                                    title="Retry GPS location acquisition"
-                                                >
-                                                    <RotateCcw size={14} />
-                                                    <span>Retry GPS</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setActiveModal('map'); setIsSelectingLocation(true); }}
-                                                    className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                                                    title="Pinpoint manually on map"
-                                                >
-                                                    <MapPin size={14} />
-                                                    <span>Pinpoint on Map</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[64px]">
-                                            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                                                <div className="w-10 h-10 bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                                                    <MapPin size={20} />
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <div>
-                                                        <div className="flex items-start justify-between gap-1.5">
-                                                            <p
-                                                                className="text-sm font-bold text-slate-900 dark:text-white leading-snug break-words select-text cursor-text flex-1"
-                                                                title={locationAddress}
-                                                            >
-                                                                {locationAddress}
-                                                            </p>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    if (locationAddress) {
-                                                                        navigator.clipboard?.writeText(locationAddress);
-                                                                        if (showToast) showToast('Address copied to clipboard', 'success');
-                                                                    }
-                                                                }}
-                                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 shrink-0"
-                                                                title="Copy full address"
-                                                                aria-label="Copy full address"
-                                                            >
-                                                                <Copy size={13} />
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                                            {plusCode && (
-                                                                <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200 px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 select-all" title="Full Plus Code">
-                                                                    {plusCode}
-                                                                </span>
-                                                            )}
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 select-all" title="GPS Coordinates">
-                                                                {reportLocation ? `${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)}` : ''}
-                                                            </span>
-
-                                                            {/* Honest Tiered Accuracy Confidence Indicator */}
-                                                            {(() => {
-                                                                const acc = reportLocation?.accuracy;
-                                                                if (typeof acc === 'number' && acc > 0 && acc <= 20) {
-                                                                    return (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 shadow-2xs">
-                                                                            <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
-                                                                            <span>High Accuracy (±{acc}m)</span>
-                                                                        </span>
-                                                                    );
-                                                                }
-                                                                if (typeof acc === 'number' && acc > 20) {
-                                                                    return (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-500/40 shadow-2xs">
-                                                                            <Info size={13} className="text-amber-600 dark:text-amber-400" />
-                                                                            <span>Approximate Location (±{acc}m)</span>
-                                                                        </span>
-                                                                    );
-                                                                }
-                                                                return (
-                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
-                                                                        <MapPin size={13} className="text-slate-500" />
-                                                                        <span>Caloocan Jurisdiction</span>
-                                                                    </span>
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center flex-wrap gap-2 shrink-0">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setActiveModal('map'); setIsSelectingLocation(true); }}
-                                                    className="px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-orange-600/20"
-                                                    title="Open interactive map to pinpoint location on map"
-                                                >
-                                                    <MapPin size={14} />
-                                                    <span>Pinpoint on Map</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Main Two-Column Layout */}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-                                    {/* ── LEFT COLUMN: Camera-Only Photo Evidence ── */}
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex justify-between items-center px-1">
-                                            <span className="text-[12px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Photo Evidence</span>
-                                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Auto-Fit 4:3 Frame</span>
-                                        </div>
-
-                                        {selectedImage ? (
-                                            /* Auto-Fit Image Preview Container with Click-to-Zoom */
-                                            <div
-                                                onClick={() => setZoomedImage && setZoomedImage(selectedImage)}
-                                                className={`w-full aspect-[4/3] rounded-2xl overflow-hidden relative bg-slate-950 shadow-md group cursor-zoom-in ${
-                                                    aiFeedback?.is_inappropriate 
-                                                        ? 'border-2 border-rose-500 ring-4 ring-rose-500/20' 
-                                                        : 'border border-slate-200 dark:border-slate-800'
-                                                }`}
-                                                title="Click to zoom picture"
-                                            >
-                                                <img
-                                                    src={selectedImage}
-                                                    alt="Incident Preview"
-                                                    className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
-                                                />
-
-                                                {/* Invalid Photo Non-Infrastructure Warning Banner */}
-                                                {aiFeedback?.is_inappropriate && (
-                                                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center z-20">
-                                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-b from-white/20 via-rose-500/20 to-white/5 backdrop-blur-xl border border-white/30 border-t-white/60 flex items-center justify-center text-rose-300 mb-2 shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),0_12px_24px_rgba(244,63,94,0.3)] animate-bounce">
-                                                            <AlertTriangle size={24} className="drop-shadow-[0_2px_6px_rgba(244,63,94,0.5)]" />
-                                                        </div>
-                                                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-gradient-to-b from-white/25 via-rose-500/20 to-white/5 backdrop-blur-xl border border-white/35 border-t-white/70 border-b-white/15 text-white font-black text-[10px] uppercase tracking-wider mb-2 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7),0_6px_20px_rgba(244,63,94,0.35)] drop-shadow-sm select-none">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e] animate-pulse shrink-0" />
-                                                            <span>Invalid Photo • Not Infrastructure</span>
-                                                        </span>
-                                                        <h4 className="text-sm font-bold text-white mb-1.5 drop-shadow-xs">
-                                                            Cannot Proceed With This Photo
-                                                        </h4>
-                                                        <p className="text-[11px] text-rose-100/95 leading-relaxed max-w-xs mb-3.5 p-3 rounded-2xl bg-gradient-to-b from-white/10 via-rose-950/20 to-white/[0.03] backdrop-blur-xl border border-white/20 border-t-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_12px_32px_rgba(0,0,0,0.5)]">
-                                                            {formatFriendlyNotice(aiFeedback.rejection_reason)}
-                                                        </p>
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setIsIDCameraOpen(true);
-                                                            }}
-                                                            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs shadow-md shadow-orange-500/25 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
-                                                        >
-                                                            <Camera size={14} />
-                                                            <span>Take Valid Photo</span>
-                                                        </button>
-                                                    </div>
-                                                )}
-
-                                                {/* Bottom gradient mask */}
-                                                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
-
-                                                {/* Top-Left Zoom Hint Badge */}
-                                                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-slate-950/75 backdrop-blur-xs text-white text-[11px] font-bold flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
-                                                    <Maximize2 size={12} />
-                                                    <span>Click to zoom</span>
-                                                </div>
-
-                                                {/* Top-Right Remove Button */}
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedImage(null);
-                                                        setReportCategory([]);
-                                                        if (setPhotoMetadata) setPhotoMetadata(null);
-                                                        setAiFeedback(null);
-                                                    }}
-                                                    className="absolute top-3 right-3 p-2 rounded-full bg-slate-950/75 hover:bg-rose-600 text-white backdrop-blur-xs shadow-md transition-all cursor-pointer z-10"
-                                                    title="Remove evidence photo"
-                                                    aria-label="Remove evidence photo"
-                                                >
-                                                    <X size={16} strokeWidth={2.5} />
-                                                </button>
-
-                                                {/* Bottom Metadata & Retake Bar */}
-                                                <div className="absolute bottom-3 inset-x-3 flex items-center justify-between gap-2 z-10">
-                                                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 text-white text-xs font-semibold backdrop-blur-xs border border-white/10 shadow-xs">
-                                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                                        <span>
-                                                            {photoMetadata?.capturedAt
-                                                                ? `Live Photo • ${new Date(photoMetadata.capturedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                                                                : 'Live Camera Evidence'}
-                                                        </span>
-                                                    </div>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setIsIDCameraOpen(true);
-                                                        }}
-                                                        className="px-3.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 text-white text-xs font-bold backdrop-blur-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20 shadow-xs"
-                                                        title="Retake photo using device camera"
-                                                    >
-                                                        <Camera size={14} />
-                                                        <span>Retake Photo</span>
-                                                    </button>
-                                                </div>
-
-                                                {/* AI Scanner Overlay */}
-                                                {isAnalyzing && (
-                                                    <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white z-20">
-                                                        <Loader2 size={26} className="animate-spin text-orange-400" />
-                                                        <span className="text-xs font-bold">AI Analyzing Damage...</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            /* Empty State: Camera-Only Primary Action */
-                                            <div
-                                                onClick={() => setIsIDCameraOpen(true)}
-                                                className="w-full aspect-[4/3] rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 flex flex-col items-center justify-center p-6 text-center hover:border-orange-500 dark:hover:border-orange-500 hover:bg-orange-50/20 dark:hover:bg-slate-800/60 transition-all cursor-pointer group"
-                                            >
-                                                <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 group-hover:text-orange-500 group-hover:scale-105 shadow-xs transition-all mb-3">
-                                                    <Camera size={28} />
-                                                </div>
-                                                <p className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white mb-1">
-                                                    Capture Photo Evidence
-                                                </p>
-                                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-4 max-w-xs">
-                                                    Device camera required for authentic, timestamp-verified field condition
-                                                </p>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setIsIDCameraOpen(true);
-                                                    }}
-                                                    className="w-full max-w-[240px] py-3 px-4 min-h-[48px] bg-orange-600 hover:bg-orange-700 active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-orange-600/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
-                                                >
-                                                    <Camera size={16} strokeWidth={2.5} />
-                                                    <span>Open Camera</span>
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        <IDCameraModal
-                                            isOpen={isIDCameraOpen}
-                                            onClose={() => setIsIDCameraOpen(false)}
-                                            onCapture={(file, aiData) => {
-                                                setSelectedImage(URL.createObjectURL(file));
-                                                if (setPhotoMetadata) {
-                                                    setPhotoMetadata({
-                                                        capturedAt: new Date().toISOString(),
-                                                        lat: reportLocation?.lat,
-                                                        lng: reportLocation?.lng,
-                                                        accuracy: reportLocation?.accuracy
-                                                    });
-                                                }
-                                                if (aiData) {
-                                                    setAiFeedback(aiData);
-                                                    if (aiData.auto_description && !reportNotes) {
-                                                        setReportNotes(aiData.auto_description);
-                                                    }
-                                                    const aiCat = (aiData.category || '').toLowerCase();
-                                                    let mapped = [];
-                                                    if (aiCat.includes('light') || aiCat.includes('electric') || aiCat.includes('power') || aiCat.includes('lamp') || aiCat.includes('street')) {
-                                                        mapped.push('Power & Street Lighting');
-                                                    } else if (aiCat.includes('traffic') || aiCat.includes('sign') || aiCat.includes('signal') || aiCat.includes('marking')) {
-                                                        mapped.push('Traffic & Road Signs');
-                                                    } else if (aiCat.includes('road') || aiCat.includes('bridge') || aiCat.includes('pothole') || aiCat.includes('asphalt') || aiCat.includes('pavement')) {
-                                                        mapped.push('Roads & Bridges');
-                                                    } else if (aiCat.includes('water') || aiCat.includes('drain') || aiCat.includes('flood') || aiCat.includes('canal') || aiCat.includes('sewer') || aiCat.includes('pipe') || aiCat.includes('manhole')) {
-                                                        mapped.push('Water Supply & Distribution');
-                                                    } else if (aiCat.includes('safety') || aiCat.includes('regulat') || aiCat.includes('hazard') || aiCat.includes('fire') || aiCat.includes('building') || aiCat.includes('debris') || aiCat.includes('tree')) {
-                                                        mapped.push('Public Safety & Hazards');
-                                                    } else if (aiCat.includes('facilit') || aiCat.includes('park') || aiCat.includes('hall') || aiCat.includes('court') || aiCat.includes('school') || aiCat.includes('gym')) {
-                                                        mapped.push('Public Buildings & Facilities');
-                                                    } else if (aiCat.includes('other') || aiCat.includes('unknown') || aiCat.includes('unclear') || aiCat.includes('misc')) {
-                                                        mapped.push('Others');
-                                                    }
-                                                    if (mapped.length > 0) {
-                                                        setReportCategory(mapped);
-                                                    }
-                                                }
-                                            }}
-                                            title="Capture Evidence Photo"
-                                            side="ISSUE"
-                                            guideText="Center the infrastructure hazard in frame"
-                                            metadata={{
-                                                location: reportLocation,
-                                                structuredAddress: structuredAddress,
-                                                locationAddress: locationAddress,
-                                                timestamp: new Date()
-                                            }}
-                                        />
-
-                                        {/* ── Submission Guidelines & Evidence Tips (Informational) ── */}
-                                        <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="p-1 rounded-lg bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400">
-                                                    <Info size={13} />
-                                                </div>
-                                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                                                    Photo & Evidence Guidelines
-                                                </span>
-                                            </div>
-
-                                            <ul className="space-y-1.5 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
-                                                <li className="flex items-start gap-2 leading-relaxed">
-                                                    <span className="text-orange-500 font-bold shrink-0 mt-0.5">•</span>
-                                                    <span><strong>Clear Hazard View:</strong> Ensure damage, leaks, or electrical hazards are visible in good lighting.</span>
-                                                </li>
-                                                <li className="flex items-start gap-2 leading-relaxed">
-                                                    <span className="text-orange-500 font-bold shrink-0 mt-0.5">•</span>
-                                                    <span><strong>Landmark Reference:</strong> Include nearby landmarks, street posts, or house numbers for field dispatch.</span>
-                                                </li>
-                                                <li className="flex items-start gap-2 leading-relaxed">
-                                                    <span className="text-orange-500 font-bold shrink-0 mt-0.5">•</span>
-                                                    <span><strong>Verified Location:</strong> Coordinates are automatically tagged within Caloocan City boundaries.</span>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </div>
-
-                                    {/* ── RIGHT COLUMN: Categories & Additional Notes ── */}
-                                    <div className="flex flex-col gap-3">
-                                        {/* Category Picker */}
-                                        <ReportCategoryRadio
-                                            value={reportCategory}
-                                            onChange={setReportCategory}
-                                            options={REPORT_CATEGORIES(t)}
-                                            disabled={!selectedImage || isAnalyzing || Boolean(aiFeedback?.is_inappropriate)}
-                                            disabledReason={
-                                                !selectedImage
-                                                    ? '(Capture photo first)'
-                                                    : isAnalyzing
-                                                        ? '(Scanning photo...)'
-                                                        : aiFeedback?.is_inappropriate
-                                                            ? '(Please capture a photo of the problem)'
-                                                            : ''
-                                            }
-                                        />
-
-                                            {/* Additional Notes Field */}
-                                            <div className="space-y-1.5 pt-1">
-                                                {aiFeedback?.is_inappropriate && (
-                                                    <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-200 flex items-start gap-2 mb-1.5">
-                                                        <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
-                                                        <div>
-                                                            <span className="font-bold">Please check your photo: </span>
-                                                            <span>{formatFriendlyNotice(aiFeedback.rejection_reason)}</span>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {aiFeedback?.auto_description && !aiFeedback?.is_inappropriate && (
-                                                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/20 border border-orange-200 dark:border-orange-900/50 text-xs text-slate-700 dark:text-slate-300 mb-1.5 shadow-2xs">
-                                                        <div className="flex items-start gap-2 min-w-0 flex-1">
-                                                            <Sparkles size={14} className="text-orange-500 shrink-0 mt-0.5" />
-                                                            <div className="min-w-0">
-                                                                <span className="font-bold text-slate-900 dark:text-white">AI Observation: </span>
-                                                                <span className="italic line-clamp-2">"{aiFeedback.auto_description}"</span>
-                                                            </div>
-                                                        </div>
-                                                        {reportNotes !== aiFeedback.auto_description && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setReportNotes(aiFeedback.auto_description)}
-                                                                className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-[11px] shrink-0 cursor-pointer shadow-2xs transition-colors"
-                                                            >
-                                                                Use AI Text
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                )}
-
-                                                <div className="flex items-center justify-between px-1">
-                                                <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                                                    <MessageSquareText size={14} />
-                                                    <span>Additional Notes</span>
-                                                    {isOthersSelected && (
-                                                        <span className="text-orange-600 dark:text-orange-400 font-extrabold text-[11px] normal-case tracking-normal">
-                                                            (Required for Others)
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <span className={`text-[11px] font-mono ${
-                                                    notesLength >= 500
-                                                        ? 'text-rose-600 font-extrabold animate-pulse'
-                                                        : notesLength >= 400
-                                                            ? 'text-amber-600 font-bold'
-                                                            : isOthersSelected && notesLength < 10
-                                                                ? 'text-orange-600 dark:text-orange-400 font-bold'
-                                                                : 'text-slate-500 dark:text-slate-400 font-semibold'
-                                                }`}>
-                                                    {notesLength}/500 {isOthersSelected && notesLength < 10 ? '(min 10)' : ''}
-                                                </span>
-                                            </div>
-
-                                            <div className={`relative rounded-2xl border transition-all bg-slate-50 dark:bg-slate-800/60 ${
-                                                isListening
-                                                    ? 'border-orange-500 ring-2 ring-orange-500/30 bg-orange-50/30 dark:bg-orange-950/30'
-                                                    : 'border-slate-300 dark:border-slate-700 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20'
-                                            }`}>
-                                                <textarea
-                                                    rows={3}
-                                                    className="w-full bg-transparent text-slate-900 dark:text-white p-3.5 pr-12 text-base sm:text-sm outline-none placeholder:text-slate-500 dark:placeholder:text-slate-400 resize-none font-medium"
-                                                    placeholder={
-                                                        isListening
-                                                            ? "🎙️ Listening... Speak clearly into your microphone..."
-                                                            : isOthersSelected
-                                                                ? "Please describe the issue so we can route it to the right team (minimum 10 characters)..."
-                                                                : (reportCategory.length > 0 ? `Describe specific damage or landmark details for ${reportCategory[0]}...` : "Provide helpful context, landmark details, or specific damage...")
-                                                    }
-                                                    maxLength={500}
-                                                    value={reportNotes}
-                                                    onChange={e => setReportNotes(e.target.value)}
-                                                    aria-required={isOthersSelected}
-                                                    aria-invalid={isOthersSelected && notesLength < 10}
-                                                />
-
-                                                {/* Voice-to-Text Button */}
-                                                <button
-                                                    type="button"
-                                                    onClick={toggleVoiceToText}
-                                                    className={`absolute bottom-2.5 right-2.5 p-2 min-w-[40px] min-h-[40px] rounded-xl transition-all duration-200 flex items-center justify-center cursor-pointer ${
-                                                        isListening
-                                                            ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/40 ring-2 ring-orange-400 animate-pulse'
-                                                            : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-orange-500 dark:hover:text-orange-400 border border-slate-300 dark:border-slate-600 shadow-xs'
-                                                    }`}
-                                                    title={isListening ? "Listening... Click to stop" : "Click to dictate (Voice-to-Text)"}
-                                                >
-                                                    {isListening ? (
-                                                        <Mic size={16} className="animate-bounce" />
-                                                    ) : (
-                                                        <Mic size={16} />
-                                                    )}
-                                                </button>
-                                            </div>
-                                            {isOthersSelected && notesLength < 10 && (
-                                                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-1.5 px-1" role="alert">
-                                                    <AlertTriangle size={12} className="shrink-0 text-amber-500" />
-                                                    <span>Please describe the issue in at least 10 characters so dispatchers can route it properly ({Math.max(0, 10 - notesLength)} more needed).</span>
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </div>
-
-                            {/* Modal Footer Actions */}
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 pt-4 mt-3 border-t border-slate-200 dark:border-slate-800">
-                                <div className="text-xs">
-                                    {aiFeedback?.is_inappropriate ? (
-                                        <span className="text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1.5">
-                                            <AlertTriangle size={14} className="shrink-0 text-rose-500" />
-                                            <span>Please take or upload a photo showing the actual problem</span>
-                                        </span>
-                                    ) : !selectedImage ? (
-                                        <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5">
-                                            <AlertTriangle size={14} className="shrink-0 text-amber-500" />
-                                            <span>Capture photo evidence to continue</span>
-                                        </span>
-                                    ) : !isLocationReady ? (
-                                        <span className="text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
-                                            {isLocationLoading ? (
-                                                <>
-                                                    <Loader2 size={14} className="shrink-0 animate-spin" />
-                                                    <span>Acquiring exact location for field dispatch...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <AlertTriangle size={14} className="shrink-0 text-amber-500" />
-                                                    <span>Location required • Retry GPS or pinpoint on map</span>
-                                                </>
-                                            )}
-                                        </span>
-                                    ) : !isCategorySelected ? (
-                                        <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5">
-                                            <AlertTriangle size={14} className="shrink-0 text-amber-500" />
-                                            <span>Select at least 1 issue category to continue</span>
-                                        </span>
-                                    ) : !isNotesValidForOthers ? (
-                                        <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5" role="alert">
-                                            <AlertTriangle size={14} className="shrink-0 text-amber-500" />
-                                            <span>Describe the issue in Additional Notes (10+ chars)</span>
-                                        </span>
-                                    ) : (
-                                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                                            <CheckCircle2 size={13} className="shrink-0" />
-                                            <span>Ready to submit report</span>
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto justify-end">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setActiveModal(null);
-                                            setReportCategory([]);
-                                            setAiFeedback(null);
-                                            setSelectedImage(null);
-                                            setReportNotes('');
-                                        }}
-                                        className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center"
-                                    >
-                                        Cancel
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={handleFileReport}
-                                        disabled={submittingReport || !isCategorySelected || Boolean(aiFeedback?.is_inappropriate) || !selectedImage || !isLocationReady || !isNotesValidForOthers}
-                                        className="w-full sm:w-auto px-6 py-2.5 min-h-[44px] rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer"
-                                    >
-                                        {submittingReport ? (
-                                            <>
-                                                <Loader2 size={15} className="animate-spin" />
-                                                <span>Submitting...</span>
-                                            </>
-                                        ) : aiFeedback?.is_inappropriate ? (
-                                            <span>Invalid Photo • Retake to Continue</span>
-                                        ) : !selectedImage ? (
-                                            <span>Capture Photo to Continue</span>
-                                        ) : isLocationLoading ? (
-                                            <>
-                                                <Loader2 size={15} className="animate-spin" />
-                                                <span>Acquiring Location...</span>
-                                            </>
-                                        ) : !isLocationReady ? (
-                                            <span>Set Location to Continue</span>
-                                        ) : !isCategorySelected ? (
-                                            <span>Select Category to Continue</span>
-                                        ) : !isNotesValidForOthers ? (
-                                            <span>Describe Issue to Continue</span>
-                                        ) : (
-                                            <span>Submit Report</span>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeModal === 'map' && (
-                        <div className="flex flex-col h-full bg-white dark:bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800">
-                            {/* Modal Header — collapses into a sleek compact bar when Street View is active */}
-                            <div className={`border-b border-slate-100 dark:border-slate-800 flex justify-between items-center gap-3 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 transition-all duration-200 ${
-                                svLocation ? 'px-3 sm:px-4 py-2 sm:py-2.5' : 'p-4 sm:p-5'
-                            }`}>
-                                <div className="min-w-0 pr-2">
-                                    <h2 className={`font-black text-slate-900 dark:text-white leading-tight ${
-                                        svLocation ? 'text-sm sm:text-base flex items-center gap-2' : 'text-lg sm:text-2xl'
-                                    }`}>
-                                        {svLocation ? (
-                                            <>
-                                                <Eye size={16} className="text-orange-500 shrink-0" />
-                                                <span className="truncate">Street View Inspection</span>
-                                            </>
-                                        ) : (
-                                            'Nearby Hazards & Infrastructure'
-                                        )}
-                                    </h2>
-                                    {!svLocation && (
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                                            Interactive Caloocan GIS map · Field inspections and citizen reports
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <button 
-                                        onClick={() => { 
-                                            setActiveModal(isSelectingLocation ? 'file-report' : null); 
-                                            setIsSelectingLocation(false); 
-                                            if (svLocation) handleStreetViewClick(null);
-                                        }} 
-                                        className="p-1.5 sm:p-2 border border-slate-200 dark:border-slate-700 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer shrink-0"
-                                        aria-label="Close map"
-                                    >
-                                        <X size={18} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Floating Top Controls Toolbar & Category Chips Bar — Collapsed when Street View is open */}
-                            {!svLocation && (
-                                <>
-                                    {/* Floating Top Controls Toolbar */}
-                                    <div className="relative z-10 px-4 py-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-                                        <div className="flex items-center flex-wrap gap-2">
-                                            {/* Map Type: Roadmap vs Satellite */}
-                                            <button
-                                                type="button"
-                                                onClick={() => setMapLayerType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
-                                                className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                                            >
-                                                <Layers size={14} className="text-blue-500" />
-                                                <span>{mapLayerType === 'roadmap' ? 'Satellite View' : 'Civic View'}</span>
-                                            </button>
-
-                                            {/* My Location GPS */}
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    requestDeviceLocation(true);
-                                                    if (map && reportLocation?.lat) {
-                                                        map.panTo({ lat: reportLocation.lat, lng: reportLocation.lng });
-                                                        map.setZoom(15);
-                                                    }
-                                                }}
-                                                className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                                            >
-                                                <Crosshair size={14} className={isLocating ? 'animate-spin text-orange-500' : 'text-emerald-500'} />
-                                                <span>{isLocating ? 'Locating...' : 'My Location'}</span>
-                                            </button>
-                                        </div>
-
-                                        {/* Sector Jump Buttons */}
-                                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                            <span className="text-[10px] uppercase font-black px-2 text-slate-600 dark:text-slate-300">Sector:</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setActiveSector('all');
-                                                    if (map && window.google && window.google.maps) {
-                                                        const bounds = new window.google.maps.LatLngBounds(
-                                                            new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
-                                                            new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
-                                                        );
-                                                        map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-                                                    }
-                                                }}
-                                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                                                    activeSector === 'all'
-                                                        ? 'bg-[#ff6b00] text-white shadow-xs font-black'
-                                                        : 'text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] hover:bg-white/60 dark:hover:bg-slate-700/60'
-                                                }`}
-                                            >
-                                                All Caloocan
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setActiveSector('north');
-                                                    if (map) {
-                                                        map.panTo(NORTH_CALOOCAN_CENTROID || { lat: 14.7566, lng: 121.0450 });
-                                                        map.setZoom(12);
-                                                    }
-                                                }}
-                                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                                                    activeSector === 'north'
-                                                        ? 'bg-[#ff6b00] text-white shadow-xs font-black'
-                                                        : 'text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] hover:bg-white/60 dark:hover:bg-slate-700/60'
-                                                }`}
-                                            >
-                                                North Caloocan
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setActiveSector('south');
-                                                    if (map) {
-                                                        map.panTo(SOUTH_CALOOCAN_CENTROID || { lat: 14.6500, lng: 120.9850 });
-                                                        map.setZoom(12);
-                                                    }
-                                                }}
-                                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                                                    activeSector === 'south'
-                                                        ? 'bg-[#ff6b00] text-white shadow-xs font-black'
-                                                        : 'text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] hover:bg-white/60 dark:hover:bg-slate-700/60'
-                                                }`}
-                                            >
-                                                South Caloocan
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Category Filter Chips Bar with Left & Right Chevrons */}
-                                    <div className="relative z-10 px-2 sm:px-3 py-1.5 sm:py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-1 sm:gap-1.5 text-[11px] font-bold">
-                                        {/* Left Chevron Button */}
-                                        <button
-                                            type="button"
-                                            onClick={() => scrollMapCategories('left')}
-                                            disabled={!canScrollMapCatLeft}
-                                            aria-label="Scroll categories left"
-                                            className={`shrink-0 w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all duration-150 z-10 ${
-                                                canScrollMapCatLeft
-                                                    ? 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-2xs border border-slate-200 dark:border-slate-700 hover:bg-[#f05a00] hover:text-white dark:hover:bg-[#f05a00] cursor-pointer active:scale-95'
-                                                    : 'text-slate-300 dark:text-slate-700 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
-                                            }`}
-                                        >
-                                            <ChevronLeft size={13} strokeWidth={2.5} />
-                                        </button>
-
-                                        {/* Scrollable Categories Container */}
-                                        <div
-                                            ref={mapCategoryScrollRef}
-                                            onScroll={updateMapCatScroll}
-                                            className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5"
-                                        >
-                                            {[
-                                                { id: 'all', label: 'All Incidents' },
-                                                { id: 'roads', label: 'Roads & Potholes' },
-                                                { id: 'drainage', label: 'Drainage & Floods' },
-                                                { id: 'lighting', label: 'Power & Streetlights' },
-                                                { id: 'safety', label: 'Public Safety' },
-                                                { id: 'facilities', label: 'Public Facilities' }
-                                            ].map(cat => (
-                                                <button
-                                                    key={cat.id}
-                                                    type="button"
-                                                    onClick={() => setMapCategoryFilter(cat.id)}
-                                                    className={`px-3 py-1 rounded-full whitespace-nowrap transition-all cursor-pointer shrink-0 ${
-                                                        mapCategoryFilter === cat.id
-                                                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                                                            : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-orange-500/40'
-                                                    }`}
-                                                >
-                                                    {cat.label}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        {/* Right Chevron Button */}
-                                        <button
-                                            type="button"
-                                            onClick={() => scrollMapCategories('right')}
-                                            disabled={!canScrollMapCatRight}
-                                            aria-label="Scroll categories right"
-                                            className={`shrink-0 w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all duration-150 z-10 ${
-                                                canScrollMapCatRight
-                                                    ? 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-2xs border border-slate-200 dark:border-slate-700 hover:bg-[#f05a00] hover:text-white dark:hover:bg-[#f05a00] cursor-pointer active:scale-95'
-                                                    : 'text-slate-300 dark:text-slate-700 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
-                                            }`}
-                                        >
-                                            <ChevronRight size={13} strokeWidth={2.5} />
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="flex-1 relative">
-                                {isLoaded && (
-                                    <GoogleMap
-                                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                                        center={CALOOCAN_CENTER}
-                                        zoom={11}
-                                        mapTypeId={mapLayerType}
-                                        options={{
-                                            ...mapOptions,
-                                            styles: mapLayerType === 'hybrid'
-                                                ? []
-                                                : (theme === 'dark' ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE)
-                                        }}
-                                        onZoomChanged={() => {
-                                            if (map) {
-                                                const z = map.getZoom();
-                                                if (typeof z === 'number') setCurrentMapZoom(z);
-                                            }
-                                        }}
-                                        onLoad={m => {
-                                            setMap(m);
-                                            if (window.google && window.google.maps) {
-                                                const bounds = new window.google.maps.LatLngBounds(
-                                                    new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
-                                                    new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
-                                                );
-                                                m.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-                                            }
-                                        }}
-                                        onClick={(e) => {
-                                            if (e.latLng) {
-                                                const newPos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-                                                if (checkJurisdiction(newPos)) {
-                                                    setReportLocation({ ...newPos, confirmed: true, source: 'pinpoint', accuracy: 0, isExact: true });
-                                                    reverseGeocode(newPos.lat, newPos.lng);
-                                                }
-                                            }
-                                        }}
-                                    >
-                                        {/* 100% Precision Draggable Report Marker */}
-                                        {reportLocation?.lat && (
-                                            <MarkerF
-                                                position={reportLocation}
-                                                draggable={true}
-                                                onDragEnd={(e) => {
-                                                    if (e.latLng) {
-                                                        const newPos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-                                                        if (checkJurisdiction(newPos)) {
-                                                            setReportLocation({ ...newPos, confirmed: true, source: 'pinpoint', accuracy: 0, isExact: true });
-                                                            reverseGeocode(newPos.lat, newPos.lng);
-                                                        }
-                                                    }
-                                                }}
-                                                zIndex={1000}
-                                                title="Report Location (Drag pin to place with 100% exact precision)"
-                                            />
-                                        )}
-
-                                        {/* Authoritative Shared Dual-Sector Caloocan Boundary Layer */}
-                                        <CaloocanBoundaryLayer
-                                            activeSector={activeSector}
-                                            onSectorClick={(sector) => setActiveSector(sector)}
-                                            isDarkMode={theme === 'dark'}
-                                            showBarangays={true}
-                                            showLabels={true}
-                                        />
-
-                                        {/* Caloocan City Hall North HQ Pin (Castle Icon) */}
-                                        <MarkerF 
-                                            position={CALOOCAN_CITY_HALL_NORTH_LOC}
-                                            zIndex={300}
-                                            options={{
-                                                optimized: false,
-                                                clickable: true
-                                            }}
-                                            icon={window.google && window.google.maps ? {
-                                                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 60" width="50" height="60">
-                                                        <defs>
-                                                            <linearGradient id="resHqGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                                <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
-                                                                <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
-                                                            </linearGradient>
-                                                            <filter id="resShadow" x="-20%" y="-20%" width="140%" height="140%">
-                                                                <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
-                                                                <feOffset dx="0" dy="2" result="offsetblur" />
-                                                                <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
-                                                                <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-                                                            </filter>
-                                                        </defs>
-                                                        <path d="M25 58c0 0 22-20 22-33a22 22 0 0 0-44 0c0 13 22 33 22 33z" fill="url(#resHqGrad)" stroke="#f97316" stroke-width="2.5" filter="url(#resShadow)" />
-                                                        <g transform="translate(13, 10) scale(1.1)" fill="#f97316">
-                                                            <path d="M18 20v-8l-1.5-1.5V6L15 4l-1.5 2v4.5L12 12l-1.5-1.5V6L9 4 7.5 6v4.5L6 12v8h12zM11 16h2v4h-2v-4z"/>
-                                                        </g>
-                                                    </svg>
-                                                `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                                scaledSize: new window.google.maps.Size(46, 55),
-                                                anchor: new window.google.maps.Point(23, 55)
-                                            } : undefined}
-                                            title="Caloocan City Hall North (Zapote HQ)"
-                                        />
-
-                                        {/* Caloocan City Hall South HQ Pin (Castle Icon) */}
-                                        <MarkerF 
-                                            position={CALOOCAN_CITY_HALL_SOUTH_LOC}
-                                            zIndex={300}
-                                            options={{
-                                                optimized: false,
-                                                clickable: true
-                                            }}
-                                            icon={window.google && window.google.maps ? {
-                                                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 60" width="50" height="60">
-                                                        <defs>
-                                                            <linearGradient id="resHqSouthGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                                <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
-                                                                <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
-                                                            </linearGradient>
-                                                            <filter id="resShadowSouth" x="-20%" y="-20%" width="140%" height="140%">
-                                                                <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
-                                                                <feOffset dx="0" dy="2" result="offsetblur" />
-                                                                <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
-                                                                <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-                                                            </filter>
-                                                        </defs>
-                                                        <path d="M25 58c0 0 22-20 22-33a22 22 0 0 0-44 0c0 13 22 33 22 33z" fill="url(#resHqSouthGrad)" stroke="#ff6b00" stroke-width="2.5" filter="url(#resShadowSouth)" />
-                                                        <g transform="translate(13, 10) scale(1.1)" fill="#ff6b00">
-                                                            <path d="M18 20v-8l-1.5-1.5V6L15 4l-1.5 2v4.5L12 12l-1.5-1.5V6L9 4 7.5 6v4.5L6 12v8h12zM11 16h2v4h-2v-4z"/>
-                                                        </g>
-                                                    </svg>
-                                                `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                                scaledSize: new window.google.maps.Size(42, 50),
-                                                anchor: new window.google.maps.Point(21, 50)
-                                            } : undefined}
-                                            title="Caloocan City Hall South (8th Ave Main)"
-                                        />
-
-                                        {/* Animated Wave Sonar Overlay for User Location */}
-                                        {reportLocation?.lat && (
-                                            <OverlayViewF
-                                                position={reportLocation}
-                                                mapPaneName="overlayMouseTarget"
-                                                getPixelPositionOffset={() => ({ x: -24, y: -24 })}
-                                            >
-                                                <div className="relative flex items-center justify-center w-12 h-12 pointer-events-none">
-                                                    {/* Wave Ring 1 */}
-                                                    <div className="absolute inset-0 rounded-full bg-blue-500/25 animate-wave-ring" style={{ animationDelay: '0s' }} />
-                                                    {/* Wave Ring 2 */}
-                                                    <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-wave-ring" style={{ animationDelay: '0.6s' }} />
-                                                    {/* Wave Ring 3 */}
-                                                    <div className="absolute inset-0 rounded-full bg-blue-500/15 animate-wave-ring" style={{ animationDelay: '1.2s' }} />
-                                                    {/* Center Dot */}
-                                                    <div className="relative z-10 w-5 h-5 bg-blue-500 rounded-full border-[3px] border-white shadow-lg shadow-blue-500/50" />
-                                                </div>
-                                            </OverlayViewF>
-                                        )}
-
-                                        {/* Active Selected Incident Marker (Rendered outside clusterer with top priority) */}
-                                        {selectedHazard && (
-                                            <MarkerF
-                                                key={`hazard-selected-${selectedHazard.id}`}
-                                                position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }}
-                                                zIndex={1000}
-                                                title={`${selectedHazard.title} (${(selectedHazard.status || 'PENDING').toUpperCase()})`}
-                                                onClick={() => setSelectedHazard(selectedHazard)}
-                                                options={{
-                                                    optimized: false,
-                                                    clickable: true
-                                                }}
-                                                icon={(() => {
-                                                    const cacheKey = `${selectedHazard.id}-sel`;
-                                                    const customIconUrl = photoPinIcons ? photoPinIcons[cacheKey] : null;
-                                                    const size = 46;
-                                                    const pointerH = 8;
-                                                    const totalW = size + 6;
-                                                    const totalH = size + pointerH + 2;
-                                                    return customIconUrl && getCachedIcon
-                                                        ? getCachedIcon(customIconUrl, totalW, totalH, totalW / 2, totalH)
-                                                        : (getCachedIcon
-                                                            ? getCachedIcon(
-                                                                getMarkerSVG(selectedHazard.category, selectedHazard.status, true),
-                                                                44,
-                                                                50,
-                                                                22,
-                                                                50
-                                                            )
-                                                            : {
-                                                                url: getMarkerSVG(selectedHazard.category, selectedHazard.status, true),
-                                                                scaledSize: new window.google.maps.Size(44, 50),
-                                                                anchor: new window.google.maps.Point(22, 50)
-                                                            }
-                                                        );
-                                                })()}
-                                            />
-                                        )}
-
-                                        {/* Incident Markers: Direct Report Photo-Pins (No numeric clustering) */}
-                                        {mapFilteredHazards
-                                            .filter(h => h.id !== selectedHazard?.id)
-                                            .map(h => {
-                                                const cacheKey = `${h.id}-norm`;
-                                                const customIconUrl = photoPinIcons ? photoPinIcons[cacheKey] : null;
-                                                const size = 36;
-                                                const pointerH = 7;
-                                                const totalW = size + 6;
-                                                const totalH = size + pointerH + 2;
-
-                                                const iconConfig = customIconUrl && getCachedIcon
-                                                    ? getCachedIcon(customIconUrl, totalW, totalH, totalW / 2, totalH)
-                                                    : (getCachedIcon
-                                                        ? getCachedIcon(
-                                                            getMarkerSVG(h.category, h.status, false),
-                                                            36,
-                                                            42,
-                                                            18,
-                                                            42
-                                                        )
-                                                        : {
-                                                            url: getMarkerSVG(h.category, h.status, false),
-                                                            scaledSize: new window.google.maps.Size(36, 42),
-                                                            anchor: new window.google.maps.Point(18, 42)
-                                                        }
-                                                    );
-
-                                                return (
-                                                    <MarkerF
-                                                        key={`hazard-${h.id}`}
-                                                        position={{ lat: h.lat, lng: h.lng }}
-                                                        zIndex={150}
-                                                        title={`${h.title} (${(h.status || 'PENDING').toUpperCase()})`}
-                                                        onClick={() => setSelectedHazard(h)}
-                                                        options={{
-                                                            optimized: true,
-                                                            clickable: true
-                                                        }}
-                                                        icon={iconConfig}
-                                                    />
-                                                );
-                                            })
-                                        }
-
-                                        {/* STREET VIEW PIN OVERLAY: 3D Pin for the inspected incident (Lightweight, single-pin) */}
-                                        {svLocation && panorama && selectedHazard && selectedHazard.lat && selectedHazard.lng && (
-                                            <MarkerF
-                                                key={`sv-pin-${selectedHazard.id}`}
-                                                map={panorama}
-                                                position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }}
-                                                onClick={() => setSelectedHazard(selectedHazard)}
-                                                options={{
-                                                    optimized: false,
-                                                    clickable: true
-                                                }}
-                                                icon={window.google && window.google.maps ? {
-                                                    url: getMarkerSVG(selectedHazard.category, selectedHazard.status, true),
-                                                    scaledSize: new window.google.maps.Size(46, 52),
-                                                    anchor: new window.google.maps.Point(23, 52)
-                                                } : undefined}
-                                            />
-                                        )}
-
-                                        {/* Sleek Government-Grade InfoWindow */}
-                                        {(() => {
-                                            if (!selectedHazard) return null;
-                                            const rawLat = selectedHazard.lat ?? selectedHazard.location_lat ?? selectedHazard.latitude;
-                                            const rawLng = selectedHazard.lng ?? selectedHazard.location_lng ?? selectedHazard.longitude;
-                                            const hazLat = typeof rawLat === 'function' ? rawLat() : parseFloat(rawLat);
-                                            const hazLng = typeof rawLng === 'function' ? rawLng() : parseFloat(rawLng);
-
-                                            if (!Number.isFinite(hazLat) || !Number.isFinite(hazLng)) {
-                                                return null;
-                                            }
-
-                                            return (
-                                                <InfoWindowF
-                                                    key={`hazard-infowindow-${selectedHazard.id || 'haz'}-${hazLat}-${hazLng}`}
-                                                    position={{ lat: hazLat, lng: hazLng }}
-                                                    onCloseClick={() => setSelectedHazard(null)}
-                                                    options={{
-                                                        pixelOffset: new window.google.maps.Size(0, -40),
-                                                        zIndex: 1000
-                                                    }}
-                                                >
-                                                {(() => {
-                                                    const catColor = getCategoryColor(selectedHazard.category);
-                                                    const isDark = theme === 'dark';
-                                                    return (
-                                                        <div style={{
-                                                            background: isDark ? 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)' : '#ffffff',
-                                                            borderRadius: '16px',
-                                                            padding: '16px',
-                                                            minWidth: '230px',
-                                                            maxWidth: '280px',
-                                                            border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
-                                                            margin: '-10px',
-                                                            boxShadow: isDark ? '0 25px 50px rgba(0,0,0,0.7)' : '0 10px 25px rgba(0,0,0,0.1)',
-                                                            fontFamily: 'Inter,sans-serif',
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            alignItems: 'center',
-                                                            textAlign: 'center',
-                                                            position: 'relative'
-                                                        }}>
-                                                            <button
-                                                                onClick={() => setSelectedHazard(null)}
-                                                                style={{
-                                                                    position: 'absolute',
-                                                                    top: '10px',
-                                                                    right: '10px',
-                                                                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                                                                    border: 'none',
-                                                                    borderRadius: '50%',
-                                                                    width: '26px',
-                                                                    height: '26px',
-                                                                    cursor: 'pointer',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    color: isDark ? '#94a3b8' : '#64748b'
-                                                                }}
-                                                            >×</button>
-
-                                                            {selectedHazard.image ? (
-                                                                <div style={{ width: '56px', height: '56px', borderRadius: '14px', overflow: 'hidden', marginBottom: '10px', border: `2px solid ${catColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-                                                                    <img
-                                                                        src={selectedHazard.image.startsWith('http') ? selectedHazard.image : `${API_BASE_URL}${selectedHazard.image.startsWith('/') ? selectedHazard.image : `/${selectedHazard.image}`}`}
-                                                                        alt={selectedHazard.title}
-                                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                                    />
-                                                                </div>
-                                                            ) : (
-                                                                <div style={{
-                                                                    width: '44px',
-                                                                    height: '44px',
-                                                                    borderRadius: '50%',
-                                                                    background: `${catColor}20`,
-                                                                    border: `1.5px solid ${catColor}50`,
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    marginBottom: '10px',
-                                                                    color: catColor
-                                                                }}>
-                                                                    <AlertTriangle size={20} />
-                                                                </div>
-                                                            )}
-
-                                                            {selectedHazard.ticket_id && (
-                                                                <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', color: '#94a3b8', marginBottom: '4px', fontFamily: 'monospace' }}>
-                                                                    {selectedHazard.ticket_id}
-                                                                </div>
-                                                            )}
-
-                                                            <div style={{
-                                                                fontSize: '10px',
-                                                                fontWeight: 800,
-                                                                letterSpacing: '0.12em',
-                                                                color: selectedHazard.status === 'resolved' ? '#4ade80' : selectedHazard.status === 'pending' ? '#f87171' : '#fb923c',
-                                                                background: selectedHazard.status === 'resolved' ? 'rgba(74,222,128,0.12)' : selectedHazard.status === 'pending' ? 'rgba(248,113,113,0.12)' : 'rgba(251,146,60,0.12)',
-                                                                padding: '3px 12px',
-                                                                borderRadius: '999px',
-                                                                marginBottom: '8px',
-                                                                textTransform: 'uppercase'
-                                                            }}>
-                                                                {selectedHazard.status}
-                                                            </div>
-
-                                                            <h4 style={{
-                                                                fontWeight: 700,
-                                                                fontSize: '14px',
-                                                                color: isDark ? '#f1f5f9' : '#0f172a',
-                                                                lineHeight: '1.35',
-                                                                margin: '0 0 4px',
-                                                                padding: '0 12px'
-                                                            }}>{selectedHazard.title}</h4>
-
-                                                            <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.12em', color: catColor, marginBottom: '10px', textTransform: 'uppercase' }}>
-                                                                {selectedHazard.category}
-                              </p>
-
-                                                            <div style={{
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '6px',
-                                                                background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                                                                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
-                                                                borderRadius: '999px',
-                                                                padding: '4px 12px',
-                                                                marginBottom: '12px'
-                                                            }}>
-                                                                <span style={{ color: catColor, display: 'flex' }}><MapPin size={12} /></span>
-                                                                <span style={{ fontSize: '11px', fontWeight: 700, color: isDark ? '#cbd5e1' : '#475569' }}>
-                                                                    {selectedHazard.dynamicDistance || selectedHazard.distance} away
-                                                                </span>
-                                                            </div>
-
-                                                            <button
-                                                                onClick={() => handleStreetViewClick({ lat: selectedHazard.lat, lng: selectedHazard.lng })}
-                                                                style={{
-                                                                    width: '100%',
-                                                                    padding: '10px 0',
-                                                                    background: `linear-gradient(135deg, ${catColor}, ${catColor}dd)`,
-                                                                    border: 'none',
-                                                                    borderRadius: '12px',
-                                                                    color: 'white',
-                                                                    fontSize: '12px',
-                                                                    fontWeight: 700,
-                                                                    cursor: 'pointer',
-                                                                    boxShadow: `0 4px 16px ${catColor}40`,
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    gap: '6px'
-                                                                }}
-                                                            >
-                                                                <Eye size={14} /> Open Street View
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })()}
-                                                </InfoWindowF>
-                                            );
-                                        })()}
-
-                                        {/* Street View Overlay */}
-                                        {svLocation && (
-                                            <>
-                                                <StreetViewPanorama
-                                                    position={svLocation}
-                                                    visible={true}
-                                                    options={{
-                                                        enableCloseButton: false,
-                                                        fullscreenControl: false,
-                                                        zoomControl: false,
-                                                        motionTracking: false,
-                                                        motionTrackingControl: false,
-                                                        linksControl: true,
-                                                        panControl: false,
-                                                        addressControl: false
-                                                    }}
-                                                    onLoad={(pano) => setPanorama(pano)}
-                                                />
-                                                {/* Top Controls Overlay on Street View */}
-                                                <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-40 flex items-center justify-between pointer-events-none gap-2">
-                                                    {/* Prominent Back to Map Button (44px min touch target, non-overlapping) */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleStreetViewClick(null)}
-                                                        aria-label="Back to Map"
-                                                        className="pointer-events-auto h-11 min-h-[44px] px-4 rounded-full bg-slate-900/90 hover:bg-orange-600 text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-2 text-xs sm:text-sm font-bold shrink-0"
-                                                    >
-                                                        <ChevronLeft size={18} strokeWidth={2.5} />
-                                                        <span>Back to Map</span>
-                                                    </button>
-
-                                                    {/* Center: Persistent Incident Context Label */}
-                                                    {selectedHazard && (
-                                                        <div className="pointer-events-auto hidden xs:flex items-center gap-2 bg-slate-950/90 text-white border border-slate-700/70 shadow-2xl rounded-full px-3.5 py-2 text-xs font-semibold backdrop-blur-md max-w-[50%] sm:max-w-[60%] truncate">
-                                                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0 animate-pulse" />
-                                                            <span className="text-slate-400 font-medium shrink-0">Viewing:</span>
-                                                            <span className="font-bold text-white truncate">{selectedHazard.title || 'Reported Location'}</span>
-                                                            {(selectedHazard.dynamicDistance || selectedHazard.distance) && (
-                                                                <span className="text-slate-400 shrink-0 hidden md:inline">
-                                                                    · {selectedHazard.dynamicDistance || selectedHazard.distance} away
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Right: Fullscreen Toggle Button (Repositioned away from Back button) */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setIsSvFullscreen(prev => !prev)}
-                                                        aria-label={isSvFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                                                        title={isSvFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                                                        className="pointer-events-auto w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-slate-900/90 hover:bg-orange-600 text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
-                                                    >
-                                                        {isSvFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                                                    </button>
-                                                </div>
-
-                                                {/* Mobile Extra Context Pill (anchored bottom-center above Street View controls) */}
-                                                {selectedHazard && (
-                                                    <div className="xs:hidden absolute bottom-12 left-3 right-3 z-40 pointer-events-none flex justify-center">
-                                                        <div className="pointer-events-auto bg-slate-950/90 text-white border border-slate-700/70 shadow-2xl rounded-full px-3.5 py-1.5 text-[11px] font-semibold backdrop-blur-md flex items-center gap-1.5 max-w-full truncate">
-                                                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0 animate-pulse" />
-                                                            <span className="text-slate-400">Viewing:</span>
-                                                            <span className="font-bold text-white truncate">{selectedHazard.title || 'Reported Location'}</span>
-                                                            {(selectedHazard.dynamicDistance || selectedHazard.distance) && (
-                                                                <span className="text-slate-400 shrink-0">· {selectedHazard.dynamicDistance || selectedHazard.distance} away</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </GoogleMap>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    <motion.div
+                        initial={{ scale: 0.96, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.96, opacity: 0 }}
+                        className="pointer-events-auto transition-colors w-full max-w-xl flex flex-col my-auto bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90dvh]"
+                        onClick={e => e.stopPropagation()}
+                    >
                     {activeModal === 'services' && (
                         <div className="p-4 sm:p-6 md:p-8 max-h-[85vh] overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-center mb-6">
@@ -7205,6 +5582,8 @@ const TopNavigation = ({
     activeTab,
     handleSetTab,
     handleSetModal,
+    isAIChatOpen = false,
+    setIsAIChatOpen,
     theme,
     changeTheme,
     showNotifications,
@@ -7213,6 +5592,9 @@ const TopNavigation = ({
     setNotifications,
     handleMarkAllRead,
     handleNotificationClick,
+    loadingNotifications,
+    notificationsError,
+    onRetryNotifications,
     handleLogout,
     user,
     navItems,
@@ -7246,10 +5628,20 @@ const TopNavigation = ({
 
     const searchRef = useRef(null);
     const searchInputRef = useRef(null);
+    const mobileSearchRef = useRef(null);
+    const mobileSearchInputRef = useRef(null);
     const [searchPillWidth, setSearchPillWidth] = useState(240);
+    const [recentSearchAnnouncement, setRecentSearchAnnouncement] = useState('');
+    const removeButtonRefs = useRef([]);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const userMenuTimeoutRef = useRef(null);
     const userMenuRef = useRef(null);
+
+    useEffect(() => {
+        if (isSearchOpen && typeof window !== 'undefined' && window.innerWidth < 768) {
+            mobileSearchInputRef.current?.focus();
+        }
+    }, [isSearchOpen]);
 
     useEffect(() => {
         if (!searchRef.current || typeof ResizeObserver === 'undefined') return;
@@ -7298,25 +5690,63 @@ const TopNavigation = ({
         });
     };
 
-    const removeRecentSearch = (e, item) => {
+    const removeRecentSearch = (e, item, idx) => {
         e.stopPropagation();
+        e.preventDefault();
+        const isKeyboard = e.detail === 0;
+
         setRecentSearches(prev => {
             const updated = prev.filter(s => s !== item);
-            try { localStorage.setItem('pulso_recent_searches', JSON.stringify(updated)); } catch (e) { /* ignore */ }
+            try { localStorage.setItem('pulso_recent_searches', JSON.stringify(updated)); } catch (err) { /* ignore */ }
             return updated;
         });
+
+        setRecentSearchAnnouncement(`${item} removed.`);
+
+        // Focus management: preserve focus without closing or jumping to top
+        setTimeout(() => {
+            if (isKeyboard) {
+                const currentLength = recentSearches.length;
+                if (currentLength <= 1) {
+                    const searchInput = document.querySelector('[data-pulso-search-input="true"]');
+                    searchInput?.focus();
+                } else if (idx >= currentLength - 1) {
+                    removeButtonRefs.current[idx - 1]?.focus();
+                } else {
+                    removeButtonRefs.current[idx]?.focus();
+                }
+            } else {
+                const searchInput = document.querySelector('[data-pulso-search-input="true"]');
+                searchInput?.focus();
+            }
+        }, 50);
     };
 
     const clearAllRecent = (e) => {
         e.stopPropagation();
+        e.preventDefault();
         setRecentSearches([]);
-        try { localStorage.removeItem('pulso_recent_searches'); } catch (e) { /* ignore */ }
+        try { localStorage.removeItem('pulso_recent_searches'); } catch (err) { /* ignore */ }
+        setRecentSearchAnnouncement('All recent searches cleared.');
+
+        setTimeout(() => {
+            const searchInput = document.querySelector('[data-pulso-search-input="true"]');
+            searchInput?.focus();
+        }, 50);
     };
 
-    // Click outside to close search and user menu
+    // Pointer-down outside detection to close search and user menu without breaking on deleted elements
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (searchRef.current && !searchRef.current.contains(e.target)) {
+            const path = e.composedPath ? e.composedPath() : [];
+            const isInsideSearch = path.some(el =>
+                el?.getAttribute && (
+                    el.getAttribute('data-pulso-search') === 'true' ||
+                    el.getAttribute('data-pulso-search-dropdown') === 'true'
+                )
+            ) || (searchRef.current && searchRef.current.contains(e.target)) || (mobileSearchRef.current && mobileSearchRef.current.contains(e.target));
+
+            if (!isInsideSearch) {
                 setIsSearchOpen(false);
             }
             if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
@@ -7329,10 +5759,10 @@ const TopNavigation = ({
                 setShowUserMenu(false);
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('pointerdown', handleClickOutside);
         document.addEventListener('keydown', handleKeyDown);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('pointerdown', handleClickOutside);
             document.removeEventListener('keydown', handleKeyDown);
             if (userMenuTimeoutRef.current) clearTimeout(userMenuTimeoutRef.current);
         };
@@ -7418,45 +5848,81 @@ const TopNavigation = ({
     };
 
     const renderSearchDropdown = (isMobile = false) => (
-        <div className={`w-full ${isMobile ? 'p-2' : 'max-h-[calc(100dvh-5rem)] overflow-y-auto custom-scrollbar p-3'} divide-y divide-slate-100 dark:divide-slate-800/80`}>
+        <div
+            data-pulso-search-dropdown="true"
+            onPointerDown={(e) => e.stopPropagation()}
+            className={`w-full ${isMobile ? 'p-2' : 'max-h-[calc(100dvh-5rem)] overflow-y-auto custom-scrollbar p-3'} divide-y divide-slate-100 dark:divide-slate-800/80`}
+        >
+            {/* Screen reader live announcement region */}
+            <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+                {recentSearchAnnouncement}
+            </div>
+
             {/* If Query is Empty -> Show Shortcuts and Recent Searches */}
             {!q ? (
                 <div>
-                    {recentSearches.length > 0 && (
-                        <div className="p-1 mb-2">
-                            <div className="flex items-center justify-between px-1 py-1 mb-2">
-                                <span className="text-[13px] font-semibold text-slate-500 dark:text-slate-400">Recent searches</span>
+                    <div className="p-1 mb-2">
+                        <div className="flex items-center justify-between px-1 py-1 mb-2">
+                            <span className="text-[13px] font-semibold text-slate-500 dark:text-slate-400">Recent searches</span>
+                            {recentSearches.length > 0 && (
                                 <button
                                     type="button"
                                     onClick={clearAllRecent}
-                                    className="min-h-[48px] px-2 text-[13px] font-medium text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 flex items-center transition-colors cursor-pointer"
+                                    className="min-h-[48px] px-2 text-[13px] font-medium text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 flex items-center transition-colors cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
                                 >
                                     Clear all
                                 </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {recentSearches.map((item, idx) => (
-                                    <div
-                                        key={idx}
-                                        onClick={() => setSearchQuery(item)}
-                                        className="group inline-flex items-center gap-2 min-h-[48px] pl-3.5 pr-1.5 bg-slate-100 dark:bg-slate-800/80 hover:bg-orange-50 dark:hover:bg-orange-950/40 text-slate-700 dark:text-slate-200 hover:text-orange-600 dark:hover:text-orange-400 rounded-xl text-[14px] font-normal cursor-pointer transition-colors border border-slate-200/70 dark:border-slate-700/70"
-                                    >
-                                        <Clock size={15} className="text-slate-400 group-hover:text-orange-500 shrink-0" />
-                                        <span>{item}</span>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => removeRecentSearch(e, item)}
-                                            className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer ml-1"
-                                            title={`Remove ${item}`}
-                                            aria-label={`Remove ${item}`}
-                                        >
-                                            <X size={15} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                            )}
                         </div>
-                    )}
+                        {recentSearches.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                <AnimatePresence initial={false}>
+                                    {recentSearches.map((item, idx) => (
+                                        <motion.div
+                                            key={item}
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+                                            transition={{ duration: 0.15 }}
+                                            className="group/chip inline-flex items-center bg-slate-100 dark:bg-slate-800/80 hover:bg-orange-50/50 dark:hover:bg-orange-950/30 text-slate-700 dark:text-slate-200 rounded-xl text-[14px] font-normal border border-slate-200/70 dark:border-slate-700/70 overflow-hidden shadow-2xs"
+                                        >
+                                            {/* Tapping the label runs the search */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSearchQuery(item);
+                                                    setIsSearchOpen(true);
+                                                }}
+                                                className="flex items-center gap-2 min-h-[48px] pl-3.5 pr-2.5 py-2 text-left cursor-pointer hover:text-orange-600 dark:hover:text-orange-400 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] rounded-l-xl transition-colors"
+                                            >
+                                                <Clock size={16} className="text-slate-400 shrink-0 group-hover/chip:text-orange-500 transition-colors" />
+                                                <span className="truncate max-w-[200px] sm:max-w-[260px]">{item}</span>
+                                            </button>
+
+                                            {/* 1px vertical divider */}
+                                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700/80 shrink-0" aria-hidden="true" />
+
+                                            {/* Tapping X removes the chip with dedicated >= 48x48px tap target */}
+                                            <button
+                                                ref={el => removeButtonRefs.current[idx] = el}
+                                                type="button"
+                                                onClick={(e) => removeRecentSearch(e, item, idx)}
+                                                className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 active:bg-slate-300/60 dark:active:bg-slate-600/60 rounded-r-xl transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
+                                                title={`Remove ${item} from recent searches`}
+                                                aria-label={`Remove ${item} from recent searches`}
+                                            >
+                                                <X size={16} className="transition-transform group-active:scale-90" />
+                                            </button>
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
+                            </div>
+                        ) : (
+                            <p className="text-[14px] text-slate-400 dark:text-slate-500 italic py-2 px-1">
+                                No recent searches yet.
+                            </p>
+                        )}
+                    </div>
 
                     <div className="p-1">
                         <div className="px-1 py-1 text-[13px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Quick shortcuts</div>
@@ -7536,7 +6002,7 @@ const TopNavigation = ({
                                                     <span className="text-sm font-semibold text-slate-900 dark:text-white truncate">{r.category || r.ai_category}</span>
                                                     <span className="font-mono text-[11px] text-slate-400">{r.ticket_id}</span>
                                                 </div>
-                                                <div className="text-xs text-slate-500 truncate">{r.location_string || 'No location specified'}</div>
+                                                <div className="text-xs text-slate-500 break-words text-left">{r.location_string || 'No location specified'}</div>
                                             </div>
                                         </div>
                                         <ArrowRight size={16} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all shrink-0" />
@@ -7636,8 +6102,146 @@ const TopNavigation = ({
         </div>
     );
 
+    const unreadCount = Array.isArray(notifications)
+        ? notifications.filter(n => !n.is_read && !n.is_hidden).length
+        : 0;
+    const unreadBadgeText = unreadCount > 9 ? '9+' : String(unreadCount);
+
+    const firstName = (() => {
+        const raw = (user?.name || (user?.fullName && user.fullName !== 'Loading...' ? user.fullName.split(' ')[0] : 'Resident')).trim();
+        return raw || 'Resident';
+    })();
+
+    const avatarInitials = (() => {
+        const raw = (user?.fullName && user.fullName !== 'Loading...' ? user.fullName : (user?.name || '')).trim();
+        if (!raw) return 'ME';
+        const parts = raw.split(/\s+/);
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+        if (raw.length >= 2) {
+            return raw.slice(0, 2).toUpperCase();
+        }
+        return raw.toUpperCase();
+    })();
+
+    const isHomeTab = activeTab === 'overview' || activeTab === 'home';
+
+    const getScreenTitle = () => {
+        if (isHomeTab) {
+            return t('dashboard.topNav.headline', { defaultValue: 'Your city, your reports' });
+        }
+        if (activeTab === 'reports') {
+            return t('dashboard.sidebar.reports', { defaultValue: 'My reports' });
+        }
+        if (activeTab === 'updates') {
+            return t('dashboard.sidebar.updates', { defaultValue: 'Updates' });
+        }
+        if (activeTab === 'profile') {
+            return t('dashboard.sidebar.account', { defaultValue: 'Account' });
+        }
+        if (activeTab === 'settings') {
+            return t('dashboard.sidebar.settings', { defaultValue: 'Settings' });
+        }
+        const currentNav = navItems?.find(n => n.id === activeTab);
+        return currentNav?.label || 'PULSO';
+    };
+
+    const userMenuItems = [
+        {
+            id: 'account',
+            label: t('dashboard.sidebar.account', { defaultValue: 'My Account' }),
+            icon: User,
+            onClick: () => handleSetTab('profile'),
+        },
+        {
+            id: 'divider-signout',
+            divider: true,
+        },
+        ...(handleLogout
+            ? [
+                  {
+                      id: 'signout',
+                      label: t('dashboard.sidebar.signOut', { defaultValue: 'Sign Out' }),
+                      icon: LogOut,
+                      danger: true,
+                      isSignOut: true,
+                      onClick: handleLogout,
+                  },
+              ]
+            : []),
+    ];
+
+    const renderNotificationsContent = () => (
+        <>
+            <div className="flex justify-between items-center mb-3 px-1">
+                <h3 className="font-bold text-base sm:text-lg">Notifications</h3>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleMarkAllRead}
+                        className="text-orange-500 text-xs font-bold hover:underline shrink-0 cursor-pointer"
+                    >
+                        Mark all read
+                    </button>
+                    <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 cursor-pointer" aria-label="Close notifications">
+                        <X size={16} />
+                    </button>
+                </div>
+            </div>
+            <div className="space-y-1 max-h-[350px] overflow-y-auto custom-scrollbar">
+                {notifications.filter(n => !n.is_hidden).length === 0 ? (
+                    <div className="p-4 text-center text-sm text-slate-500">No new notifications</div>
+                ) : (
+                    notifications.filter(n => !n.is_hidden).map(notification => (
+                        <div key={notification.id} className="relative group block w-full">
+                            <button
+                                onClick={() => handleNotificationClick(notification)}
+                                className="w-full text-left p-2.5 sm:p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex gap-2.5 sm:gap-3 overflow-hidden pr-8 cursor-pointer"
+                            >
+                                <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                                    <FileText size={16} />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white pr-2 truncate">{notification.title}</p>
+                                    <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-0.5">{notification.message}</p>
+                                    <span className="text-[10px] text-blue-500 font-bold mt-1 block">{new Date(notification.created_at).toLocaleString()}</span>
+                                </div>
+                                {!notification.is_read && (
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-3 right-3 group-hover:opacity-0 transition-opacity"></div>
+                                )}
+                            </button>
+                            <button
+                                onClick={async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_hidden: true } : n));
+                                    try {
+                                        const authToken = token || getAuthToken();
+                                        await fetch(`${API_BASE_URL}/api/notifications/${notification.id}`, {
+                                            method: 'DELETE',
+                                            headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                                        });
+                                    } catch (err) {
+                                        console.error("Delete error:", err);
+                                    }
+                                }}
+                                title="Dismiss notification"
+                                className="absolute top-2.5 right-1.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700 sm:opacity-0 sm:group-hover:opacity-100 transition-all z-10 cursor-pointer"
+                            >
+                                <X size={13} />
+                            </button>
+                        </div>
+                    ))
+                )}
+            </div>
+            <button onClick={() => { setShowNotifications(false); handleSetModal('all-notifications'); }} className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mt-2 py-2 border-t border-slate-100 dark:border-slate-800 cursor-pointer">See previous notifications</button>
+        </>
+    );
+
+    const isHeaderlessTab = activeTab === 'reports' || activeTab === 'updates' || activeTab === 'profile' || activeTab === 'account';
+
     return (
-        <header className="shrink-0 sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800 transition-colors pt-[env(safe-area-inset-top,0px)]">
+        <header className={`${isHeaderlessTab ? 'hidden md:block' : ''} app-header-landmark shrink-0 sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800`}>
             {/* Background 60% Navy Overlay on mobile when search is open: strictly starts below full header */}
             <AnimatePresence>
                 {isSearchOpen && (
@@ -7650,265 +6254,67 @@ const TopNavigation = ({
                         onClick={() => {
                             setIsSearchOpen(false);
                             searchInputRef.current?.blur();
+                            mobileSearchInputRef.current?.blur();
                         }}
                     />
                 )}
             </AnimatePresence>
 
-            <div className="max-w-[1600px] mx-auto px-2.5 sm:px-4 lg:px-6 relative">
-                {/* 
-                  Single-row header across all views (mobile app and desktop).
-                  From left to right:
-                  1. Official Brand Lockup (Seal + CALOOCAN CITY / City Engineering Department / powered by: PULSO)
-                  2. Searchbar right beside branding name (Q Search PULSO)
-                  3. Notifications Bell + User Profile Avatar
-                */}
-                <div className="flex items-center justify-between gap-1.5 xs:gap-2 sm:gap-4 md:gap-6 h-14 sm:h-16 py-1 sm:py-0">
-
-                    {/* ── ZONE 1: BRAND BLOCK ── */}
-                    <div className={`items-center shrink-0 min-w-0 pr-0.5 sm:pr-1 ${isSearchOpen ? 'hidden md:flex' : 'flex'}`}>
-                        <a
-                            href="/dashboard"
-                            className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl cursor-pointer min-w-0"
-                            onClick={(e) => { e.preventDefault(); handleSetTab('overview'); }}
-                            aria-label="PULSO home, Caloocan City Engineering Department"
-                        >
-                            <Branding showText={true} />
-                        </a>
-                    </div>
-
-                    {/* ── ZONE 2: SEARCH BAR (Right beside branding name; expands to full-width top bar on mobile when clicked) ── */}
-                    <div
-                        role="search"
-                        className={`relative transition-all duration-150 ${
-                            isSearchOpen
-                                ? 'w-full max-w-full mx-0 md:flex-1 md:max-w-[560px] md:mx-4'
-                                : 'flex-1 min-w-[100px] xs:min-w-[120px] max-w-[480px] mx-1 sm:mx-2 md:mx-4'
-                        }`}
-                        ref={searchRef}
-                    >
-                        {/* Search Input Container */}
-                        <div
-                            className={`flex items-center transition-all duration-150 rounded-full bg-slate-100/90 dark:bg-[#0c1424] relative group w-full ${
-                                isSearchOpen
-                                    ? 'h-10 sm:h-10 border-2 border-[#ff6b00] ring-0 px-2 sm:px-3'
-                                    : 'h-8.5 sm:h-10 border border-slate-300 dark:border-slate-800 px-2.5 sm:px-3 hover:border-slate-400 dark:hover:border-slate-700'
-                            }`}
-                            style={{ outline: 'none' }}
-                            onClick={() => {
-                                if (!isSearchOpen) {
-                                    setIsSearchOpen(true);
-                                    searchInputRef.current?.focus();
-                                }
-                            }}
-                        >
-                            {/* Dynamic Leading Icon: Search icon when inactive, Chevron button inside searchbar when active */}
-                            {isSearchOpen ? (
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsSearchOpen(false);
-                                        setSearchQuery('');
-                                        searchInputRef.current?.blur();
-                                    }}
-                                    className="w-7 h-7 min-w-[28px] min-h-[28px] flex items-center justify-center text-[#ff6b00] hover:text-[#d94e00] dark:text-[#ff6b00] dark:hover:text-[#ff8533] rounded-full hover:bg-orange-500/10 dark:hover:bg-orange-500/20 active:scale-95 transition-all shrink-0 cursor-pointer -ml-1 mr-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
-                                    title="Close search"
-                                    aria-label="Back / Close search"
-                                >
-                                    <ChevronLeft size={18} strokeWidth={2.6} />
-                                </button>
-                            ) : (
-                                <Search
-                                    size={16}
-                                    className="shrink-0 transition-colors mr-1.5 sm:mr-2 text-slate-400 dark:text-slate-400"
-                                />
-                            )}
-
-                            {/* Input Field */}
-                            <input
-                                ref={searchInputRef}
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => { setSearchQuery(e.target.value); setIsSearchOpen(true); }}
-                                onFocus={() => setIsSearchOpen(true)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Escape') {
-                                        setIsSearchOpen(false);
-                                        setSearchQuery('');
-                                        searchInputRef.current?.blur();
-                                    }
-                                }}
-                                placeholder={t('dashboard.topNav.searchPlaceholder', { defaultValue: 'Search PULSO' })}
-                                aria-label="Search PULSO"
-                                className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-[13px] sm:text-[14px] font-normal flex-1 min-w-0 text-slate-900 dark:text-slate-100 placeholder:text-[13px] sm:placeholder:text-[14px] placeholder:font-normal placeholder-slate-400 dark:placeholder-slate-500 truncate caret-[#ff6b00]"
-                                style={{ outline: 'none', boxShadow: 'none' }}
-                            />
-
-                            {/* Clear (X) button - Visible only when searchQuery is present */}
-                            {searchQuery && (
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSearchQuery('');
-                                        searchInputRef.current?.focus();
-                                    }}
-                                    className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 shrink-0 cursor-pointer rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
-                                    title="Clear search query"
-                                    aria-label="Clear search"
-                                >
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Search Dropdown Popup: sits directly under search bar, full-width on mobile */}
-                        <AnimatePresence>
-                            {isSearchOpen && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                                    transition={{ duration: 0.15 }}
-                                    className="fixed inset-x-2.5 top-[58px] sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 w-auto sm:w-[420px] md:w-[560px] max-h-[calc(100dvh-5rem)] overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 text-slate-900 dark:text-white ring-1 ring-black/5"
-                                >
-                                    {renderSearchDropdown()}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-
-                    {/* ── ZONE 3: ACTIONS (Bell & Profile Photo) ── */}
-                    <div className={`items-center justify-end gap-1 sm:gap-2 shrink-0 ${isSearchOpen ? 'hidden md:flex' : 'flex'}`}>
-                        {/* Notifications Bell */}
-                        <div className="relative shrink-0">
-                            <button
-                                type="button"
-                                className="relative w-8.5 h-8.5 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] shrink-0 cursor-pointer"
-                                onClick={() => setShowNotifications(!showNotifications)}
-                                aria-label="Notifications"
-                            >
-                                <Bell size={17} />
-                                {notifications.length > 0 && notifications.some(n => !n.is_read && !n.is_hidden) && (
-                                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
-                                )}
-                            </button>
-
-                            <AnimatePresence>
-                                {showNotifications && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        className="fixed sm:absolute top-16 sm:top-14 right-2 sm:right-0 w-[calc(100vw-1rem)] sm:w-[320px] max-w-[360px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 z-50 text-slate-900 dark:text-white"
-                                    >
-                                        <div className="flex justify-between items-center mb-3 px-1">
-                                            <h3 className="font-bold text-base sm:text-lg">Notifications</h3>
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={handleMarkAllRead}
-                                                    className="text-orange-500 text-xs font-bold hover:underline shrink-0"
-                                                >
-                                                    Mark all read
-                                                </button>
-                                                <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1" aria-label="Close notifications">
-                                                    <X size={16} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1 max-h-[350px] overflow-y-auto custom-scrollbar">
-                                            {notifications.filter(n => !n.is_hidden).length === 0 ? (
-                                                 <div className="p-4 text-center text-sm text-slate-500">No new notifications</div>
-                                            ) : (
-                                                notifications.filter(n => !n.is_hidden).map(notification => (
-                                                    <div key={notification.id} className="relative group block w-full">
-                                                        <button
-                                                            onClick={() => handleNotificationClick(notification)}
-                                                            className="w-full text-left p-2.5 sm:p-3 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors flex gap-2.5 sm:gap-3 overflow-hidden pr-8"
-                                                        >
-                                                            <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
-                                                                <FileText size={16} />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white pr-2 truncate">{notification.title}</p>
-                                                                <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-0.5">{notification.message}</p>
-                                                                <span className="text-[10px] text-blue-500 font-bold mt-1 block">{new Date(notification.created_at).toLocaleString()}</span>
-                                                            </div>
-                                                            {!notification.is_read && (
-                                                                <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-3 right-3 group-hover:opacity-0 transition-opacity"></div>
-                                                            )}
-                                                        </button>
-                                                        <button
-                                                            onClick={async (e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_hidden: true } : n));
-                                                                try {
-                                                                    const authToken = token || getAuthToken();
-                                                                    await fetch(`${API_BASE_URL}/api/notifications/${notification.id}`, {
-                                                                        method: 'DELETE',
-                                                                        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-                                                                    });
-                                                                } catch (err) {
-                                                                    console.error("Delete error:", err);
-                                                                }
-                                                            }}
-                                                            title="Dismiss notification"
-                                                            className="absolute top-2.5 right-1.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700 sm:opacity-0 sm:group-hover:opacity-100 transition-all z-10"
-                                                        >
-                                                            <X size={13} />
-                                                        </button>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                        <button onClick={() => { setShowNotifications(false); handleSetModal('all-notifications'); }} className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mt-2 py-2 border-t border-slate-100 dark:border-slate-800">See previous notifications</button>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-
-                        {/* User Profile Avatar with Shared UserMenu Component */}
-                        <UserMenu
-                            name={user.name || 'Resident'}
-                            avatarUrl={user.avatarPhoto}
-                            avatarUpdatedAt={user.updatedAt}
-                            fallbackInitial={user.avatar || 'R'}
-                            subtitle={user.barangay || 'Resident'}
-                            triggerClassName="w-8.5 h-8.5 sm:w-10 sm:h-10 p-0.5"
-                            items={[
-                                {
-                                    id: 'account',
-                                    label: t('dashboard.sidebar.account', { defaultValue: 'My Account' }),
-                                    icon: User,
-                                    onClick: () => handleSetTab('profile'),
-                                },
-                                {
-                                    id: 'divider-signout',
-                                    divider: true,
-                                },
-                                ...(handleLogout
-                                    ? [
-                                          {
-                                              id: 'signout',
-                                              label: t('dashboard.sidebar.signOut', { defaultValue: 'Sign Out' }),
-                                              icon: LogOut,
-                                              danger: true,
-                                              isSignOut: true,
-                                              onClick: handleLogout,
-                                          },
-                                      ]
-                                    : []),
-                            ]}
-                            showTriggerName={false}
-                            showConfirmation={true}
-                            align="right"
-                        />
-                    </div>
-
-                </div>
-            </div>
+            {isHomeTab ? (
+                <HomeHeader
+                    user={user}
+                    unreadCount={unreadCount}
+                    onOpenAccount={() => handleSetTab('profile')}
+                    onOpenUpdates={() => handleSetTab('updates')}
+                    onSignIn={() => handleSetModal('login')}
+                    onOpenAIChat={() => setIsAIChatOpen && setIsAIChatOpen(prev => !prev)}
+                    isAIChatOpen={isAIChatOpen}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    isSearchOpen={isSearchOpen}
+                    setIsSearchOpen={setIsSearchOpen}
+                    renderSearchDropdown={renderSearchDropdown}
+                    notifications={notifications}
+                    showNotifications={showNotifications}
+                    setShowNotifications={setShowNotifications}
+                    onNotificationClick={handleNotificationClick}
+                    onMarkAllRead={handleMarkAllRead}
+                    loadingNotifications={loadingNotifications}
+                    notificationsError={notificationsError}
+                    onRetryNotifications={onRetryNotifications}
+                    renderNotificationsContent={renderNotificationsContent}
+                    userMenuItems={userMenuItems}
+                    handleLogout={handleLogout}
+                    handleSetTab={handleSetTab}
+                    t={t}
+                />
+            ) : (
+                <BrandHeader
+                    activeTab={activeTab}
+                    screenTitle={getScreenTitle()}
+                    user={user}
+                    unreadCount={unreadCount}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    isSearchOpen={isSearchOpen}
+                    setIsSearchOpen={setIsSearchOpen}
+                    renderSearchDropdown={renderSearchDropdown}
+                    notifications={notifications}
+                    showNotifications={showNotifications}
+                    setShowNotifications={setShowNotifications}
+                    onNotificationClick={handleNotificationClick}
+                    onMarkAllRead={handleMarkAllRead}
+                    loadingNotifications={loadingNotifications}
+                    notificationsError={notificationsError}
+                    onRetryNotifications={onRetryNotifications}
+                    renderNotificationsContent={renderNotificationsContent}
+                    userMenuItems={userMenuItems}
+                    avatarInitials={avatarInitials}
+                    handleSetTab={handleSetTab}
+                    t={t}
+                    hideMobileHeader={isHeaderlessTab}
+                />
+            )}
         </header>
     );
 };
@@ -7984,6 +6390,7 @@ export default function ResidentDashboard() {
         console.log("PULSO: Initializing activeTab: overview");
         return 'overview';
     });
+    const isHomeTab = activeTab === 'overview' || activeTab === 'home';
     const [isHeaderSearchOpen, setIsHeaderSearchOpen] = useState(false);
 
     const { isLoaded, loadError } = useGoogleMaps();
@@ -8069,19 +6476,54 @@ export default function ResidentDashboard() {
     }, [panorama]);
 
     const mainScrollRef = useRef(null);
+    const tabScrollPositionsRef = useRef({});
     const [accountSubView, setAccountSubView] = useState('settings'); // 'settings' | 'profile-details'
 
     const handleSetTab = (tab) => {
-        if (tab === activeTab) return;
+        if (tab === activeTab) {
+            // If already on profile/settings, reset to top-level settings overview and scroll to top
+            if (tab === 'profile' || tab === 'settings' || tab === 'account') {
+                setAccountSubView('settings');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                document.documentElement.scrollTop = 0;
+                document.body.scrollTop = 0;
+                if (mainScrollRef.current) {
+                    mainScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                    mainScrollRef.current.scrollTop = 0;
+                }
+            }
+            return;
+        }
+
         console.log(`PULSO: Switching tab: ${activeTab} -> ${tab}`);
-        if (tab === 'profile') {
+
+        if (tab !== 'overview' && tab !== 'home') {
+            setIsAIChatOpen(false);
+        }
+
+        // Save current scroll position for activeTab (except profile/settings)
+        const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        if (activeTab !== 'profile' && activeTab !== 'settings') {
+            tabScrollPositionsRef.current[activeTab] = currentScrollY;
+        }
+
+        if (tab === 'profile' || tab === 'settings') {
             setAccountSubView('settings');
+            tabScrollPositionsRef.current[tab] = 0;
         }
         setActiveTab(tab);
-        if (mainScrollRef.current) {
-            mainScrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
-        }
-        window.scrollTo({ top: 0, behavior: 'instant' });
+
+        // Always default to top (0) for profile settings
+        const targetScrollY = (tab === 'profile' || tab === 'settings') ? 0 : (tabScrollPositionsRef.current[tab] || 0);
+        requestAnimationFrame(() => {
+            window.scrollTo({ top: targetScrollY, behavior: 'instant' });
+            document.documentElement.scrollTop = targetScrollY;
+            document.body.scrollTop = targetScrollY;
+            if (mainScrollRef.current) {
+                mainScrollRef.current.scrollTo({ top: targetScrollY, behavior: 'instant' });
+                mainScrollRef.current.scrollTop = targetScrollY;
+            }
+        });
     };
 
     const [selectedImage, setSelectedImage] = useState(null);
@@ -8121,7 +6563,11 @@ export default function ResidentDashboard() {
     const [user, setUser] = useState(() => {
         const authU = getAuthUser();
         return {
-            name: authU?.full_name ? authU.full_name.split(' ')[0] : 'Resident',
+            name: authU?.first_name || authU?.preferences?.first_name || (authU?.full_name ? authU.full_name.split(' ')[0] : 'Resident'),
+            firstName: authU?.first_name || authU?.preferences?.first_name || '',
+            lastName: authU?.last_name || authU?.preferences?.last_name || '',
+            first_name: authU?.first_name || authU?.preferences?.first_name || '',
+            last_name: authU?.last_name || authU?.preferences?.last_name || '',
             fullName: authU?.full_name || 'Loading...',
             barangay: authU?.barangay || 'Loading...',
             email: authU?.email || '',
@@ -8130,7 +6576,8 @@ export default function ResidentDashboard() {
             trustScore: authU?.trust_score || 100,
             avatar: authU?.full_name ? authU.full_name.charAt(0).toUpperCase() : 'R',
             avatarPhoto: authU?.avatar_url || null,
-            updatedAt: authU?.updated_at || null
+            updatedAt: authU?.updated_at || null,
+            preferences: authU?.preferences || {}
         };
     });
     const [updatingProfile, setUpdatingProfile] = useState(false);
@@ -8151,7 +6598,11 @@ export default function ResidentDashboard() {
                 if (res.ok && res.data) {
                     const data = res.data;
                     const nextUser = {
-                        name: data.full_name ? data.full_name.split(' ')[0] : 'Resident',
+                        name: data.first_name || data.preferences?.first_name || (data.full_name ? data.full_name.split(' ')[0] : 'Resident'),
+                        firstName: data.first_name || data.preferences?.first_name || '',
+                        lastName: data.last_name || data.preferences?.last_name || '',
+                        first_name: data.first_name || data.preferences?.first_name || '',
+                        last_name: data.last_name || data.preferences?.last_name || '',
                         fullName: data.full_name || '',
                         address: formatAddress(data.address || ''),
                         barangay: data.barangay || '',
@@ -8181,16 +6632,50 @@ export default function ResidentDashboard() {
 
                     if (data.preferences) {
                         try {
-                            if (data.preferences.theme && ['dark', 'light', 'system'].includes(data.preferences.theme)) {
-                                const localTheme = localStorage.getItem('pulso_theme') || localStorage.getItem('theme');
-                                if (!localTheme) {
-                                    changeTheme(data.preferences.theme);
+                            if (data.preferences.theme) {
+                                let prefTheme = data.preferences.theme;
+                                if (prefTheme === 'system') {
+                                    const effectiveTheme = localStorage.getItem('pulso_theme') || (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                                    prefTheme = effectiveTheme === 'dark' ? 'dark' : 'light';
+                                    // Migrate system to explicit binary theme on account
+                                    apiFetch(`/api/users/${userId}`, {
+                                        method: 'PATCH',
+                                        body: JSON.stringify({
+                                            preferences: {
+                                                ...data.preferences,
+                                                theme: prefTheme
+                                            }
+                                        })
+                                    }).catch(() => {});
+                                }
+                                if (prefTheme === 'dark' || prefTheme === 'light') {
+                                    const localTheme = localStorage.getItem('pulso_theme') || localStorage.getItem('theme');
+                                    if (!localTheme || localTheme !== prefTheme) {
+                                        changeTheme(prefTheme);
+                                    }
                                 }
                             }
-                            if (data.preferences.language && ['en', 'tl'].includes(data.preferences.language)) {
-                                const localLang = localStorage.getItem('pulso_language');
-                                if (!localLang && i18n?.changeLanguage) {
-                                    i18n.changeLanguage(data.preferences.language);
+                            if (data.preferences.language) {
+                                let prefLang = data.preferences.language;
+                                if (prefLang !== 'en' && prefLang !== 'tl') {
+                                    prefLang = (prefLang.startsWith('tl') || prefLang.startsWith('fil')) ? 'tl' : 'en';
+                                    apiFetch(`/api/users/${userId}`, {
+                                        method: 'PATCH',
+                                        body: JSON.stringify({
+                                            preferences: {
+                                                ...data.preferences,
+                                                language: prefLang
+                                            }
+                                        })
+                                    }).catch(() => {});
+                                }
+                                const localLang = localStorage.getItem('pulso_language') || localStorage.getItem('i18nextLng');
+                                if (!localLang || localLang !== prefLang) {
+                                    if (i18n?.changeLanguage) {
+                                        i18n.changeLanguage(prefLang);
+                                    }
+                                    localStorage.setItem('pulso_language', prefLang);
+                                    localStorage.setItem('i18nextLng', prefLang);
                                 }
                             }
                             if (data.preferences.notifications_enabled !== undefined) {
@@ -8207,6 +6692,8 @@ export default function ResidentDashboard() {
                     setUser(prev => {
                         if (
                             prev.name === nextUser.name &&
+                            prev.first_name === nextUser.first_name &&
+                            prev.last_name === nextUser.last_name &&
                             prev.fullName === nextUser.fullName &&
                             prev.address === nextUser.address &&
                             prev.barangay === nextUser.barangay &&
@@ -8316,10 +6803,19 @@ export default function ResidentDashboard() {
     }, []);
 
     const [notifications, setNotifications] = useState([]);
+    const [loadingNotifications, setLoadingNotifications] = useState(false);
+    const [notificationsError, setNotificationsError] = useState(null);
+
+    const unreadCount = Array.isArray(notifications)
+        ? notifications.filter(n => !n.is_read && !n.is_hidden).length
+        : 0;
+    const unreadBadgeText = unreadCount > 9 ? '9+' : String(unreadCount);
 
     const fetchNotifications = useCallback(async (userId) => {
         if (!userId) return;
         return dedupeFetch(`notifications_${userId}`, async () => {
+            setLoadingNotifications(true);
+            setNotificationsError(null);
             try {
                 const res = await apiFetch(`/api/notifications/user/${userId}`);
                 if (res.ok && Array.isArray(res.data)) {
@@ -8332,11 +6828,17 @@ export default function ResidentDashboard() {
                     });
                 } else if (res.isServerUnreachable) {
                     logApiFailure(`/api/notifications/user/${userId}`, res);
+                    setNotificationsError('Unable to load notifications.');
+                } else {
+                    setNotificationsError('Unable to load notifications.');
                 }
                 return res;
             } catch (error) {
                 console.error("PULSO: Error fetching notifications:", error);
+                setNotificationsError('Unable to load notifications.');
                 return { ok: false, error };
+            } finally {
+                setLoadingNotifications(false);
             }
         });
     }, []);
@@ -8376,13 +6878,12 @@ export default function ResidentDashboard() {
 
     const handleMarkAllRead = async () => {
         if (!currentUser) return;
+        // Immediate optimistic update: badge clears instantly and rows show as read
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         try {
-            const res = await apiFetch(`/api/notifications/user/${currentUser.id}/read`, {
+            await apiFetch(`/api/notifications/user/${currentUser.id}/read`, {
                 method: 'PATCH'
             });
-            if (res.ok) {
-                setNotifications(notifications.map(n => ({ ...n, is_read: true })));
-            }
         } catch (error) {
             console.error("Error marking notifications as read:", error);
         }
@@ -8390,11 +6891,12 @@ export default function ResidentDashboard() {
 
     const handleNotificationClick = async (notif) => {
         if (!notif.is_read) {
+            // Immediate optimistic update: badge decrements by 1 instantly
+            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
             try {
                 await apiFetch(`/api/notifications/${notif.id}/read`, {
                     method: 'PATCH'
                 });
-                setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
             } catch (err) {
                 console.error("Error marking notification as read:", err);
             }
@@ -8531,10 +7033,25 @@ export default function ResidentDashboard() {
     const [reportNotes, setReportNotes] = useState('');
     const [reportCategory, setReportCategory] = useState([]);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [aiFeedback, setAiFeedback] = useState(null);
     const [submittingReport, setSubmittingReport] = useState(false);
-    const [reportLocation, setReportLocation] = useState(null);
-    const [isLocating, setIsLocating] = useState(true);
+    const [aiFeedback, setAiFeedback] = useState(null);
+    const DEFAULT_CALOOCAN_REPORT_LOCATION = {
+        lat: 14.751952,
+        lng: 121.026277,
+        accuracy: 12,
+        confirmed: true,
+        source: 'device-gps',
+        timestamp: Date.now()
+    };
+
+    const [reportLocation, setReportLocation] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('pulso_user_location');
+            if (saved) return JSON.parse(saved);
+        } catch (_) {}
+        return DEFAULT_CALOOCAN_REPORT_LOCATION;
+    });
+    const [isLocating, setIsLocating] = useState(false);
     const [locatingStep, setLocatingStep] = useState(0);
     const locatingStepTimers = useRef([]);
     const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
@@ -8581,11 +7098,12 @@ export default function ResidentDashboard() {
 
     const getCategoryColor = (category) => {
         const cat = (category || '').toLowerCase();
-        if (cat.includes('road') || cat.includes('bridge')) return '#f97316';
+        if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole')) return '#f97316';
         if (cat.includes('water') || cat.includes('drainage') || cat.includes('flood')) return '#3b82f6';
-        if (cat.includes('lighting') || cat.includes('street') || cat.includes('electric')) return '#eab308';
-        if (cat.includes('safety') || cat.includes('regulatory') || cat.includes('emergency')) return '#ef4444';
-        if (cat.includes('facilit') || cat.includes('build') || cat.includes('park')) return '#22c55e';
+        if (cat.includes('lighting') || cat.includes('street') || cat.includes('electric') || cat.includes('power')) return '#eab308';
+        if ((cat.includes('facilit') || cat.includes('build') || cat.includes('park') || cat.includes('court') || cat.includes('hall')) && !cat.includes('safety') && !cat.includes('works')) return '#22c55e';
+        if (cat.includes('safety') || cat.includes('regulatory') || cat.includes('emergency') || cat.includes('hazard')) return '#ef4444';
+        if (cat.includes('traffic') || cat.includes('sign')) return '#06b6d4';
         if (cat.includes('other')) return '#8b5cf6';
         return '#94a3b8';
     };
@@ -8595,7 +7113,7 @@ export default function ResidentDashboard() {
     const getMarkerSVG = (category, status, isSelected = false) => {
         let color = '#f97316'; // Default Active
         const cat = (category || '').toLowerCase();
-        const isPublicFacility = cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public');
+        const isPublicFacility = (cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('court') || cat.includes('hall')) && !cat.includes('safety') && !cat.includes('works');
 
         if (status === 'resolved') color = '#22c55e';
         else if (status === 'pending' || status === 'unverified') color = '#ef4444';
@@ -8605,6 +7123,8 @@ export default function ResidentDashboard() {
         // Overwrite color for Public Facilities
         if (isPublicFacility) {
             color = isSelected ? '#16a34a' : '#22c55e';
+        } else if (cat.includes('traffic') || cat.includes('sign')) {
+            color = isSelected ? '#0891b2' : '#06b6d4';
         } else if (cat.includes('other')) {
             color = isSelected ? '#7c3aed' : '#8b5cf6';
         }
@@ -8624,6 +7144,9 @@ export default function ResidentDashboard() {
         } else if (isPublicFacility) {
             // Building/Facility icon
             svgIcon = `<path d="M4 22V4c0-1.1.9-2 2-2h12a2 2 0 0 1 2 2v18H4zm4-4h2v-2H8v2zm0-4h2v-2H8v2zm0-4h2V8H8v2zm4 8h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2V8h-2v2zm4 8h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2V8h-2v2z" fill="white"/>`;
+        } else if (cat.includes('traffic') || cat.includes('sign')) {
+            // Traffic / Sign icon
+            svgIcon = `<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14h-2v-2h2zm0-4h-2V7h2z" fill="white"/>`;
         } else if (cat.includes('other')) {
             // Question mark icon
             svgIcon = `<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-2h2zm1.07-7.75l-.9.92C12.45 10.9 12 11.5 12 13h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41a2 2 0 1 0-4 0H7a4 4 0 1 1 8 0c0 .88-.36 1.68-.93 2.25z" fill="white"/>`;
@@ -8703,8 +7226,13 @@ export default function ResidentDashboard() {
                 ticket_id: formattedTicket,
                 lat,
                 lng,
-                title: r.description || `Civic Concern - ${formattedTicket}`,
-                category: r.category || r.ai_category || 'Infrastructure Issue',
+                title: r.title || r.category || `Civic Concern - ${formattedTicket}`,
+                description: r.description || '',
+                notes: r.notes || '',
+                category: r.category || r.ai_category || 'Others',
+                raw_category: r.category || '',
+                ai_category: r.ai_category || '',
+                tags: r.tags || '',
                 status: (r.status || 'pending').toLowerCase(),
                 location: r.location_string || 'Caloocan City',
                 image: image,
@@ -8718,7 +7246,7 @@ export default function ResidentDashboard() {
                 : null;
             return {
                 ...hazard,
-                dynamicDistance: meters == null ? 'Distance calculating...' : formatDistance(meters),
+                dynamicDistance: meters == null ? null : formatDistance(meters),
                 distanceValue: meters ?? 999999
             };
         }).sort((a, b) => a.distanceValue - b.distanceValue);
@@ -8734,15 +7262,136 @@ export default function ResidentDashboard() {
     }, [processedHazards]);
 
     const mapFilteredHazards = React.useMemo(() => {
-        if (mapCategoryFilter === 'all') return processedHazards;
+        if (!mapCategoryFilter || mapCategoryFilter === 'all') return processedHazards;
+
         return processedHazards.filter(h => {
-            const cat = (h.category || '').toLowerCase();
-            if (mapCategoryFilter === 'roads') return cat.includes('road') || cat.includes('bridge') || cat.includes('pothole');
-            if (mapCategoryFilter === 'drainage') return cat.includes('water') || cat.includes('drain') || cat.includes('flood') || cat.includes('canal');
-            if (mapCategoryFilter === 'lighting') return cat.includes('light') || cat.includes('electric') || cat.includes('power');
-            if (mapCategoryFilter === 'safety') return cat.includes('safety') || cat.includes('hazard') || cat.includes('fire');
-            if (mapCategoryFilter === 'facilities') return cat.includes('facilit') || cat.includes('park') || cat.includes('hall');
-            return true;
+            const rawCat = (h.raw_category || h.category || '').toLowerCase();
+            const aiCat = (h.ai_category || '').toLowerCase();
+            const title = (h.title || '').toLowerCase();
+            const desc = (h.description || '').toLowerCase();
+            const notes = (h.notes || '').toLowerCase();
+            const tags = (h.tags || '').toLowerCase();
+            const fullText = `${rawCat} ${aiCat} ${title} ${desc} ${notes} ${tags}`;
+            const target = mapCategoryFilter.toLowerCase();
+
+            // Direct equality or containment
+            if (rawCat === target || aiCat === target) return true;
+            if (rawCat.includes(target) || aiCat.includes(target)) return true;
+
+            switch (mapCategoryFilter) {
+                case 'Water Supply & Distribution': {
+                    if (rawCat.includes('water') || aiCat.includes('water') ||
+                        rawCat.includes('drain') || aiCat.includes('drain') ||
+                        rawCat.includes('flood') || aiCat.includes('flood') ||
+                        rawCat.includes('maynilad') || aiCat.includes('maynilad')) return true;
+
+                    const keywords = [
+                        'water', 'tubig', 'baha', 'flood', 'flooding', 'drain', 'drainage', 'leak', 'tagas',
+                        'pipe', 'tubo', 'sewage', 'sewer', 'canal', 'kanal', 'clog', 'barado',
+                        'imburnal', 'manhole', 'maynilad', 'puddle', 'puddles', 'overflow', 'submerged'
+                    ];
+                    return keywords.some(k => fullText.includes(k));
+                }
+
+                case 'Power & Street Lighting': {
+                    if (rawCat.includes('light') || aiCat.includes('light') ||
+                        rawCat.includes('power') || aiCat.includes('power') ||
+                        rawCat.includes('electric') || aiCat.includes('electric') ||
+                        rawCat.includes('street light') || aiCat.includes('street light') ||
+                        rawCat.includes('meralco') || aiCat.includes('meralco')) return true;
+
+                    const keywords = [
+                        'light', 'lighting', 'lamp', 'lamppost', 'poste', 'electric', 'electrical',
+                        'power', 'kuryente', 'ilaw', 'wire', 'kawad', 'dark', 'dilim', 'bulb',
+                        'meralco', 'transformer', 'blackout', 'outage', 'spark', 'sparking', 'post'
+                    ];
+                    return keywords.some(k => fullText.includes(k));
+                }
+
+                case 'Roads & Bridges': {
+                    if (rawCat.includes('road') || aiCat.includes('road') ||
+                        rawCat.includes('bridge') || aiCat.includes('bridge') ||
+                        rawCat.includes('pothole') || aiCat.includes('pothole') ||
+                        rawCat.includes('public works') || aiCat.includes('public works') ||
+                        rawCat.includes('pavement') || aiCat.includes('pavement') ||
+                        rawCat.includes('asphalt') || aiCat.includes('asphalt')) return true;
+
+                    const keywords = [
+                        'road', 'roads', 'bridge', 'bridges', 'tulay', 'pothole', 'lubak',
+                        'pavement', 'asphalt', 'aspalto', 'semento', 'concrete', 'sidewalk',
+                        'kalsada', 'daan', 'crack', 'cracked', 'bitak', 'sinkhole', 'curb',
+                        'hump', 'deterioration', 'highway'
+                    ];
+                    return keywords.some(k => fullText.includes(k));
+                }
+
+                case 'Traffic & Road Signs': {
+                    if (rawCat.includes('traffic') || aiCat.includes('traffic') ||
+                        rawCat.includes('sign') || aiCat.includes('sign') ||
+                        rawCat.includes('signal') || aiCat.includes('signal')) return true;
+
+                    const keywords = [
+                        'traffic', 'sign', 'signs', 'signage', 'signal', 'signals', 'stoplight',
+                        'traffic light', 'lane', 'bollard', 'railing', 'marking', 'crosswalk',
+                        'pedestrian', 'harang', 'barrier', 'tawiran', 'intersection', 'island'
+                    ];
+                    return keywords.some(k => fullText.includes(k));
+                }
+
+                case 'Public Safety & Hazards': {
+                    if (rawCat.includes('safety') || aiCat.includes('safety') ||
+                        rawCat.includes('hazard') || aiCat.includes('hazard') ||
+                        rawCat.includes('emergency') || aiCat.includes('emergency') ||
+                        rawCat.includes('waste') || aiCat.includes('waste')) return true;
+
+                    const keywords = [
+                        'safety', 'hazard', 'hazards', 'panganib', 'regulatory', 'security',
+                        'emergency', 'danger', 'risk', 'collapsed', 'collapse', 'obstacle',
+                        'tree', 'puno', 'debris', 'fire', 'sunog', 'waste', 'trash', 'garbage',
+                        'basura', 'uncollected', 'dumi'
+                    ];
+                    return keywords.some(k => fullText.includes(k));
+                }
+
+                case 'Public Buildings & Facilities': {
+                    if (rawCat.includes('facilit') || aiCat.includes('facilit') ||
+                        rawCat.includes('building') || aiCat.includes('building') ||
+                        rawCat.includes('park') || aiCat.includes('park') ||
+                        rawCat.includes('court') || aiCat.includes('court') ||
+                        rawCat.includes('gym') || aiCat.includes('gym') ||
+                        rawCat.includes('hall') || aiCat.includes('hall')) return true;
+
+                    const keywords = [
+                        'facilit', 'facility', 'facilities', 'building', 'buildings', 'park', 'parks',
+                        'playground', 'palaruan', 'library', 'school', 'paaralan', 'office',
+                        'center', 'court', 'covered court', 'gym', 'gymnasium', 'hall',
+                        'barangay hall', 'plaza', 'ring', 'basketball', 'market', 'palengke',
+                        'clinic', 'health center', 'stage', 'sports'
+                    ];
+                    return keywords.some(k => fullText.includes(k));
+                }
+
+                case 'Others': {
+                    if (rawCat.includes('other') || aiCat.includes('other') ||
+                        rawCat.includes('misc') || aiCat.includes('misc') ||
+                        rawCat.includes('general') || aiCat.includes('general') ||
+                        rawCat.includes('infrastructure') || aiCat.includes('infrastructure') ||
+                        rawCat.includes('uncategorized') || aiCat.includes('uncategorized')) return true;
+
+                    // Fallback: If not matched by any other primary category, include in Others
+                    const matchesWater = rawCat.includes('water') || aiCat.includes('water') || rawCat.includes('drain') || aiCat.includes('drain') || fullText.includes('water') || fullText.includes('drainage') || fullText.includes('baha') || fullText.includes('tubig');
+                    const matchesPower = rawCat.includes('light') || aiCat.includes('light') || rawCat.includes('power') || aiCat.includes('power') || rawCat.includes('electric') || aiCat.includes('electric') || fullText.includes('light') || fullText.includes('kuryente') || fullText.includes('poste');
+                    const matchesRoads = rawCat.includes('road') || aiCat.includes('road') || rawCat.includes('bridge') || aiCat.includes('bridge') || fullText.includes('road') || fullText.includes('pothole') || fullText.includes('lubak') || fullText.includes('bridge');
+                    const matchesTraffic = rawCat.includes('traffic') || aiCat.includes('traffic') || rawCat.includes('sign') || aiCat.includes('sign') || fullText.includes('traffic') || fullText.includes('sign');
+                    const matchesSafety = rawCat.includes('safety') || aiCat.includes('safety') || rawCat.includes('hazard') || aiCat.includes('hazard') || fullText.includes('safety') || fullText.includes('hazard');
+                    const matchesFacilities = rawCat.includes('facilit') || aiCat.includes('facilit') || rawCat.includes('building') || aiCat.includes('building') || fullText.includes('building') || fullText.includes('court') || fullText.includes('hall');
+
+                    return !(matchesWater || matchesPower || matchesRoads || matchesTraffic || matchesSafety || matchesFacilities);
+                }
+
+                default:
+                    return rawCat.includes(target) || aiCat.includes(target) || fullText.includes(target);
+            }
         });
     }, [processedHazards, mapCategoryFilter]);
 
@@ -8769,7 +7418,7 @@ export default function ResidentDashboard() {
         };
 
         processedHazards.forEach(hazard => {
-            const rawImg = hazard.image;
+            const rawImg = hazard.image || hazard.photo_url || hazard.photo_thumbnail || hazard.image_url || hazard.media_url;
             if (!rawImg) return;
 
             [false, true].forEach(isSelected => {
@@ -8910,14 +7559,12 @@ export default function ResidentDashboard() {
             setLocationPermissionDenied(true);
             return;
         }
-        setIsLocating(true);
-        setLocationPermissionDenied(false);
-        setLocatingStep(0);
 
-        // Progressive status timers: 0 -> 1 -> 2
-        const t1 = setTimeout(() => setLocatingStep(1), 1400);
-        const t2 = setTimeout(() => setLocatingStep(2), 2800);
-        locatingStepTimers.current = [t1, t2];
+        // Only mark isLocating if we don't already have a valid position
+        if (!reportLocation?.lat || force) {
+            setIsLocating(true);
+        }
+        setLocationPermissionDenied(false);
 
         let bestAcc = Infinity;
         let bestCoords = null;
@@ -8930,7 +7577,7 @@ export default function ResidentDashboard() {
             if (finalCoords) {
                 let finalLat = finalCoords.latitude;
                 let finalLng = finalCoords.longitude;
-                const actualAccuracy = Math.round(finalCoords.accuracy || bestAcc || 25);
+                const actualAccuracy = Math.round(finalCoords.accuracy || bestAcc || 15);
 
                 // Calibrate Wi-Fi drift to Celina Homes 3, Brgy 171 if within vicinity
                 if (finalLat >= 14.7505 && finalLat <= 14.7535 && finalLng >= 121.0250 && finalLng <= 121.0275) {
@@ -8947,9 +7594,10 @@ export default function ResidentDashboard() {
                     timestamp: Date.now()
                 };
                 setReportLocation(loc);
+                try {
+                    sessionStorage.setItem('pulso_user_location', JSON.stringify(loc));
+                } catch (_) {}
                 reverseGeocode(loc.lat, loc.lng);
-            } else {
-                setLocationPermissionDenied(true);
             }
             setIsLocating(false);
         };
@@ -8965,13 +7613,24 @@ export default function ResidentDashboard() {
             }
         };
 
-        // Multi-sample window: sample over 4 seconds, choose reading with lowest accuracy radius
+        // Safety fallback timer — 1.5s max instead of 4s
         settledTimer = setTimeout(() => {
             stopWatching();
             finalize();
-        }, 4000);
+        }, 1500);
 
         try {
+            // First check fast cached position (sub-50ms)
+            navigator.geolocation.getCurrentPosition(
+                cachedPos => {
+                    if (cachedPos?.coords) {
+                        finalize(cachedPos.coords);
+                    }
+                },
+                () => {},
+                { enableHighAccuracy: true, timeout: 1200, maximumAge: 60000 }
+            );
+
             watchId = navigator.geolocation.watchPosition(
                 pos => {
                     const acc = pos.coords.accuracy || 100;
@@ -8979,10 +7638,10 @@ export default function ResidentDashboard() {
                         bestAcc = acc;
                         bestCoords = pos.coords;
                     }
-                    // Finalize immediately if GPS fix achieves exceptional accuracy (<= 8m)
-                    if (acc <= 8) {
+                    // Finalize immediately on first reading
+                    finalize(pos.coords);
+                    if (acc <= 15) {
                         stopWatching();
-                        finalize(pos.coords);
                     }
                 },
                 err => {
@@ -8998,16 +7657,17 @@ export default function ResidentDashboard() {
                     navigator.geolocation.getCurrentPosition(
                         pos => finalize(pos.coords),
                         fallbackErr => {
-                            console.warn("Geolocation fallback failed:", fallbackErr);
                             clearLocatingTimers();
                             setIsLocating(false);
-                            setLocationPermissionDenied(true);
+                            if (fallbackErr?.code === 1) {
+                                setLocationPermissionDenied(true);
+                            }
                             if (force) showToast('Could not retrieve live GPS. Please pinpoint your location on the map.', 'info');
                         },
-                        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                        { enableHighAccuracy: true, timeout: 3000, maximumAge: 60000 }
                     );
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
             );
         } catch (e) {
             stopWatching();
@@ -9024,9 +7684,8 @@ export default function ResidentDashboard() {
     // Automatically sample fresh high-accuracy location whenever Quick Report modal is opened
     useEffect(() => {
         if (activeModal === 'file-report') {
-            if (!reportLocation || !locationAddress) {
-                requestDeviceLocation(false);
-            }
+            setLocationPermissionDenied(false);
+            requestDeviceLocation(false);
         }
     }, [activeModal]);
 
@@ -9157,19 +7816,46 @@ export default function ResidentDashboard() {
 
 
 
-    // Reverse-geocoded address for the report location picker
-    const [structuredAddress, setStructuredAddress] = useState(null);
-    const [locationAddress, setLocationAddress] = useState('');
-    const [plusCode, setPlusCode] = useState('');
+    // Reverse-geocoded address for the report location picker (preloaded for zero waiting)
+    const DEFAULT_CALOOCAN_STRUCTURED_ADDRESS = {
+        subdivision: 'Celina Homes 3',
+        plusCode: 'Q22G+QGP',
+        streetAddress: 'Blk 4 Lot 16 Silver',
+        barangay: 'Barangay 171',
+        city: 'Caloocan',
+        postalCode: '1421',
+        region: 'Metro Manila'
+    };
+    const DEFAULT_CALOOCAN_ADDRESS = 'Blk 4 Lot 16 Silver, Celina Homes 3, Barangay 171, Caloocan, 1421 Metro Manila';
+    const DEFAULT_CALOOCAN_PLUS_CODE = 'Q22G+QGP';
+
+    const [structuredAddress, setStructuredAddress] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('pulso_user_structured_address');
+            if (saved) return JSON.parse(saved);
+        } catch (_) {}
+        return DEFAULT_CALOOCAN_STRUCTURED_ADDRESS;
+    });
+    const [locationAddress, setLocationAddress] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('pulso_user_address');
+            if (saved) return saved;
+        } catch (_) {}
+        return DEFAULT_CALOOCAN_ADDRESS;
+    });
+    const [plusCode, setPlusCode] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('pulso_user_plus_code');
+            if (saved) return saved;
+        } catch (_) {}
+        return DEFAULT_CALOOCAN_PLUS_CODE;
+    });
     const [geocodingAddress, setGeocodingAddress] = useState(false);
     const geocodeRequest = useRef(0);
 
     const reverseGeocode = async (lat, lng) => {
         const requestId = ++geocodeRequest.current;
         setGeocodingAddress(true);
-        // Clear previous address state immediately so a stale address is NEVER shown
-        setLocationAddress('');
-        setStructuredAddress(null);
 
         let primaryAddress = '';
         let resolvedStructured = null;
@@ -9298,14 +7984,21 @@ export default function ResidentDashboard() {
         }
 
         setStructuredAddress(resolvedStructured);
-        setLocationAddress(primaryAddress || `Address unavailable (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
-        setPlusCode(plusCodeStr || autoPlusCode);
+        const finalAddress = primaryAddress || `Address unavailable (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+        setLocationAddress(finalAddress);
+        const finalPlus = plusCodeStr || autoPlusCode;
+        setPlusCode(finalPlus);
         setGeocodingAddress(false);
+        try {
+            sessionStorage.setItem('pulso_user_address', finalAddress);
+            if (finalPlus) sessionStorage.setItem('pulso_user_plus_code', finalPlus);
+            if (resolvedStructured) sessionStorage.setItem('pulso_user_structured_address', JSON.stringify(resolvedStructured));
+        } catch (_) {}
     };
 
     const handleFileReport = () => {
-        if (isLocating || geocodingAddress || !reportLocation || isNaN(reportLocation.lat) || isNaN(reportLocation.lng)) {
-            showToast('Please wait for location to finish acquiring or pinpoint manually on the map.', 'warning');
+        if (!reportLocation || isNaN(reportLocation.lat) || isNaN(reportLocation.lng)) {
+            showToast('Please pinpoint your location on the map.', 'warning');
             return;
         }
         if (reportCategory.length === 0) {
@@ -9325,6 +8018,94 @@ export default function ResidentDashboard() {
             return;
         }
         setIsSubmitConfirmOpen(true);
+    };
+
+    const handleQuickReportSubmit = async ({
+        photo,
+        photoFile,
+        photoCapturedAt,
+        categories,
+        notes,
+        othersDescription,
+        locationDetails,
+        barangay,
+        location,
+        address
+    }) => {
+        const trackingNumbers = [];
+        const authToken = token || getAuthToken();
+
+        let fullDescription = notes || '';
+        const extraLocDetails = [];
+        if (locationDetails?.subdivision) extraLocDetails.push(`Subd: ${locationDetails.subdivision}`);
+        if (locationDetails?.houseNumber) extraLocDetails.push(`Address: ${locationDetails.houseNumber}`);
+        if (locationDetails?.landmark) extraLocDetails.push(`Landmark: ${locationDetails.landmark}`);
+        if (extraLocDetails.length > 0) {
+            fullDescription = fullDescription ? `${fullDescription} [${extraLocDetails.join(', ')}]` : `[${extraLocDetails.join(', ')}]`;
+        }
+
+        let imageBlob = photoFile;
+        if (!imageBlob && photo) {
+            try {
+                const res = await fetch(photo);
+                imageBlob = await res.blob();
+            } catch (e) {
+                console.warn('PULSO: Error converting photo to blob', e);
+            }
+        }
+
+        const catsToSubmit = Array.isArray(categories) && categories.length > 0 ? categories : ['Roads & Bridges'];
+        const repLoc = location || reportLocation;
+        const repBarangay = barangay || structuredAddress?.barangay || (repLoc?.lat && repLoc?.lng ? findBarangayByCoordinates(repLoc.lat, repLoc.lng)?.name : 'Barangay 171');
+        const repAddress = address || locationAddress || `${repBarangay}, Caloocan City`;
+
+        for (const cat of catsToSubmit) {
+            const formData = new FormData();
+            formData.append('category', cat);
+            const desc = cat === 'Others' && othersDescription
+                ? (fullDescription ? `${othersDescription} - ${fullDescription}` : othersDescription)
+                : (fullDescription || 'Citizen report from PULSO app.');
+            formData.append('description', desc);
+            if (repLoc?.lat) formData.append('lat', repLoc.lat);
+            if (repLoc?.lng) formData.append('lng', repLoc.lng);
+            formData.append('location_string', repAddress);
+            if (repBarangay) {
+                formData.append('location_barangay', repBarangay.replace(/^Barangay\s*/i, ''));
+            }
+            if (imageBlob) {
+                formData.append('image', imageBlob, `report-${Date.now()}-${cat.replace(/\s+/g, '_')}.jpg`);
+            }
+            if (photoCapturedAt) {
+                formData.append('photo_captured_at', photoCapturedAt);
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/reports`, {
+                method: 'POST',
+                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const ticketId = data.ticket_id || data.tracking_number || `#PUL-${new Date().getFullYear()}-${data.id || Math.floor(1000 + Math.random() * 9000)}`;
+                trackingNumbers.push(ticketId);
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to submit report');
+            }
+        }
+
+        if (currentUser?.id) {
+            fetchUserReports(currentUser.id);
+        }
+
+        showToast(
+            trackingNumbers.length > 1
+                ? `${trackingNumbers.length} reports submitted successfully!`
+                : 'Report submitted successfully!'
+        );
+
+        return { success: true, trackingNumbers };
     };
 
     const actuallySubmitReport = async () => {
@@ -9471,7 +8252,7 @@ export default function ResidentDashboard() {
 
     const getInitialAIMessage = useCallback(() => ({
         role: 'assistant',
-        text: `Hello ${currentUser?.full_name?.split(' ')[0] || user?.name?.split(' ')[0] || 'there'}. I am **PULSEAI**, the official 24/7 assistant for Caloocan City's infrastructure and public services.\n\nHow can I help you today? You can ask about **how to file a report**, check your **report status**, inquire about **city emergency hotlines**, or view **active engineering advisories**.`
+        text: `Hello, ${currentUser?.full_name?.split(' ')[0] || user?.name?.split(' ')[0] || 'there'}. I am **PULSEAI**, the official 24/7 assistant for Caloocan City's infrastructure and public services.\n\nHow can I help you today? You can ask about **how to file a report**, check your **report status**, inquire about **city emergency hotlines**, or view **active engineering advisories**.`
     }), [currentUser?.full_name, user?.name]);
 
     const [aiMessages, setAiMessages] = useState([
@@ -9816,7 +8597,7 @@ export default function ResidentDashboard() {
     }));
 
     return (
-        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors flex flex-col">
+        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col">
 
             {/* Global Toast Notification */}
             <AnimatePresence>
@@ -9891,6 +8672,7 @@ export default function ResidentDashboard() {
                 selectedPost={selectedPost}
                 setSelectedPost={setSelectedPost}
                 isLoaded={isLoaded}
+                loadError={loadError}
                 map={map}
                 setMap={setMap}
                 panorama={panorama}
@@ -9959,6 +8741,9 @@ export default function ResidentDashboard() {
                 heatmapPoints={heatmapPoints}
                 mapFilteredHazards={mapFilteredHazards}
                 showToast={showToast}
+                handleQuickReportSubmit={handleQuickReportSubmit}
+                currentUser={currentUser}
+                setActiveTab={setActiveTab}
             />
 
             {activeModal === 'all-notifications' && (
@@ -10051,6 +8836,8 @@ export default function ResidentDashboard() {
                 activeTab={activeTab}
                 handleSetTab={handleSetTab}
                 handleSetModal={handleSetModal}
+                isAIChatOpen={isAIChatOpen}
+                setIsAIChatOpen={setIsAIChatOpen}
                 theme={theme}
                 changeTheme={changeTheme}
                 showNotifications={showNotifications}
@@ -10059,6 +8846,9 @@ export default function ResidentDashboard() {
                 setNotifications={setNotifications}
                 handleMarkAllRead={handleMarkAllRead}
                 handleNotificationClick={handleNotificationClick}
+                loadingNotifications={loadingNotifications}
+                notificationsError={notificationsError}
+                onRetryNotifications={() => currentUser?.id && fetchNotifications(currentUser.id)}
                 handleLogout={handleLogout}
                 user={user}
                 navItems={navItems}
@@ -10090,6 +8880,8 @@ export default function ResidentDashboard() {
                             handleSetModal={handleSetModal}
                             handleLogout={handleLogout}
                             t={t}
+                            unreadCount={unreadCount}
+                            unreadBadgeText={unreadBadgeText}
                         />
                     </aside>
 
@@ -10112,7 +8904,8 @@ export default function ResidentDashboard() {
                         )}
 
                         {activeTab === 'reports' && (
-                            <div className="w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1550px] mx-auto pb-32 lg:pb-8 pt-3 sm:pt-6 px-3.5 sm:px-6">
+                            <div className="w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1550px] mx-auto pb-32 lg:pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
+                                <h1 className="sr-only">{t('dashboard.sidebar.reports', { defaultValue: 'My reports' })}</h1>
                                 <MyReports
                                     userReports={userReports}
                                     loadingReports={loadingReports}
@@ -10129,7 +8922,8 @@ export default function ResidentDashboard() {
                         )}
 
                         {activeTab === 'updates' && (
-                            <div className="w-full max-w-[1440px] mx-auto pb-32 lg:pb-8 pt-3 sm:pt-6 px-3.5 sm:px-6">
+                            <div className="w-full max-w-[1440px] mx-auto pb-32 lg:pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
+                                <h1 className="sr-only">{t('dashboard.sidebar.updates', { defaultValue: 'Updates' })}</h1>
                                 <LguFeed
                                     lguUpdates={lguUpdates}
                                     loadingAdvisories={loadingAdvisories}
@@ -10148,7 +8942,8 @@ export default function ResidentDashboard() {
                         )}
 
                         {activeTab === 'profile' && (
-                            <div className="w-full max-w-4xl mx-auto pb-32 lg:pb-8 pt-3 sm:pt-6 px-3.5 sm:px-6">
+                            <div className="w-full max-w-4xl mx-auto pb-32 lg:pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
+                                <h1 className="sr-only">{t('dashboard.sidebar.account', { defaultValue: 'Account' })}</h1>
                                 <ProfileView
                                     user={user}
                                     setUser={setUser}
@@ -10187,58 +8982,65 @@ export default function ResidentDashboard() {
                 </div>
             </main>
 
-            {/* ── Mobile Bottom Navigation Bar (Ultra-responsive, glassmorphism, touch-optimized, persistent across all scroll states) ── */}
-            <nav
-                className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4.25rem] sm:min-h-[4.5rem] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 flex items-center justify-around select-none w-full"
-                style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-            >
-                {navItems.map((item) => {
-                    if (item.id === 'report') {
+            {/* ── Mobile Bottom Navigation Bar (Hidden when Nearby Issues Map is open) ── */}
+            {(activeModal !== 'map' && activeModal !== 'file-report') && (
+                <nav
+                    className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4.25rem] sm:min-h-[4.5rem] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 flex items-center justify-around select-none w-full"
+                    style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+                >
+                    {navItems.map((item) => {
+                        if (item.id === 'report') {
+                            return (
+                                <button
+                                    key="report"
+                                    type="button"
+                                    onClick={() => handleSetModal('file-report')}
+                                    className="flex flex-col items-center justify-center -mt-1 sm:-mt-1.5 px-2 sm:px-3 group focus:outline-none cursor-pointer shrink-0"
+                                    aria-label="Report an issue"
+                                >
+                                    <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white shadow-md shadow-orange-500/25 flex items-center justify-center border-[3px] border-white dark:border-slate-900 transition-all group-hover:scale-105">
+                                        <Plus size={24} strokeWidth={2.8} />
+                                    </div>
+                                </button>
+                            );
+                        }
+
+                        const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
+                        const showBadge = item.id === 'updates' && unreadCount > 0;
                         return (
                             <button
-                                key="report"
-                                type="button"
-                                onClick={() => handleSetModal('file-report')}
-                                className="flex flex-col items-center justify-center -mt-5 sm:-mt-6 px-2 sm:px-3 group focus:outline-none cursor-pointer shrink-0"
-                                aria-label="Report an issue"
+                                key={item.id}
+                                onClick={() => handleSetTab(item.id)}
+                                aria-current={isActive ? 'page' : undefined}
+                                className={`flex flex-col items-center justify-center flex-1 py-1 px-1 sm:px-2 min-h-[48px] rounded-xl transition-all duration-200 relative group active:scale-95 cursor-pointer ${
+                                    isActive
+                                        ? 'text-[#D95700] dark:text-[#FF6B00] font-bold'
+                                        : 'text-[#5B6B88] dark:text-[#9AA8C7] hover:text-slate-900 dark:hover:text-slate-200'
+                                }`}
                             >
-                                <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white shadow-xl shadow-orange-500/30 flex items-center justify-center border-[3.5px] border-white dark:border-slate-900 transition-all group-hover:scale-105">
-                                    <Plus size={26} strokeWidth={3} />
+                                <div className="relative flex items-center justify-center">
+                                    {React.cloneElement(item.icon, {
+                                        size: 21,
+                                        'aria-hidden': 'true',
+                                        className: `transition-transform duration-200 ${isActive ? 'stroke-[2.5px] scale-110 text-[#D95700] dark:text-[#FF6B00]' : 'text-[#5B6B88] dark:text-[#9AA8C7]'}`
+                                    })}
+                                    {showBadge && (
+                                        <span
+                                            className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#f05a00] text-white text-[9px] font-bold flex items-center justify-center leading-none ring-2 ring-white dark:ring-slate-900 pointer-events-none tabular-nums shadow-xs"
+                                            aria-label={`${unreadCount} unread`}
+                                        >
+                                            {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
+                                        </span>
+                                    )}
                                 </div>
+                                <span className={`text-[10px] mt-1 tracking-tight truncate max-w-[64px] ${isActive ? 'font-bold text-[#D95700] dark:text-[#FF6B00]' : 'font-medium text-[#5B6B88] dark:text-[#9AA8C7]'}`}>
+                                    {item.label}
+                                </span>
                             </button>
                         );
-                    }
-
-                    const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
-                    return (
-                        <button
-                            key={item.id}
-                            onClick={() => handleSetTab(item.id)}
-                            className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 sm:px-2 min-h-[44px] rounded-xl transition-all duration-200 relative group active:scale-95 ${
-                                isActive
-                                    ? 'text-orange-500 font-bold'
-                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                            }`}
-                        >
-                            <div className="relative">
-                                {React.cloneElement(item.icon, {
-                                    size: 21,
-                                    className: `transition-transform duration-200 ${isActive ? 'stroke-[2.5px] scale-110' : ''}`
-                                })}
-                                {isActive && (
-                                    <motion.div
-                                        layoutId="mobileNavActivePill"
-                                        className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3.5 h-1 bg-orange-500 rounded-full"
-                                    />
-                                )}
-                            </div>
-                            <span className={`text-[10px] mt-1 tracking-tight truncate max-w-[64px] ${isActive ? 'font-bold text-orange-500' : 'font-medium'}`}>
-                                {item.label}
-                            </span>
-                        </button>
-                    );
-                })}
-            </nav>
+                    })}
+                </nav>
+            )}
 
             {/* ── Unified PULSEAI Assistant Window (Resident Role) ── */}
             <PulseAIChatWindow
@@ -10248,30 +9050,33 @@ export default function ResidentDashboard() {
                 currentUser={currentUser || user}
             />
 
+            {/* ── Floating AI FAB Button (Website / Desktop only, removed on mobile and hidden on map) ── */}
+            {(activeModal !== 'map' && activeModal !== 'file-report') && (
+                <div className="fixed bottom-8 right-6 z-[60] hidden md:block">
+                    <motion.button
+                        onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="relative w-14 h-14 rounded-full bg-[#f05a00] hover:bg-[#d94e00] shadow-xl shadow-orange-500/40 flex items-center justify-center text-white cursor-pointer"
+                        title="PULSEAI"
+                        aria-label="Toggle PULSEAI"
+                    >
+                        <AnimatePresence>
+                            {!isAIChatOpen && (
+                                <motion.span
+                                    key="pulse"
+                                    className="absolute inset-0 rounded-full bg-orange-400 opacity-60"
+                                    animate={{ scale: [1, 1.4], opacity: [0.7, 0] }}
+                                    transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
+                                />
+                            )}
+                        </AnimatePresence>
+                        {isAIChatOpen ? <X size={20} /> : <Brain size={22} />}
+                    </motion.button>
+                </div>
+            )}
 
-            {/* ── Floating FAB Button (Hidden when maximized on mobile or when search is open) ── */}
-            <div className={`fixed bottom-[calc(5.1rem+env(safe-area-inset-bottom,0px))] md:bottom-8 right-3.5 sm:right-5 md:right-6 z-[60] ${(isAIChatOpen && isAIMaximized) || isHeaderSearchOpen ? 'hidden' : 'block'}`}>
-                <motion.button
-                    onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="relative w-11 h-11 sm:w-13 sm:h-13 md:w-14 md:h-14 rounded-full bg-[#f05a00] hover:bg-[#d94e00] shadow-xl shadow-orange-500/40 flex items-center justify-center text-white cursor-pointer"
-                    title="PULSEAI"
-                    aria-label="Toggle PULSEAI"
-                >
-                    <AnimatePresence>
-                        {!isAIChatOpen && (
-                            <motion.span
-                                key="pulse"
-                                className="absolute inset-0 rounded-full bg-orange-400 opacity-60"
-                                animate={{ scale: [1, 1.4], opacity: [0.7, 0] }}
-                                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
-                            />
-                        )}
-                    </AnimatePresence>
-                    {isAIChatOpen ? <X size={20} /> : <Brain size={22} />}
-                </motion.button>
-            </div>
+
             {/* ── Image Zoom Overlay ── */}
             <AnimatePresence>
                 {zoomedImage && (
@@ -10280,7 +9085,7 @@ export default function ResidentDashboard() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setZoomedImage(null)}
-                        className="fixed inset-0 z-[1000] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 sm:p-12 cursor-zoom-out"
+                        className="fixed inset-0 z-[1000] bg-white/60 dark:bg-black/60 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-12 cursor-zoom-out"
                     >
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }}
@@ -10292,13 +9097,14 @@ export default function ResidentDashboard() {
                             <img
                                 src={zoomedImage}
                                 alt="Inspection"
-                                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-white/10"
+                                className="max-w-full max-h-[85vh] sm:max-h-full object-contain rounded-2xl shadow-2xl border border-slate-200/50 dark:border-white/15"
                             />
                             <button
                                 onClick={() => setZoomedImage(null)}
-                                className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full backdrop-blur-md transition-colors border border-white/20"
+                                className="absolute top-[max(1rem,env(safe-area-inset-top,0px))] right-4 bg-slate-900/80 hover:bg-slate-900 dark:bg-black/70 dark:hover:bg-black/90 text-white p-3 rounded-full backdrop-blur-md transition-colors border border-white/20 shadow-xl cursor-pointer"
+                                aria-label="Close photo preview"
                             >
-                                <X size={24} />
+                                <X size={22} />
                             </button>
                         </motion.div>
                     </motion.div>

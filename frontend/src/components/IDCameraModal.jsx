@@ -290,7 +290,7 @@ const IDCameraModal = ({
                     const data = await res.json();
                     if (data.is_inappropriate || data.is_infrastructure === false) {
                         // REJECT! Block proceeding
-                        const reason = data.rejection_reason || "We couldn't clearly see a city infrastructure issue in this photo. Please point your camera at the actual road damage, broken streetlight, or drainage hazard.";
+                        const reason = data.rejection_reason || "We couldn't clearly see a city infrastructure issue in this photo. Please retake a clear photo of the problem.";
                         setValidationError(reason);
                         setIsVerifying(false);
                         return;
@@ -511,7 +511,7 @@ const IDCameraModal = ({
                                                 Verifying Infrastructure Photo...
                                             </h4>
                                             <p className="text-xs text-slate-300 max-w-xs leading-relaxed">
-                                                PULSO AI is confirming that this photo shows an actual city hazard (road, lighting, drainage, or public safety issue).
+                                                PULSO AI is confirming that this photo shows an actual city infrastructure issue.
                                             </p>
                                         </div>
                                     )}

@@ -36,26 +36,8 @@ html {
   scroll-behavior: smooth;
 }
 
-/* 150ms Theme fade transition rule (switches instantly under reduced motion) */
-html.theme-transitioning,
-html.theme-transitioning *,
-html.theme-transitioning *::before,
-html.theme-transitioning *::after {
-  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, fill 150ms ease, stroke 150ms ease !important;
-  transition-delay: 0s !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html.theme-transitioning,
-  html.theme-transitioning *,
-  html.theme-transitioning *::before,
-  html.theme-transitioning *::after {
-    transition: none !important;
-  }
-}
-
-/* Enforce manual dark mode toggling alongside system preferring */
-@variant dark (&:is(.dark *));
+/* Instant theme switching (no color delay or muddy intermediate rendering) */
+@variant dark (&:where(.dark, .dark *));
 
 @theme {
   --breakpoint-xs: 420px;
@@ -237,6 +219,12 @@ html.theme-transitioning *::after {
   --pulso-tut-dot-inactive: #cbd5e1;
   --pulso-tut-dot-active: #ff6b00;
   --pulso-tut-emergency: #b91c1c;
+
+  /* Settings & Icon Tile Tokens (Light Mode - Morning Field Sheet) */
+  --icon-tile-bg: rgba(255, 107, 0, 0.12);
+  --icon-tile-fg: #D95700;
+  --icon-tile-destructive-bg: rgba(239, 68, 68, 0.10);
+  --icon-tile-destructive-fg: #DC2626;
 }
 
 .dark {
@@ -304,6 +292,12 @@ html.theme-transitioning *::after {
   --pulso-tut-dot-inactive: #334155;
   --pulso-tut-dot-active: #ff6b00;
   --pulso-tut-emergency: #f87171;
+
+  /* Settings & Icon Tile Tokens (Dark Mode - Night Inspection) */
+  --icon-tile-bg: rgba(255, 107, 0, 0.15);
+  --icon-tile-fg: #FF6B00;
+  --icon-tile-destructive-bg: rgba(239, 68, 68, 0.15);
+  --icon-tile-destructive-fg: #F87171;
 }
 
 @layer base {
@@ -733,24 +727,26 @@ canvas + div {
    HIGH-CONTRAST LIGHT MODE TYPOGRAPHY (USER REQUIREMENT)
    All gray/slate text classes render as solid black in light mode across all pages.
    Dark mode (.dark) remains completely unaffected with zero regression.
-   Uses :not(:hover) so standard hover states (:hover) smoothly override.
+   Only explicit interactive elements with hover classes (like hover:text-orange-500)
+   or links/buttons with hover classes are allowed to change color on hover.
+   Plain text labels, headings, and paragraphs NEVER change color on hover.
    ========================================================================== */
 
-html:not(.dark) :not(footer):not(footer *).text-slate-300:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-slate-400:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-slate-500:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-slate-600:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-slate-700:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-gray-400:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-gray-500:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-gray-600:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-zinc-400:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-zinc-500:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-zinc-600:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-neutral-400:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-neutral-500:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-neutral-600:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-neutral-muted:not(:hover) {
+html:not(.dark) :not(footer):not(footer *).text-slate-300:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-slate-400:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-slate-500:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-slate-600:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-slate-700:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-gray-400:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-gray-500:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-gray-600:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-zinc-400:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-zinc-500:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-zinc-600:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-neutral-400:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-neutral-500:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-neutral-600:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-neutral-muted:not([class*="hover:text-"]):not(a):not(button) {
   color: #000000 !important;
 }
 
@@ -796,45 +792,35 @@ html:not(.dark) .civic-footer {
   border-top: 1px solid #1e293b !important;
 }
 
-html:not(.dark) footer[role="contentinfo"] .text-slate-400:not(:hover),
 html:not(.dark) footer[role="contentinfo"] .text-slate-400,
-html:not(.dark) .civic-footer .text-slate-400:not(:hover),
 html:not(.dark) .civic-footer .text-slate-400,
-html:not(.dark) footer[role="contentinfo"] .text-slate-500:not(:hover),
 html:not(.dark) footer[role="contentinfo"] .text-slate-500,
-html:not(.dark) .civic-footer .text-slate-500:not(:hover),
 html:not(.dark) .civic-footer .text-slate-500,
-html:not(.dark) footer[role="contentinfo"] p:not(:hover),
-html:not(.dark) .civic-footer p:not(:hover),
-html:not(.dark) footer[role="contentinfo"] li:not(:hover),
-html:not(.dark) .civic-footer li:not(:hover) {
+html:not(.dark) footer[role="contentinfo"] p,
+html:not(.dark) .civic-footer p,
+html:not(.dark) footer[role="contentinfo"] li,
+html:not(.dark) .civic-footer li {
   color: #94a3b8 !important;
 }
 
-html:not(.dark) footer[role="contentinfo"] .text-slate-300:not(:hover),
 html:not(.dark) footer[role="contentinfo"] .text-slate-300,
-html:not(.dark) .civic-footer .text-slate-300:not(:hover),
 html:not(.dark) .civic-footer .text-slate-300 {
   color: #cbd5e1 !important;
 }
 
-html:not(.dark) footer[role="contentinfo"] .text-slate-200:not(:hover),
 html:not(.dark) footer[role="contentinfo"] .text-slate-200,
-html:not(.dark) .civic-footer .text-slate-200:not(:hover),
 html:not(.dark) .civic-footer .text-slate-200,
-html:not(.dark) footer[role="contentinfo"] .text-white:not(:hover),
 html:not(.dark) footer[role="contentinfo"] .text-white,
-html:not(.dark) .civic-footer .text-white:not(:hover),
 html:not(.dark) .civic-footer .text-white,
-html:not(.dark) footer[role="contentinfo"] strong:not(:hover),
-html:not(.dark) .civic-footer strong:not(:hover) {
+html:not(.dark) footer[role="contentinfo"] strong,
+html:not(.dark) .civic-footer strong {
   color: #ffffff !important;
 }
 
-html:not(.dark) footer[role="contentinfo"] a:not(:hover),
-html:not(.dark) footer[role="contentinfo"] button:not(:hover),
-html:not(.dark) .civic-footer a:not(:hover),
-html:not(.dark) .civic-footer button:not(:hover) {
+html:not(.dark) footer[role="contentinfo"] a,
+html:not(.dark) footer[role="contentinfo"] button,
+html:not(.dark) .civic-footer a,
+html:not(.dark) .civic-footer button {
   color: #94a3b8 !important;
 }
 
@@ -975,6 +961,10 @@ input, select, textarea {
   --text-muted: #475569;
   --link-accent: #B83A00;
   --link-accent-hover: #8F2D00;
+  --icon-tile-bg: rgba(255, 107, 0, 0.12);
+  --icon-tile-fg: #D95700;
+  --icon-tile-destructive-bg: rgba(239, 68, 68, 0.10);
+  --icon-tile-destructive-fg: #DC2626;
 }
 
 html.dark,
@@ -995,6 +985,10 @@ html.dark,
   --text-muted: #B6C2DC;
   --link-accent: #FF8A3D;
   --link-accent-hover: #FFA266;
+  --icon-tile-bg: rgba(255, 107, 0, 0.15);
+  --icon-tile-fg: #FF6B00;
+  --icon-tile-destructive-bg: rgba(239, 68, 68, 0.15);
+  --icon-tile-destructive-fg: #F87171;
 }
 
 .pulso-onboarding-container {

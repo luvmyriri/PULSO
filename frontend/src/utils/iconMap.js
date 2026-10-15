@@ -11,6 +11,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import React from 'react';
 import {
   Camera,
   MapPin,
@@ -31,8 +32,13 @@ import {
   ChevronRight,
   X,
   Clock,
-  Check
+  Check,
+  History,
+  Bell
 } from 'lucide-react';
+
+import { FlagPH, FlagUS } from '../components/FlagIcons';
+export { FlagPH, FlagUS };
 
 export const PULSO_CORE_ICONS = {
   // Primary reporting actions
@@ -47,6 +53,10 @@ export const PULSO_CORE_ICONS = {
   emergencyCall: PhoneCall,
 
   // Navigation & utility
+  updates: History,
+  notifications: Bell,
+  'language-ph': FlagPH,
+  'language-us': FlagUS,
   back: ChevronLeft,
   next: ArrowRight,
   forward: ChevronRight,

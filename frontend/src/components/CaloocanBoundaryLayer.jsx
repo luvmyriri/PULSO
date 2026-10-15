@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PolygonF, MarkerF } from '@react-google-maps/api';
-import caloocanBorderData from '../data/caloocan_border.json';
+import caloocanBorderData from '../data/caloocan_simplified_boundary.json';
 import {
     NORTH_CALOOCAN_PATH,
     SOUTH_CALOOCAN_PATH,
@@ -62,9 +62,10 @@ export default function CaloocanBoundaryLayer({
     onSectorClick,
     zoom,
     showBarangays = true,
-    showLabels = true,
+    showLabels = false,
     isDarkMode = true,
-    interactive = true
+    interactive = true,
+    grayStyle = false
 }) {
     const [borderData, setBorderData] = useState(() => {
         try {
@@ -87,7 +88,7 @@ export default function CaloocanBoundaryLayer({
     // Fetch authoritative live border if available, fallback to bundled data
     useEffect(() => {
         let isMounted = true;
-        if (!cachedBarangayFeatures) {
+        if (!cachedBarangayFeatures || cachedBarangayFeatures.length === 0) {
             apiFetch('/api/geo/caloocan-border', { skipAuth: true, timeout: 6000 })
                 .then(res => {
                     if (isMounted && res.ok && res.data?.features?.length > 0) {
@@ -107,20 +108,16 @@ export default function CaloocanBoundaryLayer({
 
     // Pre-parse and memoize all 188 barangay polygons
     const barangayList = useMemo(() => {
-        if (!cachedBarangayFeatures) {
+        if (!cachedBarangayFeatures || cachedBarangayFeatures.length === 0) {
             cachedBarangayFeatures = parseBarangayFeatures(borderData?.features || caloocanBorderData?.features);
         }
         return cachedBarangayFeatures;
     }, [borderData]);
 
-    // Zoom-level filtering: if zoom prop is provided, fade in barangay lines from medium zoom (>= 12)
+    // Always render internal barangay boundary lines inside the perimeter when showBarangays is true
     const shouldRenderBarangays = useMemo(() => {
-        if (!showBarangays) return false;
-        if (typeof zoom === 'number') {
-            return zoom >= 12;
-        }
-        return true;
-    }, [showBarangays, zoom]);
+        return Boolean(showBarangays);
+    }, [showBarangays]);
 
     // Polygon styles memoized by active sector, dark mode, and hover state
     const northSectorStyle = useMemo(() => getSectorPolygonStyle({
@@ -128,30 +125,34 @@ export default function CaloocanBoundaryLayer({
         activeSector,
         isDarkMode,
         isHovered: hoveredSector === 'north',
-        customOrange: orangeColor
-    }), [activeSector, isDarkMode, hoveredSector, orangeColor]);
+        customOrange: orangeColor,
+        interactive
+    }), [activeSector, isDarkMode, hoveredSector, orangeColor, interactive]);
 
     const southSectorStyle = useMemo(() => getSectorPolygonStyle({
         sector: 'south',
         activeSector,
         isDarkMode,
         isHovered: hoveredSector === 'south',
-        customOrange: orangeColor
-    }), [activeSector, isDarkMode, hoveredSector, orangeColor]);
+        customOrange: orangeColor,
+        interactive
+    }), [activeSector, isDarkMode, hoveredSector, orangeColor, interactive]);
 
     const northBarangayStyle = useMemo(() => getBarangayPolygonStyle({
         sector: 'north',
         activeSector,
         isDarkMode,
-        customOrange: orangeColor
-    }), [activeSector, isDarkMode, orangeColor]);
+        customOrange: orangeColor,
+        grayStyle
+    }), [activeSector, isDarkMode, orangeColor, grayStyle]);
 
     const southBarangayStyle = useMemo(() => getBarangayPolygonStyle({
         sector: 'south',
         activeSector,
         isDarkMode,
-        customOrange: orangeColor
-    }), [activeSector, isDarkMode, orangeColor]);
+        customOrange: orangeColor,
+        grayStyle
+    }), [activeSector, isDarkMode, orangeColor, grayStyle]);
 
     // Label SVG Icons for Centroids
     const northLabelIcon = useMemo(() => {

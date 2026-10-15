@@ -364,7 +364,7 @@ export default function MobileAppSplashScreen({
               <button
                 type="button"
                 onClick={handleRetry}
-                className="min-h-[48px] px-6 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-[#0B1630] font-semibold text-sm shadow-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400 focus-visible:ring-offset-2"
+                className="min-h-[48px] px-6 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-bold text-sm shadow-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400 focus-visible:ring-offset-2"
                 style={{
                   outlineOffset: '2px'
                 }}

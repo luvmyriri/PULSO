@@ -4,25 +4,27 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 export const ThemeContext = createContext();
 
 export const APPEARANCE_OPTIONS = [
-    { id: 'system', label: 'Match my phone' },
     { id: 'light', label: 'Light' },
     { id: 'dark', label: 'Dark' },
 ];
 
 export function ThemeProvider({ children }) {
-    // Check localStorage, default to 'system'
+    // Check localStorage, migrate 'system' or initialize from prefers-color-scheme once on first launch
     const [theme, setTheme] = useState(() => {
-        return localStorage.getItem('pulso_theme') || 'system';
+        if (typeof window === 'undefined') return 'dark';
+        const saved = localStorage.getItem('pulso_theme') || localStorage.getItem('theme');
+        if (saved === 'dark' || saved === 'light') {
+            return saved;
+        }
+        // First launch or migration from 'system': read once, save explicitly, never follow after
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const initial = prefersDark ? 'dark' : 'light';
+        localStorage.setItem('pulso_theme', initial);
+        localStorage.setItem('theme', initial);
+        return initial;
     });
 
-    // Track active effective dark status
-    const [isDark, setIsDark] = useState(() => {
-        if (typeof window === 'undefined') return true;
-        const saved = localStorage.getItem('pulso_theme') || 'system';
-        if (saved === 'dark') return true;
-        if (saved === 'light') return false;
-        return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    });
+    const isDark = theme === 'dark';
 
     const updateStatusBarColor = useCallback((activeIsDark) => {
         const color = activeIsDark ? '#070a12' : '#f8f7f5';
@@ -42,53 +44,28 @@ export function ThemeProvider({ children }) {
 
     useEffect(() => {
         const root = window.document.documentElement;
-        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
-
-        const applyTheme = (currentTheme) => {
-            root.classList.remove('light', 'dark');
-
-            const activeDark = currentTheme === 'system'
-                ? systemPrefersDark.matches
-                : currentTheme === 'dark';
-
-            root.classList.add(activeDark ? 'dark' : 'light');
-            root.setAttribute('data-theme', activeDark ? 'dark' : 'light');
-            setIsDark(activeDark);
-            updateStatusBarColor(activeDark);
-        };
-
-        applyTheme(theme);
-
-        // Listen for OS theme changes if set to system
-        const listener = (e) => {
-            if (theme === 'system') {
-                root.classList.remove('light', 'dark');
-                const activeDark = e.matches;
-                root.classList.add(activeDark ? 'dark' : 'light');
-                root.setAttribute('data-theme', activeDark ? 'dark' : 'light');
-                setIsDark(activeDark);
-                updateStatusBarColor(activeDark);
-            }
-        };
-
-        systemPrefersDark.addEventListener('change', listener);
-        return () => systemPrefersDark.removeEventListener('change', listener);
+        root.classList.remove('light', 'dark');
+        const activeDark = theme === 'dark';
+        root.classList.add(activeDark ? 'dark' : 'light');
+        root.setAttribute('data-theme', activeDark ? 'dark' : 'light');
+        updateStatusBarColor(activeDark);
     }, [theme, updateStatusBarColor]);
 
     const changeTheme = (newTheme) => {
+        const resolvedTheme = newTheme === 'light' ? 'light' : 'dark';
         const root = window.document.documentElement;
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const activeDark = resolvedTheme === 'dark';
 
-        if (!prefersReducedMotion) {
-            root.classList.add('theme-transitioning');
-            setTimeout(() => {
-                root.classList.remove('theme-transitioning');
-            }, 150);
-        }
+        // Synchronously switch root classes and attributes immediately (no transition delay or lag)
+        root.classList.remove('theme-transitioning');
+        root.classList.remove('light', 'dark');
+        root.classList.add(activeDark ? 'dark' : 'light');
+        root.setAttribute('data-theme', activeDark ? 'dark' : 'light');
+        updateStatusBarColor(activeDark);
 
-        setTheme(newTheme);
-        localStorage.setItem('pulso_theme', newTheme);
-        localStorage.setItem('theme', newTheme);
+        setTheme(resolvedTheme);
+        localStorage.setItem('pulso_theme', resolvedTheme);
+        localStorage.setItem('theme', resolvedTheme);
     };
 
     return (
@@ -101,3 +78,4 @@ export function ThemeProvider({ children }) {
 export function useTheme() {
     return useContext(ThemeContext);
 }
+

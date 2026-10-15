@@ -13,9 +13,18 @@
   <script>
     (function () {
       try {
-        var saved = localStorage.getItem('pulso_theme') || 'system';
-        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        var isDark = saved === 'dark' || (saved === 'system' && prefersDark);
+        var saved = localStorage.getItem('pulso_theme') || localStorage.getItem('theme');
+        var isDark;
+        if (saved === 'dark' || saved === 'light') {
+          isDark = (saved === 'dark');
+        } else {
+          // Migration from 'system' or first launch: read prefers-color-scheme once and save explicitly
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          isDark = (saved === 'system' ? prefersDark : (prefersDark !== false));
+          var resolved = isDark ? 'dark' : 'light';
+          localStorage.setItem('pulso_theme', resolved);
+          localStorage.setItem('theme', resolved);
+        }
         var root = document.documentElement;
         root.classList.remove('light', 'dark');
         root.classList.add(isDark ? 'dark' : 'light');

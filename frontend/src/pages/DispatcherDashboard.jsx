@@ -59,6 +59,7 @@ import GovUserDropdown from '../components/GovUserDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import PulseAIChatWindow from '../components/PulseAIChatWindow';
 import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
+import { getCityHallMarkerSvg } from '../config/boundaryStyle';
 import SearchInput from '../components/SearchInput';
 import Swal from 'sweetalert2';
 import { CANONICAL_STATUS_LIST, getStatusDescriptor, formatTicketId } from '../utils/reportWorkflow';
@@ -2552,7 +2553,7 @@ const DispatcherDashboard = () => {
                                 onSectorClick={(sector) => setSelectedArea(sector)}
                                 isDarkMode={isDarkMode}
                                 showBarangays={true}
-                                showLabels={true}
+                                showLabels={false}
                             />
 
                             {/* South Caloocan City Hall HQ Pin */}
@@ -2567,39 +2568,21 @@ const DispatcherDashboard = () => {
                                     setSelectedMarker({
                                         id: 'hq-south',
                                         isHQ: true,
-                                        title: 'Caloocan City Hall (South Main)',
+                                        title: 'Caloocan City Hall - South',
                                         location_lat: CALOOCAN_CITY_HALL_SOUTH_LOC.lat,
                                         location_lng: CALOOCAN_CITY_HALL_SOUTH_LOC.lng,
                                         description: 'South Caloocan Executive & Municipal Hall (8th Ave / Grace Park)'
                                     });
                                 }}
                                 icon={window.google && window.google.maps ? {
-                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 60" width="50" height="60">
-                                            <defs>
-                                                <linearGradient id="hqSouthGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                    <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
-                                                    <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
-                                                </linearGradient>
-                                                <filter id="shadowSouth" x="-20%" y="-20%" width="140%" height="140%">
-                                                    <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
-                                                    <feOffset dx="0" dy="2" result="offsetblur" />
-                                                    <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
-                                                    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-                                                </filter>
-                                            </defs>
-                                            <path d="M25 58c0 0 22-20 22-33a22 22 0 0 0-44 0c0 13 22 33 22 33z" fill="url(#hqSouthGrad)" stroke="#ff6b00" stroke-width="2.5" filter="url(#shadowSouth)" />
-                                            <g transform="translate(13, 10) scale(1.1)" fill="#ff6b00">
-                                                <path d="M18 20v-8l-1.5-1.5V6L15 4l-1.5 2v4.5L12 12l-1.5-1.5V6L9 4 7.5 6v4.5L6 12v8h12zM11 16h2v4h-2v-4z"/>
-                                            </g>
-                                        </svg>
-                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                    scaledSize: new window.google.maps.Size(42, 50),
-                                    anchor: new window.google.maps.Point(21, 50)
+                                    url: getCityHallMarkerSvg({ sector: 'south', isDarkMode }),
+                                    scaledSize: new window.google.maps.Size(38, 38),
+                                    anchor: new window.google.maps.Point(19, 19)
                                 } : undefined}
+                                title="Caloocan City Hall - South"
                             />
 
-                            {/* Caloocan City Hall North Pin — Styled as requested (Castle Icon) */}
+                            {/* Caloocan City Hall North Marker */}
                             <MarkerF 
                                 position={CALOOCAN_CITY_HALL_NORTH_LOC}
                                 zIndex={300}
@@ -2608,30 +2591,11 @@ const DispatcherDashboard = () => {
                                     clickable: true
                                 }}
                                 icon={window.google && window.google.maps ? {
-                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 60" width="50" height="60">
-                                            <defs>
-                                                <linearGradient id="hqGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                    <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
-                                                    <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
-                                                </linearGradient>
-                                                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                                                    <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
-                                                    <feOffset dx="0" dy="2" result="offsetblur" />
-                                                    <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
-                                                    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-                                                </filter>
-                                            </defs>
-                                            <path d="M25 58c0 0 22-20 22-33a22 22 0 0 0-44 0c0 13 22 33 22 33z" fill="url(#hqGrad)" stroke="#f97316" stroke-width="2.5" filter="url(#shadow)" />
-                                            <g transform="translate(13, 10) scale(1.1)" fill="#f97316">
-                                                <path d="M18 20v-8l-1.5-1.5V6L15 4l-1.5 2v4.5L12 12l-1.5-1.5V6L9 4 7.5 6v4.5L6 12v8h12zM11 16h2v4h-2v-4z"/>
-                                            </g>
-                                        </svg>
-                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                    scaledSize: new window.google.maps.Size(50, 60),
-                                    anchor: new window.google.maps.Point(25, 60)
+                                    url: getCityHallMarkerSvg({ sector: 'north', isDarkMode }),
+                                    scaledSize: new window.google.maps.Size(38, 38),
+                                    anchor: new window.google.maps.Point(19, 19)
                                 } : undefined}
-                                title="LGU Command Center (HQ)"
+                                title="Caloocan City Hall - North"
                                 onClick={() => {
                                     // Trigger specialized HQ Tactical Card instead of just zooming
                                     setSelectedMarker({
@@ -3621,7 +3585,7 @@ const DispatcherDashboard = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setZoomedImage(null)}
-                        className="fixed inset-0 z-[1000] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 sm:p-12 cursor-zoom-out"
+                        className="fixed inset-0 z-[1000] bg-white/60 dark:bg-black/60 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-12 cursor-zoom-out"
                     >
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }}
@@ -3633,13 +3597,14 @@ const DispatcherDashboard = () => {
                             <img 
                                 src={zoomedImage} 
                                 alt="Inspection" 
-                                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-white/10"
+                                className="max-w-full max-h-[85vh] sm:max-h-full object-contain rounded-2xl shadow-2xl border border-slate-200/50 dark:border-white/15"
                             />
                             <button 
                                 onClick={() => setZoomedImage(null)}
-                                className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full backdrop-blur-md transition-colors border border-white/20"
+                                className="absolute top-[max(1rem,env(safe-area-inset-top,0px))] right-4 bg-slate-900/80 hover:bg-slate-900 dark:bg-black/70 dark:hover:bg-black/90 text-white p-3 rounded-full backdrop-blur-md transition-colors border border-white/20 shadow-xl cursor-pointer"
+                                aria-label="Close photo preview"
                             >
-                                <X size={24} />
+                                <X size={22} />
                             </button>
                         </motion.div>
                     </motion.div>

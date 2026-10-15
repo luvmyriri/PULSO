@@ -578,6 +578,69 @@ export function formatNearbyAddress(addressOrStructured) {
 }
 
 /**
+ * Formats a nearby report's location for the Nearby Issues list.
+ * Returns { primary, secondary }:
+ *   primary: Specific Street / Landmark / Subdivision / Plus Code
+ *   secondary: Barangay, Caloocan
+ */
+export function formatNearbyIssueLocation(issue) {
+    if (!issue) return { primary: 'Caloocan City', secondary: 'Metro Manila' };
+
+    const rawLoc = issue.location_string || issue.location || issue.address || '';
+    const lat = issue.lat ?? issue.location_lat;
+    const lng = issue.lng ?? issue.location_lng;
+    const parsed = typeof rawLoc === 'string'
+        ? parseAddressString(rawLoc, lat, lng)
+        : (rawLoc || {});
+
+    const details = issue.location_details || {};
+    const landmark = details.landmark || '';
+    const subdivision = details.subdivision || parsed.subdivision || '';
+    const street = details.houseNumber
+        ? `${details.houseNumber} ${parsed.streetAddress || ''}`.trim()
+        : (parsed.streetAddress || '');
+    const plusCode = parsed.plusCode || extractCleanPlusCode(rawLoc, lat, lng);
+
+    // 1. Identify specific landmark, street, subdivision, or plus code
+    const specificParts = [landmark, subdivision, street, plusCode].filter(Boolean);
+    let primary = specificParts[0] || '';
+
+    // If still no primary, check if rawLoc has a prefix before "Barangay"
+    if (!primary && typeof rawLoc === 'string') {
+        const brgyIdx = rawLoc.toLowerCase().indexOf('barangay');
+        if (brgyIdx > 0) {
+            const beforeBrgy = rawLoc.slice(0, brgyIdx).replace(/[,\s]+$/, '').trim();
+            if (beforeBrgy && !/^lat:?/i.test(beforeBrgy)) {
+                primary = beforeBrgy;
+            }
+        }
+    }
+
+    const brgy = issue.barangay || parsed.barangay || '';
+    const cleanBrgy = brgy ? `Barangay ${String(brgy).replace(/^Barangay\s*/i, '')}` : '';
+
+    if (primary) {
+        return {
+            primary,
+            secondary: cleanBrgy ? `${cleanBrgy}, Caloocan` : 'Caloocan City'
+        };
+    }
+
+    // Fallback: If only barangay is known, primary is Barangay, secondary is Caloocan City
+    if (cleanBrgy) {
+        return {
+            primary: cleanBrgy,
+            secondary: 'Caloocan City'
+        };
+    }
+
+    return {
+        primary: 'Caloocan City',
+        secondary: 'Metro Manila'
+    };
+}
+
+/**
  * Validates whether address meets minimum viable standard:
  * Plus Code + Barangay + City + ZIP
  * Returns true if barangay is resolved.
