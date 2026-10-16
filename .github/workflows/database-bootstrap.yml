@@ -30,6 +30,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Block secrets in feature commits
+        run: |
+          git rev-parse --verify origin/main >/dev/null
+          docker run --rm --network none \
+            -v "$PWD:/workspace:ro" -w /workspace \
+            ghcr.io/gitleaks/gitleaks:v8.30.0 \
+            git --log-opts="origin/main..HEAD" --redact
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

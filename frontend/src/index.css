@@ -1015,5 +1015,31 @@ html.dark,
   }
 }
 
+.pulso-boundary-source-credit {
+  display: block;
+  max-width: min(94vw, 520px);
+  margin: 8px;
+  padding: 5px 8px;
+  border: 1px solid #c9d4d9;
+  border-radius: 4px;
+  background: #fff;
+  color: #0c2436;
+  font: 600 12px/1.4 sans-serif;
+  text-align: center;
+  text-decoration: underline;
+  white-space: normal;
+}
+
+.pulso-boundary-source-credit.is-dark {
+  border-color: #335166;
+  background: #0e283e;
+  color: #f4f7f2;
+}
+
+.pulso-boundary-source-credit:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
 
 

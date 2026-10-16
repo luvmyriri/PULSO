@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { PolygonF, MarkerF } from '@react-google-maps/api';
+import { PolygonF, MarkerF, useGoogleMap } from '@react-google-maps/api';
 import caloocanBorderData from '../data/caloocan_border.json';
 import {
     NORTH_CALOOCAN_PATH,
@@ -66,6 +66,7 @@ export default function CaloocanBoundaryLayer({
     isDarkMode = true,
     interactive = true
 }) {
+    const map = useGoogleMap();
     const [borderData, setBorderData] = useState(() => {
         try {
             const cached = sessionStorage.getItem(BORDER_CACHE_KEY);
@@ -78,6 +79,25 @@ export default function CaloocanBoundaryLayer({
     });
     const [hoveredSector, setHoveredSector] = useState(null);
     const [orangeColor, setOrangeColor] = useState(getPulsoOrange);
+
+    // Credit the server's jurisdiction reference without attributing the
+    // legacy visual barangay overlay to that separate dataset.
+    useEffect(() => {
+        if (!map || !window.google?.maps?.ControlPosition) return undefined;
+        const credit = document.createElement('a');
+        credit.className = `pulso-boundary-source-credit${isDarkMode ? ' is-dark' : ''}`;
+        credit.href = 'https://www.geoboundaries.org/api/current/gbOpen/PHL/ADM3/';
+        credit.target = '_blank';
+        credit.rel = 'noopener noreferrer';
+        credit.textContent = 'Jurisdiction reference: geoBoundaries / NAMRIA / PSA / OCHA · CC BY 3.0 IGO';
+        credit.setAttribute('aria-label', 'Caloocan jurisdiction reference: geoBoundaries, NAMRIA, PSA and OCHA; Creative Commons Attribution 3.0 IGO. Opens source details in a new tab.');
+        const controls = map.controls[window.google.maps.ControlPosition.TOP_CENTER];
+        controls.push(credit);
+        return () => {
+            const index = controls.getArray().indexOf(credit);
+            if (index >= 0) controls.removeAt(index);
+        };
+    }, [map, isDarkMode]);
 
     // Sync orange color with theme token dynamically
     useEffect(() => {

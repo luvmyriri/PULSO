@@ -47,3 +47,13 @@ For ANDROID_MANIFEST_GCP_KEY, obtain the package name and the SHA-1 of the actua
 Use scripts/set_secret.ps1 or scripts/set_secret.sh to write local ignored env files with hidden input. scripts/verify_secrets.ps1 and scripts/verify_secrets.sh print key names and PASS/FAIL only. A FAIL can mean that the provider has no safe read-only verification endpoint; complete the app-path verification above before any revoke. Never interpret mere presence in an env file as proof of a working credential.
 
 History scanning found historical credential material in backend/.env, frontend/.env, backend/google-credentials.json, mobile_app/android/app/src/main/AndroidManifest.xml, and backend/logs/ocr_scans/scan_20260312_230125_411257.json. The latter was untracked locally and ignored; history still exists. No history rewrite is authorized. Coordinate provider-side revocation of historical keys after replacement is verified.
+
+## 16 October 2026 tracked-file Gitleaks triage
+
+| Gitleaks rule | Tracked path | Key type | Required action |
+| --- | --- | --- | --- |
+| `gcp-api-key` | `mobile_app/android/app/src/main/AndroidManifest.xml` | Google Maps Android client API key, potentially live | Rotate and restrict the replacement to the Android package, signing certificate, and required Maps APIs. Source its value from untracked local or CI build configuration, verify the new build, then revoke the old key. |
+
+The manifest itself must remain tracked, so `git rm --cached` and `.gitignore` do not apply to that file. The key is not in `.gitleaksignore`. Removing its literal in an ordinary patch would repeat the old value in review output; coordinate a replacement that keeps it out of diffs and logs. No provider key was used in this triage.
+
+The other 45 tracked-file findings were synthetic fixtures, placeholder/documentation examples, or generated analysis containing synthetic examples. Each confirmed false positive has an exact fingerprint and reason in `.gitleaksignore`; no file-wide or rule-wide exemption was added.
