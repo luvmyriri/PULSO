@@ -47,23 +47,14 @@ from utils.rate_limiter import report_submission_limiter, tracking_query_limiter
 from utils.geometry_utils import is_in_caloocan, calculate_haversine_distance
 
 # In-Memory SQLite Setup for Deterministic Isolated Testing
-TEST_DATABASE_URL = "sqlite:///:memory:"
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-    echo=False
-)
+from database import engine as test_engine
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
 @pytest.fixture(autouse=True)
-def setup_test_db():
+def setup_test_db(clean_postgis):
     """Recreates database tables and resets rate limiters before every test."""
-    Base.metadata.drop_all(bind=test_engine)
-    gov_models.Base.metadata.drop_all(bind=test_engine)
-    Base.metadata.create_all(bind=test_engine)
-    gov_models.Base.metadata.create_all(bind=test_engine)
+    # The disposable PostGIS schema is bootstrapped; clean_postgis resets rows.
 
     # Reset rate limiters
     report_submission_limiter.reset()

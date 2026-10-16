@@ -72,7 +72,7 @@ three `.env` files and the Node and Python versions. The batch path is
 
 The bootstrap script creates the named database if missing, refuses a
 non-empty database, loads the checked-in schema-only snapshot, stamps
-`c455ca49f6d5`, upgrades to `a9c6e4b2d1f0`, and prints `alembic current`.
+`c455ca49f6d5`, upgrades to `e4b7c9d2f610`, and prints `alembic current`.
 Run it **once per blank database**. `alembic upgrade head` alone cannot build
 this legacy schema from an empty database.
 
@@ -95,7 +95,7 @@ Remove-Variable dbLine
 ./scripts/bootstrap_db.ps1 -Python ./backend/.venv/Scripts/python.exe
 ```
 
-Expected revision: `a9c6e4b2d1f0 (head)`. The Linux shell script passed a
+Expected revision: `e4b7c9d2f610 (head)`. The Linux shell script passed a
 blank database, a schema-only existing copy, and non-empty/divergent refusal
 tests. The PowerShell scripts passed the same disposable checks earlier.
 
@@ -164,7 +164,7 @@ startup does not create schema objects.
   was built by another Python version. The project does not support the
   current Python 3.14/Pillow combination.
 
-CI treats blank bootstrap, Alembic head, and normalized inventory parity as
-blocking. `alembic check` reports the known drift count without blocking;
-the legacy backend test suite is currently report-only while its failures are
-reconciled.
+CI treats blank bootstrap, Alembic head, normalized inventory parity, and
+backend PostGIS tests as blocking. The explicit baseline in
+`tests/known_failures.txt` is marked xfail and CI fails if any listed test starts
+passing. `alembic check` reports the known drift count without blocking.

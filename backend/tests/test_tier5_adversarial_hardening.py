@@ -41,23 +41,14 @@ from utils.security import generate_tracking_token, hash_tracking_token, verify_
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter
 from utils.geometry_utils import is_in_caloocan
 
-# Isolated SQLite in-memory database
-TEST_DATABASE_URL = "sqlite:///:memory:"
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-    echo=False
-)
+# Bootstrapped disposable PostGIS database; no ORM DDL in tests.
+from database import engine as test_engine
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
 @pytest.fixture(autouse=True)
-def setup_tier5_db():
-    Base.metadata.drop_all(bind=test_engine)
-    gov_models.Base.metadata.drop_all(bind=test_engine)
-    Base.metadata.create_all(bind=test_engine)
-    gov_models.Base.metadata.create_all(bind=test_engine)
+def setup_tier5_db(clean_postgis):
+    # clean_postgis resets rows while preserving the bootstrapped schema.
 
     report_submission_limiter.reset()
     tracking_query_limiter.reset()

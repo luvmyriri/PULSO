@@ -13,6 +13,7 @@ Tests:
 9. GiST Spatial Index Verification (EXPLAIN ANALYZE index usage on spatial queries)
 """
 
+import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -21,6 +22,15 @@ from database import get_db, SessionLocal
 from services import spatial_service
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def fake_boundary_data(request):
+    """Use clearly fake geometry so tests do not depend on governed city data."""
+    if os.environ.get("PULSO_BOUNDARY_DATA") != "real":
+        request.getfixturevalue("clean_postgis")
+        request.getfixturevalue("synthetic_boundaries")
+    yield
 
 # Known landmark coordinates
 MONUMENTO_LAT, MONUMENTO_LNG = 14.6575, 120.9839       # South Caloocan (Brgy 78)
@@ -161,24 +171,15 @@ def test_api_preventive_risk_inputs():
 
 
 def test_gist_index_usage():
-    """Verify via EXPLAIN that PostgreSQL uses the GiST spatial index on reports.location."""
+    """Verify the GiST index exists; an empty table may validly get a Seq Scan."""
     db = SessionLocal()
     try:
-        explain_query = text("""
-            EXPLAIN
-            SELECT id
-            FROM reports
-            WHERE ST_DWithin(
-                location,
-                ST_SetSRID(ST_MakePoint(121.0423, 14.7562), 4326),
-                0.01
-            );
-        """)
-        rows = db.execute(explain_query).fetchall()
-        plan_text = " ".join([r[0] for r in rows])
-        # Either Index Scan using idx_reports_location or Bitmap Index Scan
-        assert "idx_reports_location" in plan_text or "Index Scan" in plan_text or "Bitmap Index Scan" in plan_text or "Seq Scan" in plan_text
-        print("\nQuery Plan:", plan_text)
+        indexes = db.execute(text("""
+            SELECT indexname, indexdef FROM pg_indexes
+            WHERE schemaname = 'public' AND tablename = 'reports'
+              AND indexdef ILIKE '%%USING gist%%'
+        """)).all()
+        assert any("(location)" in definition for _, definition in indexes)
     finally:
         db.close()
 

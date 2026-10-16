@@ -32,7 +32,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version-file: .python-version
+          python-version: '3.12'
       - name: Install backend requirements
         run: python -m pip install -r backend/requirements.txt
       - name: Bootstrap blank database
@@ -41,7 +41,7 @@ jobs:
         working-directory: backend
         run: |
           python -m alembic -c alembic.ini current
-          python ../scripts/db_schema.py assert-revision a9c6e4b2d1f0
+          python ../scripts/db_schema.py assert-revision e4b7c9d2f610
       - name: Compare normalized schema inventory
         run: |
           python scripts/db_schema.py inventory --output "$RUNNER_TEMP/head-inventory.json"
@@ -50,7 +50,7 @@ jobs:
           import sys
           from pathlib import Path
 
-          expected = json.loads(Path("backend/schema/head_a9c6e4b2d1f0.inventory.json").read_text())
+          expected = json.loads(Path("backend/schema/head_e4b7c9d2f610.inventory.json").read_text())
           actual = json.loads(Path(sys.argv[1]).read_text())
           assert actual == expected, "Normalized schema inventory differs from the checked-in manifest"
           print("Normalized schema inventory: PASS")
@@ -69,13 +69,15 @@ jobs:
             sed -n '1,20p' "$RUNNER_TEMP/alembic-check.log"
           fi
           exit "$status"
-      - name: Run existing backend tests
-        continue-on-error: true
+      - name: Run backend tests against PostGIS
+        working-directory: backend
+        env:
+          PULSO_TEST_DATABASE: '1'
+          PULSO_ENFORCE_KNOWN: '1'
+          PULSO_XPASS_FILE: ${{ runner.temp }}/pulso-known-xpass.txt
         run: |
           python -m pip install pytest==8.4.2
-          set +e
-          python -m pytest backend/tests -q > "$RUNNER_TEMP/backend-tests.log" 2>&1
-          status=$?
-          set -e
-          tail -n 1 "$RUNNER_TEMP/backend-tests.log"
-          exit "$status"
+          python -m pytest tests -q --disable-warnings
+      - name: Fail if a known failure starts passing
+        if: always()
+        run: python scripts/check_known_failures.py --xpass-file "$RUNNER_TEMP/pulso-known-xpass.txt"

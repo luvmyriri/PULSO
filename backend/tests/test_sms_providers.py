@@ -193,16 +193,9 @@ def test_iprogsms_blocks_smart_without_approved_sender(monkeypatch):
 
 
 @pytest.fixture
-def phone_client(monkeypatch):
+def phone_client(monkeypatch, clean_postgis):
     monkeypatch.setenv("JWT_SECRET_KEY", "unit-test-only-secret")
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-    gov_models.Base.metadata.create_all(bind=engine)
-    session_factory = sessionmaker(bind=engine)
+    session_factory = clean_postgis
 
     def override_db():
         with session_factory() as db:
@@ -220,7 +213,6 @@ def phone_client(monkeypatch):
         db.commit()
     yield TestClient(app), session_factory
     app.dependency_overrides.pop(get_db, None)
-    engine.dispose()
 
 
 def test_phone_otp_is_hashed_hidden_and_single_use(phone_client, monkeypatch):

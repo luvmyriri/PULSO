@@ -529,19 +529,13 @@ class TestMilestone1AuthDependencyFuzzer(unittest.TestCase):
         from sqlalchemy.pool import StaticPool
         from database import Base
         
-        self.engine = create_engine(
-            "sqlite:///:memory:",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool
-        )
-        Base.metadata.create_all(bind=self.engine)
+        from tests.postgis_support import reset_rows
+        self.engine = reset_rows()
         Session = sessionmaker(bind=self.engine)
         self.db = Session()
         
     def tearDown(self):
         self.db.close()
-        from database import Base
-        Base.metadata.drop_all(bind=self.engine)
         
     def test_optional_auth_fuzzing_never_raises(self):
         """Verify get_optional_current_user handles malicious/garbage string inputs safely returning None."""

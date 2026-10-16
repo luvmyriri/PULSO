@@ -20,9 +20,9 @@ from sqlalchemy.engine import make_url
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT = ROOT / "backend" / "schema" / "baseline_c455ca49f6d5.sql"
 BASELINE_INVENTORY = ROOT / "backend" / "schema" / "baseline_c455ca49f6d5.inventory.json"
-HEAD_INVENTORY = ROOT / "backend" / "schema" / "head_a9c6e4b2d1f0.inventory.json"
+HEAD_INVENTORY = ROOT / "backend" / "schema" / "head_e4b7c9d2f610.inventory.json"
 BASELINE_REVISION = "c455ca49f6d5"
-HEAD_REVISION = "a9c6e4b2d1f0"
+HEAD_REVISION = "e4b7c9d2f610"
 
 
 def connection_kwargs(database: str | None = None) -> dict:

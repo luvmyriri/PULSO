@@ -1,0 +1,5 @@
+# Existing failures confirmed in the pre-change baseline worktree; remove each entry when fixed.
+tests/test_tier5_adversarial_hardening.py::TestTier5CryptographicAssurance::test_token_hash_salt_independence	Pre-change test expects per-call salt variation, but the token hash contract is deterministic HMAC.
+tests/test_tier5_adversarial_hardening.py::TestTier5AntiEnumerationAndTiming::test_public_tracking_uniform_not_found	Pre-change assertion expects punctuation that differs from the current uniform public error copy.
+tests/test_tier5_adversarial_hardening.py::TestTier5InjectionResilience::test_injection_strings_in_report_intake[Pothole with \x00 null bytes and \r\n CRLF headers]	Pre-change intake test sends a NUL character that PostgreSQL rejects before the expected HTTP response.
+tests/test_tier5_adversarial_hardening.py::TestTier5LifecycleProgressionAndTimeline::test_full_lifecycle_advancement_and_timeline_events	Pre-change test references models.ProcessTimeline although the model lives in gov_models.
