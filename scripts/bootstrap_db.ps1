@@ -10,19 +10,20 @@ $env:PYTHONDONTWRITEBYTECODE = "1"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $helper = Join-Path $PSScriptRoot "db_schema.py"
 $backend = Join-Path $repoRoot "backend"
+$pythonExe = (Get-Command $Python -ErrorAction Stop).Source
 
-& $Python $helper bootstrap
+& $pythonExe $helper bootstrap
 if ($LASTEXITCODE -ne 0) { throw "Schema bootstrap failed." }
 
 Push-Location $backend
 try {
-    & $Python -m alembic -c alembic.ini stamp c455ca49f6d5
+    & $pythonExe -m alembic -c alembic.ini stamp c455ca49f6d5
     if ($LASTEXITCODE -ne 0) { throw "Alembic stamp failed." }
-    & $Python -m alembic -c alembic.ini upgrade head
+    & $pythonExe -m alembic -c alembic.ini upgrade head
     if ($LASTEXITCODE -ne 0) { throw "Alembic upgrade failed." }
-    & $Python $helper assert-revision e4b7c9d2f610
+    & $pythonExe $helper assert-revision e4b7c9d2f610
     if ($LASTEXITCODE -ne 0) { throw "Unexpected Alembic revision." }
-    & $Python -m alembic -c alembic.ini current
+    & $pythonExe -m alembic -c alembic.ini current
     if ($LASTEXITCODE -ne 0) { throw "Could not read Alembic current." }
 }
 finally {
