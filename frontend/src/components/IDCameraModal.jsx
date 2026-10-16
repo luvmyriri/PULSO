@@ -1,9 +1,22 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RefreshCw, AlertCircle, CameraOff, Loader2, AlertTriangle } from 'lucide-react';
-import { burnEvidenceWatermark, formatWatermarkTimestamp } from '../utils/watermark';
+import {
+    Zap,
+    ZapOff,
+    Check,
+    RotateCcw,
+    CameraOff,
+    Loader2
+} from 'lucide-react';
+import { drawEvidenceWatermark, burnEvidenceWatermark, formatWatermarkTimestamp } from '../utils/watermark';
 import { formatWatermarkAddress } from '../utils/philippineAddress';
 import { API_BASE_URL } from '../utils/apiBase';
+import PulsoPulseLine from './common/PulsoPulseLine';
+import CameraTopBar from './camera/CameraTopBar';
+import CameraMessage from './camera/CameraMessage';
+import ShutterButton from './camera/ShutterButton';
+import RatioSelector from './camera/RatioSelector';
+import WatermarkPainter from './camera/WatermarkPainter';
 
 // ---------------------------------------------------------------------------
 // Faint Guide Silhouettes for ID Viewfinder (Visual Echo of Document Layout)
@@ -11,27 +24,16 @@ import { API_BASE_URL } from '../utils/apiBase';
 function FrontIdSilhouette() {
     return (
         <svg viewBox="0 0 120 76" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-36 sm:w-48 h-auto opacity-35 select-none pointer-events-none">
-            {/* Hologram / Emblem dot */}
             <circle cx="106" cy="14" r="4" className="stroke-white/40" strokeWidth="1" />
-            
-            {/* Smart Chip */}
             <rect x="10" y="10" width="14" height="11" rx="1.5" className="fill-white/20 stroke-white/40" strokeWidth="0.8" />
-
-            {/* Photo Avatar Box */}
             <rect x="10" y="27" width="28" height="36" rx="3" className="fill-white/10 stroke-white/40" strokeWidth="1" />
             <circle cx="24" cy="38" r="5" className="fill-white/45" />
             <path d="M15 57 C15 50 18 48 24 48 C30 48 33 50 33 57" className="fill-white/45" />
-
-            {/* Header lines */}
             <rect x="44" y="12" width="44" height="3" rx="1.5" className="fill-white/50" />
             <rect x="44" y="18" width="26" height="2" rx="1" className="fill-white/30" />
-
-            {/* Information Rows (Name, Details) */}
             <rect x="44" y="28" width="60" height="2.5" rx="1.25" className="fill-white/30" />
             <rect x="44" y="35" width="50" height="2.5" rx="1.25" className="fill-white/30" />
             <rect x="44" y="42" width="40" height="2.5" rx="1.25" className="fill-white/30" />
-
-            {/* ID Number Ribbon */}
             <rect x="44" y="52" width="60" height="6" rx="1.5" className="fill-orange-500/20 stroke-orange-400/40" strokeWidth="0.8" />
         </svg>
     );
@@ -40,17 +42,10 @@ function FrontIdSilhouette() {
 function BackIdSilhouette() {
     return (
         <svg viewBox="0 0 120 76" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-36 sm:w-48 h-auto opacity-35 select-none pointer-events-none">
-            {/* Magnetic Stripe */}
             <rect x="4" y="10" width="112" height="13" rx="1" className="fill-white/25" />
-
-            {/* Signature Panel */}
             <rect x="10" y="30" width="62" height="12" rx="1.5" className="fill-white/15 stroke-white/30" strokeWidth="0.8" />
             <path d="M14 38 Q 24 33 34 39 T 52 36 T 66 38" className="stroke-white/40" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-
-            {/* Auth code box */}
             <rect x="78" y="32" width="30" height="8" rx="1.2" className="fill-white/15" />
-
-            {/* Barcode Stripes */}
             <g className="fill-white/35">
                 <rect x="10" y="49" width="2.5" height="15" />
                 <rect x="14" y="49" width="1.2" height="15" />
@@ -67,16 +62,35 @@ function BackIdSilhouette() {
     );
 }
 
+/**
+ * IDCameraModal
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Redesigned full-screen dark camera flow (PULSO Mobile App & Website):
+ * Zone 1 (Top Bar): "Take a photo" (18px bold, white) + "Photos are saved with your location and time."
+ *                   48px round close (X) button with card fill & border.
+ * Zone 2 (Content): Live 4:3 frame with 4 thin white corner marks & hint text,
+ *                   Checking state with pulse line, Preview state (Use this photo / Retake),
+ *                   Invalid state (Centered warning, "Not an infrastructure photo" pill, "Cannot proceed with this photo"),
+ *                   Permission denied state, and Error state.
+ * Zone 3 (Bottom Bar): Navy panel with centered shutter and flash toggle at right.
+ */
 const IDCameraModal = ({ 
     isOpen, 
     onClose, 
     onCapture, 
     side = 'front', 
-    title, 
-    subtitle, 
+    title = 'Take a photo', 
+    subtitle = 'Photos are saved with your location and time.', 
     metadata, 
     guideText,
-    idTypeName = 'ID'
+    idTypeName = 'ID',
+    onPickFromGallery, // optional gallery picker
+    // Preview simulation props (used by /dev/app-preview)
+    standalone = false,
+    previewMode = null, // 'live' | 'checking' | 'invalid' | 'accepted' | 'permission_denied' | 'error'
+    previewSamplePhoto = null,
+    ratioOverride = null,
+    onRatioChange = null
 }) => {
     const isIssue = side === 'ISSUE';
     const isBack = typeof side === 'string' && (side.toLowerCase().includes('back') || side.toLowerCase() === 'secondback');
@@ -86,34 +100,124 @@ const IDCameraModal = ({
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const streamRef = useRef(null);
+    const modalRef = useRef(null);
+    const closeBtnRef = useRef(null);
+
     const [error, setError] = useState(null);
     const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
     const [facingMode, setFacingMode] = useState('environment');
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(!previewMode);
     const [liveTime, setLiveTime] = useState(() => new Date());
     const [isVerifying, setIsVerifying] = useState(false);
     const [capturedPreviewUrl, setCapturedPreviewUrl] = useState(null);
+    const [capturedBlob, setCapturedBlob] = useState(null);
+    const [capturedAiData, setCapturedAiData] = useState(null);
+    const [isAccepted, setIsAccepted] = useState(false);
     const [validationError, setValidationError] = useState(null);
+    const [announcement, setAnnouncement] = useState('');
+
+    // Flash / Torch state
+    const [flashOn, setFlashOn] = useState(false);
+    const [isFlashSupported, setIsFlashSupported] = useState(Boolean(previewMode));
+
+    // Aspect ratio selection state (4:3 default, persists during retakes, resets on new report)
+    const [photoRatio, setPhotoRatio] = useState(ratioOverride || '4:3');
+    const [isLandscape, setIsLandscape] = useState(false);
+    const prevIsOpenRef = useRef(false);
+
+    // Sync ratio if controlled via dev showcase
+    useEffect(() => {
+        if (ratioOverride) {
+            setPhotoRatio(ratioOverride);
+        }
+    }, [ratioOverride]);
+
+    // Orientation detection
+    useEffect(() => {
+        const handleResize = () => {
+            if (typeof window !== 'undefined') {
+                setIsLandscape(window.innerWidth > window.innerHeight);
+            }
+        };
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Reset to 4:3 default every time camera opens fresh for a new report
+    useEffect(() => {
+        if (isOpen && !prevIsOpenRef.current && !ratioOverride) {
+            setPhotoRatio('4:3');
+        }
+        prevIsOpenRef.current = isOpen;
+    }, [isOpen, ratioOverride]);
+
+    // Apply previewMode overrides if supplied (for dev showcase testing)
+    useEffect(() => {
+        if (!isOpen) return;
+        if (previewMode === 'checking') {
+            setIsVerifying(true);
+            setValidationError(null);
+            setIsAccepted(false);
+            setCapturedPreviewUrl(previewSamplePhoto || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80');
+        } else if (previewMode === 'invalid') {
+            setIsVerifying(false);
+            setValidationError('This looks like a personal photo or selfie. Please take a clear photo of the public infrastructure issue instead.');
+            setIsAccepted(false);
+            setCapturedPreviewUrl(previewSamplePhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80');
+        } else if (previewMode === 'accepted') {
+            setIsVerifying(false);
+            setValidationError(null);
+            setIsAccepted(true);
+            setCapturedPreviewUrl(previewSamplePhoto || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80');
+        } else if (previewMode === 'permission_denied') {
+            setError('Camera access denied. Please enable camera permissions in your phone settings.');
+            setIsVerifying(false);
+            setValidationError(null);
+            setIsAccepted(false);
+            setCapturedPreviewUrl(null);
+        } else if (previewMode === 'error') {
+            setError("We can't open the camera right now.");
+            setIsVerifying(false);
+            setValidationError(null);
+            setIsAccepted(false);
+            setCapturedPreviewUrl(null);
+        } else if (previewMode === 'live') {
+            setIsVerifying(false);
+            setValidationError(null);
+            setIsAccepted(false);
+            setCapturedPreviewUrl(null);
+            setError(null);
+        }
+    }, [previewMode, previewSamplePhoto, isOpen]);
 
     // Reset captured preview when modal opens or closes
     useEffect(() => {
         if (!isOpen) {
-            if (capturedPreviewUrl) {
+            if (capturedPreviewUrl && !previewMode) {
                 URL.revokeObjectURL(capturedPreviewUrl);
             }
             setCapturedPreviewUrl(null);
+            setCapturedBlob(null);
+            setCapturedAiData(null);
+            setIsAccepted(false);
             setValidationError(null);
             setIsVerifying(false);
+            setFlashOn(false);
         }
     }, [isOpen]);
 
     const handleRetake = () => {
-        if (capturedPreviewUrl) {
+        if (capturedPreviewUrl && !previewMode) {
             URL.revokeObjectURL(capturedPreviewUrl);
         }
         setCapturedPreviewUrl(null);
+        setCapturedBlob(null);
+        setCapturedAiData(null);
+        setIsAccepted(false);
         setValidationError(null);
         setIsVerifying(false);
+        setAnnouncement('Returned to live camera view.');
     };
 
     // Live clock for real-time camera viewfinder watermark
@@ -146,7 +250,11 @@ const IDCameraModal = ({
 
     const stopStream = useCallback(() => {
         if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current.getTracks().forEach(track => {
+                try {
+                    track.stop();
+                } catch (e) {}
+            });
             streamRef.current = null;
         }
         if (videoRef.current) {
@@ -154,7 +262,30 @@ const IDCameraModal = ({
         }
     }, []);
 
+    // Flash / Torch toggle
+    const handleToggleFlash = async () => {
+        const next = !flashOn;
+        setFlashOn(next);
+        if (streamRef.current) {
+            const track = streamRef.current.getVideoTracks()[0];
+            if (track && typeof track.applyConstraints === 'function') {
+                try {
+                    await track.applyConstraints({
+                        advanced: [{ torch: next }]
+                    });
+                } catch (err) {
+                    console.warn('Torch constraint not applied:', err);
+                }
+            }
+        }
+    };
+
     const startStream = useCallback(async () => {
+        if (previewMode && previewMode !== 'live') {
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         stopStream();
@@ -172,11 +303,19 @@ const IDCameraModal = ({
             const newStream = await navigator.mediaDevices.getUserMedia(constraints);
             streamRef.current = newStream;
 
+            const videoTrack = newStream.getVideoTracks()[0];
+            if (videoTrack && typeof videoTrack.getCapabilities === 'function') {
+                const capabilities = videoTrack.getCapabilities();
+                setIsFlashSupported(Boolean(capabilities?.torch));
+            } else {
+                setIsFlashSupported(false);
+            }
+
             if (videoRef.current) {
                 videoRef.current.srcObject = newStream;
                 await new Promise((resolve) => {
                     videoRef.current.onloadedmetadata = () => {
-                        videoRef.current.play();
+                        videoRef.current.play().catch(() => {});
                         resolve();
                     };
                 });
@@ -189,7 +328,7 @@ const IDCameraModal = ({
         } catch (err) {
             console.error('Camera error:', err);
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                setError('Camera access denied. Please enable camera permissions in your browser settings.');
+                setError('permission_denied');
             } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
                 setError('No camera detected. Please ensure your camera is connected.');
             } else if (err.name === 'NotReadableError') {
@@ -200,7 +339,7 @@ const IDCameraModal = ({
         } finally {
             setIsLoading(false);
         }
-    }, [facingMode, stopStream]);
+    }, [facingMode, stopStream, previewMode]);
 
     useEffect(() => {
         if (isOpen) {
@@ -221,32 +360,131 @@ const IDCameraModal = ({
         setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
     };
 
-    const handleCapture = () => {
-        if (!videoRef.current || !canvasRef.current) return;
+    const getFrameRatioClass = (ratio, isLand) => {
+        if (ratio === '16:9') {
+            return isLand ? 'aspect-[16/9] max-w-2xl' : 'aspect-[9/16] max-h-[64vh]';
+        }
+        if (ratio === '1:1') {
+            return 'aspect-square max-h-[48vh] sm:max-h-[52vh]';
+        }
+        // '4:3'
+        return isLand ? 'aspect-[4/3] max-w-xl' : 'aspect-[3/4] max-h-[56vh] sm:max-h-[60vh]';
+    };
 
-        const video = videoRef.current;
+    const handleCapture = () => {
+        if (!canvasRef.current) return;
+
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // Final Mirror compensation for captured image
+        // Handle simulated capture when in previewMode without active media stream
+        if (previewMode && !streamRef.current) {
+            const sampleImg = new Image();
+            sampleImg.crossOrigin = 'anonymous';
+            sampleImg.onload = () => {
+                const imgW = sampleImg.naturalWidth || 1600;
+                const imgH = sampleImg.naturalHeight || 1200;
+                const isLandImg = imgW >= imgH;
+
+                let targetRatio = 1.0;
+                if (photoRatio === '4:3') targetRatio = isLandImg ? 4 / 3 : 3 / 4;
+                else if (photoRatio === '16:9') targetRatio = isLandImg ? 16 / 9 : 9 / 16;
+                else targetRatio = 1.0;
+
+                let cW = imgW, cH = imgH, cX = 0, cY = 0;
+                if (imgW / imgH > targetRatio) {
+                    cW = Math.round(imgH * targetRatio);
+                    cX = Math.round((imgW - cW) / 2);
+                } else {
+                    cH = Math.round(imgW / targetRatio);
+                    cY = Math.round((imgH - cH) / 2);
+                }
+
+                const maxC = Math.max(cW, cH);
+                const sc = Math.max(1, 1280 / maxC);
+                canvas.width = Math.round(cW * sc);
+                canvas.height = Math.round(cH * sc);
+                context.drawImage(sampleImg, cX, cY, cW, cH, 0, 0, canvas.width, canvas.height);
+
+                if (side === 'ISSUE') {
+                    drawEvidenceWatermark(canvas, {
+                        ...metadata,
+                        timestamp: liveTime
+                    });
+                }
+
+                canvas.toBlob((blob) => {
+                    if (!blob) return;
+                    const previewUrl = URL.createObjectURL(blob);
+                    setCapturedPreviewUrl(previewUrl);
+                    setCapturedBlob(blob);
+                    setIsVerifying(false);
+                    setIsAccepted(true);
+                    setAnnouncement('Photo accepted. Review your photo or retake.');
+                }, 'image/jpeg', 0.92);
+            };
+            sampleImg.src = previewSamplePhoto || "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=80";
+            return;
+        }
+
+        if (!videoRef.current) return;
+        const video = videoRef.current;
+
+        const vw = video.videoWidth || 1920;
+        const vh = video.videoHeight || 1080;
+        const isLand = vw >= vh;
+
+        let targetRatio = 1.0;
+        if (photoRatio === '4:3') {
+            targetRatio = isLand ? 4 / 3 : 3 / 4;
+        } else if (photoRatio === '16:9') {
+            targetRatio = isLand ? 16 / 9 : 9 / 16;
+        } else {
+            targetRatio = 1.0;
+        }
+
+        // Exact crop matching what is displayed in preview frame with object-cover
+        let cropX = 0;
+        let cropY = 0;
+        let cropW = vw;
+        let cropH = vh;
+
+        const videoRatio = vw / vh;
+        if (videoRatio > targetRatio) {
+            cropW = Math.round(vh * targetRatio);
+            cropH = vh;
+            cropX = Math.round((vw - cropW) / 2);
+            cropY = 0;
+        } else {
+            cropW = vw;
+            cropH = Math.round(vw / targetRatio);
+            cropX = 0;
+            cropY = Math.round((vh - cropH) / 2);
+        }
+
+        // Ensure long side is at least 1280px after crop
+        const maxCrop = Math.max(cropW, cropH);
+        const scale = Math.max(1, 1280 / maxCrop);
+
+        canvas.width = Math.round(cropW * scale);
+        canvas.height = Math.round(cropH * scale);
+
+        // Mirror compensation for user-facing camera
         if (facingMode === 'user') {
             context.translate(canvas.width, 0);
             context.scale(-1, 1);
         }
-        
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Reset transform so watermark text is never mirrored
+        context.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+
+        // Reset transform so watermark is never mirrored
         if (facingMode === 'user') {
             context.setTransform(1, 0, 0, 1, 0, 0);
         }
 
-        // Burn evidence watermark for issue reports
+        // Burn evidence watermark using shared function
         if (side === 'ISSUE') {
-            burnEvidenceWatermark(canvas, {
+            drawEvidenceWatermark(canvas, {
                 ...metadata,
                 timestamp: liveTime
             });
@@ -254,7 +492,11 @@ const IDCameraModal = ({
 
         canvas.toBlob(async (blob) => {
             if (!blob) return;
-            const file = new File([blob], `captured_evidence.jpg`, { type: 'image/jpeg' });
+            const file = new File([blob], `captured_evidence_${photoRatio.replace(':', '_')}.jpg`, { type: 'image/jpeg' });
+
+            // Attach text version of watermark in existing details data for screen readers
+            const fullAddr = formatWatermarkAddress(metadata?.structuredAddress || metadata?.locationAddress || metadata?.address, metadata?.location || metadata?.coordinates);
+            file.watermarkText = `PULSO · Caloocan City | ${fullAddr} | ${formatWatermarkTimestamp(liveTime)}`;
 
             // If not issue photo (e.g. ID card), proceed directly
             if (side !== 'ISSUE') {
@@ -263,11 +505,14 @@ const IDCameraModal = ({
                 return;
             }
 
-            // For infrastructure issue evidence: Validate with AI before proceeding
+            // For infrastructure issue evidence: Validate with AI
             const previewUrl = URL.createObjectURL(blob);
             setCapturedPreviewUrl(previewUrl);
+            setCapturedBlob(blob);
             setIsVerifying(true);
             setValidationError(null);
+            setIsAccepted(false);
+            setAnnouncement('Checking your photo...');
 
             try {
                 const formData = new FormData();
@@ -289,121 +534,210 @@ const IDCameraModal = ({
                 if (res.ok) {
                     const data = await res.json();
                     if (data.is_inappropriate || data.is_infrastructure === false) {
-                        // REJECT! Block proceeding
-                        const reason = data.rejection_reason || "We couldn't clearly see a city infrastructure issue in this photo. Please retake a clear photo of the problem.";
+                        const reason = data.rejection_reason || "This looks like a personal photo or selfie. Please take a clear photo of the public infrastructure issue instead.";
                         setValidationError(reason);
                         setIsVerifying(false);
+                        setIsAccepted(false);
+                        setAnnouncement(`Cannot proceed with this photo. ${reason}`);
                         return;
                     }
 
-                    // Valid infrastructure photo: proceed
                     setIsVerifying(false);
-                    onCapture(file, data);
-                    onClose();
+                    setIsAccepted(true);
+                    setCapturedAiData(data);
+                    setAnnouncement('Photo accepted. Review your photo or retake.');
                 } else {
-                    // Fallback on server response error
                     setIsVerifying(false);
-                    onCapture(file);
-                    onClose();
+                    setIsAccepted(true);
+                    setCapturedAiData(null);
+                    setAnnouncement('Photo captured.');
                 }
             } catch (err) {
                 console.warn('AI infrastructure verification network error:', err);
                 setIsVerifying(false);
-                onCapture(file);
-                onClose();
+                setIsAccepted(true);
+                setCapturedAiData(null);
+                setAnnouncement('Photo captured.');
             }
         }, 'image/jpeg', 0.95);
     };
 
+    // User confirmed accepted photo in preview state
+    const handleConfirmAcceptedPhoto = () => {
+        if (!capturedBlob && !previewSamplePhoto) {
+            onClose();
+            return;
+        }
+        const file = capturedBlob
+            ? new File([capturedBlob], `captured_evidence.jpg`, { type: 'image/jpeg' })
+            : new File([], `preview_sample.jpg`, { type: 'image/jpeg' });
+        onCapture(file, capturedAiData);
+        onClose();
+    };
+
+    // Determine current active substate
+    const isPermissionDenied = error === 'permission_denied' || (typeof error === 'string' && error.toLowerCase().includes('denied'));
+    const isOtherCameraError = Boolean(error && !isPermissionDenied);
+    const isInvalidState = Boolean(validationError);
+    const isCheckingState = isVerifying;
+    const isPreviewAcceptedState = isAccepted && capturedPreviewUrl && !validationError && !isVerifying;
+    const isLiveState = !capturedPreviewUrl && !error && !isCheckingState;
+
+    const displayTitle = isIssue ? 'Take a photo' : (title || 'Take a photo');
+    const displaySubtitle = isIssue ? 'Photos are saved with your location and time.' : (subtitle || '');
+
     return (
         <AnimatePresence>
             {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-xl p-4 sm:p-6"
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="camera-screen-title"
+                    ref={modalRef}
+                    className={`${standalone ? 'absolute inset-0 z-20 w-full h-full' : 'fixed inset-0 z-[200] w-full h-[100dvh]'} bg-[#070d1a] text-white flex flex-col justify-between overflow-hidden select-none`}
+                    style={{
+                        paddingTop: standalone ? '0px' : 'env(safe-area-inset-top, 0px)',
+                        paddingBottom: standalone ? '0px' : 'env(safe-area-inset-bottom, 0px)'
+                    }}
                 >
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                        animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                        className="relative w-full max-w-2xl 
-                            bg-white dark:bg-slate-900 
-                            border border-gray-200 dark:border-slate-800 
-                            rounded-3xl overflow-hidden shadow-2xl flex flex-col h-full 
-                            max-h-[95vh] sm:max-h-[85vh]"
-                    >
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-4 sm:p-5 
-                            border-b border-gray-200 dark:border-slate-800
-                            bg-white dark:bg-slate-900">
-                            <div>
-                                {title ? (
-                                    <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white uppercase truncate max-w-[200px] sm:max-w-none">
-                                        {title}
-                                    </h3>
-                                ) : (
-                                    <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">
-                                        ID Camera Capture
-                                    </h3>
-                                )}
-                                {subtitle ? (
-                                    <p className="text-[10px] sm:text-xs text-gray-500 dark:text-slate-400">
-                                        {subtitle}
-                                    </p>
-                                ) : (
-                                    <p className="text-[10px] sm:text-xs text-gray-500 dark:text-slate-400">
-                                        {isIssue ? (
-                                            "Capture a clear photo of the infrastructure issue for AI verification"
-                                        ) : (
-                                            <>
-                                                Capture the{' '}
-                                                <span className="text-orange-500 font-bold uppercase">{sideWord}</span>
-                                                {' '}of your {cleanIdTypeName}
-                                            </>
-                                        )}
-                                    </p>
-                                )}
-                            </div>
-                            <button
-                                onClick={onClose}
-                                className="p-2 sm:p-2.5 rounded-full 
-                                    bg-gray-100 dark:bg-slate-800 
-                                    text-gray-500 dark:text-slate-400 
-                                    hover:bg-gray-200 dark:hover:bg-slate-700 
-                                    hover:text-gray-900 dark:hover:text-white 
-                                    transition-all"
-                            >
-                                <X size={18} className="sm:hidden" />
-                                <X size={20} className="hidden sm:block" />
-                            </button>
-                        </div>
+                    {/* Live accessibility announcements */}
+                    <div className="sr-only" role="status" aria-live="polite">
+                        {announcement}
+                    </div>
 
-                        {/* Camera Preview */}
-                        <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-                            {error ? (
-                                <div className="text-center p-8 
-                                    bg-white dark:bg-slate-900 
-                                    w-full h-full flex flex-col items-center justify-center">
-                                    <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
-                                    <p className="font-medium mb-4
-                                        text-gray-800 dark:text-white">
-                                        {error}
-                                    </p>
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {/* ZONE 1: TOP BAR                                            */}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    <CameraTopBar
+                        title={displayTitle}
+                        subtitle={displaySubtitle}
+                        onClose={onClose}
+                        titleId="camera-screen-title"
+                    />
+
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {/* ZONE 2: CONTENT ZONE (fills remaining space)                */}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    <main className="flex-1 min-h-0 w-full flex items-center justify-center p-3 sm:p-5 overflow-y-auto no-scrollbar relative">
+                        {/* ── State A: Permission Denied ── */}
+                        {isPermissionDenied && (
+                            <CameraMessage
+                                type="permission_denied"
+                                onPrimaryAction={startStream}
+                                primaryButtonText="Try again"
+                                onSecondaryAction={onPickFromGallery}
+                                secondaryButtonText={onPickFromGallery ? "Choose from gallery instead" : undefined}
+                            />
+                        )}
+
+                        {/* ── State B: Camera Hardware / Startup Error ── */}
+                        {isOtherCameraError && (
+                            <CameraMessage
+                                type="error"
+                                reason={typeof error === 'string' && !error.startsWith('Camera error:') ? error : undefined}
+                                onPrimaryAction={startStream}
+                                primaryButtonText="Try again"
+                            />
+                        )}
+
+                        {/* ── State C: Invalid Photo (Selfie / Non-Infrastructure) ── */}
+                        {isInvalidState && (
+                            <CameraMessage
+                                type="invalid"
+                                reason={validationError}
+                                onPrimaryAction={handleRetake}
+                                primaryButtonText="Retake photo"
+                            />
+                        )}
+
+                        {/* ── State D: Checking State (Verifying with PULSO Pulse Line) ── */}
+                        {isCheckingState && (
+                            <div className={`relative w-full max-w-md ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center shadow-lg transition-all duration-200 motion-reduce:transition-none`}>
+                                {capturedPreviewUrl && (
+                                    <img
+                                        src={capturedPreviewUrl}
+                                        alt=""
+                                        className="w-full h-full object-cover opacity-35 filter brightness-75"
+                                    />
+                                )}
+                                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center space-y-4">
+                                    <div className="w-14 h-14 rounded-2xl bg-[#ff6b00]/15 border border-[#ff6b00]/30 flex items-center justify-center text-[#ff6b00] shadow-inner">
+                                        <Loader2 size={26} className="animate-spin text-[#ff6b00]" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h3 className="text-lg font-bold text-white">
+                                            Checking your photo...
+                                        </h3>
+                                        <p className="text-xs text-slate-300 max-w-xs">
+                                            PULSO Vision Eye is confirming infrastructure clarity
+                                        </p>
+                                    </div>
+                                    <div className="w-48 pt-1">
+                                        <PulsoPulseLine />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── State E: Accepted Preview State ── */}
+                        {isPreviewAcceptedState && (
+                            <div className="w-full max-w-md flex flex-col items-center space-y-4">
+                                <div className={`relative w-full ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-md transition-all duration-200 motion-reduce:transition-none flex items-center justify-center`}>
+                                    <img
+                                        src={capturedPreviewUrl}
+                                        alt="Captured problem photo"
+                                        className="w-full h-full object-cover"
+                                    />
+                                    {/* For preview simulation, render WatermarkPainter overlay so reviewer sees the exact watermark on accepted preview */}
+                                    {isIssue && previewMode === 'accepted' && (
+                                        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-end">
+                                            <WatermarkPainter
+                                                metadata={{
+                                                    ...metadata,
+                                                    timestamp: liveTime
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                    {/* Success check badge top-left */}
+                                    <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/90 backdrop-blur-md text-white text-xs font-bold shadow-md z-30">
+                                        <Check size={14} strokeWidth={3} />
+                                        <span>Photo accepted ({photoRatio})</span>
+                                    </div>
+                                </div>
+
+                                {/* Acceptance actions */}
+                                <div className="w-full space-y-2.5 pt-1">
                                     <button
-                                        onClick={startStream}
-                                        className="px-6 py-2.5 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600 transition-all"
+                                        type="button"
+                                        onClick={handleConfirmAcceptedPhoto}
+                                        className="w-full h-[52px] min-h-[52px] rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-[#070d1a] font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-white"
                                     >
-                                        Retry Camera Access
+                                        <Check size={18} strokeWidth={2.75} />
+                                        <span>Use this photo</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleRetake}
+                                        className="w-full h-[52px] min-h-[52px] rounded-xl border border-slate-700 bg-white/5 hover:bg-white/10 text-white font-semibold text-base flex items-center justify-center gap-2 cursor-pointer transition-colors active:scale-[0.99]"
+                                    >
+                                        <RotateCcw size={16} strokeWidth={2.25} />
+                                        <span>Retake</span>
                                     </button>
                                 </div>
-                            ) : (
-                                <>
-                                    {capturedPreviewUrl ? (
+                            </div>
+                        )}
+
+                        {/* ── State F: Live Camera View ── */}
+                        {isLiveState && (
+                            <div className="w-full max-w-md flex flex-col items-center space-y-2.5">
+                                {/* Reshaping Live Camera Frame with 200ms transition and corner marks */}
+                                <div className={`relative w-full ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl flex items-center justify-center transition-all duration-200 motion-reduce:transition-none`}>
+                                    {previewMode === 'live' && !streamRef.current ? (
                                         <img
-                                            src={capturedPreviewUrl}
-                                            alt="Captured Evidence Preview"
+                                            src={previewSamplePhoto || "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=80"}
+                                            alt="Simulated camera live feed"
                                             className="w-full h-full object-cover"
                                         />
                                     ) : (
@@ -416,208 +750,134 @@ const IDCameraModal = ({
                                         />
                                     )}
 
-                                    {/* Camera UI Overlays */}
-                                    {!capturedPreviewUrl && (
-                                        isIssue ? (
-                                            /* Issue / Hazard Camera UI Overlay */
-                                            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-6">
-                                                <div />
-                                                <div className="mb-28 sm:mb-32">
-                                                    <span className="text-white text-[11px] sm:text-xs font-bold tracking-wide drop-shadow-lg bg-black/40 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
-                                                        {guideText || "Center the issue in your view"}
-                                                    </span>
-                                                </div>
+                                    {/* 4 Thin White Corner Marks (follow frame geometry) */}
+                                    <div className="absolute inset-3 pointer-events-none z-10">
+                                        {/* Top Left */}
+                                        <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white/90 rounded-tl-sm" />
+                                        {/* Top Right */}
+                                        <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white/90 rounded-tr-sm" />
+                                        {/* Bottom Left */}
+                                        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white/90 rounded-bl-sm" />
+                                        {/* Bottom Right */}
+                                        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white/90 rounded-br-sm" />
+                                    </div>
+
+                                    {/* ID Card Silhouette (Only when capturing resident ID) */}
+                                    {!isIssue && (
+                                        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-4">
+                                            <div className="relative w-[86%] max-w-[340px] aspect-[85.6/54] rounded-2xl border border-white/40 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] flex items-center justify-center">
+                                                {isBack ? <BackIdSilhouette /> : <FrontIdSilhouette />}
                                             </div>
-                                        ) : (
-                                            /* ID Card Alignment Guide Overlay */
-                                            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-4">
-                                                {/* Card-Shaped Alignment Frame (ISO/IEC 7810 ID-1 aspect ratio: 85.6 / 54) */}
-                                                <div className="relative w-[86%] max-w-[380px] sm:max-w-[420px] aspect-[85.6/54] rounded-2xl border border-white/40 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] flex items-center justify-center">
-                                                    {/* 4 Corner Orange Brackets */}
-                                                    <div className="absolute -top-[3px] -left-[3px] w-6 h-6 border-t-[3px] border-l-[3px] border-orange-500 rounded-tl-xl" />
-                                                    <div className="absolute -top-[3px] -right-[3px] w-6 h-6 border-t-[3px] border-r-[3px] border-orange-500 rounded-tr-xl" />
-                                                    <div className="absolute -bottom-[3px] -left-[3px] w-6 h-6 border-b-[3px] border-l-[3px] border-orange-500 rounded-bl-xl" />
-                                                    <div className="absolute -bottom-[3px] -right-[3px] w-6 h-6 border-b-[3px] border-r-[3px] border-orange-500 rounded-br-xl" />
-
-                                                    {/* Visual Echo Silhouette */}
-                                                    {isBack ? <BackIdSilhouette /> : <FrontIdSilhouette />}
-                                                </div>
-
-                                                {/* Floating Pill with ID-Specific Guidance */}
-                                                <div className="mt-4 sm:mt-5 z-10">
-                                                    <span className="text-white text-[11px] sm:text-xs font-semibold tracking-wide drop-shadow-lg bg-black/65 px-4 py-1.5 sm:py-2 rounded-full border border-white/20 backdrop-blur-md flex items-center gap-1.5 text-center shadow-lg">
-                                                        {guideText || (isBack 
-                                                            ? `Position the back of your ${cleanIdTypeName} within the frame`
-                                                            : `Position the front of your ${cleanIdTypeName} within the frame`)}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )
-                                    )}
-
-                                    {/* Live Evidence Watermark Overlay on Viewfinder */}
-                                    {isIssue && !capturedPreviewUrl && (
-                                        <div className="absolute inset-x-0 bottom-0 pointer-events-none z-20">
-                                            {/* Protective Scrim Gradient */}
-                                            <div className="bg-gradient-to-t from-[#05080f]/95 via-[#060a12]/85 to-transparent pt-8 pb-3 px-3 sm:px-5">
-                                                {/* Civic Signal Cut: Orange beacon bar */}
-                                                <div className="flex items-center gap-2 mb-1.5">
-                                                    <div className="w-12 sm:w-16 h-0.5 bg-orange-500 rounded-full shadow-[0_0_8px_#ff6b00]" />
-                                                    <div className="flex-1 h-px bg-white/20" />
-                                                </div>
-
-                                                {/* Line 1: PULSO · Caloocan City   Timestamp */}
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-xs sm:text-sm font-bold tracking-tight">
-                                                        <span className="text-[#ff7a1a]">PULSO</span>
-                                                        <span className="text-white"> · Caloocan City</span>
-                                                    </span>
-                                                    <span 
-                                                        style={{ color: '#ffffff' }}
-                                                        className="text-[10px] sm:text-xs font-semibold text-white font-mono tracking-tight drop-shadow-md"
-                                                    >
-                                                        {formatWatermarkTimestamp(liveTime)}
-                                                    </span>
-                                                </div>
-
-                                                {/* Line 2: Full Address with Plus Code */}
-                                                <div 
-                                                    style={{ color: '#ffffff' }}
-                                                    className="text-[11px] sm:text-xs text-white font-medium leading-snug mt-0.5 line-clamp-2 drop-shadow-md"
-                                                >
-                                                    {watermarkAddress}
-                                                </div>
-
-                                                {/* Line 3: Coordinates */}
-                                                {coordsText && (
-                                                    <div 
-                                                        style={{ color: 'rgba(255, 255, 255, 0.85)' }}
-                                                        className="text-[9px] sm:text-[10px] font-mono text-white/85 mt-0.5 drop-shadow-md"
-                                                    >
-                                                        {coordsText}
-                                                    </div>
-                                                )}
+                                            <div className="mt-3 z-10">
+                                                <span className="text-white text-[11px] font-semibold tracking-wide drop-shadow-lg bg-black/65 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md">
+                                                    {guideText || (isBack ? `Back of your ${cleanIdTypeName}` : `Front of your ${cleanIdTypeName}`)}
+                                                </span>
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* AI Verifying Overlay */}
-                                    {isVerifying && (
-                                        <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center z-30">
-                                            <div className="w-14 h-14 rounded-2xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 mb-3 animate-pulse shadow-lg">
-                                                <Loader2 size={30} className="animate-spin text-orange-500" />
-                                            </div>
-                                            <h4 className="text-base sm:text-lg font-bold text-white mb-1.5">
-                                                Verifying Infrastructure Photo...
-                                            </h4>
-                                            <p className="text-xs text-slate-300 max-w-xs leading-relaxed">
-                                                PULSO AI is confirming that this photo shows an actual city infrastructure issue.
-                                            </p>
+                                    {/* Live Evidence Watermark Overlay on Viewfinder (Drawn with shared drawEvidenceWatermark) */}
+                                    {isIssue && (
+                                        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-end">
+                                            <WatermarkPainter
+                                                metadata={{
+                                                    ...metadata,
+                                                    timestamp: liveTime
+                                                }}
+                                            />
                                         </div>
                                     )}
 
-                                    {/* Invalid Photo: Non-Infrastructure Warning Modal Overlay */}
-                                    {validationError && (
-                                        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-30">
-                                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-b from-white/20 via-rose-500/20 to-white/5 backdrop-blur-xl border border-white/30 border-t-white/60 flex items-center justify-center text-rose-300 mb-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),0_12px_28px_rgba(244,63,94,0.3)] animate-bounce">
-                                                <AlertTriangle size={30} className="drop-shadow-[0_2px_8px_rgba(244,63,94,0.5)]" />
-                                            </div>
-                                            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-b from-white/25 via-rose-500/20 to-white/5 backdrop-blur-xl border border-white/35 border-t-white/70 border-b-white/15 text-white font-black text-[10px] sm:text-[11px] uppercase tracking-wider mb-2.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7),0_8px_24px_rgba(244,63,94,0.35)] drop-shadow-sm select-none">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e] animate-pulse shrink-0" />
-                                                <span>Invalid Photo • Not Infrastructure</span>
-                                            </span>
-                                            <h4 className="text-base sm:text-lg font-bold text-white mb-2 max-w-sm drop-shadow-sm">
-                                                Cannot Proceed With This Photo
-                                            </h4>
-                                            <p className="text-xs sm:text-[13px] text-rose-100/95 leading-relaxed max-w-sm mb-5 p-4 rounded-2xl bg-gradient-to-b from-white/10 via-rose-950/20 to-white/[0.03] backdrop-blur-xl border border-white/20 border-t-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_12px_40px_rgba(0,0,0,0.5)]">
-                                                {validationError}
-                                            </p>
-                                            <button
-                                                type="button"
-                                                onClick={handleRetake}
-                                                className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-lg shadow-orange-500/25 flex items-center gap-2 cursor-pointer active:scale-95"
-                                            >
-                                                <RefreshCw size={16} />
-                                                <span>Retake Photo</span>
-                                            </button>
-                                        </div>
-                                    )}
-
+                                    {/* Loading spinner while stream initializes */}
                                     {isLoading && (
-                                        <div className="absolute inset-0 
-                                            bg-white dark:bg-slate-900 
-                                            flex flex-col items-center justify-center">
-                                            <div className="w-12 h-12 border-4 
-                                                border-gray-200 dark:border-slate-700 
-                                                border-t-orange-500 rounded-full animate-spin mb-4" />
-                                            <p className="text-sm font-medium
-                                                text-gray-500 dark:text-slate-400">
-                                                Initializing camera...
-                                            </p>
+                                        <div className="absolute inset-0 bg-[#070d1a] flex flex-col items-center justify-center space-y-3 z-30">
+                                            <Loader2 size={32} className="animate-spin text-[#ff6b00]" />
+                                            <p className="text-xs text-slate-400">Starting camera...</p>
                                         </div>
                                     )}
-                                </>
-                            )}
-                            <canvas ref={canvasRef} className="hidden" />
-                        </div>
+                                </div>
 
-                        {/* Controls */}
-                        <div className="p-4 sm:p-6 
-                            bg-white dark:bg-slate-900 
-                            border-t border-gray-200 dark:border-slate-800 
-                            flex items-center justify-between gap-4 sm:gap-6">
+                                {/* Frame Helper Text: 14px, soft gray-blue */}
+                                <p className="text-sm text-slate-300 text-center font-medium">
+                                    Show the problem clearly, in good light.
+                                </p>
 
-                            {/* Switch Camera */}
-                            <div className="w-10 sm:w-12">
-                                {hasMultipleCameras && !error && !capturedPreviewUrl && (
+                                {/* Photo Size Choices (4:3, 16:9, 1:1) Segmented Control & Dynamic Note */}
+                                {isIssue && (
+                                    <RatioSelector
+                                        value={photoRatio}
+                                        onChange={(newRatio) => {
+                                            setPhotoRatio(newRatio);
+                                            onRatioChange?.(newRatio);
+                                            const notes = {
+                                                '4:3': 'Photo size 4:3. Most detail. Best for reports.',
+                                                '16:9': 'Photo size 16:9. Wide view. Crops the top and bottom.',
+                                                '1:1': 'Photo size 1:1. Square view. Crops the sides.'
+                                            };
+                                            setAnnouncement(notes[newRatio] || `Photo size ${newRatio}`);
+                                        }}
+                                        className="pt-1"
+                                    />
+                                )}
+                            </div>
+                        )}
+
+                        <canvas ref={canvasRef} className="hidden" />
+                    </main>
+
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {/* ZONE 3: BOTTOM BAR (slightly lighter navy panel)            */}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    <footer className="w-full bg-[#0c1427] border-t border-slate-800 px-[clamp(1rem,5vw,1.5rem)] py-4 sm:py-5 z-30 shrink-0">
+                        <div className="max-w-md mx-auto grid grid-cols-3 items-center">
+                            {/* Left: Camera Switcher (if multiple cameras exist) or Empty so shutter stays centered */}
+                            <div className="flex items-center justify-start">
+                                {hasMultipleCameras && isLiveState && (
                                     <button
+                                        type="button"
                                         onClick={handleSwitchCamera}
-                                        className="p-2 sm:p-3.5 rounded-full 
-                                            bg-gray-100 dark:bg-slate-800 
-                                            text-gray-700 dark:text-white 
-                                            hover:bg-gray-200 dark:hover:bg-slate-700 
-                                            transition-all group"
-                                        title="Switch Camera"
+                                        aria-label="Switch camera"
+                                        className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full flex flex-col items-center justify-center text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-colors cursor-pointer"
                                     >
-                                        <RefreshCw size={18} className="sm:hidden group-active:rotate-180 transition-transform duration-500" />
-                                        <RefreshCw size={22} className="hidden sm:block group-active:rotate-180 transition-transform duration-500" />
+                                        <RotateCcw size={18} strokeWidth={2.25} />
                                     </button>
                                 )}
                             </div>
 
-                            {/* Center Action: Shutter Capture Button */}
-                            <button
-                                onClick={handleCapture}
-                                disabled={!streamRef.current || isLoading || !!error || isVerifying || !!capturedPreviewUrl}
-                                className="w-14 h-14 sm:w-18 sm:h-18 rounded-full 
-                                    bg-white dark:bg-slate-700
-                                    flex items-center justify-center 
-                                    border-[4px] sm:border-[6px] border-gray-300 dark:border-slate-600
-                                    hover:scale-105 active:scale-95 transition-all shadow-2xl 
-                                    disabled:opacity-40 disabled:cursor-not-allowed group"
-                                title={capturedPreviewUrl ? 'Retake photo above to continue' : 'Capture photo'}
-                            >
-                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-orange-500 group-hover:bg-orange-600 transition-colors" />
-                            </button>
+                            {/* Center: 4.5rem (72px) Shutter Button */}
+                            <div className="flex items-center justify-center">
+                                <ShutterButton
+                                    onClick={handleCapture}
+                                    disabled={!isLiveState || isLoading}
+                                    className={isInvalidState ? 'opacity-30 pointer-events-none' : ''}
+                                    ariaLabel="Take photo"
+                                />
+                            </div>
 
-                            {/* Live Indicator */}
-                            <div className="w-10 sm:w-12 flex flex-col items-center 
-                                text-gray-400 dark:text-slate-500">
-                                <div className="relative">
-                                    <CameraOff size={18} className="sm:hidden mb-0.5" />
-                                    <CameraOff size={20} className="hidden sm:block mb-0.5" />
-                                    {/* Live dot */}
-                                    {streamRef.current && !isLoading && !capturedPreviewUrl && (
-                                        <span className="absolute -top-1 -right-1 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full animate-pulse" />
-                                    )}
-                                </div>
-                                <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-tighter">
-                                    {streamRef.current && !isLoading && !capturedPreviewUrl ? 'Live' : 'Off'}
-                                </span>
+                            {/* Right: Flash Toggle Button (48px tap area with label under it) */}
+                            <div className="flex items-center justify-end">
+                                {(isFlashSupported || previewMode) && (
+                                    <button
+                                        type="button"
+                                        onClick={handleToggleFlash}
+                                        aria-pressed={flashOn}
+                                        aria-label={flashOn ? "Turn flash off" : "Turn flash on"}
+                                        className="min-w-[48px] min-h-[48px] flex flex-col items-center justify-center text-center cursor-pointer transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl px-2 py-1"
+                                    >
+                                        {flashOn ? (
+                                            <Zap size={22} className="text-[#ff6b00]" strokeWidth={2.5} />
+                                        ) : (
+                                            <ZapOff size={22} className="text-slate-400 group-hover:text-slate-200" strokeWidth={2} />
+                                        )}
+                                        <span className={`text-[11px] font-bold mt-1 leading-none ${flashOn ? 'text-[#ff6b00]' : 'text-slate-400'}`}>
+                                            {flashOn ? 'Flash on' : 'Flash off'}
+                                        </span>
+                                    </button>
+                                )}
                             </div>
                         </div>
-                    </motion.div>
-                </motion.div>
+                    </footer>
+                </div>
             )}
         </AnimatePresence>
     );

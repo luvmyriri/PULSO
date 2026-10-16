@@ -598,6 +598,20 @@ html {
   .gm-ui-hover-effect {
     display: none !important; /* Hide default X button to use our clean design */
   }
+
+  /* Hide Google Maps bottom terms, map data copyright strip, and keyboard shortcuts */
+  .gm-style-cc {
+    display: none !important;
+  }
+
+  button[title*="shortcuts" i],
+  button[aria-label*="shortcuts" i] {
+    display: none !important;
+  }
+
+  .gm-style a[href*="terms_maps"] {
+    display: none !important;
+  }
 }
 
 @layer utilities {

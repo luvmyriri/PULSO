@@ -181,9 +181,9 @@ export default function LatestReportCard({
                     </h3>
                 </div>
 
-                {/* Solid PULSO Orange Pill Badge (white bold text on #ff6b00) */}
+                {/* Status Pill Badge - Plain Glassmorphism matching Civic Aperture */}
                 <div
-                    className="inline-flex items-center justify-center px-3.5 py-1 rounded-full bg-[#ff6b00] text-white font-bold text-sm shrink-0 shadow-2xs whitespace-nowrap"
+                    className="inline-flex items-center justify-center px-3.5 py-1 rounded-full bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white font-bold text-xs sm:text-sm shrink-0 shadow-2xs whitespace-nowrap"
                     aria-label={`Status: ${badgeText}`}
                 >
                     <span>{badgeText}</span>

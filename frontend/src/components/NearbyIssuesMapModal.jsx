@@ -512,11 +512,11 @@ export default function NearbyIssuesMapModal({
     if (!isOpen) return null;
 
     const modalContent = (
-        <div className={`flex flex-col h-full w-full bg-white dark:bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 ${isSvFullscreen ? 'fixed inset-0 z-[100] rounded-none border-0' : ''}`}>
+        <div className={`flex flex-col h-full w-full bg-white dark:bg-slate-950 rounded-none sm:rounded-3xl overflow-hidden shadow-2xl border-0 sm:border border-slate-200 dark:border-slate-800 ${isSvFullscreen ? 'fixed inset-0 z-[100] rounded-none border-0' : ''}`}>
             {/* Modal Header — collapses into a sleek compact bar when Street View is active */}
             <div className={`border-b border-slate-100 dark:border-slate-800 flex justify-between items-center gap-3 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 transition-all duration-200 ${
                 svLocation ? 'px-3 sm:px-4 py-2 sm:py-2.5' : 'p-4 sm:p-5'
-            }`}>
+            } pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:pt-5`}>
                 <div className="min-w-0 pr-2">
                     <h2 className={`font-black text-slate-900 dark:text-white leading-tight ${
                         svLocation ? 'text-sm sm:text-base flex items-center gap-2' : 'text-lg sm:text-2xl'
@@ -684,7 +684,7 @@ export default function NearbyIssuesMapModal({
             )}
 
             {/* Map Canvas Region */}
-            <div className="flex-1 relative w-full h-full min-h-[300px]">
+            <div className="flex-1 relative w-full h-full min-h-[300px] overflow-hidden [&_.gm-style-cc]:!hidden [&_.gmnoprint]:!hidden [&_button[title*='shortcuts']]:!hidden [&_button[aria-label*='shortcuts']]:!hidden [&_a[href*='terms_maps']]:!hidden">
                 {isLoaded ? (
                     <GoogleMap
                         mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -697,7 +697,8 @@ export default function NearbyIssuesMapModal({
                                 : (isDark ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE),
                             disableDefaultUI: true,
                             zoomControl: false,
-                            gestureHandling: 'greedy'
+                            gestureHandling: 'greedy',
+                            keyboardShortcuts: false
                         }}
                         onZoomChanged={() => {
                             if (map) {
@@ -1134,8 +1135,8 @@ export default function NearbyIssuesMapModal({
     }
 
     return (
-        <div className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 md:p-6 overflow-hidden">
-            <div className="w-full max-w-7xl h-[88dvh] sm:h-[90vh] flex flex-col my-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 md:p-6 overflow-hidden">
+            <div className="w-full max-w-7xl h-full sm:h-[90vh] flex flex-col my-auto" onClick={(e) => e.stopPropagation()}>
                 {modalContent}
             </div>
         </div>

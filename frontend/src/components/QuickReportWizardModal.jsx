@@ -1016,16 +1016,16 @@ function QuickReportWizardModal({
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {/* Photo preview cropped to 4:3 with fullscreen expansion */}
+                                    {/* Photo preview following real photo shape (4:3, 16:9 or 1:1) with fullscreen expansion */}
                                     <div
                                         onClick={() => setIsFullscreenPhotoOpen(true)}
-                                        className="aspect-[4/3] w-full rounded-2xl overflow-hidden relative border border-slate-200 dark:border-slate-800 bg-slate-950 cursor-pointer group"
+                                        className="w-full max-h-[380px] rounded-2xl overflow-hidden relative border border-slate-200 dark:border-slate-800 bg-slate-950 cursor-pointer group flex items-center justify-center"
                                         title="Click to view full photo"
                                     >
                                         <img
                                             src={photo}
                                             alt="Captured field hazard"
-                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                                            className="w-full h-auto max-h-[380px] object-contain transition-transform duration-300 group-hover:scale-[1.01]"
                                         />
 
                                         {/* Remove Photo (X Button) */}

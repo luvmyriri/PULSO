@@ -660,11 +660,9 @@ export function isMinimumViableAddress(structured) {
 export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates = null) {
     if (!addressOrStructured) {
         if (fallbackCoordinates && fallbackCoordinates.lat && fallbackCoordinates.lng) {
-            const pc = extractCleanPlusCode('', fallbackCoordinates.lat, fallbackCoordinates.lng);
             const brgy = findBarangayByCoordinates(fallbackCoordinates.lat, fallbackCoordinates.lng);
             const postal = brgy ? getPostalCodeForBarangay(brgy.name) : '1421';
             const parts = [
-                pc,
                 brgy ? brgy.name : 'Barangay 171',
                 'Caloocan',
                 `${postal} Metro Manila`
@@ -679,13 +677,8 @@ export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates 
         : addressOrStructured;
 
     if (!s) {
-        return typeof addressOrStructured === 'string' ? addressOrStructured : 'Caloocan City';
-    }
-
-    // Resolve Plus Code
-    let pc = s.plusCode;
-    if (!pc && fallbackCoordinates?.lat && fallbackCoordinates?.lng) {
-        pc = extractCleanPlusCode('', fallbackCoordinates.lat, fallbackCoordinates.lng);
+        const raw = typeof addressOrStructured === 'string' ? addressOrStructured : 'Caloocan City';
+        return raw.replace(/\b[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,4}\b,?\s*/gi, '').trim().replace(/,\s*$/, '');
     }
 
     // Resolve Barangay
@@ -707,7 +700,8 @@ export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates 
     const city = s.city ? s.city.replace(/\s*City$/i, '') : 'Caloocan';
 
     // Assemble components in standard order:
-    // [Subdivision], [Street / Block-Lot], [Plus Code], [Barangay], [City], [ZIP Region]
+    // [Subdivision / Building], [Street / Block-Lot], [Barangay], [City], [ZIP Region]
+    // STRICT RULE: Do NOT put a Plus Code in the address.
     const parts = [];
 
     if (s.subdivision) {
@@ -715,11 +709,9 @@ export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates 
     }
 
     if (s.streetAddress && (!s.subdivision || !s.streetAddress.includes(s.subdivision))) {
-        parts.push(s.streetAddress);
-    }
-
-    if (pc) {
-        parts.push(pc);
+        // Strip any inline plus code
+        const cleanStreet = s.streetAddress.replace(/\b[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,4}\b,?\s*/gi, '').trim().replace(/,\s*$/, '');
+        if (cleanStreet) parts.push(cleanStreet);
     }
 
     if (brgy) {

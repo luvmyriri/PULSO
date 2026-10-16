@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -103,6 +103,8 @@ import {
 
 import PulseAIMarkdown from '../components/PulseAIMarkdown';
 import PulseAIChatWindow from '../components/PulseAIChatWindow';
+import ReportHistoryCard from '../components/ReportHistoryCard';
+import ReportDetailView from '../components/ReportDetailView';
 import { useTheme } from '../contexts/ThemeContext';
 import Swal from 'sweetalert2';
 import Branding from '../components/Branding';
@@ -183,7 +185,7 @@ export const formatFriendlyNotice = (reason) => {
 
     const lower = clean.toLowerCase();
     if (lower.includes('selfie') || lower.includes('portrait')) {
-        return "This looks like a personal photo or selfie. Please take a photo showing the actual damage or problem instead.";
+        return "This looks like a personal photo or selfie. Please take a clear photo of the public infrastructure issue instead.";
     }
     if (lower.includes('infrastructure issue') || lower.includes('valid infrastructure') || lower.includes('hazard or damage')) {
         return "We couldn't clearly spot a community issue in this photo. Please take or upload a photo showing the actual problem.";
@@ -850,7 +852,7 @@ const ResidentHomeView = ({
                                     <span className="block sm:inline whitespace-nowrap">emergency contacts</span>
                                 </h3>
                             </div>
-                            <span className="text-[9px] min-[360px]:text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 px-2 min-[360px]:px-2.5 py-0.5 rounded-full border border-red-200 dark:border-red-900/60 whitespace-nowrap shrink-0">
+                            <span className="text-[9px] min-[360px]:text-[10px] font-bold uppercase tracking-wider text-black dark:text-white bg-white/70 dark:bg-slate-800/60 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-slate-200/80 dark:border-white/10 whitespace-nowrap shrink-0 shadow-2xs">
                                 24/7 Hotlines
                             </span>
                         </div>
@@ -1017,9 +1019,9 @@ const LguFeed = ({
                 </div>
             </div>
 
-            {/* ── Category Tabs: Full Width Pill with Responsive Chevrons ── */}
-            <div className="relative flex items-center min-w-0 max-w-full">
-                {/* Left Scroll Chevron Button (only visible when scrollable) */}
+            {/* ── Category Chips: 48px tall tap targets, horizontal scroll with smooth chevrons and fade affordances (consistent with Report History) ── */}
+            <div className="relative flex items-center min-w-0 max-w-full w-full">
+                {/* Left Scroll Chevron (<) */}
                 <button
                     type="button"
                     onClick={() => scrollTabs('left')}
@@ -1027,7 +1029,7 @@ const LguFeed = ({
                     aria-label="Scroll categories left"
                     className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 mr-1 sm:mr-1.5 ${
                         canScrollLeft
-                            ? 'flex bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 cursor-pointer active:scale-95'
+                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
                             : 'hidden'
                     }`}
                 >
@@ -1038,15 +1040,16 @@ const LguFeed = ({
                 <div className="relative min-w-0 flex-1 overflow-hidden">
                     {/* Left Trailing Edge Fade */}
                     <div
-                        className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-100 dark:from-slate-950 to-transparent transition-opacity duration-200 ${
+                        className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
                             canScrollLeft ? 'opacity-100' : 'opacity-0'
                         }`}
+                        aria-hidden="true"
                     />
 
                     {/* Scrollable Track */}
                     <div
                         ref={tabsScrollRef}
-                        className="inline-flex items-center gap-1.5 p-1.5 bg-slate-200/60 dark:bg-slate-900/90 rounded-full border border-slate-200/90 dark:border-slate-800/90 shadow-inner overflow-x-auto no-scrollbar scroll-smooth w-full"
+                        className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5 w-full"
                     >
                         {categoryTabs.map(tab => {
                             const count = tab.id === 'all'
@@ -1066,25 +1069,21 @@ const LguFeed = ({
                                     data-tab-id={tab.id}
                                     type="button"
                                     onClick={() => setSelectedCategory(tab.id)}
-                                    className={`group relative px-3.5 sm:px-4 py-2 min-h-[44px] rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer select-none ${
+                                    aria-pressed={isActive}
+                                    className={`h-12 min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
                                         isActive
-                                            ? 'text-orange-600 dark:text-orange-400'
-                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'
+                                            ? 'bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold shadow-sm'
+                                            : 'bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white'
                                     }`}
                                 >
-                                    {isActive && (
-                                        <motion.span
-                                            layoutId="activeUpdateCategoryPill"
-                                            transition={{ type: "spring", stiffness: 450, damping: 35 }}
-                                            className="absolute inset-0 bg-white dark:bg-slate-800 rounded-full shadow-xs ring-1 ring-slate-200/90 dark:ring-slate-700/80 -z-0"
-                                        />
-                                    )}
-                                    <span className="relative z-10">{tab.label}</span>
-                                    <span className={`relative z-10 px-1.5 py-0.2 rounded-full text-[10.5px] font-mono font-bold ${
-                                        isActive
-                                            ? 'bg-orange-500 text-white'
-                                            : 'text-slate-400 dark:text-slate-500'
-                                    }`}>
+                                    <span className={isActive ? 'text-white' : ''}>{tab.label}</span>
+                                    <span
+                                        className={`px-1.5 py-0.5 rounded-full text-[11px] font-mono font-bold leading-none transition-colors ${
+                                            isActive
+                                                ? 'bg-black/20 text-white'
+                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                        }`}
+                                    >
                                         {count}
                                     </span>
                                 </button>
@@ -1094,9 +1093,10 @@ const LguFeed = ({
 
                     {/* Right Trailing Edge Fade */}
                     <div
-                        className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-100 dark:from-slate-950 to-transparent transition-opacity duration-200 ${
+                        className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
                             canScrollRight ? 'opacity-100' : 'opacity-0'
                         }`}
+                        aria-hidden="true"
                     />
                 </div>
 
@@ -1108,7 +1108,7 @@ const LguFeed = ({
                     aria-label="Scroll categories right"
                     className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 ml-1 sm:ml-1.5 ${
                         canScrollRight
-                            ? 'flex bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 cursor-pointer active:scale-95'
+                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
                             : 'hidden'
                     }`}
                 >
@@ -1151,7 +1151,7 @@ const LguFeed = ({
                                 initial={{ opacity: 0, y: 15 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 key={update.id || update.advisory_id || idx}
-                                className="flex flex-col justify-between h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs hover:shadow-md transition-all"
+                                className="flex flex-col justify-between h-full bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all"
                             >
                                 <div className="space-y-3">
                                     {/* Card Header: Source & Timestamp */}
@@ -1216,7 +1216,7 @@ const LguFeed = ({
                                     <button
                                         type="button"
                                         onClick={() => { setSelectedPost(update); setActiveModal('post-details'); }}
-                                        className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:underline cursor-pointer transition-colors min-h-[44px] py-1"
+                                        className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#ff6b00] hover:text-[#e66000] cursor-pointer transition-colors min-h-[44px] py-1"
                                     >
                                         <span>Read Full Advisory</span>
                                         <ChevronRight size={15} />
@@ -1839,26 +1839,30 @@ const ReportCardSkeleton = () => (
     </div>
 );
 
-const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenClaimModal, containerVariants, setZoomedImage, reportStatusFilter, setReportStatusFilter, handleCancelReport, t }) => {
-    const [currentPage, setCurrentPage] = useState(1);
+const getCategoryIconComponent = (category) => {
+    const cat = (category || '').toLowerCase();
+    if (cat.includes('water') || cat.includes('drain') || cat.includes('flood') || cat.includes('pipe') || cat.includes('leak')) return Droplets;
+    if (cat.includes('power') || cat.includes('light') || cat.includes('electric') || cat.includes('wire')) return Zap;
+    if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole') || cat.includes('pavement')) return HardHat;
+    if (cat.includes('traffic') || cat.includes('sign') || cat.includes('hazard') || cat.includes('safety')) return ShieldAlert;
+    return Wrench;
+};
+
+const MyReports = ({
+    userReports = [],
+    loadingReports,
+    handleSetModal,
+    containerVariants,
+    setZoomedImage,
+    reportStatusFilter,
+    setReportStatusFilter,
+    handleCancelReport,
+    onSelectReportForDetails,
+    onOpenMap,
+    t
+}) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [expandedReportId, setExpandedReportId] = useState(null);
-
-    // Auto-collapse expanded report card when switching status tabs, searching, or paging
-    useEffect(() => {
-        setExpandedReportId(null);
-    }, [reportStatusFilter, searchQuery, currentPage]);
-
-    useEffect(() => {
-        const handleResize = () => {
-            setIsMobile(window.innerWidth < 768);
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    const itemsPerPage = isMobile ? 5 : 6;
 
     const tabsScrollRef = useRef(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -1868,14 +1872,8 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
         const el = tabsScrollRef.current;
         if (!el) return;
         const { scrollLeft, scrollWidth, clientWidth } = el;
-        setCanScrollLeft(prev => {
-            const nextVal = scrollLeft > 6;
-            return prev !== nextVal ? nextVal : prev;
-        });
-        setCanScrollRight(prev => {
-            const nextVal = scrollLeft < scrollWidth - clientWidth - 6;
-            return prev !== nextVal ? nextVal : prev;
-        });
+        setCanScrollLeft(scrollLeft > 6);
+        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 6);
     }, []);
 
     useEffect(() => {
@@ -1905,73 +1903,25 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
     useEffect(() => {
         const el = tabsScrollRef.current;
         if (!el) return;
-        const activeBtn = el.querySelector(`[data-tab-id="${reportStatusFilter}"]`);
+        const activeBtn = el.querySelector(`[data-filter-id="${reportStatusFilter}"]`);
         if (activeBtn) {
             activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
     }, [reportStatusFilter]);
 
-    const filterOptions = [
-        {
-            id: 'all',
-            label: t('dashboard.reports.filterAll', { defaultValue: 'All Reports' }),
-            icon: FileText,
-            activeText: 'text-orange-600 dark:text-orange-400',
-            activeBadge: 'bg-orange-500 text-white',
-            idleBadge: 'bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
-            iconColor: 'text-orange-500 dark:text-orange-400'
-        },
-        {
-            id: 'pending',
-            label: t('dashboard.reports.filterPending', { defaultValue: 'Pending' }),
-            icon: Clock,
-            activeText: 'text-amber-600 dark:text-amber-400',
-            activeBadge: 'bg-amber-500 text-white',
-            idleBadge: 'bg-amber-100/90 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/20',
-            iconColor: 'text-amber-500 dark:text-amber-400'
-        },
-        {
-            id: 'in_progress',
-            label: t('dashboard.reports.filterInProgress', { defaultValue: 'In Progress' }),
-            icon: Wrench,
-            activeText: 'text-sky-600 dark:text-sky-400',
-            activeBadge: 'bg-sky-500 text-white',
-            idleBadge: 'bg-sky-100/90 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 ring-1 ring-sky-500/20',
-            iconColor: 'text-sky-500 dark:text-sky-400'
-        },
-        {
-            id: 'resolved',
-            label: t('dashboard.reports.filterResolved', { defaultValue: 'Resolved' }),
-            icon: CheckCircle2,
-            activeText: 'text-emerald-600 dark:text-emerald-400',
-            activeBadge: 'bg-emerald-500 text-white',
-            idleBadge: 'bg-emerald-100/90 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20',
-            iconColor: 'text-emerald-500 dark:text-emerald-400'
-        },
-        {
-            id: 'rejected',
-            label: t('dashboard.reports.filterRejected', { defaultValue: 'Rejected' }),
-            icon: AlertTriangle,
-            activeText: 'text-rose-600 dark:text-rose-400',
-            activeBadge: 'bg-rose-500 text-white',
-            idleBadge: 'bg-rose-100/90 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 ring-1 ring-rose-500/20',
-            iconColor: 'text-rose-500 dark:text-rose-400'
-        },
-        {
-            id: 'cancelled',
-            label: t('dashboard.reports.filterCancelled', { defaultValue: 'Cancelled' }),
-            icon: RotateCcw,
-            activeText: 'text-slate-700 dark:text-slate-300',
-            activeBadge: 'bg-slate-600 text-white',
-            idleBadge: 'bg-slate-200/80 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
-            iconColor: 'text-slate-400 dark:text-slate-500'
-        },
-    ];
+    // Auto-collapse expanded report card when switching status tabs or searching
+    useEffect(() => {
+        setExpandedReportId(null);
+    }, [reportStatusFilter, searchQuery]);
 
-    // Compute newest report ID for priority indicator
-    const newestReportId = userReports.length > 0
-        ? [...userReports].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]?.id
-        : null;
+    const filterOptions = [
+        { id: 'all', label: 'All reports' },
+        { id: 'pending', label: 'Pending' },
+        { id: 'in_progress', label: 'In Progress' },
+        { id: 'resolved', label: 'Resolved' },
+        { id: 'rejected', label: 'Rejected' },
+        { id: 'cancelled', label: 'Cancelled' }
+    ];
 
     // Combined filtering: tab filter + in-page text search
     const filteredReports = userReports.filter(r => {
@@ -1979,7 +1929,7 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
         if (reportStatusFilter === 'in_progress') {
             if (!['dispatched', 'approved_internal', 'in_progress'].includes(r.status)) return false;
         } else if (reportStatusFilter === 'pending') {
-            if (!['pending', 'unverified'].includes(r.status)) return false;
+            if (!['pending', 'unverified', 'received'].includes(r.status)) return false;
         } else if (reportStatusFilter !== 'all') {
             if (r.status !== reportStatusFilter) return false;
         }
@@ -1997,312 +1947,254 @@ const MyReports = ({ userReports = [], loadingReports, handleSetModal, onOpenCla
         return true;
     });
 
-    useEffect(() => {
-        setCurrentPage(prev => (prev === 1 ? prev : 1));
-    }, [reportStatusFilter, searchQuery, isMobile]);
+    // Group filtered reports by Month Heading ("August 2026", "April 2026")
+    const groupedReports = useMemo(() => {
+        const groups = {};
+        filteredReports.forEach((report) => {
+            const dateObj = report.created_at ? new Date(report.created_at) : new Date();
+            const monthYear = dateObj.toLocaleDateString('en-US', {
+                month: 'long',
+                year: 'numeric'
+            });
+            if (!groups[monthYear]) {
+                groups[monthYear] = [];
+            }
+            groups[monthYear].push(report);
+        });
 
-    const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
-    const paginatedReports = filteredReports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-    // Context-sensitive Empty State Message Generator
-    const getEmptyStateContent = () => {
-        if (userReports.length === 0) {
-            return {
-                title: "No infrastructure reports filed yet",
-                desc: "Help keep Caloocan safe and functional. Report broken streetlights, water pipe leaks, road potholes, or drainage issues directly to city maintenance crews.",
-                showCta: true
-            };
-        }
-        if (searchQuery.trim()) {
-            return {
-                title: `No reports matching "${searchQuery}"`,
-                desc: "Check for typos or try clearing your search keyword to view all submitted reports.",
-                showClearSearch: true
-            };
-        }
-        switch (reportStatusFilter) {
-            case 'pending':
-                return {
-                    title: "No pending reports",
-                    desc: "All your filed reports have been reviewed and advanced to engineering dispatch!"
-                };
-            case 'in_progress':
-                return {
-                    title: "No reports currently in progress",
-                    desc: "Reports advance to active dispatch once verified by city engineering evaluators."
-                };
-            case 'resolved':
-                return {
-                    title: "No resolved reports yet",
-                    desc: "Our field crews will upload verified photo proof here once repairs are completed."
-                };
-            case 'rejected':
-                return {
-                    title: "No rejected reports — nice!",
-                    desc: "All of your submitted infrastructure reports have met city verification criteria."
-                };
-            case 'cancelled':
-                return {
-                    title: "No cancelled reports on file",
-                    desc: "You haven't retracted any submitted reports."
-                };
-            default:
-                return {
-                    title: "No reports found",
-                    desc: "Try selecting another status tab or submit a new report."
-                };
-        }
-    };
-
-    const emptyState = getEmptyStateContent();
+        // Return ordered array of { monthYear, reports }
+        return Object.entries(groups).map(([monthYear, reports]) => ({
+            monthYear,
+            reports
+        }));
+    }, [filteredReports]);
 
     return (
         <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full space-y-6"
+            className="w-full space-y-4 max-w-2xl mx-auto"
         >
-            {/* Header: Title */}
+            {/* Header: Title 24px bold + one soft gray line "Track your submitted reports." */}
             <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    {t('dashboard.reports.history', { defaultValue: 'Report History' })}
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    Report History
                 </h2>
-                <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {t('dashboard.reports.historyDesc', { defaultValue: 'Track the status and progress of all your submitted infrastructure issues.' })}
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    Track your submitted reports.
                 </p>
             </div>
 
-            {/* Controls: Search Input on Top, Category Reports Tabs on Bottom */}
-            <div className="flex flex-col gap-3 sm:gap-3.5 w-full min-w-0">
-                {/* Cohesive Matching In-Page Search Filter (Top) */}
-                <div className="relative w-full">
-                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search by ID, category, street..."
-                        className="w-full pl-9.5 pr-8 py-2.5 text-base sm:text-xs min-h-[44px] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 rounded-full text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-700/50 transition-all shadow-2xs"
-                        style={{ outline: 'none', boxShadow: 'none' }}
-                    />
-                    {searchQuery && (
-                        <button
-                            type="button"
-                            onClick={() => setSearchQuery('')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                            aria-label="Clear search"
-                        >
-                            <X size={14} />
-                        </button>
-                    )}
-                </div>
-
-                {/* Modern Segmented Control Capsule with Chevrons and Edge Fade Affordance (Bottom) */}
-                <div className="relative flex items-center min-w-0 max-w-full w-full">
-                    {/* Left Scroll Chevron Button (only visible when scrollable) */}
+            {/* Search: Full-width rounded field (0.875rem radius, 3rem tall, existing card fill & 1px border) */}
+            <div className="relative w-full">
+                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by ID or location"
+                    className="w-full h-12 min-h-[3rem] pl-11 pr-10 text-sm bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 rounded-[0.875rem] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#ff6b00] focus:ring-[3px] focus:ring-[#ff6b00]/20 transition-all shadow-2xs"
+                />
+                {searchQuery && (
                     <button
                         type="button"
-                        onClick={() => scrollTabs('left')}
-                        disabled={!canScrollLeft}
-                        aria-label="Scroll tabs left"
-                        className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 mr-1 sm:mr-1.5 ${
-                            canScrollLeft
-                                ? 'flex bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 cursor-pointer active:scale-95'
-                                : 'hidden'
-                        }`}
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        aria-label="Clear search query"
                     >
-                        <ChevronLeft size={16} strokeWidth={2.5} />
+                        <X size={16} />
                     </button>
-
-                    {/* Scroll Container with Fade Overlays */}
-                    <div className="relative min-w-0 flex-1 overflow-hidden">
-                        {/* Left Trailing Edge Fade */}
-                        <div
-                            className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-100 dark:from-slate-950 to-transparent transition-opacity duration-200 ${
-                                canScrollLeft ? 'opacity-100' : 'opacity-0'
-                            }`}
-                        />
-
-                        {/* Scrollable Track */}
-                        <div
-                            ref={tabsScrollRef}
-                            className="inline-flex items-center gap-1.5 p-1.5 bg-slate-200/60 dark:bg-slate-900/90 rounded-full border border-slate-200/90 dark:border-slate-800/90 shadow-inner overflow-x-auto no-scrollbar scroll-smooth w-full"
-                        >
-                            {filterOptions.map(opt => {
-                                const count = opt.id === 'all'
-                                    ? userReports.length
-                                    : userReports.filter(r => {
-                                        if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress'].includes(r.status);
-                                        if (opt.id === 'pending') return ['pending', 'unverified'].includes(r.status);
-                                        return r.status === opt.id;
-                                    }).length;
-
-                                const isActive = reportStatusFilter === opt.id;
-
-                                return (
-                                    <button
-                                        key={opt.id}
-                                        data-tab-id={opt.id}
-                                        type="button"
-                                        onClick={() => setReportStatusFilter(opt.id)}
-                                        className={`group relative px-3.5 sm:px-4 py-2 min-h-[44px] rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer select-none ${
-                                            isActive
-                                                ? 'text-orange-600 dark:text-orange-400'
-                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'
-                                        }`}
-                                    >
-                                        {/* Animated Spring Pill Sliding Indicator */}
-                                        {isActive && (
-                                            <motion.span
-                                                layoutId="activeReportFilterPill"
-                                                transition={{ type: "spring", stiffness: 450, damping: 35 }}
-                                                className="absolute inset-0 bg-white dark:bg-slate-800 rounded-full shadow-xs ring-1 ring-slate-200/90 dark:ring-slate-700/80 -z-0"
-                                            />
-                                        )}
-
-                                        {/* Label */}
-                                        <span className="relative z-10">{opt.label}</span>
-
-                                        {/* Micro Count Pill */}
-                                        <span className={`relative z-10 px-1.5 py-0.2 rounded-full text-[10.5px] font-mono font-bold ${
-                                            isActive
-                                                ? 'bg-orange-500 text-white'
-                                                : 'text-slate-400 dark:text-slate-500'
-                                        }`}>
-                                            {count}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Right Trailing Edge Fade */}
-                        <div
-                            className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-100 dark:from-slate-950 to-transparent transition-opacity duration-200 ${
-                                canScrollRight ? 'opacity-100' : 'opacity-0'
-                            }`}
-                        />
-                    </div>
-
-                    {/* Right Scroll Chevron Button (only visible when scrollable) */}
-                    <button
-                        type="button"
-                        onClick={() => scrollTabs('right')}
-                        disabled={!canScrollRight}
-                        aria-label="Scroll tabs right"
-                        className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 ml-1 sm:ml-1.5 ${
-                            canScrollRight
-                                ? 'flex bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 cursor-pointer active:scale-95'
-                                : 'hidden'
-                        }`}
-                    >
-                        <ChevronRight size={16} strokeWidth={2.5} />
-                    </button>
-                </div>
+                )}
             </div>
 
-            {/* Card List / Skeleton Loading / Tailored Empty State */}
-            <div className="space-y-3.5">
+            {/* Filter chips: 48px tall tap targets, horizontal scroll with smooth chevrons and fade affordances */}
+            <div className="relative flex items-center min-w-0 max-w-full w-full">
+                {/* Left Scroll Chevron (<) */}
+                <button
+                    type="button"
+                    onClick={() => scrollTabs('left')}
+                    disabled={!canScrollLeft}
+                    aria-label="Scroll filter options left"
+                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 mr-1 sm:mr-1.5 ${
+                        canScrollLeft
+                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
+                            : 'hidden'
+                    }`}
+                >
+                    <ChevronLeft size={16} strokeWidth={2.5} />
+                </button>
+
+                {/* Scrollable Track with Edge Fades */}
+                <div className="relative min-w-0 flex-1 overflow-hidden">
+                    {/* Left Trailing Edge Fade */}
+                    <div
+                        className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
+                            canScrollLeft ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        aria-hidden="true"
+                    />
+
+                    <div
+                        ref={tabsScrollRef}
+                        className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5 w-full"
+                    >
+                        {filterOptions.map((opt) => {
+                            const count = opt.id === 'all'
+                                ? userReports.length
+                                : userReports.filter(r => {
+                                    if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress'].includes(r.status);
+                                    if (opt.id === 'pending') return ['pending', 'unverified', 'received'].includes(r.status);
+                                    return r.status === opt.id;
+                                }).length;
+
+                            const isSelected = reportStatusFilter === opt.id;
+
+                            return (
+                                <button
+                                    key={opt.id}
+                                    data-filter-id={opt.id}
+                                    type="button"
+                                    onClick={() => setReportStatusFilter(opt.id)}
+                                    aria-pressed={isSelected}
+                                    className={`h-12 min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
+                                        isSelected
+                                            ? 'bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold shadow-sm'
+                                            : 'bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white'
+                                    }`}
+                                >
+                                    <span className={isSelected ? 'text-white' : ''}>{opt.label}</span>
+                                    <span
+                                        className={`px-1.5 py-0.5 rounded-full text-[11px] font-mono font-bold leading-none transition-colors ${
+                                            isSelected
+                                                ? 'bg-black/20 text-white'
+                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                        }`}
+                                    >
+                                        {count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Right Trailing Edge Fade */}
+                    <div
+                        className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
+                            canScrollRight ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        aria-hidden="true"
+                    />
+                </div>
+
+                {/* Right Scroll Chevron (>) */}
+                <button
+                    type="button"
+                    onClick={() => scrollTabs('right')}
+                    disabled={!canScrollRight}
+                    aria-label="Scroll filter options right"
+                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 ml-1 sm:ml-1.5 ${
+                        canScrollRight
+                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
+                            : 'hidden'
+                    }`}
+                >
+                    <ChevronRight size={16} strokeWidth={2.5} />
+                </button>
+            </div>
+
+            {/* List / Loading / Empty States */}
+            <div className="pt-2 space-y-5">
                 {loadingReports ? (
-                    <div className="space-y-3.5">
+                    <div className="space-y-3">
                         <ReportCardSkeleton />
                         <ReportCardSkeleton />
                         <ReportCardSkeleton />
                     </div>
                 ) : filteredReports.length === 0 ? (
-                    <div className="flex flex-col items-center gap-4 py-16 sm:py-20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-slate-900/40 px-4 text-center">
-                        <div className="w-14 h-14 rounded-2xl bg-orange-50 dark:bg-orange-950/40 text-orange-500 border border-orange-200/80 dark:border-orange-800/60 flex items-center justify-center shadow-xs">
-                            <FileText size={28} strokeWidth={1.75} />
-                        </div>
-                        <div className="max-w-md">
-                            <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">
-                                {emptyState.title}
-                            </h3>
-                            <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                                {emptyState.desc}
-                            </p>
-                        </div>
-                        {emptyState.showCta && (
+                    userReports.length === 0 ? (
+                        /* Empty State: "No reports yet." with "Report a problem" button */
+                        <div className="flex flex-col items-center gap-3 py-16 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-[#0c1427]/40">
+                            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-[#ff6b00] flex items-center justify-center">
+                                <FileText size={28} strokeWidth={1.75} />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
+                                    No reports yet.
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+                                    You haven't submitted any civic infrastructure reports yet.
+                                </p>
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => handleSetModal('file-report')}
-                                className="mt-2 bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shadow-orange-500/20 cursor-pointer flex items-center gap-2"
+                                className="h-12 min-h-[48px] mt-2 px-5 rounded-xl bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold text-sm flex items-center gap-2 cursor-pointer shadow-sm transition-all focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
                             >
-                                <Plus size={15} strokeWidth={2.5} />
-                                <span>Report an Issue Now</span>
+                                <Plus size={18} strokeWidth={2.5} className="text-white" />
+                                <span className="text-white">Report a problem</span>
                             </button>
-                        )}
-                        {emptyState.showClearSearch && (
+                        </div>
+                    ) : (
+                        /* No-Match State: "No reports found." with "Clear filters" button */
+                        <div className="flex flex-col items-center gap-3 py-16 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-[#0c1427]/40">
+                            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
+                                <Search size={26} strokeWidth={1.75} />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
+                                    No reports found.
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+                                    No reports match your active search keyword or filter criteria.
+                                </p>
+                            </div>
                             <button
                                 type="button"
-                                onClick={() => setSearchQuery('')}
-                                className="mt-2 text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setReportStatusFilter('all');
+                                }}
+                                className="h-12 min-h-[48px] mt-2 px-5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm flex items-center justify-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
                             >
-                                Clear search filter
+                                Clear filters
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    )
                 ) : (
-                    paginatedReports.map((report) => (
-                        <ReportCard
-                            key={report.id}
-                            report={report}
-                            setZoomedImage={setZoomedImage}
-                            handleCancelReport={handleCancelReport}
-                            isLatest={report.id === newestReportId}
-                            newestReportId={newestReportId}
-                            isExpanded={expandedReportId === report.id}
-                            onToggleExpand={() => setExpandedReportId(prev => prev === report.id ? null : report.id)}
-                        />
+                    /* Month-Grouped Report Cards List */
+                    groupedReports.map(({ monthYear, reports }) => (
+                        <section key={monthYear} className="space-y-2.5">
+                            {/* Month Heading ("August 2026", "April 2026"), 13px semibold, soft gray */}
+                            <h3 className="text-[13px] font-semibold text-slate-500 dark:text-slate-400 px-1 select-none">
+                                {monthYear}
+                            </h3>
+
+                            {/* Reports under this month */}
+                            <div className="space-y-3">
+                                {reports.map((report) => (
+                                    <ReportHistoryCard
+                                        key={report.id}
+                                        report={report}
+                                        categoryIcon={getCategoryIconComponent(report.category || report.ai_category)}
+                                        isExpanded={expandedReportId === report.id}
+                                        onToggle={() => setExpandedReportId(prev => prev === report.id ? null : report.id)}
+                                        onOpenDetails={(rep) => onSelectReportForDetails?.(rep)}
+                                        onOpenMap={(rep) => onOpenMap?.(rep)}
+                                    />
+                                ))}
+                            </div>
+                        </section>
                     ))
                 )}
             </div>
 
-            {/* Pagination Controls */}
-            {filteredReports.length > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 mt-6 border-t border-slate-200/80 dark:border-slate-800">
-                    <div className="font-mono text-[12px] text-slate-500 dark:text-slate-400">
-                        Showing {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredReports.length)} of {filteredReports.length} records
-                    </div>
-                    {totalPages > 1 && (
-                        <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-900/80 p-1 rounded-full border border-slate-200/90 dark:border-slate-800 shadow-inner">
-                            <button
-                                type="button"
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed aspect-square"
-                                aria-label="Previous page"
-                            >
-                                <ChevronLeft size={15} strokeWidth={2.5} />
-                            </button>
-
-                            {[...Array(totalPages)].map((_, i) => (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => setCurrentPage(i + 1)}
-                                    className={`w-8 h-8 flex items-center justify-center rounded-full font-mono text-[12px] font-semibold transition-all cursor-pointer aspect-square ${
-                                        currentPage === i + 1
-                                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold ring-1 ring-slate-200/80 dark:ring-slate-700/80'
-                                            : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/50'
-                                    }`}
-                                >
-                                    {i + 1}
-                                </button>
-                            ))}
-
-                            <button
-                                type="button"
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed aspect-square"
-                                aria-label="Next page"
-                            >
-                                <ChevronRight size={15} strokeWidth={2.5} />
-                            </button>
-                        </div>
-                    )}
+            {/* Footer Text under the list: "Showing X of Y reports" (14px soft gray) */}
+            {userReports.length > 0 && (
+                <div className="pt-4 pb-8 text-center">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                        Showing {filteredReports.length} of {userReports.length} reports
+                    </p>
                 </div>
             )}
         </motion.div>
@@ -3518,7 +3410,7 @@ const ProfileView = ({
                                                 <Mail size={14} className="text-orange-500" />
                                                 CONTACT INFORMATION
                                             </h4>
-                                            <span className="text-[11px] font-semibold text-orange-600 dark:text-orange-400/90 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 px-2.5 py-0.5 rounded-md">
+                                            <span className="text-[11px] font-semibold text-black dark:text-white bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/80 dark:border-white/10 px-2.5 py-0.5 rounded-md shadow-2xs">
                                                 Citizen Editable
                                             </span>
                                         </div>
@@ -6730,6 +6622,7 @@ export default function ResidentDashboard() {
     const [userReports, setUserReports] = useState([]);
     const [loadingReports, setLoadingReports] = useState(true);
     const [reportStatusFilter, setReportStatusFilter] = useState('all');
+    const [selectedReportForDetails, setSelectedReportForDetails] = useState(null);
 
     const handleLogout = () => {
         clearAuthSession();
@@ -8922,20 +8815,48 @@ export default function ResidentDashboard() {
                         )}
 
                         {activeTab === 'reports' && (
-                            <div className="w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1550px] mx-auto pb-32 lg:pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
+                            <div className={`w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1550px] mx-auto ${
+                                selectedReportForDetails
+                                    ? 'pt-0 pb-6 px-0'
+                                    : 'pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 pb-32 lg:pb-8 px-[clamp(1rem,5vw,1.25rem)] lg:px-6'
+                            }`}>
                                 <h1 className="sr-only">{t('dashboard.sidebar.reports', { defaultValue: 'My reports' })}</h1>
-                                <MyReports
-                                    userReports={userReports}
-                                    loadingReports={loadingReports}
-                                    handleSetModal={handleSetModal}
-                                    onOpenClaimModal={() => setIsClaimModalOpen(true)}
-                                    containerVariants={containerVariants}
-                                    setZoomedImage={setZoomedImage}
-                                    reportStatusFilter={reportStatusFilter}
-                                    setReportStatusFilter={setReportStatusFilter}
-                                    handleCancelReport={handleCancelReport}
-                                    t={t}
-                                />
+                                {selectedReportForDetails ? (
+                                    <ReportDetailView
+                                        report={selectedReportForDetails}
+                                        onBack={() => {
+                                            setSelectedReportForDetails(null);
+                                            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                                        }}
+                                        onOpenMap={(rep) => {
+                                            handleSetModal('map');
+                                            setSelectedPost(rep);
+                                        }}
+                                        onWithdrawReport={(rep) => handleCancelReport(rep)}
+                                        setZoomedImage={setZoomedImage}
+                                    />
+                                ) : (
+                                    <MyReports
+                                        userReports={userReports}
+                                        loadingReports={loadingReports}
+                                        handleSetModal={handleSetModal}
+                                        onOpenClaimModal={() => setIsClaimModalOpen(true)}
+                                        containerVariants={containerVariants}
+                                        setZoomedImage={setZoomedImage}
+                                        reportStatusFilter={reportStatusFilter}
+                                        setReportStatusFilter={setReportStatusFilter}
+                                        handleCancelReport={handleCancelReport}
+                                        onSelectReportForDetails={(rep) => {
+                                            setSelectedReportForDetails(rep);
+                                            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                                        }}
+                                        onOpenMap={(rep) => {
+                                            handleSetModal('map');
+                                            setSelectedPost(rep);
+                                        }}
+                                        t={t}
+                                    />
+                                )}
                             </div>
                         )}
 
@@ -9000,8 +8921,8 @@ export default function ResidentDashboard() {
                 </div>
             </main>
 
-            {/* ── Mobile Bottom Navigation Bar (Hidden when Nearby Issues Map is open) ── */}
-            {(activeModal !== 'map' && activeModal !== 'file-report') && (
+            {/* ── Mobile Bottom Navigation Bar (Hidden when Nearby Issues Map, Wizard or Report Details is open) ── */}
+            {(activeModal !== 'map' && activeModal !== 'file-report' && !selectedReportForDetails) && (
                 <nav
                     className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4.25rem] sm:min-h-[4.5rem] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 flex items-center justify-around select-none w-full"
                     style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
@@ -9145,3 +9066,4 @@ export default function ResidentDashboard() {
         </div>
     );
 }
+

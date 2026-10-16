@@ -32,6 +32,8 @@ import {
   Home,
   Plus,
   History,
+  Camera,
+  CameraOff,
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -45,6 +47,9 @@ import SettingsRow from '../components/SettingsRow';
 import LanguageToggle from '../components/LanguageToggle';
 import NearbyIssuesMapModal from '../components/NearbyIssuesMapModal';
 import QuickReportWizardModal from '../components/QuickReportWizardModal';
+import IDCameraModal from '../components/IDCameraModal';
+import ReportHistoryCard from '../components/ReportHistoryCard';
+import ReportDetailView from '../components/ReportDetailView';
 import { REPORT_WORKFLOW_STEPS } from '../utils/reportWorkflow';
 import { getAuthUser } from '../utils/authSession';
 
@@ -228,30 +233,41 @@ const SAMPLE_SHOWCASE_REPORTS = [
     ticket_id: 'PUL-2026-1042',
     category: 'Roads & Bridges',
     status: 'received',
-    location_string: 'Celina Homes 3, Blk 4 Lot 16 Silver, Barangay 171, Caloocan City',
+    location_string: 'Congressional Rd Ext, Barangay 171, Caloocan City',
     lat: 14.7523,
     lng: 121.0421,
-    created_at: new Date(Date.now() - 3600000 * 2).toISOString()
+    image_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=80',
+    description: 'Deep road potholes along the outer northbound lane near the market entrance. Causes hazardous vehicular bottleneck and motorcycle skidding hazards especially during rainfall.',
+    barangay: 'Barangay 171',
+    created_at: '2026-08-14T09:30:00Z'
   },
   {
     id: 2184,
     ticket_id: 'PUL-2026-2184',
-    category: 'Streetlights & Power',
+    category: 'Power & Street Lighting',
     status: 'verified',
     location_string: 'Malolos Ave, Zone 12, Barangay 177, Caloocan City',
     lat: 14.7612,
     lng: 121.0514,
-    created_at: new Date(Date.now() - 3600000 * 18).toISOString()
+    image_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80',
+    description: 'Three consecutive streetlight luminaires have burned out lamps. Complete black-spot during night inspection hours.',
+    staff_notes: 'Initial hazard triage completed by North Caloocan Field Division on Oct 16. Work order being prepared.',
+    barangay: 'Barangay 177',
+    created_at: '2026-08-02T18:15:00Z'
   },
   {
     id: 5231,
     ticket_id: 'PUL-2026-5231',
-    category: 'Water & Drainage',
+    category: 'Water Supply & Distribution',
     status: 'assigned',
     location_string: 'Bagumbong, Zone 15, Caybiga, District 1, Caloocan City',
     lat: 14.7505,
     lng: 121.0540,
-    created_at: new Date(Date.now() - 3600000 * 36).toISOString()
+    image_url: 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600&auto=format&fit=crop&q=80',
+    description: 'Underground high-pressure distribution pipe cracked. Continuous clean potable water flooding sidewalk curb.',
+    staff_notes: 'Engineering team assigned: North Caloocan Water Utility Crew Alpha.',
+    barangay: 'Bagumbong',
+    created_at: '2026-04-18T11:20:00Z'
   },
   {
     id: 3890,
@@ -261,7 +277,11 @@ const SAMPLE_SHOWCASE_REPORTS = [
     location_string: 'Camarin Road, Barangay 175, Caloocan City',
     lat: 14.7489,
     lng: 121.0612,
-    created_at: new Date(Date.now() - 3600000 * 50).toISOString()
+    image_url: 'https://images.unsplash.com/photo-1541888946425-d0fbb1861564?w=600&auto=format&fit=crop&q=80',
+    description: 'Fallen overhead pedestrian directional sign blocking the rightmost traffic lane and posing danger to motorists.',
+    staff_notes: 'Maintenance truck dispatched with crane and welding equipment on site.',
+    barangay: 'Barangay 175',
+    created_at: '2026-04-10T14:45:00Z'
   },
   {
     id: 915,
@@ -271,7 +291,11 @@ const SAMPLE_SHOWCASE_REPORTS = [
     location_string: 'Tala Central Park, Barangay 185, Caloocan City',
     lat: 14.7634,
     lng: 121.0689,
-    created_at: new Date(Date.now() - 3600000 * 96).toISOString()
+    image_url: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=600&auto=format&fit=crop&q=80',
+    description: 'Damaged perimeter iron fence near the public children playground with protruding sharp edges.',
+    resolution_notes: 'Engineering works completed. Perimeter iron fencing replaced and repainted to city safety standards.',
+    barangay: 'Barangay 185',
+    created_at: '2026-04-03T08:00:00Z'
   }
 ];
 
@@ -327,6 +351,30 @@ const SAMPLE_12_NOTIFICATIONS = Array.from({ length: 12 }, (_, i) => ({
   type: i % 2 === 0 ? 'status_change' : 'advisory'
 }));
 
+const CAMERA_ADDRESS_PRESETS = {
+  short: {
+    id: 'short',
+    label: 'Short (Barangay only)',
+    address: 'Barangay 171, Caloocan City',
+    coordinates: { lat: 14.7523, lng: 121.0421, accuracy: 5 },
+    expectedLines: '1 line'
+  },
+  standard: {
+    id: 'standard',
+    label: 'Standard (Celina Homes 3)',
+    address: 'Celina Homes 3, Blk 4 Lot 16 Silver, Barangay 171, Caloocan City, 1421 Metro Manila',
+    coordinates: { lat: 14.7523, lng: 121.0421, accuracy: 6 },
+    expectedLines: '2 lines (no Plus Codes)'
+  },
+  long: {
+    id: 'long',
+    label: 'Long (140+ chars)',
+    address: 'Phase 4B Extension, Block 28 Lot 14 Diamond St. near Corner Sapphire Avenue, Celina Homes Subdivision, Barangay 171, Caloocan City, 1421 Metro Manila',
+    coordinates: { lat: 14.7523, lng: 121.0421, accuracy: 8 },
+    expectedLines: '3-4 lines wrapped, zero "..."'
+  }
+};
+
 /**
  * DevAppPreviewPage (/dev/app-preview)
  * ─────────────────────────────────────────────────────────────────────────────
@@ -360,7 +408,14 @@ export default function DevAppPreviewPage() {
   const [screenSize, setScreenSize] = useState({ width: 390, height: 844, label: '390 x 844 (iPhone 12/13/14 native)' });
   const [testStep, setTestStep] = useState(1);
   const [previewAppearance, setPreviewAppearance] = useState('dark');
-  const [previewTarget, setPreviewTarget] = useState('tutorial'); // 'tutorial' | 'splash' | 'cards' | 'header' | 'settings' | 'map' | 'report'
+  const [previewTarget, setPreviewTarget] = useState('tutorial'); // 'tutorial' | 'splash' | 'cards' | 'header' | 'settings' | 'map' | 'report' | 'history' | 'details' | 'camera'
+  const [cameraPreviewMode, setCameraPreviewMode] = useState('invalid'); // 'invalid' | 'live' | 'checking' | 'accepted' | 'permission_denied' | 'error'
+  const [cameraPhotoRatio, setCameraPhotoRatio] = useState('4:3'); // '4:3' | '16:9' | '1:1'
+  const [cameraAddressPreset, setCameraAddressPreset] = useState('standard'); // 'short' | 'standard' | 'long'
+  const [historyFilter, setHistoryFilter] = useState('all');
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyExpandedId, setHistoryExpandedId] = useState(null);
+  const [detailsStatusIndex, setDetailsStatusIndex] = useState(0);
   const [reportPreviewKey, setReportPreviewKey] = useState(1);
   const [mapSheetPosition, setMapSheetPosition] = useState('collapsed'); // 'collapsed' | 'half' | 'full'
   const [mapSimulateLocation, setMapSimulateLocation] = useState(true);
@@ -552,6 +607,38 @@ export default function DevAppPreviewPage() {
 
   // Determine "What happens now" in plain words
   const whatHappensNow = useMemo(() => {
+    if (previewTarget === 'camera') {
+      const modeLabels = {
+        invalid: 'Invalid Photo Warning (Centered Stack)',
+        live: `Live Viewfinder (${cameraPhotoRatio} Frame & Corner Marks)`,
+        checking: `Checking Photo (${cameraPhotoRatio})`,
+        accepted: `Accepted Photo Preview (${cameraPhotoRatio})`,
+        permission_denied: 'Permission Denied State (Phone Settings)',
+        error: 'Hardware Error State (Try Again)'
+      };
+      return {
+        badge: `Camera Flow: ${modeLabels[cameraPreviewMode] || cameraPreviewMode}`,
+        text: `Live interactive preview of the 3-zone full-screen dark camera screen (Zone 1: Top bar with title & 48px round close button, Zone 2: Content zone with ${cameraPhotoRatio} frame / centered warning stack / checking pulse / preview, Zone 3: Bottom navy panel with 4.5rem shutter button and 48px flash toggle). Watermark dynamically scales with shorter side (u = min(w, h)), wraps without "..." cutoffs, and has zero plus codes.`,
+        color: 'border-[#ff6b00]/40 bg-[#ff6b00]/10 text-[#ff6b00]'
+      };
+    }
+
+    if (previewTarget === 'history') {
+      return {
+        badge: 'Report History (Cards & Month Groups)',
+        text: 'Live interactive preview of Report History with 24px bold title, 48px search field, 48px sideways scrolling filter chips with count pills, month grouping ("August 2026", "April 2026"), and expandable photo cards (200ms height transition) showing readable address, 5-step progress bar, and 48px "View on map" and "View details" buttons.',
+        color: 'border-[#ff6b00]/40 bg-[#ff6b00]/10 text-[#ff6b00]'
+      };
+    }
+
+    if (previewTarget === 'details') {
+      return {
+        badge: 'Report Details View',
+        text: 'Live interactive preview of Report Details with sticky header, 48px round back button, 20px bold tracking ID with Copy, 4:3 photo with top-left status pill and 48px round zoom button, 5-step progress line card, inset location card with Map button, "What was reported" card with 4-line clamp toggle, and 48px full-width outlined "Withdraw report" button with accessible confirmation alertdialog.',
+        color: 'border-[#ff6b00]/40 bg-[#ff6b00]/10 text-[#ff6b00]'
+      };
+    }
+
     if (previewTarget === 'report') {
       return {
         badge: 'Quick Report 3-Step Flow (Photo, Category, Details)',
@@ -653,7 +740,7 @@ export default function DevAppPreviewPage() {
       text: 'The resident has completed the tutorial as a guest. The app routes directly to the Guest Report flow (/report).',
       color: 'border-purple-500/40 bg-purple-500/10 text-purple-400'
     };
-  }, [previewTarget, headerActiveTab, headerUserType, headerUnreadCount, splashSimulateMode, simulateInstalled, tutorialCompleted, signedInResident]);
+  }, [previewTarget, cameraPreviewMode, cameraPhotoRatio, headerActiveTab, headerUserType, headerUnreadCount, splashSimulateMode, simulateInstalled, tutorialCompleted, signedInResident]);
 
   // Check overflow / scrolling inside phone container
   useEffect(() => {
@@ -663,6 +750,13 @@ export default function DevAppPreviewPage() {
       setScrollCheckPassed(!hasOverflow);
     }
   }, [screenSize, testStep, simulateInstalled, tutorialCompleted]);
+
+  // Reset phone container scroll to top when preview target or details status changes
+  useEffect(() => {
+    if (phoneContainerRef.current) {
+      phoneContainerRef.current.scrollTop = 0;
+    }
+  }, [previewTarget, detailsStatusIndex]);
 
   // Quick checks rules data for the active tutorial screen
   const quickChecksData = useMemo(() => {
@@ -1065,7 +1159,7 @@ export default function DevAppPreviewPage() {
         {/* ── PHONE-SHAPED FRAME CONTAINER ── */}
         <div className="lg:col-span-5 xl:col-span-5 flex flex-col items-center">
           {/* Target Mode Switcher */}
-          <div className="grid grid-cols-7 gap-1 p-1 rounded-2xl bg-slate-900 border border-slate-800 mb-3 w-full max-w-[540px]">
+          <div className="grid grid-cols-5 sm:grid-cols-10 gap-1 p-1 rounded-2xl bg-slate-900 border border-slate-800 mb-3 w-full max-w-[540px]">
             <button
               type="button"
               onClick={() => {
@@ -1105,6 +1199,32 @@ export default function DevAppPreviewPage() {
                 }`}
             >
               Cards
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewTarget('history');
+                addLog('Switched preview to Report History.');
+              }}
+              className={`py-2 px-0.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer text-center truncate ${previewTarget === 'history'
+                ? 'bg-[#ff6b00] text-white font-extrabold shadow-xs'
+                : 'text-slate-400 hover:text-white'
+                }`}
+            >
+              History
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewTarget('details');
+                addLog('Switched preview to Report Details.');
+              }}
+              className={`py-2 px-0.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer text-center truncate ${previewTarget === 'details'
+                ? 'bg-[#ff6b00] text-white font-extrabold shadow-xs'
+                : 'text-slate-400 hover:text-white'
+                }`}
+            >
+              Details
             </button>
             <button
               type="button"
@@ -1158,6 +1278,19 @@ export default function DevAppPreviewPage() {
                 }`}
             >
               Report
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewTarget('camera');
+                addLog('Switched preview to Camera Screens (3-Zone Full-Screen Dark Layout).');
+              }}
+              className={`py-2 px-0.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer text-center truncate ${previewTarget === 'camera'
+                ? 'bg-[#ff6b00] text-slate-950 font-black shadow-xs'
+                : 'text-slate-400 hover:text-white'
+                }`}
+            >
+              Camera
             </button>
           </div>
 
@@ -1370,6 +1503,223 @@ export default function DevAppPreviewPage() {
                       Solid #ff6b00 pill with #0B1630 dark navy text. Contrast holds in both Light and Dark modes.
                     </p>
                   </div>
+                </div>
+              )}
+
+              {/* CASE D1: Report History Screen Preview */}
+              {previewTarget === 'history' && (
+                <div className={`h-full flex flex-col p-4 overflow-y-auto ${previewIsDark ? 'bg-[#070d1a] text-white' : 'bg-slate-50 text-slate-900'}`}>
+                  {/* Context Banner */}
+                  <div className={`mb-3 p-2.5 rounded-xl border flex items-center justify-between text-xs shrink-0 ${previewIsDark ? 'bg-[#0c1427] border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                    <span className="font-mono text-[10px] font-bold text-[#ff6b00]">
+                      Report History • Month Grouping
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewAppearance(previewIsDark ? 'light' : 'dark')}
+                      className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#ff6b00] text-[#0c1427]"
+                    >
+                      {previewIsDark ? 'Set Light' : 'Set Dark'}
+                    </button>
+                  </div>
+
+                  {/* Header */}
+                  <div className="mb-3">
+                    <h2 className="text-2xl font-bold tracking-tight">Report History</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Track your submitted reports.</p>
+                  </div>
+
+                  {/* Search */}
+                  <div className="relative w-full mb-3">
+                    <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={historySearch}
+                      onChange={(e) => setHistorySearch(e.target.value)}
+                      placeholder="Search by ID or location"
+                      className="w-full h-12 pl-10 pr-9 text-xs sm:text-sm bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 rounded-[0.875rem] focus:outline-none focus:border-[#ff6b00]"
+                    />
+                    {historySearch && (
+                      <button
+                        type="button"
+                        onClick={() => setHistorySearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 p-1.5"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter Chips Row with Chevrons */}
+                  <div className="relative flex items-center min-w-0 max-w-full w-full mb-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById('preview-history-chips');
+                        if (el) el.scrollBy({ left: -140, behavior: 'smooth' });
+                      }}
+                      aria-label="Scroll filters left"
+                      className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:text-[#ff6b00] cursor-pointer mr-1 z-10"
+                    >
+                      <ChevronLeft size={14} strokeWidth={2.5} />
+                    </button>
+
+                    <div id="preview-history-chips" className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 flex-1 min-w-0">
+                      {['all', 'received', 'verified', 'assigned', 'in_progress', 'resolved'].map((fid) => {
+                        const count = fid === 'all'
+                          ? SAMPLE_SHOWCASE_REPORTS.length
+                          : SAMPLE_SHOWCASE_REPORTS.filter(r => r.status === fid).length;
+                        const labelMap = {
+                          all: 'All reports',
+                          received: 'Pending',
+                          verified: 'Verified',
+                          assigned: 'Assigned',
+                          in_progress: 'In Progress',
+                          resolved: 'Resolved'
+                        };
+                        const isSel = historyFilter === fid;
+                        return (
+                          <button
+                            key={fid}
+                            type="button"
+                            onClick={() => setHistoryFilter(fid)}
+                            className={`h-12 min-h-[48px] px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                              isSel
+                                ? 'bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold shadow-sm'
+                                : 'bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                          >
+                            <span className={isSel ? 'text-white' : ''}>{labelMap[fid]}</span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold transition-colors ${
+                              isSel ? 'bg-black/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                            }`}>
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById('preview-history-chips');
+                        if (el) el.scrollBy({ left: 140, behavior: 'smooth' });
+                      }}
+                      aria-label="Scroll filters right"
+                      className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:text-[#ff6b00] cursor-pointer ml-1 z-10"
+                    >
+                      <ChevronRight size={14} strokeWidth={2.5} />
+                    </button>
+                  </div>
+
+                  {/* List grouped by month */}
+                  <div className="space-y-4 flex-1">
+                    {(() => {
+                      const filtered = SAMPLE_SHOWCASE_REPORTS.filter((r) => {
+                        if (historyFilter !== 'all' && r.status !== historyFilter) return false;
+                        if (historySearch.trim()) {
+                          const q = historySearch.toLowerCase();
+                          return r.ticket_id.toLowerCase().includes(q) || r.location_string.toLowerCase().includes(q) || r.category.toLowerCase().includes(q);
+                        }
+                        return true;
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                            <p className="text-sm font-bold">No reports found.</p>
+                            <button
+                              type="button"
+                              onClick={() => { setHistoryFilter('all'); setHistorySearch(''); }}
+                              className="mt-2 text-xs text-[#ff6b00] font-bold underline"
+                            >
+                              Clear filters
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      // Group by month
+                      const groups = {};
+                      filtered.forEach(rep => {
+                        const m = new Date(rep.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                        if (!groups[m]) groups[m] = [];
+                        groups[m].push(rep);
+                      });
+
+                      return Object.entries(groups).map(([month, reps]) => (
+                        <div key={month} className="space-y-2">
+                          <h3 className="text-xs font-semibold text-slate-400 px-1">{month}</h3>
+                          <div className="space-y-2.5">
+                            {reps.map(rep => (
+                              <ReportHistoryCard
+                                key={rep.id}
+                                report={rep}
+                                isExpanded={historyExpandedId === rep.id}
+                                onToggle={() => setHistoryExpandedId(prev => prev === rep.id ? null : rep.id)}
+                                onOpenDetails={(selected) => {
+                                  setSelectedStatusIndex(SAMPLE_SHOWCASE_REPORTS.findIndex(r => r.id === selected.id));
+                                  setDetailsStatusIndex(SAMPLE_SHOWCASE_REPORTS.findIndex(r => r.id === selected.id));
+                                  setPreviewTarget('details');
+                                  addLog(`Navigated to Details for ${selected.ticket_id}`);
+                                }}
+                                onOpenMap={(selected) => addLog(`Opened map for ${selected.ticket_id}`)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="pt-4 text-center pb-2">
+                    <p className="text-xs text-slate-400 font-medium">
+                      Showing {SAMPLE_SHOWCASE_REPORTS.length} of {SAMPLE_SHOWCASE_REPORTS.length} reports
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* CASE D2: Report Details Screen Preview */}
+              {previewTarget === 'details' && (
+                <div
+                  ref={(el) => {
+                    if (el && el.scrollTop > 0) {
+                      el.scrollTop = 0;
+                    }
+                  }}
+                  className={`h-full flex flex-col overflow-y-auto ${previewIsDark ? 'bg-[#070d1a] text-white' : 'bg-slate-50 text-slate-900'}`}>
+                  {/* Status Picker Bar */}
+                  <div className={`p-2 border-b flex items-center justify-between text-xs shrink-0 ${previewIsDark ? 'bg-[#0c1427] border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="font-mono text-[10px] font-bold text-[#ff6b00]">
+                      Details Mode • Status:
+                    </span>
+                    <div className="flex gap-1 overflow-x-auto">
+                      {SAMPLE_SHOWCASE_REPORTS.map((r, idx) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setDetailsStatusIndex(idx)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${detailsStatusIndex === idx ? 'bg-[#ff6b00] text-[#0c1427]' : 'text-slate-400'}`}
+                        >
+                          {r.status}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Full Detail View */}
+                  <ReportDetailView
+                    report={SAMPLE_SHOWCASE_REPORTS[detailsStatusIndex] || SAMPLE_SHOWCASE_REPORTS[0]}
+                    onBack={() => {
+                      setPreviewTarget('history');
+                      addLog('Navigated back to Report History.');
+                    }}
+                    onOpenMap={(rep) => addLog(`Opened map for ${rep.ticket_id}: ${rep.location_string}`)}
+                    onWithdrawReport={(rep) => addLog(`Withdraw confirmed for ${rep.ticket_id} (${rep.status})`)}
+                  />
                 </div>
               )}
 
@@ -1821,6 +2171,44 @@ export default function DevAppPreviewPage() {
                   />
                 </div>
               )}
+
+              {/* CASE I: Fullscreen Camera Screens Showcase */}
+              {previewTarget === 'camera' && (
+                <div className="relative w-full h-full overflow-hidden bg-[#070d1a]">
+                  <IDCameraModal
+                    isOpen={true}
+                    standalone={true}
+                    side="ISSUE"
+                    title="Take a photo"
+                    subtitle="Photos are saved with your location and time."
+                    previewMode={cameraPreviewMode}
+                    ratioOverride={cameraPhotoRatio}
+                    onRatioChange={(newRatio) => {
+                      setCameraPhotoRatio(newRatio);
+                      addLog(`Camera ratio updated inside viewfinder: ${newRatio}`);
+                    }}
+                    previewSamplePhoto={
+                      cameraPreviewMode === 'invalid'
+                        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80'
+                        : 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80'
+                    }
+                    metadata={{
+                      locationAddress: CAMERA_ADDRESS_PRESETS[cameraAddressPreset]?.address || 'Celina Homes 3, Blk 4 Lot 16 Silver, Barangay 171, Caloocan City, 1421 Metro Manila',
+                      coordinates: CAMERA_ADDRESS_PRESETS[cameraAddressPreset]?.coordinates || { lat: 14.7523, lng: 121.0421, accuracy: 6 }
+                    }}
+                    onClose={() => {
+                      addLog('Camera closed via round X button.');
+                      setPreviewTarget('report');
+                    }}
+                    onCapture={(file, aiData) => {
+                      addLog(`Photo accepted & confirmed: ${file?.name || 'captured.jpg'} (${cameraPhotoRatio})`);
+                    }}
+                    onPickFromGallery={() => {
+                      addLog('Opened gallery picker fallback.');
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1839,6 +2227,211 @@ export default function DevAppPreviewPage() {
             <p className="text-sm font-medium text-white leading-relaxed">
               {whatHappensNow.text}
             </p>
+          </div>
+
+          {/* ── CAMERA SCREENS & PHOTO CHECK SHOWCASE CONTROLS ── */}
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#ff6b00]" />
+                <h2 className="font-heading font-black text-lg text-white">
+                  Camera Screens &amp; Photo Check
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewTarget('camera');
+                  addLog('Switched preview to Camera screens (3-zone full-screen dark layout).');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${previewTarget === 'camera'
+                  ? 'bg-[#ff6b00] text-slate-950 shadow-sm font-black'
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+              >
+                {previewTarget === 'camera' ? 'Active in phone' : 'Show in phone'}
+              </button>
+            </div>
+
+            {/* Subtitle / summary */}
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Full-screen dark layout (<span className="text-white font-medium">Zone 1</span> Top bar with title and 48px round close button, <span className="text-white font-medium">Zone 2</span> 4:3 frame &amp; centered states, <span className="text-white font-medium">Zone 3</span> bottom navy bar with centered 4.5rem shutter and 48px flash toggle). Preserves dark layout in both themes, 100dvh, safe-area-inset.
+            </p>
+
+            {/* State Picker Buttons */}
+            <div>
+              <span className="text-xs font-bold text-[#C9D3EA] block mb-2">
+                Simulate Camera State:
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {[
+                  { id: 'invalid', label: '1. Invalid Photo', desc: 'Target Screenshot Reference', badge: 'Screenshot match', icon: AlertTriangle },
+                  { id: 'live', label: '2. Live Viewfinder', desc: '4:3 frame + corner marks', icon: Camera },
+                  { id: 'checking', label: '3. Checking Photo', desc: 'PULSO pulse line', icon: Activity },
+                  { id: 'accepted', label: '4. Accepted Preview', desc: 'Use photo / Retake', icon: CheckCircle2 },
+                  { id: 'permission_denied', label: '5. Permission Denied', desc: 'Phone settings prompt', icon: CameraOff },
+                  { id: 'error', label: '6. Hardware Error', desc: 'Cannot open camera', icon: XCircle }
+                ].map((item) => {
+                  const isSelected = previewTarget === 'camera' && cameraPreviewMode === item.id;
+                  const IconComp = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setCameraPreviewMode(item.id);
+                        setPreviewTarget('camera');
+                        addLog(`Switched camera state to: ${item.label} (${item.desc})`);
+                      }}
+                      className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer relative ${
+                        isSelected
+                          ? 'bg-orange-500/20 border-orange-500 text-white shadow-xs'
+                          : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:border-slate-600 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <IconComp size={14} className={isSelected ? 'text-[#ff6b00]' : 'text-slate-400'} />
+                        <span className="text-xs font-bold">{item.label}</span>
+                      </div>
+                      <div className="text-[10.5px] text-slate-400">{item.desc}</div>
+                      {item.badge && (
+                        <span className="mt-1.5 inline-block text-[9px] font-mono uppercase font-bold px-1.5 py-0.5 rounded bg-orange-500/15 text-[#ff6b00] border border-orange-500/30">
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Photo Shape / Ratio Selector (4:3, 16:9, 1:1) */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#ff6b00]" />
+                  Photo Shape Choice (Problem 1):
+                </span>
+                <span className="text-[11px] font-mono text-[#ff6b00] font-bold">
+                  {cameraPhotoRatio} active
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: '4:3', label: '4:3 (Default)', desc: 'Sensor full detail' },
+                  { id: '16:9', label: '16:9 (Wide)', desc: 'Crops top/bottom' },
+                  { id: '1:1', label: '1:1 (Square)', desc: 'Crops sides' }
+                ].map((item) => {
+                  const isSelected = cameraPhotoRatio === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setCameraPhotoRatio(item.id);
+                        if (previewTarget !== 'camera') setPreviewTarget('camera');
+                        addLog(`Switched camera ratio to ${item.id} (${item.desc})`);
+                      }}
+                      className={`p-2.5 rounded-xl text-center border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#ff6b00] text-[#070d1a] border-[#ff6b00] font-black shadow-sm'
+                          : 'bg-slate-900 border-slate-700/70 text-slate-300 hover:text-white hover:border-slate-500'
+                      }`}
+                    >
+                      <div className="text-xs font-bold leading-tight">{item.label}</div>
+                      <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-slate-950/80 font-medium' : 'text-slate-400'}`}>
+                        {item.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Address Length & Watermark Presets */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  Watermark Scaling &amp; No Cutoffs (Problem 2):
+                </span>
+                <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                  Zero "..." Cutoffs
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {Object.values(CAMERA_ADDRESS_PRESETS).map((preset) => {
+                  const isSelected = cameraAddressPreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setCameraAddressPreset(preset.id);
+                        if (previewTarget !== 'camera') setPreviewTarget('camera');
+                        addLog(`Switched watermark address preset to ${preset.label}`);
+                      }}
+                      className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-xs'
+                          : 'bg-slate-900 border-slate-700/70 text-slate-300 hover:text-white hover:border-slate-500'
+                      }`}
+                    >
+                      <div className="text-xs font-bold leading-tight">{preset.label}</div>
+                      <div className="text-[10px] text-slate-400 mt-1 line-clamp-2">
+                        {preset.address}
+                      </div>
+                      <div className="text-[9.5px] font-mono text-emerald-400 mt-1">
+                        {preset.expectedLines}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Feature Checklist Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 text-xs">
+              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                  <span>Photo Shapes (4:3, 16:9, 1:1)</span>
+                </span>
+                <p className="text-[11px] text-slate-400">
+                  48px segmented control directly under hint line. 200ms smooth frame reshape without stretching. Symmetrical crop keeps long side &gt;= 1280px.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                  <span>Proportional Watermark (No "...")</span>
+                </span>
+                <p className="text-[11px] text-slate-400">
+                  Text scales with <code className="text-[#ff6b00]">u = min(w, h)</code>. Wraps full address onto multiple lines with zero Plus Codes and zero cutoffs.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                  <span>3-Zone Dark Architecture</span>
+                </span>
+                <p className="text-[11px] text-slate-400">
+                  Full-screen dark navy (<code className="text-[#ff6b00]">#070d1a</code>) in both themes. Safe-area padding ensures zero overlap with notch or home indicator.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                  <span>Centered Warning Stack</span>
+                </span>
+                <p className="text-[11px] text-slate-400">
+                  5rem red warning circle, "NOT AN INFRASTRUCTURE PHOTO" all-caps pill, 20-22px bold heading ("Cannot proceed with this photo"), and full-width 52px solid orange button with dark navy text.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* ── QUICK REPORT 3-STEP FLOW SHOWCASE CONTROLS ── */}
