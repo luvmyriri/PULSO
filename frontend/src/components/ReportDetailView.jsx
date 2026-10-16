@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-    ArrowLeft,
+    ChevronLeft,
     Copy,
     Check,
     MapPin,
@@ -156,7 +156,7 @@ export default function ReportDetailView({
                         aria-label="Back to report history"
                         className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
                     >
-                        <ArrowLeft size={20} strokeWidth={2.25} />
+                        <ChevronLeft size={22} strokeWidth={2.5} className="mr-0.5" />
                     </button>
 
                     {/* Middle: 20px bold tracking number + "[Date] · Submitted" */}

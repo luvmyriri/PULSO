@@ -349,7 +349,7 @@ export default function PulseAIChatWindow({
                         <div
                             className={`fixed z-[9999] pointer-events-none transition-all duration-300 ${
                                 isMaximized
-                                    ? 'inset-0 flex items-center justify-center p-3 sm:p-6 lg:p-10'
+                                    ? 'inset-0 flex items-center justify-center p-0 sm:p-4 lg:p-8'
                                     : 'inset-0 sm:inset-auto sm:bottom-6 sm:right-6 flex flex-col justify-end sm:justify-start items-end'
                             }`}
                         >
@@ -360,14 +360,14 @@ export default function PulseAIChatWindow({
                                 role="dialog"
                                 aria-modal="true"
                                 aria-label={`PULSEAI ${isStaff ? 'Staff Assistant' : 'Community Helper'}`}
-                                initial={{ opacity: 0, scale: 0.92, y: 24 }}
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.92, y: 24 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
                                 transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-                                className={`pointer-events-auto bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col relative z-10 transition-all duration-300 ${
+                                className={`pointer-events-auto bg-white dark:bg-slate-900 shadow-2xl border-0 sm:border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col relative z-10 transition-all duration-300 ${
                                     isMaximized
-                                        ? 'w-full h-full max-w-5xl max-h-[90vh] sm:max-h-[88vh] rounded-2xl sm:rounded-3xl'
-                                        : 'w-full sm:w-[410px] md:w-[430px] h-[90vh] sm:h-[580px] max-h-[90dvh] sm:max-h-[calc(100vh-3rem)] rounded-t-2xl sm:rounded-2xl'
+                                        ? 'w-full h-full max-w-6xl max-h-full sm:max-h-[92vh] rounded-none sm:rounded-3xl'
+                                        : 'w-full h-full sm:h-[580px] sm:w-[410px] md:w-[430px] rounded-none sm:rounded-2xl max-h-[100dvh] sm:max-h-[calc(100vh-3rem)]'
                                 }`}
                             >
                         {/* ── HEADER ── */}
@@ -423,12 +423,12 @@ export default function PulseAIChatWindow({
                                     <History size={16} />
                                 </button>
 
-                                {/* Maximize / Minimize (desktop only) */}
+                                {/* Maximize / Minimize / Fullscreen */}
                                 <button
                                     type="button"
                                     onClick={() => setIsMaximized(prev => !prev)}
-                                    title={isMaximized ? 'Minimize' : 'Maximize'}
-                                    aria-label={isMaximized ? 'Minimize Window' : 'Maximize Window'}
+                                    title={isMaximized ? 'Exit Full Screen' : 'Full Screen'}
+                                    aria-label={isMaximized ? 'Exit Full Screen' : 'Full Screen'}
                                     className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                                 >
                                     {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
