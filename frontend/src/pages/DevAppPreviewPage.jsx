@@ -414,6 +414,7 @@ export default function DevAppPreviewPage() {
   const [cameraAddressPreset, setCameraAddressPreset] = useState('standard'); // 'short' | 'standard' | 'long'
   const [historyFilter, setHistoryFilter] = useState('all');
   const [historySearch, setHistorySearch] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
   const [historyExpandedId, setHistoryExpandedId] = useState(null);
   const [detailsStatusIndex, setDetailsStatusIndex] = useState(0);
   const [reportPreviewKey, setReportPreviewKey] = useState(1);
@@ -1631,8 +1632,8 @@ export default function DevAppPreviewPage() {
                             <p className="text-sm font-bold">No reports found.</p>
                             <button
                               type="button"
-                              onClick={() => { setHistoryFilter('all'); setHistorySearch(''); }}
-                              className="mt-2 text-xs text-[#ff6b00] font-bold underline"
+                              onClick={() => { setHistoryFilter('all'); setHistorySearch(''); setHistoryPage(1); }}
+                              className="mt-2 text-xs text-[#ff6b00] font-bold underline cursor-pointer"
                             >
                               Clear filters
                             </button>
@@ -1640,43 +1641,85 @@ export default function DevAppPreviewPage() {
                         );
                       }
 
-                      // Group by month
+                      const HISTORY_PER_PAGE = 5;
+                      const totalHistoryPages = Math.max(1, Math.ceil(filtered.length / HISTORY_PER_PAGE));
+                      const activePage = Math.min(historyPage, totalHistoryPages);
+                      const paginatedSlice = filtered.slice((activePage - 1) * HISTORY_PER_PAGE, activePage * HISTORY_PER_PAGE);
+
+                      // Group paginated 5 items by month
                       const groups = {};
-                      filtered.forEach(rep => {
+                      paginatedSlice.forEach(rep => {
                         const m = new Date(rep.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
                         if (!groups[m]) groups[m] = [];
                         groups[m].push(rep);
                       });
 
-                      return Object.entries(groups).map(([month, reps]) => (
-                        <div key={month} className="space-y-2">
-                          <h3 className="text-xs font-semibold text-slate-400 px-1">{month}</h3>
-                          <div className="space-y-2.5">
-                            {reps.map(rep => (
-                              <ReportHistoryCard
-                                key={rep.id}
-                                report={rep}
-                                isExpanded={historyExpandedId === rep.id}
-                                onToggle={() => setHistoryExpandedId(prev => prev === rep.id ? null : rep.id)}
-                                onOpenDetails={(selected) => {
-                                  setSelectedStatusIndex(SAMPLE_SHOWCASE_REPORTS.findIndex(r => r.id === selected.id));
-                                  setDetailsStatusIndex(SAMPLE_SHOWCASE_REPORTS.findIndex(r => r.id === selected.id));
-                                  setPreviewTarget('details');
-                                  addLog(`Navigated to Details for ${selected.ticket_id}`);
-                                }}
-                                onOpenMap={(selected) => addLog(`Opened map for ${selected.ticket_id}`)}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      ));
+                      return (
+                        <>
+                          {Object.entries(groups).map(([month, reps]) => (
+                            <div key={month} className="space-y-2">
+                              <h3 className="text-xs font-semibold text-slate-400 px-1">{month}</h3>
+                              <div className="space-y-2.5">
+                                {reps.map(rep => (
+                                  <ReportHistoryCard
+                                    key={rep.id}
+                                    report={rep}
+                                    isExpanded={historyExpandedId === rep.id}
+                                    onToggle={() => setHistoryExpandedId(prev => prev === rep.id ? null : rep.id)}
+                                    onOpenDetails={(selected) => {
+                                      setSelectedStatusIndex(SAMPLE_SHOWCASE_REPORTS.findIndex(r => r.id === selected.id));
+                                      setDetailsStatusIndex(SAMPLE_SHOWCASE_REPORTS.findIndex(r => r.id === selected.id));
+                                      setPreviewTarget('details');
+                                      addLog(`Navigated to Details for ${selected.ticket_id}`);
+                                    }}
+                                    onOpenMap={(selected) => addLog(`Opened map for ${selected.ticket_id}`)}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Pagination Controls */}
+                          {filtered.length > HISTORY_PER_PAGE && (
+                            <div className="flex items-center justify-between pt-3 pb-1 px-1 border-t border-slate-200/80 dark:border-slate-800/80 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                Showing {Math.min((activePage - 1) * HISTORY_PER_PAGE + 1, filtered.length)}–{Math.min(activePage * HISTORY_PER_PAGE, filtered.length)} of {filtered.length}
+                              </span>
+
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={activePage <= 1}
+                                  onClick={() => setHistoryPage(prev => Math.max(1, prev - 1))}
+                                  aria-label="Previous page"
+                                  className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                >
+                                  Prev
+                                </button>
+                                <span className="px-1.5 py-0.5 text-[11px] font-bold text-slate-800 dark:text-white">
+                                  {activePage} / {totalHistoryPages}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={activePage >= totalHistoryPages}
+                                  onClick={() => setHistoryPage(prev => Math.min(totalHistoryPages, prev + 1))}
+                                  aria-label="Next page"
+                                  className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
                     })()}
                   </div>
 
                   {/* Footer */}
-                  <div className="pt-4 text-center pb-2">
+                  <div className="pt-2 text-center pb-2">
                     <p className="text-xs text-slate-400 font-medium">
-                      Showing {SAMPLE_SHOWCASE_REPORTS.length} of {SAMPLE_SHOWCASE_REPORTS.length} reports
+                      Total {SAMPLE_SHOWCASE_REPORTS.length} reports recorded
                     </p>
                   </div>
                 </div>

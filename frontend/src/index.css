@@ -615,6 +615,28 @@ html {
 }
 
 @layer utilities {
+  .themed-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .themed-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .themed-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.4);
+    border-radius: 9999px;
+  }
+  .dark .themed-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.5);
+  }
+  .themed-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  }
+  .dark .themed-scrollbar {
+    scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+  }
+
   .glass-nav {
     background-color: color-mix(in srgb, white 90%, transparent);
     backdrop-filter: blur(12px);

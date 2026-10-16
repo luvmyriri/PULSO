@@ -1863,6 +1863,7 @@ const MyReports = ({
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedReportId, setExpandedReportId] = useState(null);
+    const [reportHistoryPage, setReportHistoryPage] = useState(1);
 
     const tabsScrollRef = useRef(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -1947,10 +1948,24 @@ const MyReports = ({
         return true;
     });
 
+    // Pagination: 5 reports per page
+    const REPORTS_PER_PAGE = 5;
+    const totalReportPages = Math.max(1, Math.ceil(filteredReports.length / REPORTS_PER_PAGE));
+    const activeReportPage = Math.min(reportHistoryPage, totalReportPages);
+
+    useEffect(() => {
+        setReportHistoryPage(1);
+    }, [reportStatusFilter, searchQuery]);
+
+    const paginatedReports = useMemo(() => {
+        const start = (activeReportPage - 1) * REPORTS_PER_PAGE;
+        return filteredReports.slice(start, start + REPORTS_PER_PAGE);
+    }, [filteredReports, activeReportPage]);
+
     // Group filtered reports by Month Heading ("August 2026", "April 2026")
     const groupedReports = useMemo(() => {
         const groups = {};
-        filteredReports.forEach((report) => {
+        paginatedReports.forEach((report) => {
             const dateObj = report.created_at ? new Date(report.created_at) : new Date();
             const monthYear = dateObj.toLocaleDateString('en-US', {
                 month: 'long',
@@ -1967,7 +1982,7 @@ const MyReports = ({
             monthYear,
             reports
         }));
-    }, [filteredReports]);
+    }, [paginatedReports]);
 
     return (
         <motion.div
@@ -2187,13 +2202,52 @@ const MyReports = ({
                         </section>
                     ))
                 )}
+
+                {/* Pagination Controls (5 per page) */}
+                {filteredReports.length > REPORTS_PER_PAGE && (
+                    <div className="flex items-center justify-between pt-3 pb-1 px-1 border-t border-slate-200/80 dark:border-slate-800/80 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                        <span className="text-[12px] text-slate-500 dark:text-slate-400 font-medium">
+                            Showing {Math.min((activeReportPage - 1) * REPORTS_PER_PAGE + 1, filteredReports.length)}–{Math.min(activeReportPage * REPORTS_PER_PAGE, filteredReports.length)} of {filteredReports.length}
+                        </span>
+
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                disabled={activeReportPage <= 1}
+                                onClick={() => {
+                                    setReportHistoryPage(prev => Math.max(1, prev - 1));
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                aria-label="Previous page"
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            >
+                                Prev
+                            </button>
+                            <span className="px-2 py-0.5 text-xs font-bold text-slate-800 dark:text-white">
+                                {activeReportPage} / {totalReportPages}
+                            </span>
+                            <button
+                                type="button"
+                                disabled={activeReportPage >= totalReportPages}
+                                onClick={() => {
+                                    setReportHistoryPage(prev => Math.min(totalReportPages, prev + 1));
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                aria-label="Next page"
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Footer Text under the list: "Showing X of Y reports" (14px soft gray) */}
+            {/* Footer Text under the list: "Total X reports recorded" (14px soft gray) */}
             {userReports.length > 0 && (
-                <div className="pt-4 pb-8 text-center">
-                    <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                        Showing {filteredReports.length} of {userReports.length} reports
+                <div className="pt-2 pb-8 text-center">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                        Total {userReports.length} reports recorded
                     </p>
                 </div>
             )}

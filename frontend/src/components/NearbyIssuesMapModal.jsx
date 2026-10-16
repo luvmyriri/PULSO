@@ -12,12 +12,21 @@ import {
     Crosshair,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
+    ChevronUp,
     MapPin,
     AlertTriangle,
     Eye,
     Maximize2,
     Minimize2,
-    ShieldCheck
+    ShieldCheck,
+    Menu,
+    Droplets,
+    Mountain,
+    Zap,
+    Car,
+    Building2,
+    MoreHorizontal
 } from 'lucide-react';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import CaloocanBoundaryLayer from './CaloocanBoundaryLayer';
@@ -196,14 +205,95 @@ export function getMarkerSVG(category, status, isSelected = false) {
     return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
 }
 
+export const CATEGORY_TILES = [
+    { id: 'all', shortLabel: 'All', fullLabel: 'All Categories', icon: Menu },
+    { id: 'water', shortLabel: 'Water', fullLabel: 'Water Supply & Distribution', icon: Droplets },
+    { id: 'roads', shortLabel: 'Roads', fullLabel: 'Roads & Bridges', icon: Mountain },
+    { id: 'power', shortLabel: 'Power', fullLabel: 'Power & Street Lighting', icon: Zap },
+    { id: 'traffic', shortLabel: 'Traffic', fullLabel: 'Traffic & Road Signs', icon: Car },
+    { id: 'safety', shortLabel: 'Safety', fullLabel: 'Public Safety & Hazards', icon: AlertTriangle },
+    { id: 'facilities', shortLabel: 'Buildings', fullLabel: 'Public Buildings & Facilities', icon: Building2 },
+    { id: 'others', shortLabel: 'Others', fullLabel: 'Other Incidents', icon: MoreHorizontal }
+];
+
+export function getCategoryIconComponent(category, rawCategory) {
+    const cat = (category || rawCategory || '').toLowerCase();
+    if (cat.includes('water') || cat.includes('flood') || cat.includes('drain')) return Droplets;
+    if (cat.includes('power') || cat.includes('light') || cat.includes('electric')) return Zap;
+    if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole')) return Mountain;
+    if (cat.includes('safety') || cat.includes('hazard') || cat.includes('danger')) return AlertTriangle;
+    if (cat.includes('building') || cat.includes('facility') || cat.includes('hall')) return Building2;
+    if (cat.includes('traffic') || cat.includes('sign')) return Car;
+    return MoreHorizontal;
+}
+
+export function IssueStatusPill({ status }) {
+    const s = (status || 'received').toLowerCase();
+    let label = 'Received';
+
+    if (s === 'resolved') {
+        label = 'Resolved';
+    } else if (s === 'in_progress' || s === 'in progress' || s === 'investigating') {
+        label = 'In Progress';
+    } else if (s === 'assigned') {
+        label = 'Assigned';
+    } else if (s === 'verified') {
+        label = 'Verified';
+    } else if (s === 'received' || s === 'pending') {
+        label = 'Received';
+    }
+
+    return (
+        <span className="px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white shadow-2xs">
+            {label}
+        </span>
+    );
+}
+
+export function matchesCategory(r, catId) {
+    if (!catId || catId === 'all') return true;
+    const rawCat = (r.raw_category || r.category || '').toLowerCase();
+    const aiCat = (r.ai_category || '').toLowerCase();
+    const title = (r.title || '').toLowerCase();
+    const desc = (r.description || '').toLowerCase();
+    const fullText = `${rawCat} ${aiCat} ${title} ${desc}`;
+
+    switch (catId) {
+        case 'water':
+            return ['water', 'tubig', 'baha', 'flood', 'drain', 'leak', 'pipe', 'tubo', 'sewer', 'canal', 'barado'].some(k => fullText.includes(k));
+        case 'power':
+            return ['power', 'light', 'electric', 'kuryente', 'wire', 'poste', 'lamp', 'blackout'].some(k => fullText.includes(k));
+        case 'roads':
+            return ['road', 'bridge', 'pothole', 'lubak', 'kalsada', 'asphalt', 'crack', 'pavement', 'tulay', 'sidewalk'].some(k => fullText.includes(k));
+        case 'safety':
+            return ['safety', 'hazard', 'danger', 'collapse', 'sunog', 'fire', 'landslide', 'emergency'].some(k => fullText.includes(k));
+        case 'facilities':
+            return ['building', 'facility', 'hall', 'clinic', 'hospital', 'court', 'park', 'school', 'center'].some(k => fullText.includes(k));
+        case 'traffic':
+            return ['traffic', 'sign', 'signage', 'signal', 'stoplight', 'blockage', 'illegal parking'].some(k => fullText.includes(k));
+        case 'others':
+            return !['water', 'tubig', 'baha', 'flood', 'drain', 'leak', 'pipe', 'tubo', 'sewer', 'canal', 'barado',
+                     'power', 'light', 'electric', 'kuryente', 'wire', 'poste', 'lamp', 'blackout',
+                     'road', 'bridge', 'pothole', 'lubak', 'kalsada', 'asphalt', 'crack', 'pavement', 'tulay', 'sidewalk',
+                     'safety', 'hazard', 'danger', 'collapse', 'sunog', 'fire', 'landslide', 'emergency',
+                     'building', 'facility', 'hall', 'clinic', 'hospital', 'court', 'park', 'school', 'center',
+                     'traffic', 'sign', 'signage', 'signal', 'stoplight', 'blockage', 'illegal parking'].some(k => fullText.includes(k));
+        default:
+            return true;
+    }
+}
+
 /**
  * NearbyIssuesMapModal
  *
- * Restores the authentic, user-requested PULSO Civic Aperture GIS Map layout:
- * - Header: "Nearby Hazards & Infrastructure", "Interactive Caloocan GIS map · Field inspections and citizen reports"
- * - Controls Toolbar: Satellite View toggle, My Location button, Sector segmented control (All Caloocan, North Caloocan, South Caloocan)
- * - Horizontal scrolling Category Filter Chips with left/right chevrons
- * - Google Map with real Caloocan boundaries, City Hall HQ pins, incident markers, and interactive Street View inspection
+ * Renders the PULSO Civic Aperture GIS Map with Fullscreen Map & Redesigned Bottom Panel:
+ * - Full-screen Map with authoritative Caloocan boundaries & photo-pins
+ * - Top-right floating controls: Close (X), Satellite View, My Location (48px round buttons)
+ * - Bottom Draggable Panel (3 snap positions: collapsed, half, full; 26rem card on desktop)
+ * - Row 1: Title "Nearby issues", orange count chip, Minimize/Show list button
+ * - Area control (All Caloocan, North Caloocan, South Caloocan)
+ * - Category tiles 4x2 grid with live counts and disabled empty states
+ * - Vertically scrolling list of issues with thumbnails, titles, sublines, status pills & themed scrollbar
  */
 export default function NearbyIssuesMapModal({
     isOpen = true,
@@ -221,18 +311,73 @@ export default function NearbyIssuesMapModal({
     reverseGeocode,
     onOpenReportDetail,
     standalone = false,
-    photoPinIcons: externalPhotoPinIcons = null
+    photoPinIcons: externalPhotoPinIcons = null,
+    initialSheetPosition = 'half'
 }) {
     const isDark = theme === 'dark';
     const [map, setMap] = useState(null);
     const [mapLayerType, setMapLayerType] = useState('roadmap'); // 'roadmap' | 'hybrid'
     const [activeSector, setActiveSector] = useState('all'); // 'all' | 'north' | 'south'
     const [activeCategory, setActiveCategory] = useState('all'); // category id
+    const [currentPage, setCurrentPage] = useState(1);
     const [selectedHazard, setSelectedHazard] = useState(null);
     const [svLocation, setSvLocation] = useState(null);
     const [panorama, setPanorama] = useState(null);
     const [isSvFullscreen, setIsSvFullscreen] = useState(false);
     const [currentZoom, setCurrentZoom] = useState(11);
+
+    // Draggable bottom sheet state: 'collapsed' | 'half' | 'full'
+    const [panelSnap, setPanelSnap] = useState(initialSheetPosition || 'half');
+
+    useEffect(() => {
+        if (initialSheetPosition) {
+            setPanelSnap(initialSheetPosition);
+        }
+    }, [initialSheetPosition]);
+
+    const dragStartY = useRef(0);
+    const dragStartSnap = useRef('half');
+    const isDragging = useRef(false);
+
+    const handlePointerDown = (e) => {
+        isDragging.current = true;
+        dragStartY.current = e.clientY;
+        dragStartSnap.current = panelSnap;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+    };
+
+    const handlePointerMove = (e) => {
+        if (!isDragging.current) return;
+    };
+
+    const handlePointerUp = (e) => {
+        if (!isDragging.current) return;
+        isDragging.current = false;
+        e.currentTarget.releasePointerCapture?.(e.pointerId);
+        const deltaY = e.clientY - dragStartY.current;
+
+        if (deltaY > 40) {
+            if (dragStartSnap.current === 'full') setPanelSnap('half');
+            else if (dragStartSnap.current === 'half') setPanelSnap('collapsed');
+        } else if (deltaY < -40) {
+            if (dragStartSnap.current === 'collapsed') setPanelSnap('half');
+            else if (dragStartSnap.current === 'half') setPanelSnap('full');
+        } else if (Math.abs(deltaY) <= 10) {
+            setPanelSnap(prev => prev === 'collapsed' ? 'half' : 'collapsed');
+        }
+    };
+
+    const listContainerRef = useRef(null);
+    const itemRefs = useRef({});
+
+    useEffect(() => {
+        if (selectedHazard?.id && itemRefs.current[selectedHazard.id]) {
+            itemRefs.current[selectedHazard.id].scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest'
+            });
+        }
+    }, [selectedHazard?.id]);
 
     const pinIconCache = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
     const iconCacheRef = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
@@ -256,29 +401,8 @@ export default function NearbyIssuesMapModal({
         return iconCacheRef.current.get(key);
     }, []);
 
-    const mapCategoryScrollRef = useRef(null);
-    const [canScrollMapCatLeft, setCanScrollMapCatLeft] = useState(false);
-    const [canScrollMapCatRight, setCanScrollMapCatRight] = useState(true);
-
-    const updateMapCatScroll = () => {
-        if (!mapCategoryScrollRef.current) return;
-        const { scrollLeft, scrollWidth, clientWidth } = mapCategoryScrollRef.current;
-        setCanScrollMapCatLeft(scrollLeft > 4);
-        setCanScrollMapCatRight(scrollLeft + clientWidth < scrollWidth - 4);
-    };
-
-    const scrollMapCategories = (dir) => {
-        if (!mapCategoryScrollRef.current) return;
-        const offset = dir === 'left' ? -180 : 180;
-        mapCategoryScrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
-    };
-
-    useEffect(() => {
-        updateMapCatScroll();
-    }, []);
-
-    // Filter reports based on activeSector & activeCategory
-    const filteredReports = useMemo(() => {
+    // Reports filtered by sector only (used to compute category counts)
+    const sectorFilteredReports = useMemo(() => {
         if (!Array.isArray(reports)) return [];
 
         return reports.filter(r => {
@@ -297,36 +421,22 @@ export default function NearbyIssuesMapModal({
                 }
             }
 
-            // Category Filter
-            if (activeCategory !== 'all') {
-                const rawCat = (r.raw_category || r.category || '').toLowerCase();
-                const aiCat = (r.ai_category || '').toLowerCase();
-                const title = (r.title || '').toLowerCase();
-                const desc = (r.description || '').toLowerCase();
-                const fullText = `${rawCat} ${aiCat} ${title} ${desc}`;
-
-                switch (activeCategory) {
-                    case 'water':
-                        return ['water', 'tubig', 'baha', 'flood', 'drain', 'leak', 'pipe', 'tubo', 'sewer', 'canal', 'barado'].some(k => fullText.includes(k));
-                    case 'power':
-                        return ['power', 'light', 'electric', 'kuryente', 'wire', 'poste', 'lamp', 'blackout'].some(k => fullText.includes(k));
-                    case 'roads':
-                        return ['road', 'bridge', 'pothole', 'lubak', 'kalsada', 'asphalt', 'crack', 'pavement', 'tulay', 'sidewalk'].some(k => fullText.includes(k));
-                    case 'safety':
-                        return ['safety', 'hazard', 'danger', 'collapse', 'sunog', 'fire', 'landslide', 'emergency'].some(k => fullText.includes(k));
-                    case 'facilities':
-                        return ['building', 'facility', 'hall', 'clinic', 'hospital', 'court', 'park', 'school', 'center'].some(k => fullText.includes(k));
-                    case 'traffic':
-                        return ['traffic', 'sign', 'signage', 'signal', 'stoplight', 'blockage', 'illegal parking'].some(k => fullText.includes(k));
-                    case 'others':
-                        return true;
-                    default:
-                        return true;
-                }
-            }
-
             return true;
-        }).map(r => {
+        });
+    }, [reports, activeSector]);
+
+    // Live counts for all 8 category tiles within current sector
+    const categoryCounts = useMemo(() => {
+        const counts = {};
+        CATEGORY_TILES.forEach(cat => {
+            counts[cat.id] = sectorFilteredReports.filter(r => matchesCategory(r, cat.id)).length;
+        });
+        return counts;
+    }, [sectorFilteredReports]);
+
+    // Reports filtered by activeSector & activeCategory
+    const filteredReports = useMemo(() => {
+        return sectorFilteredReports.filter(r => matchesCategory(r, activeCategory)).map(r => {
             const lat = parseFloat(r.lat ?? r.location_lat ?? r.latitude);
             const lng = parseFloat(r.lng ?? r.location_lng ?? r.longitude);
             const hasUserLocation = reportLocation?.lat && reportLocation?.lng;
@@ -339,7 +449,42 @@ export default function NearbyIssuesMapModal({
                 formattedDistance: meters != null ? formatDistance(meters) : null
             };
         });
-    }, [reports, activeSector, activeCategory, reportLocation]);
+    }, [sectorFilteredReports, activeCategory, reportLocation]);
+
+    // Pagination: 5 issues per page
+    const ITEMS_PER_PAGE = 5;
+    const totalPages = Math.max(1, Math.ceil(filteredReports.length / ITEMS_PER_PAGE));
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeSector, activeCategory]);
+
+    const paginatedReports = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredReports.slice(start, start + ITEMS_PER_PAGE);
+    }, [filteredReports, currentPage]);
+
+    // If an issue is selected from map pins, ensure it's on the active page
+    useEffect(() => {
+        if (!selectedHazard?.id || filteredReports.length === 0) return;
+        const index = filteredReports.findIndex(r => r.id === selectedHazard.id);
+        if (index !== -1) {
+            const targetPage = Math.floor(index / ITEMS_PER_PAGE) + 1;
+            if (targetPage !== currentPage) {
+                setCurrentPage(targetPage);
+            }
+        }
+    }, [selectedHazard?.id]);
+
+    // Screen reader announcement for filter changes (WCAG 2.2 AA)
+    const [ariaAnnouncement, setAriaAnnouncement] = useState('');
+
+    useEffect(() => {
+        const currentCatObj = CATEGORY_TILES.find(c => c.id === activeCategory);
+        const catLabel = currentCatObj ? currentCatObj.shortLabel : 'All';
+        const areaLabel = activeSector === 'all' ? 'All Caloocan' : activeSector === 'north' ? 'North Caloocan' : 'South Caloocan';
+        setAriaAnnouncement(`${filteredReports.length} issues shown, Page ${currentPage} of ${totalPages}, ${catLabel}, Area: ${areaLabel}`);
+    }, [filteredReports.length, activeCategory, activeSector, currentPage, totalPages]);
 
     // Generate high-performance Canvas Image Pins for Native Google Maps MarkerF
     // (Size-optimized thumbnails, status borders & pointer arrow matching Government Dispatcher Command Center)
@@ -512,179 +657,12 @@ export default function NearbyIssuesMapModal({
     if (!isOpen) return null;
 
     const modalContent = (
-        <div className={`flex flex-col h-full w-full bg-white dark:bg-slate-950 rounded-none sm:rounded-3xl overflow-hidden shadow-2xl border-0 sm:border border-slate-200 dark:border-slate-800 ${isSvFullscreen ? 'fixed inset-0 z-[100] rounded-none border-0' : ''}`}>
-            {/* Modal Header — collapses into a sleek compact bar when Street View is active */}
-            <div className={`border-b border-slate-100 dark:border-slate-800 flex justify-between items-center gap-3 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 transition-all duration-200 ${
-                svLocation ? 'px-3 sm:px-4 py-2 sm:py-2.5' : 'p-4 sm:p-5'
-            } pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:pt-5`}>
-                <div className="min-w-0 pr-2">
-                    <h2 className={`font-black text-slate-900 dark:text-white leading-tight ${
-                        svLocation ? 'text-sm sm:text-base flex items-center gap-2' : 'text-lg sm:text-2xl'
-                    }`}>
-                        {svLocation ? (
-                            <>
-                                <Eye size={16} className="text-orange-500 shrink-0" />
-                                <span className="truncate">Street View Inspection</span>
-                            </>
-                        ) : (
-                            'Nearby Hazards & Infrastructure'
-                        )}
-                    </h2>
-                    {!svLocation && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                            Interactive Caloocan GIS map · Field inspections and citizen reports
-                        </p>
-                    )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                    <button 
-                        type="button"
-                        onClick={() => { 
-                            if (svLocation) {
-                                handleStreetViewClick(null);
-                            } else if (onClose) {
-                                onClose();
-                            }
-                        }} 
-                        className="p-1.5 sm:p-2 border border-slate-200 dark:border-slate-700 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer shrink-0"
-                        aria-label="Close map"
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
-            </div>
+        <div className={`relative flex flex-col h-full w-full bg-[#0c1427] rounded-none sm:rounded-3xl overflow-hidden shadow-2xl border-0 sm:border border-slate-200 dark:border-slate-800 ${isSvFullscreen ? 'fixed inset-0 z-[100] rounded-none border-0' : ''}`}>
+            {/* Screen Reader Live Announcements */}
+            <div className="sr-only" aria-live="polite" aria-atomic="true">{ariaAnnouncement}</div>
 
-            {/* Floating Top Controls Toolbar & Category Chips Bar — Collapsed when Street View is open */}
-            {!svLocation && (
-                <>
-                    {/* Floating Top Controls Toolbar */}
-                    <div className="relative z-10 px-4 py-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center flex-wrap gap-2">
-                            {/* Map Type: Roadmap vs Satellite */}
-                            <button
-                                type="button"
-                                onClick={() => setMapLayerType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
-                                className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                            >
-                                <Layers size={14} className="text-blue-500" />
-                                <span>{mapLayerType === 'roadmap' ? 'Satellite View' : 'Civic View'}</span>
-                            </button>
-
-                            {/* My Location GPS */}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (requestDeviceLocation) requestDeviceLocation(true);
-                                    if (map && reportLocation?.lat) {
-                                        map.panTo({ lat: reportLocation.lat, lng: reportLocation.lng });
-                                        map.setZoom(15);
-                                    }
-                                }}
-                                className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                            >
-                                <Crosshair size={14} className={isLocating ? 'animate-spin text-orange-500' : 'text-emerald-500'} />
-                                <span>{isLocating ? 'Locating...' : 'My Location'}</span>
-                            </button>
-                        </div>
-
-                        {/* Sector Jump Buttons */}
-                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                            <span className="text-[10px] uppercase font-black px-2 text-slate-600 dark:text-slate-300">Sector:</span>
-                            <button
-                                type="button"
-                                onClick={() => handleSectorChange('all')}
-                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                                    activeSector === 'all'
-                                        ? 'bg-[#ff6b00] text-white shadow-xs font-black'
-                                        : 'text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] hover:bg-white/60 dark:hover:bg-slate-700/60'
-                                }`}
-                            >
-                                All Caloocan
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => handleSectorChange('north')}
-                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                                    activeSector === 'north'
-                                        ? 'bg-[#ff6b00] text-white shadow-xs font-black'
-                                        : 'text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] hover:bg-white/60 dark:hover:bg-slate-700/60'
-                                }`}
-                            >
-                                North Caloocan
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => handleSectorChange('south')}
-                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                                    activeSector === 'south'
-                                        ? 'bg-[#ff6b00] text-white shadow-xs font-black'
-                                        : 'text-slate-700 dark:text-slate-300 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] hover:bg-white/60 dark:hover:bg-slate-700/60'
-                                }`}
-                            >
-                                South Caloocan
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Category Filter Chips Bar with Left & Right Chevrons */}
-                    <div className="relative z-10 px-2 sm:px-3 py-1.5 sm:py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-1 sm:gap-1.5 text-[11px] font-bold">
-                        {/* Left Chevron Button */}
-                        <button
-                            type="button"
-                            onClick={() => scrollMapCategories('left')}
-                            disabled={!canScrollMapCatLeft}
-                            aria-label="Scroll categories left"
-                            className={`shrink-0 w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all duration-150 z-10 ${
-                                canScrollMapCatLeft
-                                    ? 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-2xs border border-slate-200 dark:border-slate-700 hover:bg-[#f05a00] hover:text-white dark:hover:bg-[#f05a00] cursor-pointer active:scale-95'
-                                    : 'text-slate-300 dark:text-slate-700 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
-                            }`}
-                        >
-                            <ChevronLeft size={13} strokeWidth={2.5} />
-                        </button>
-
-                        {/* Scrollable Categories Container */}
-                        <div
-                            ref={mapCategoryScrollRef}
-                            onScroll={updateMapCatScroll}
-                            className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5"
-                        >
-                            {MAP_CATEGORIES.map(cat => (
-                                <button
-                                    key={cat.id}
-                                    type="button"
-                                    onClick={() => setActiveCategory(cat.id)}
-                                    className={`px-3 py-1 rounded-full whitespace-nowrap transition-all cursor-pointer shrink-0 ${
-                                        activeCategory === cat.id
-                                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                                            : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-orange-500/40'
-                                    }`}
-                                >
-                                    {cat.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Right Chevron Button */}
-                        <button
-                            type="button"
-                            onClick={() => scrollMapCategories('right')}
-                            disabled={!canScrollMapCatRight}
-                            aria-label="Scroll categories right"
-                            className={`shrink-0 w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all duration-150 z-10 ${
-                                canScrollMapCatRight
-                                    ? 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-2xs border border-slate-200 dark:border-slate-700 hover:bg-[#f05a00] hover:text-white dark:hover:bg-[#f05a00] cursor-pointer active:scale-95'
-                                    : 'text-slate-300 dark:text-slate-700 border border-transparent opacity-20 cursor-not-allowed pointer-events-none'
-                            }`}
-                        >
-                            <ChevronRight size={13} strokeWidth={2.5} />
-                        </button>
-                    </div>
-                </>
-            )}
-
-            {/* Map Canvas Region */}
-            <div className="flex-1 relative w-full h-full min-h-[300px] overflow-hidden [&_.gm-style-cc]:!hidden [&_.gmnoprint]:!hidden [&_button[title*='shortcuts']]:!hidden [&_button[aria-label*='shortcuts']]:!hidden [&_a[href*='terms_maps']]:!hidden">
+            {/* Map Canvas Region — Fullscreen behind bottom panel */}
+            <div className="absolute inset-0 w-full h-full overflow-hidden [&_.gm-style-cc]:!hidden [&_.gmnoprint]:!hidden [&_button[title*='shortcuts']]:!hidden [&_button[aria-label*='shortcuts']]:!hidden [&_a[href*='terms_maps']]:!hidden">
                 {isLoaded ? (
                     <GoogleMap
                         mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -1127,6 +1105,418 @@ export default function NearbyIssuesMapModal({
                     </div>
                 )}
             </div>
+
+            {/* Floating Top-Left Back Button (< Chevron) */}
+            {!svLocation && (
+                <div className="absolute top-[calc(env(safe-area-inset-top,0px)+1rem)] left-4 sm:left-6 z-30 pointer-events-auto">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (svLocation) handleStreetViewClick(null);
+                            else if (onClose) onClose();
+                        }}
+                        aria-label="Back to dashboard"
+                        title="Back"
+                        className="group w-12 h-12 rounded-full bg-white dark:bg-[#0c1427] border border-slate-200 dark:border-slate-800 shadow-md flex items-center justify-center text-slate-800 dark:text-white hover:bg-[#ff6b00] hover:border-[#ff6b00] hover:text-white active:scale-95 transition-all cursor-pointer"
+                    >
+                        <ChevronLeft size={22} strokeWidth={2.5} className="mr-0.5 text-slate-800 dark:text-white group-hover:text-white transition-colors" />
+                    </button>
+                </div>
+            )}
+
+            {/* Floating Top-Right Controls Stack (Satellite View & My Location) */}
+            {!svLocation && (
+                <div className="absolute top-[calc(env(safe-area-inset-top,0px)+1rem)] right-4 sm:right-6 z-30 flex flex-col gap-3 items-end pointer-events-auto">
+                    {/* Satellite View Toggle (48px round button) */}
+                    <button
+                        type="button"
+                        onClick={() => setMapLayerType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
+                        aria-label={mapLayerType === 'roadmap' ? 'Switch to Satellite view' : 'Switch to Civic view'}
+                        title={mapLayerType === 'roadmap' ? 'Satellite View' : 'Civic View'}
+                        className={`group w-12 h-12 rounded-full border shadow-md flex items-center justify-center active:scale-95 transition-all cursor-pointer ${
+                            mapLayerType === 'hybrid'
+                                ? 'bg-[#ff6b00] border-[#ff6b00] hover:bg-[#e65c00] text-white shadow-orange-500/25'
+                                : 'bg-white dark:bg-[#0c1427] border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white hover:bg-[#ff6b00] hover:border-[#ff6b00] hover:text-white'
+                        }`}
+                    >
+                        <Layers size={20} className={mapLayerType === 'hybrid' ? 'text-white' : 'text-slate-800 dark:text-white group-hover:text-white transition-colors'} />
+                    </button>
+
+                    {/* My Location GPS (48px round button) */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (requestDeviceLocation) requestDeviceLocation(true);
+                            if (map && reportLocation?.lat) {
+                                map.panTo({ lat: reportLocation.lat, lng: reportLocation.lng });
+                                map.setZoom(15);
+                            }
+                        }}
+                        aria-label={isLocating ? 'Locating device...' : 'My location'}
+                        title={isLocating ? 'Locating...' : 'My Location'}
+                        className="group w-12 h-12 rounded-full bg-white dark:bg-[#0c1427] border border-slate-200 dark:border-slate-800 shadow-md flex items-center justify-center text-slate-800 dark:text-white hover:bg-[#ff6b00] hover:border-[#ff6b00] hover:text-white active:scale-95 transition-all cursor-pointer"
+                    >
+                        <Crosshair size={20} className={isLocating ? 'animate-spin text-orange-500' : 'text-slate-800 dark:text-white group-hover:text-white transition-colors'} />
+                    </button>
+                </div>
+            )}
+
+            {/* Redesigned Nearby Issues Bottom Panel */}
+            {!svLocation && (
+                <div
+                    role="region"
+                    aria-label="Nearby issues"
+                    style={{
+                        height: panelSnap === 'collapsed' ? '5.25rem' : panelSnap === 'full' ? '88%' : '50%'
+                    }}
+                    className={`z-20 flex flex-col bg-white dark:bg-[#0c1427] border-t border-slate-200 dark:border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] transition-[height] duration-300 motion-reduce:transition-none ease-out select-none
+                        absolute inset-x-0 bottom-0 rounded-t-[1.25rem] pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)]
+                        ${!standalone ? 'md:left-6 md:bottom-6 md:w-[26rem] md:max-h-[720px] md:rounded-2xl md:border md:border-slate-200 md:dark:border-slate-800 md:shadow-2xl md:pb-0' : ''}
+                    `}
+                >
+                    {/* Centered Drag Handle & Header Row 1 */}
+                    <div className="px-4 sm:px-5 pt-2 pb-1 shrink-0 select-none">
+                        {/* Centered Drag Handle (2.5rem x 0.25rem = w-10 h-1) */}
+                        <div
+                            className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700/80 mx-auto mb-2 cursor-grab active:cursor-grabbing touch-none p-1 -m-1"
+                            role="button"
+                            tabIndex={0}
+                            aria-label={panelSnap === 'full' ? 'Minimize list' : 'Expand list'}
+                            aria-expanded={panelSnap === 'full'}
+                            onPointerDown={handlePointerDown}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setPanelSnap(prev => prev === 'full' ? 'half' : 'full');
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setPanelSnap(prev => prev === 'full' ? 'half' : 'full');
+                                }
+                            }}
+                        />
+
+                        {/* Row 1: Title, Count Chip & Expand / Collapse actions */}
+                        <div className="flex items-center justify-between gap-1.5 min-h-[3rem]">
+                            <div className="flex items-center gap-2 shrink-0">
+                                <h2 className="text-lg xs:text-xl font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
+                                    Nearby issues
+                                </h2>
+                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white shadow-2xs shrink-0 whitespace-nowrap">
+                                    {filteredReports.length} nearby
+                                </span>
+                            </div>
+
+                            {panelSnap === 'collapsed' ? (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPanelSnap('half');
+                                    }}
+                                    aria-label="Expand list"
+                                    aria-expanded="false"
+                                    className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium flex items-center gap-1.5 min-h-[48px] px-2 -mr-2 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                                >
+                                    <span className="whitespace-nowrap">Expand</span>
+                                    <ChevronUp size={14} className="shrink-0" />
+                                </button>
+                            ) : panelSnap === 'full' ? (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPanelSnap('half');
+                                    }}
+                                    aria-label="Collapse to 2nd stage"
+                                    aria-expanded="false"
+                                    className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium flex items-center gap-1.5 min-h-[48px] px-2 -mr-2 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                                >
+                                    <span className="whitespace-nowrap">Collapse</span>
+                                    <ChevronDown size={14} className="shrink-0" />
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPanelSnap('full');
+                                        }}
+                                        aria-label="Expand to full view"
+                                        aria-expanded="false"
+                                        className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium flex items-center gap-1 min-h-[48px] px-2 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                                    >
+                                        <span className="whitespace-nowrap">Expand</span>
+                                        <ChevronUp size={14} className="shrink-0" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPanelSnap('collapsed');
+                                        }}
+                                        aria-label="Collapse list"
+                                        aria-expanded="true"
+                                        className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium flex items-center gap-1 min-h-[48px] px-2 -mr-2 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                                    >
+                                        <span className="whitespace-nowrap">Collapse</span>
+                                        <ChevronDown size={14} className="shrink-0" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Expanded Content Area: Area Control, Categories, & Issue List */}
+                    {panelSnap !== 'collapsed' && (
+                        <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-5 pb-3 gap-3">
+                            {/* Area Control (3 equal segments, 48px tall) */}
+                            <div
+                                role="radiogroup"
+                                aria-label="Area"
+                                className="grid grid-cols-3 p-1 rounded-xl bg-slate-100 dark:bg-[#101b33] border border-slate-200/80 dark:border-slate-800/80 h-12 shrink-0 select-none"
+                            >
+                                {[
+                                    { id: 'all', label: 'All Caloocan' },
+                                    { id: 'north', label: 'North Caloocan' },
+                                    { id: 'south', label: 'South Caloocan' }
+                                ].map(sector => {
+                                    const isSelected = activeSector === sector.id;
+                                    return (
+                                        <button
+                                            key={sector.id}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={isSelected}
+                                            onClick={() => handleSectorChange(sector.id)}
+                                            className={`text-[13px] xs:text-sm font-semibold rounded-lg transition-all flex items-center justify-center cursor-pointer select-none ${
+                                                isSelected
+                                                    ? 'bg-[#ff6b00] text-white font-bold shadow-xs'
+                                                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
+                                            }`}
+                                        >
+                                            {sector.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Section Label: ISSUE CATEGORIES (clean text, no blue border/outline) */}
+                            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wider uppercase select-none outline-none border-0 pt-0.5">
+                                ISSUE CATEGORIES
+                            </div>
+
+                            {/* Category Tiles Grid: 4 cols x 2 rows, equal width, 4.5rem tall, 0.5rem gaps */}
+                            <div
+                                role="radiogroup"
+                                aria-label="Issue categories"
+                                className="grid grid-cols-4 gap-2 shrink-0 select-none"
+                            >
+                                {CATEGORY_TILES.map(cat => {
+                                    const count = categoryCounts[cat.id] || 0;
+                                    const isSelected = activeCategory === cat.id;
+                                    const isDisabled = count === 0;
+                                    const IconComponent = cat.icon;
+
+                                    return (
+                                        <button
+                                            key={cat.id}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={isSelected}
+                                            aria-label={`${cat.fullLabel}, ${count} issues`}
+                                            aria-disabled={isDisabled ? 'true' : undefined}
+                                            disabled={isDisabled}
+                                            onClick={() => {
+                                                if (!isDisabled) setActiveCategory(cat.id);
+                                            }}
+                                            className={`h-[4.5rem] rounded-xl p-2 flex flex-col justify-between text-left transition-all relative ${
+                                                isDisabled
+                                                    ? 'opacity-55 cursor-not-allowed bg-slate-100/50 dark:bg-[#111c33]/50 border border-slate-200/50 dark:border-slate-800/40 text-slate-400 dark:text-slate-500'
+                                                    : isSelected
+                                                        ? 'bg-[#ff6b00]/10 dark:bg-[#ff6b00]/15 border border-[#ff6b00] text-[#B83A00] dark:text-[#ff6b00] shadow-2xs cursor-pointer'
+                                                        : 'bg-slate-100/80 dark:bg-[#111c33] border border-slate-200 dark:border-slate-800/80 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between w-full">
+                                                <IconComponent className={`w-5 h-5 sm:w-6 sm:h-6 shrink-0 ${
+                                                    isSelected ? 'text-[#B83A00] dark:text-[#ff6b00]' : 'text-slate-600 dark:text-slate-300'
+                                                }`} />
+                                                <span className={`text-xs font-semibold ${
+                                                    isSelected ? 'text-[#B83A00] dark:text-[#ff6b00]' : 'text-slate-400 dark:text-slate-400'
+                                                }`}>
+                                                    {count}
+                                                </span>
+                                            </div>
+                                            <span className={`text-xs font-semibold truncate leading-none ${
+                                                isSelected ? 'text-[#B83A00] dark:text-[#ff6b00]' : 'text-slate-700 dark:text-slate-200'
+                                            }`}>
+                                                {cat.shortLabel}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Vertically Scrolling List */}
+                            <div
+                                ref={listContainerRef}
+                                role="list"
+                                aria-label="Nearby issues list"
+                                className="flex-1 min-h-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex flex-col gap-2 py-1 pr-0.5"
+                            >
+                                {filteredReports.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                                        <MapPin size={32} className="text-slate-400 dark:text-slate-500 mb-2" />
+                                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                            No issues found here.
+                                        </p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-[240px]">
+                                            Try selecting a different category or view all of Caloocan.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                handleSectorChange('all');
+                                                setActiveCategory('all');
+                                            }}
+                                            className="mt-4 px-4 py-2 rounded-xl text-xs font-bold bg-[#ff6b00] hover:bg-[#e65c00] text-white shadow-xs transition-all cursor-pointer active:scale-95"
+                                        >
+                                            Show all of Caloocan
+                                        </button>
+                                    </div>
+                                ) : (
+                                    paginatedReports.map(report => {
+                                        const isSelected = selectedHazard?.id === report.id;
+                                        const rawImg = report.image_url || report.photo_url || report.photo_thumbnail || report.media_url || report.image;
+                                        const barangayText = report.barangay || (report.location ? report.location.split(',')[0] : 'Caloocan');
+                                        const categoryText = report.category || report.raw_category || 'General';
+                                        const CatIcon = getCategoryIconComponent(report.category, report.raw_category);
+
+                                        let thumbUrl = rawImg;
+                                        if (rawImg && !rawImg.startsWith('http') && !rawImg.startsWith('data:')) {
+                                            const cleanPath = rawImg.startsWith('/') ? rawImg : `/${rawImg}`;
+                                            thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
+                                        }
+
+                                        return (
+                                            <div
+                                                key={report.id}
+                                                ref={el => { itemRefs.current[report.id] = el; }}
+                                                role="listitem"
+                                                tabIndex={0}
+                                                onClick={() => {
+                                                    if (isSelected && onOpenReportDetail) {
+                                                        onOpenReportDetail(report);
+                                                    } else {
+                                                        setSelectedHazard(report);
+                                                        if (map && report.lat != null && report.lng != null) {
+                                                            map.panTo({ lat: report.lat, lng: report.lng });
+                                                            if (window.innerWidth < 768) {
+                                                                map.panBy(0, panelSnap === 'full' ? 140 : 80);
+                                                            }
+                                                        }
+                                                    }
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        if (isSelected && onOpenReportDetail) {
+                                                            onOpenReportDetail(report);
+                                                        } else {
+                                                            setSelectedHazard(report);
+                                                            if (map && report.lat != null && report.lng != null) {
+                                                                map.panTo({ lat: report.lat, lng: report.lng });
+                                                            }
+                                                        }
+                                                    }
+                                                }}
+                                                className={`p-3 rounded-2xl border transition-all cursor-pointer min-h-[4.5rem] flex items-center gap-3 ${
+                                                    isSelected
+                                                        ? 'bg-[#ff6b00]/10 dark:bg-[#ff6b00]/15 border-[#ff6b00] shadow-xs'
+                                                        : 'bg-slate-50 dark:bg-[#111c33]/80 border-slate-200 dark:border-slate-800/80 hover:bg-slate-100/70 dark:hover:bg-[#152340]'
+                                                }`}
+                                            >
+                                                {/* Thumbnail (3.25rem = w-13 h-13) */}
+                                                <div className="w-[3.25rem] h-[3.25rem] rounded-xl shrink-0 overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                                                    {thumbUrl ? (
+                                                        <img
+                                                            src={thumbUrl}
+                                                            alt={report.title}
+                                                            className="w-full h-full object-cover"
+                                                            loading="lazy"
+                                                            onError={(e) => {
+                                                                e.currentTarget.style.display = 'none';
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <CatIcon size={22} className="text-slate-500 dark:text-slate-400" />
+                                                    )}
+                                                </div>
+
+                                                {/* Middle: Title & Subline */}
+                                                <div className="flex-1 min-w-0 pr-1">
+                                                    <div className="text-sm font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
+                                                        {report.title || 'Civic Infrastructure Report'}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 leading-tight">
+                                                        {barangayText} · {categoryText}
+                                                    </div>
+                                                </div>
+
+                                                {/* Right Status Pill */}
+                                                <IssueStatusPill status={report.status} />
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            {/* Pagination Controls (5 per page) */}
+                            {filteredReports.length > ITEMS_PER_PAGE && (
+                                <div className="flex items-center justify-between pt-1 pb-0.5 px-1 shrink-0 border-t border-slate-200/70 dark:border-slate-800/70 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                        Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredReports.length)}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredReports.length)} of {filteredReports.length}
+                                    </span>
+
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            disabled={currentPage <= 1}
+                                            onClick={() => {
+                                                setCurrentPage(prev => Math.max(1, prev - 1));
+                                                if (listContainerRef.current) listContainerRef.current.scrollTop = 0;
+                                            }}
+                                            aria-label="Previous page"
+                                            className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                        >
+                                            Prev
+                                        </button>
+                                        <span className="px-1.5 py-0.5 text-[11px] font-bold text-slate-800 dark:text-white">
+                                            {currentPage} / {totalPages}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            disabled={currentPage >= totalPages}
+                                            onClick={() => {
+                                                setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                                                if (listContainerRef.current) listContainerRef.current.scrollTop = 0;
+                                            }}
+                                            aria-label="Next page"
+                                            className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 
