@@ -5210,6 +5210,10 @@ const ResidentModals = ({
                     isSelectingLocation={isSelectingLocation}
                     onOpenReportDetail={(report) => {
                         setSelectedHazard(report);
+                        if (report?.isOwnReport) {
+                            setActiveModal(null);
+                            setActiveTab('reports');
+                        }
                     }}
                     photoPinIcons={photoPinIcons}
                 />
@@ -6779,7 +6783,7 @@ export default function ResidentDashboard() {
     const fetchPublicReports = useCallback(async () => {
         return dedupeFetch('public_reports', async () => {
             try {
-                const res = await apiFetch('/api/reports/public?limit=100');
+                const res = await apiFetch('/api/reports/public?limit=300');
                 if (res.ok && Array.isArray(res.data)) {
                     const list = res.data;
                     setPublicReports(prev => {
@@ -7190,15 +7194,28 @@ export default function ResidentDashboard() {
     const processedHazards = React.useMemo(() => {
         if (!isLoaded) return [];
 
-        // Combine public community reports and personal reports (deduplicate by id or ticket_id)
-        const combined = [...(publicReports || []), ...(userReports || [])];
+        const userReportKeys = new Set(
+            (userReports || []).flatMap(ur => [
+                ur.id != null ? String(ur.id) : null,
+                ur.ticket_id ? String(ur.ticket_id) : null
+            ]).filter(Boolean)
+        );
+
+        // Prioritize userReports so the resident's own full context is kept for their own reports,
+        // followed by publicReports which provides all active pin locations from other residents.
+        const combined = [...(userReports || []), ...(publicReports || [])];
         const seen = new Set();
         const uniqueReports = [];
         for (const r of combined) {
             const idKey = r.id != null ? String(r.id) : (r.ticket_id ? String(r.ticket_id) : (r.tracking_token || `${r.location_lat || r.lat}_${r.location_lng || r.lng}_${r.created_at || ''}`));
             if (!seen.has(idKey)) {
                 seen.add(idKey);
-                uniqueReports.push(r);
+                const isOwn = Boolean(
+                    (currentUser?.id && (r.resident_id === currentUser.id || r.claimed_by_user_id === currentUser.id)) ||
+                    (r.id != null && userReportKeys.has(String(r.id))) ||
+                    (r.ticket_id && userReportKeys.has(String(r.ticket_id)))
+                );
+                uniqueReports.push({ ...r, isOwnReport: isOwn });
             }
         }
 
@@ -7236,7 +7253,8 @@ export default function ResidentDashboard() {
                 status: (r.status || 'pending').toLowerCase(),
                 location: r.location_string || 'Caloocan City',
                 image: image,
-                ai_urgency: r.ai_urgency || r.urgency
+                ai_urgency: r.ai_urgency || r.urgency,
+                isOwnReport: Boolean(r.isOwnReport)
             };
         }).filter(r => !isNaN(r.lat) && !isNaN(r.lng));
 
@@ -7250,7 +7268,7 @@ export default function ResidentDashboard() {
                 distanceValue: meters ?? 999999
             };
         }).sort((a, b) => a.distanceValue - b.distanceValue);
-    }, [reportLocation, userReports, publicReports, isLoaded]);
+    }, [reportLocation, userReports, publicReports, isLoaded, currentUser?.id]);
 
     const heatmapPoints = React.useMemo(() => {
         if (!processedHazards || processedHazards.length === 0) return [];

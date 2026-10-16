@@ -1748,27 +1748,53 @@ def read_user_reports(
 @app.get("/api/reports/public", response_model=List[schemas.ReportResponse])
 def read_public_reports(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 300,
     db: Session = Depends(get_db),
     current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
-    Returns public/verified reports that residents should see as 'Nearby Hazards'.
-    Excludes pending/unverified reports and anonymizes reporters for privacy.
+    Returns public reports that all residents can see as pin locations on the map.
+    Includes active community reports (pending, under_review, validated, in_progress, resolved).
+    Excludes cancelled and rejected reports.
+    Strictly strips and anonymizes all resident personal information (name, email, phone, user IDs, tracking tokens)
+    so viewers only see the reported pin location, category, status, and evidence.
     """
-    reports = crud.get_reports(db, skip=skip, limit=limit)
+    query = db.query(models.Report).filter(
+        models.Report.location_lat.isnot(None),
+        models.Report.location_lng.isnot(None),
+        or_(
+            models.Report.status.is_(None),
+            models.Report.status.notin_(["cancelled", "rejected"])
+        )
+    ).order_by(models.Report.created_at.desc())
     
-    # Filter for reports that are validated or further in the workflow
-    public_statuses = ["validated", "dispatched", "approved_internal", "in_progress", "resolved"]
-    public_reports = [r for r in reports if r.status in public_statuses]
+    db_reports = query.offset(skip).limit(min(limit, 500)).all()
     
-    # Anonymize reporter names if the requester is not an official or is another resident
-    for r in public_reports:
-        if not current_user or not isinstance(current_user, models.Official):
-            if not current_user or r.resident_id != current_user.id:
-                r.reporter_name = "Anonymous Resident"
-                
-    return public_reports
+    results = []
+    is_official = current_user is not None and isinstance(current_user, models.Official)
+    current_resident_id = current_user.id if (current_user is not None and isinstance(current_user, models.Resident)) else None
+
+    for r in db_reports:
+        is_owner = (current_resident_id is not None) and (
+            r.resident_id == current_resident_id or r.claimed_by_user_id == current_resident_id
+        )
+
+        resp = schemas.ReportResponse.model_validate(r)
+
+        # If requester is not an official and not the report author/claimant,
+        # strip all personal resident information so only the pin location & civic details are exposed
+        if not is_official and not is_owner:
+            resp.reporter_name = "Anonymous Resident"
+            resp.contact_email = None
+            resp.contact_phone = None
+            resp.resident_id = None
+            resp.claimed_by_user_id = None
+            resp.tracking_token = None
+            resp.tracking_url = None
+
+        results.append(resp)
+
+    return results
 
 @app.get("/api/reports/{report_id}", response_model=schemas.ReportResponse)
 def read_report(

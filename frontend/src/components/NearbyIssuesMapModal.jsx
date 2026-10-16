@@ -16,7 +16,8 @@ import {
     AlertTriangle,
     Eye,
     Maximize2,
-    Minimize2
+    Minimize2,
+    ShieldCheck
 } from 'lucide-react';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import CaloocanBoundaryLayer from './CaloocanBoundaryLayer';
@@ -926,11 +927,43 @@ export default function NearbyIssuesMapModal({
                                                 background: selectedHazard.status === 'resolved' ? 'rgba(74,222,128,0.12)' : selectedHazard.status === 'pending' ? 'rgba(248,113,113,0.12)' : 'rgba(251,146,60,0.12)',
                                                 padding: '3px 12px',
                                                 borderRadius: '999px',
-                                                marginBottom: '8px',
+                                                marginBottom: '6px',
                                                 textTransform: 'uppercase'
                                             }}>
                                                 {selectedHazard.status || 'Received'}
                                             </div>
+
+                                            {/* Ownership & Identity Protection Indicator */}
+                                            {selectedHazard.isOwnReport ? (
+                                                <div style={{
+                                                    fontSize: '10px',
+                                                    fontWeight: 700,
+                                                    color: '#ff6b00',
+                                                    background: 'rgba(255,107,0,0.12)',
+                                                    border: '1px solid rgba(255,107,0,0.25)',
+                                                    padding: '2px 10px',
+                                                    borderRadius: '999px',
+                                                    marginBottom: '8px'
+                                                }}>
+                                                    Your Report
+                                                </div>
+                                            ) : (
+                                                <div style={{
+                                                    fontSize: '10px',
+                                                    fontWeight: 600,
+                                                    color: isDark ? '#94a3b8' : '#64748b',
+                                                    background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                                                    border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
+                                                    padding: '2px 10px',
+                                                    borderRadius: '999px',
+                                                    marginBottom: '8px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                }}>
+                                                    <ShieldCheck size={11} /> Community Report · Identity Protected
+                                                </div>
+                                            )}
 
                                             <h4 style={{
                                                 fontWeight: 700,
@@ -987,7 +1020,7 @@ export default function NearbyIssuesMapModal({
                                                     <Eye size={14} /> Open Street View
                                                 </button>
 
-                                                {onOpenReportDetail && (
+                                                {onOpenReportDetail && selectedHazard.isOwnReport && (
                                                     <button
                                                         type="button"
                                                         onClick={() => onOpenReportDetail(selectedHazard)}
@@ -1003,7 +1036,7 @@ export default function NearbyIssuesMapModal({
                                                             cursor: 'pointer'
                                                         }}
                                                     >
-                                                        View Full Details
+                                                        View in My Reports
                                                     </button>
                                                 )}
                                             </div>
