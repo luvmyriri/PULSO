@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MapPinned, Activity, BrainCircuit, ArrowRight, ActivitySquare, Menu, X } from 'lucide-react';
+import { MapPinned, Activity, BrainCircuit, ArrowRight, ActivitySquare, Menu, X } from '../icons';
 import { useTranslation } from 'react-i18next';
 import Branding from '../components/Branding';
 

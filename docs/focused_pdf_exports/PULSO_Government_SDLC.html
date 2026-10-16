@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Government Command Center: SDLC Specification</title>
+    <style>
+        
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@page {
+    size: A4 portrait;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-center {
+        content: counter(page);
+    }
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.6;
+    color: #1e293b;
+    background-color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+/* Document Header & Cover */
+.doc-cover {
+    page-break-after: always;
+    padding: 30px 10px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 88vh;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.pulse-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 2px solid #f97316;
+    border-radius: 10px;
+    color: #f97316;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-title {
+    font-size: 15pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #0f172a;
+    text-transform: uppercase;
+}
+
+.brand-sub {
+    font-size: 8pt;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.cover-main {
+    margin: 30px 0;
+}
+
+.cover-badge {
+    display: inline-block;
+    padding: 5px 14px;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
+    border-radius: 20px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.cover-title {
+    font-size: 24pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+}
+
+.cover-subtitle {
+    font-size: 11.5pt;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.6;
+    max-width: 650px;
+    margin-bottom: 24px;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.meta-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+}
+
+.meta-value {
+    font-size: 9pt;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.cover-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8pt;
+    color: #64748b;
+}
+
+/* Headings */
+h1 {
+    font-size: 16pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-top: 28px;
+    margin-bottom: 12px;
+    letter-spacing: -0.3px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h2 {
+    font-size: 12.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    border-left: 3.5px solid #f97316;
+    padding-left: 10px;
+    letter-spacing: -0.2px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h4 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+p {
+    margin: 0 0 10px 0;
+}
+
+/* Lists */
+ul, ol {
+    margin: 0 0 12px 0;
+    padding-left: 22px;
+}
+
+li {
+    margin-bottom: 4px;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 18px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+thead {
+    display: table-header-group;
+}
+
+tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid #1e293b;
+    letter-spacing: 0.2px;
+}
+
+td {
+    padding: 7px 10px;
+    border: 1px solid #e2e8f0;
+    vertical-align: top;
+    color: #334155;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+/* Blockquotes / Callouts */
+blockquote {
+    margin: 14px 0;
+    padding: 10px 16px;
+    background-color: #f8fafc;
+    border-left: 4px solid #f97316;
+    border-radius: 0 6px 6px 0;
+    color: #334155;
+    font-size: 9pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* Code & Preformatted */
+code {
+    font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+    font-size: 8.2pt;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+pre {
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 8pt;
+    line-height: 1.45;
+    margin: 12px 0 16px 0;
+    border: 1px solid #334155;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+    border: none;
+    font-size: inherit;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 20px 0;
+}
+
+/* Scenario Highlighting */
+strong {
+    color: #0f172a;
+}
+
+    </style>
+</head>
+<body>
+    
+    <div class="doc-cover">
+        <div class="cover-brand">
+            <div class="pulse-logo">P</div>
+            <div class="brand-text">
+                <span class="brand-title">PULSO PLATFORM</span>
+                <span class="brand-sub">Civic Operations & Engineering</span>
+            </div>
+        </div>
+        <div class="cover-main">
+            <span class="cover-badge">GOVERNMENT SDLC SPECIFICATION</span>
+            <h1 class="cover-title">Government Command Center: SDLC Specification</h1>
+            <div class="cover-subtitle">Enterprise Stage-Gate delivery governance, statutory alignment (RA 9184 & RA 10173), canonical state machines, staging UAT sign-off, and Gov-Cloud deployment protocols.</div>
+            <div class="meta-grid">
+                
+        <div class="meta-item">
+            <span class="meta-label">Document Title</span>
+            <span class="meta-value">Government Operations Software Development Life Cycle (SDLC)</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">System</span>
+            <span class="meta-value">PULSO Civic Engagement & Infrastructure Intelligence Platform</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Target Audience</span>
+            <span class="meta-value">Enterprise Solution Architects, Backend/DevOps Leads, LGU Project Managers</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Version</span>
+            <span class="meta-value">1.0 (Focused Specification)</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Authority</span>
+            <span class="meta-value">City Engineering Office & Information Technology Department, Caloocan City</span>
+        </div>
+        
+            </div>
+        </div>
+        <div class="cover-footer">
+            <span>City Government of Caloocan &bull; Engineering & Resident Operations</span>
+            <span>OFFICIAL PRODUCT & ENGINEERING SPECIFICATION</span>
+        </div>
+    </div>
+    
+    <div class="content-body">
+        <hr />
+<h2 id="1-enterprise-sdlc-governance-paradigm">1. Enterprise SDLC Governance Paradigm</h2>
+<p>The PULSO Government Command Center and Operations Suite follow a <strong>Stage-Gate Agile Engineering Framework</strong>. This model couples iterative sprint cycles with rigorous formal stage-gate approvals required for public sector compliance, statutory auditability (COA rules), and data privacy (RA 10173).</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│                   ENTERPRISE STAGE-GATE SDLC GOVERNANCE                 │
+├───────────────────────────────────┬─────────────────────────────────────┤
+│   STAGE-GATE AUDIT MILESTONES     │     AGILE INCREMENTAL CYCLES        │
+│   • Gate 1: Statutory Compliance  │     • 2-Week Backend/FE Sprints     │
+│   • Gate 2: RBAC &amp; Security Audit │     • Continuous Integration (CI)   │
+│   • Gate 3: Dept. Head UAT Signoff│     • Weekly Staging Demos          │
+│   • Gate 4: Production Commission │     • Automated Migration Scripts   │
+└───────────────────────────────────┴─────────────────────────────────────┘
+</code></pre>
+<p>The government platform operates under high-assurance reliability standards: 99.95% command center availability, zero data loss, strict role-based access control (RBAC), and tamper-evident audit logging for every administrative and financial transaction.</p>
+<hr />
+<h2 id="2-seven-phase-lifecycle-workflow">2. Seven-Phase Lifecycle Workflow</h2>
+<pre><code>[Phase 1: Statutory Alignment] ──► [Phase 2: Domain &amp; State Machines] ──► [Phase 3: Core Sprint Build]
+                                                                                   │
+[Phase 6: Gov-Cloud Commission] ◄── [Phase 5: Departmental UAT] ◄── [Phase 4: Security &amp; RBAC Gates]
+          │
+          ▼
+[Phase 7: SLA &amp; Archival Governance]
+</code></pre>
+<h3 id="phase-1-statutory-alignment-regulatory-mapping">Phase 1: Statutory Alignment &amp; Regulatory Mapping</h3>
+<ul>
+<li><strong>Objective:</strong> Align system logic with Philippine statutory standards governing local government operations.</li>
+<li><strong>Key Statutory Mandates Enforced:</strong><ul>
+<li><em>RA 9184 (Government Procurement Reform Act):</em> Governing requisition letters, BAC bidding stages, and purchase authorizations.</li>
+<li><em>RA 10173 (Data Privacy Act of 2012):</em> Segregating resident PII from public-facing government analytics.</li>
+<li><em>COA (Commission on Audit) Guidelines:</em> Immutable logging of financial approvals and asset lifecycle events.</li>
+</ul>
+</li>
+<li><strong>Deliverables:</strong> Statutory Compliance Matrix, Functional Architecture Specification.</li>
+</ul>
+<hr />
+<h3 id="phase-2-domain-modeling-canonical-state-machines">Phase 2: Domain Modeling &amp; Canonical State Machines</h3>
+<ul>
+<li><strong>Objective:</strong> Define unambiguous, backend-authoritative state machines and data models for all municipal entities.</li>
+<li><strong>Key State Machines Formalized:</strong><ol>
+<li><strong>Incident Ticket Lifecycle:</strong> <code>Submitted</code> -&gt; <code>AI Verified</code> -&gt; <code>Assigned</code> -&gt; <code>Dispatched</code> -&gt; <code>In Progress</code> -&gt; <code>Resolved</code> -&gt; <code>Closed</code>.</li>
+<li><strong>13-Phase Infrastructure Project Engine:</strong> Linear progression from <code>Project Request</code> to <code>Certificate of Completion</code> with strict milestone transition guards.</li>
+<li><strong>Procurement Lifecycle:</strong> <code>Requisition Drafted</code> -&gt; <code>Budget Certified</code> -&gt; <code>BAC Processing</code> -&gt; <code>Delivered</code>.</li>
+</ol>
+</li>
+<li><strong>Deliverables:</strong> Database Entity-Relationship Diagrams (ERD), OpenAPI 3.1 Swagger Contracts.</li>
+</ul>
+<hr />
+<h3 id="phase-3-enterprise-sprint-engineering-modular-services">Phase 3: Enterprise Sprint Engineering &amp; Modular Services</h3>
+<ul>
+<li><strong>Objective:</strong> Implement decoupled backend services and responsive desktop dashboards in structured 2-week iterations.</li>
+<li><strong>Architecture Stack:</strong><ul>
+<li><em>Backend:</em> Python FastAPI with async route execution, SQLAlchemy ORM, and Pydantic schema validation.</li>
+<li><em>Frontend:</em> React with role-aware routed shells, Vite build tooling, and Tailwind/Vanilla CSS styling.</li>
+<li><em>Geospatial Engine:</em> PostGIS / BallTree spatial indexing with DBSCAN clustering for density analysis.</li>
+<li><em>AI Service:</em> Google Gemini 2.5 Flash API for automated multimodal incident triage.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h3 id="phase-4-security-access-control-quality-gates">Phase 4: Security, Access Control &amp; Quality Gates</h3>
+<ul>
+<li><strong>Objective:</strong> Validate that every endpoint, UI affordance, and database operation strictly adheres to the enterprise authorization model.</li>
+<li><strong>Mandatory Quality Gates:</strong><ol>
+<li><strong>Role-Based Access Control (RBAC) Verification:</strong> Enforcing capability checks on all 154 API operations; zero UI exposure of unauthorized actions.</li>
+<li><strong>SQL Transaction Integrity:</strong> Ensuring atomic database writes for procurement, work order assignments, and milestone sign-offs.</li>
+<li><strong>Tamper-Proof Audit Logging:</strong> Verifying that all status modifications record the actor ID, timestamp, prior state, and justification.</li>
+<li><strong>Static &amp; Dynamic Vulnerability Scanning:</strong> Zero high or critical vulnerabilities on OWASP Top 10 security audits.</li>
+</ol>
+</li>
+</ul>
+<hr />
+<h3 id="phase-5-departmental-uat-operational-simulation">Phase 5: Departmental UAT &amp; Operational Simulation</h3>
+<ul>
+<li><strong>Objective:</strong> Execute realistic operational simulation exercises with the City Engineering Office staff.</li>
+<li><strong>Key Activities:</strong><ul>
+<li>Deploy candidate build to isolated LGU Staging Environment (<code>lgu-staging.pulso.caloocan.gov.ph</code>).</li>
+<li>Conduct end-to-end simulations involving: Intake Clerk triage -&gt; Dispatcher work order creation -&gt; Field Engineer mobile check-in -&gt; Estimator BoQ creation -&gt; City Engineer sign-off.</li>
+<li>Validate printed executive PDF outputs (Certificates of Completion, BoQ sheets, Procurement Letters).</li>
+</ul>
+</li>
+<li><strong>Sign-off Gate:</strong> Formal UAT sign-off document executed by the City Engineer and Administrative Officer V.</li>
+</ul>
+<hr />
+<h3 id="phase-6-production-commissioning-gov-cloud-deployment">Phase 6: Production Commissioning &amp; Gov-Cloud Deployment</h3>
+<ul>
+<li><strong>Objective:</strong> Commission the platform onto secure government-grade cloud or municipal on-premises infrastructure.</li>
+<li><strong>Infrastructure Configuration:</strong><ul>
+<li><em>Compute:</em> Containerized Docker/Kubernetes cluster with automatic horizontal pod autoscaling.</li>
+<li><em>Database:</em> Managed MySQL Enterprise cluster with master-replica replication and point-in-time recovery.</li>
+<li><em>Security:</em> Cloudflare WAF, TLS 1.3 encryption in transit, AES-256 encryption at rest.</li>
+<li><em>Deployment Protocol:</em> Zero-downtime rolling deployment with automated health check probes.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h3 id="phase-7-sla-governance-continuous-archival-operations">Phase 7: SLA Governance &amp; Continuous Archival Operations</h3>
+<ul>
+<li><strong>Objective:</strong> Ensure uninterrupted operational readiness, adherence to incident SLAs, and long-term document retention.</li>
+<li><strong>Operational Governance:</strong><ul>
+<li><em>Automated SLA Escalation:</em> Auto-escalating tickets exceeding 48 hours without assignment to the Division Chief.</li>
+<li><em>Disaster Recovery &amp; Backup:</em> Daily automated full database snapshots; hourly WAL backups replicated to an offsite secure storage bucket.</li>
+<li><em>Document Archiving:</em> Automated archiving of closed project records, CAD drawings, and inspection permits in compliance with the National Archives Act.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2 id="3-branching-promotion-release-governance">3. Branching, Promotion &amp; Release Governance</h2>
+<pre><code>[main] ──────────────────────────● (Production v1.0.0) ──● (v1.0.1)
+  │                                ▲
+  │                                │ (Gate 4: Production Commission)
+[release/gov-v1.0] ────────────────┴─────────────────────
+  │                                ▲
+  │                                │ (Gate 3: Department UAT)
+[develop] ──────●────────●─────────┴─────────────────────
+  │             ▲        ▲
+  ├──[feature/boq-module]│
+  └──[feature/obo-permit]
+</code></pre>
+<h3 id="promotion-governance">Promotion Governance</h3>
+<ol>
+<li><strong>PR to <code>develop</code>:</strong> Requires passing automated CI suite (linting, 100% unit tests) and 2 Senior Engineer approvals.</li>
+<li><strong>Promotion to <code>release/*</code>:</strong> Requires deployment to Staging, completed security scan, and successful internal integration testing.</li>
+<li><strong>Promotion to <code>main</code>:</strong> Requires formal signed UAT approval from the City Engineering Office leadership and completed production smoke test.</li>
+</ol>
+<hr />
+<h2 id="4-definition-of-ready-dor-definition-of-done-dod">4. Definition of Ready (DoR) &amp; Definition of Done (DoD)</h2>
+<h3 id="definition-of-ready-dor">Definition of Ready (DoR)</h3>
+<ol>
+<li>User story maps directly to an approved LGU Plantilla Role and organizational capability.</li>
+<li>Complete input/output schemas and statutory requirements (e.g., RA 9184 requirements) are documented.</li>
+<li>Desktop UI mockups (1440px) and tablet responsive designs exist with verified accessibility.</li>
+<li>Database migration scripts and audit trail impacts are fully mapped out.</li>
+</ol>
+<h3 id="definition-of-done-dod">Definition of Done (DoD)</h3>
+<ol>
+<li>Complete implementation of backend API and frontend views matching the approved capability contract.</li>
+<li>Zero unauthorized access vulnerability paths across any system role.</li>
+<li>All state transitions trigger corresponding immutable audit records.</li>
+<li>Automated integration tests pass with 100% success rate on CI pipelines.</li>
+<li>Formal demo and acceptance sign-off by the relevant Division Chief or City Engineer.</li>
+</ol>
+    </div>
+</body>
+</html>

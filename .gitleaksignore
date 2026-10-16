@@ -1,0 +1,177 @@
+# Reviewed exact false-positive fingerprints. No whole-file or whole-rule exclusions.
+# The Android Google Maps client API key is deliberately NOT ignored.
+
+# .agents/challenger_m2_1_g2/challenge_tests.py — Generated analysis or test artifact with synthetic examples.
+.agents/challenger_m2_1_g2/challenge_tests.py:generic-api-key:169
+# .agents/challenger_m2_1_g2/challenge_tests.py — Generated analysis or test artifact with synthetic examples.
+.agents/challenger_m2_1_g2/challenge_tests.py:generic-api-key:201
+# .agents/challenger_m2_1_g2/challenge_tests.py — Generated analysis or test artifact with synthetic examples.
+.agents/challenger_m2_1_g2/challenge_tests.py:generic-api-key:522
+# .agents/explorer_m1_3/report.md — Generated analysis or test artifact with synthetic examples.
+.agents/explorer_m1_3/report.md:generic-api-key:511
+# .agents/explorer_m1_3/report.md — Generated analysis or test artifact with synthetic examples.
+.agents/explorer_m1_3/report.md:generic-api-key:533
+# .agents/explorer_m1_3/test_m1_self_verify.py — Generated analysis or test artifact with synthetic examples.
+.agents/explorer_m1_3/test_m1_self_verify.py:generic-api-key:351
+# .agents/explorer_m1_3/test_m1_self_verify.py — Generated analysis or test artifact with synthetic examples.
+.agents/explorer_m1_3/test_m1_self_verify.py:generic-api-key:366
+# .agents/explorer_m2_3/report.md — Generated analysis or test artifact with synthetic examples.
+.agents/explorer_m2_3/report.md:generic-api-key:150
+# .agents/explorer_m2_3/report.md — Generated analysis or test artifact with synthetic examples.
+.agents/explorer_m2_3/report.md:generic-api-key:63
+# .agents/explorer_m2_3/report.md — Generated analysis or test artifact with synthetic examples.
+.agents/explorer_m2_3/report.md:generic-api-key:92
+# .agents/explorer_survey_frontend/report.md — Generated analysis or test artifact with synthetic examples.
+.agents/explorer_survey_frontend/report.md:generic-api-key:218
+# .agents/spec_miner_requirements/spec.md — Generated analysis or test artifact with synthetic examples.
+.agents/spec_miner_requirements/spec.md:generic-api-key:249
+# .agents/spec_miner_requirements/spec.md — Generated analysis or test artifact with synthetic examples.
+.agents/spec_miner_requirements/spec.md:generic-api-key:292
+# .agents/spec_miner_requirements/spec.md — Generated analysis or test artifact with synthetic examples.
+.agents/spec_miner_requirements/spec.md:generic-api-key:358
+# PROJECT.md — Synthetic fixture, placeholder, or documentation example; not live.
+PROJECT.md:generic-api-key:166
+# PROJECT.md — Synthetic fixture, placeholder, or documentation example; not live.
+PROJECT.md:generic-api-key:179
+# PROJECT.md — Synthetic fixture, placeholder, or documentation example; not live.
+PROJECT.md:generic-api-key:213
+# .agents/challenger_m2_1_g2/challenge_tests.py — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/challenger_m2_1_g2/challenge_tests.py:generic-api-key:169
+# .agents/challenger_m2_1_g2/challenge_tests.py — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/challenger_m2_1_g2/challenge_tests.py:generic-api-key:201
+# .agents/challenger_m2_1_g2/challenge_tests.py — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/challenger_m2_1_g2/challenge_tests.py:generic-api-key:522
+# .agents/explorer_m1_3/report.md — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/explorer_m1_3/report.md:generic-api-key:511
+# .agents/explorer_m1_3/report.md — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/explorer_m1_3/report.md:generic-api-key:533
+# .agents/explorer_m1_3/test_m1_self_verify.py — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/explorer_m1_3/test_m1_self_verify.py:generic-api-key:351
+# .agents/explorer_m1_3/test_m1_self_verify.py — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/explorer_m1_3/test_m1_self_verify.py:generic-api-key:366
+# .agents/explorer_m2_3/report.md — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/explorer_m2_3/report.md:generic-api-key:150
+# .agents/explorer_m2_3/report.md — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/explorer_m2_3/report.md:generic-api-key:63
+# .agents/explorer_m2_3/report.md — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/explorer_m2_3/report.md:generic-api-key:92
+# .agents/explorer_survey_frontend/report.md — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/explorer_survey_frontend/report.md:generic-api-key:218
+# .agents/spec_miner_requirements/spec.md — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/spec_miner_requirements/spec.md:generic-api-key:249
+# .agents/spec_miner_requirements/spec.md — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/spec_miner_requirements/spec.md:generic-api-key:292
+# .agents/spec_miner_requirements/spec.md — Generated analysis or test artifact with synthetic examples.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:.agents/spec_miner_requirements/spec.md:generic-api-key:358
+# PROJECT.md — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:PROJECT.md:generic-api-key:166
+# PROJECT.md — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:PROJECT.md:generic-api-key:179
+# PROJECT.md — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:PROJECT.md:generic-api-key:213
+# backend/tests/test_challenger_m2_2_security_edge.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_challenger_m2_2_security_edge.py:generic-api-key:531
+# backend/tests/test_e2e_open_reporting.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_e2e_open_reporting.py:generic-api-key:1328
+# backend/tests/test_fuzz_crypto_m1.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_fuzz_crypto_m1.py:generic-api-key:149
+# backend/tests/test_fuzz_crypto_m1.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_fuzz_crypto_m1.py:generic-api-key:429
+# backend/tests/test_fuzz_crypto_m1.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_fuzz_crypto_m1.py:jwt:555
+# backend/tests/test_m1_database_challenge.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_m1_database_challenge.py:generic-api-key:557
+# backend/tests/test_m1_database_challenge.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_m1_database_challenge.py:generic-api-key:625
+# backend/tests/test_milestone1_backend.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_milestone1_backend.py:generic-api-key:774
+# backend/tests/test_milestone1_backend.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_milestone1_backend.py:generic-api-key:780
+# backend/tests/test_milestone1_schema_security.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_milestone1_schema_security.py:generic-api-key:265
+# backend/tests/test_milestone1_schema_security.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_milestone1_schema_security.py:generic-api-key:319
+# backend/tests/test_milestone2_endpoints.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_milestone2_endpoints.py:generic-api-key:436
+# backend/tests/test_milestone2_endpoints.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_milestone2_endpoints.py:generic-api-key:442
+# backend/tests/test_rate_limit_anti_enum_challenge.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:backend/tests/test_rate_limit_anti_enum_challenge.py:generic-api-key:415
+# docs/ui-ux-audit/21-government-website-complete-design-v1.0.md — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:docs/ui-ux-audit/21-government-website-complete-design-v1.0.md:generic-api-key:814
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:frontend/test-challenger-m2-frontend.mjs:generic-api-key:120
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:frontend/test-challenger-m2-frontend.mjs:generic-api-key:46
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:frontend/test-challenger-m2-frontend.mjs:generic-api-key:48
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:frontend/test-challenger-m2-frontend.mjs:generic-api-key:80
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:frontend/test-challenger-m2-frontend.mjs:generic-api-key:82
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:frontend/test-challenger-m2-frontend.mjs:generic-api-key:86
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:frontend/test-challenger-m2-frontend.mjs:generic-api-key:88
+# frontend/test-challenger-m2-ssr-dom.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:frontend/test-challenger-m2-ssr-dom.mjs:generic-api-key:21
+# frontend/test-challenger-m2-ssr-dom.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:frontend/test-challenger-m2-ssr-dom.mjs:generic-api-key:22
+# tests/e2e/test_harness.py — Synthetic fixture, placeholder, or documentation example; not live.
+ade2ce39c65b9e45f669e85e21561a4acec28f22:tests/e2e/test_harness.py:generic-api-key:66
+# backend/main.py — Google-published reCAPTCHA v2 test secret; not production.
+backend/main.py:generic-api-key:34
+# backend/tests/test_challenger_m2_2_security_edge.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_challenger_m2_2_security_edge.py:generic-api-key:522
+# backend/tests/test_e2e_open_reporting.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_e2e_open_reporting.py:generic-api-key:1328
+# backend/tests/test_fuzz_crypto_m1.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_fuzz_crypto_m1.py:generic-api-key:149
+# backend/tests/test_fuzz_crypto_m1.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_fuzz_crypto_m1.py:generic-api-key:429
+# backend/tests/test_fuzz_crypto_m1.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_fuzz_crypto_m1.py:jwt:549
+# backend/tests/test_m1_database_challenge.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_m1_database_challenge.py:generic-api-key:546
+# backend/tests/test_m1_database_challenge.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_m1_database_challenge.py:generic-api-key:614
+# backend/tests/test_milestone1_backend.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_milestone1_backend.py:generic-api-key:766
+# backend/tests/test_milestone1_backend.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_milestone1_backend.py:generic-api-key:772
+# backend/tests/test_milestone1_schema_security.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_milestone1_schema_security.py:generic-api-key:260
+# backend/tests/test_milestone1_schema_security.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_milestone1_schema_security.py:generic-api-key:314
+# backend/tests/test_milestone2_endpoints.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_milestone2_endpoints.py:generic-api-key:427
+# backend/tests/test_milestone2_endpoints.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_milestone2_endpoints.py:generic-api-key:433
+# backend/tests/test_rate_limit_anti_enum_challenge.py — Synthetic fixture, placeholder, or documentation example; not live.
+backend/tests/test_rate_limit_anti_enum_challenge.py:generic-api-key:406
+# diff_backend.txt — Generated analysis or test artifact with synthetic examples.
+diff_backend.txt:generic-api-key:748
+# docs/ui-ux-audit/21-government-website-complete-design-v1.0.md — Synthetic fixture, placeholder, or documentation example; not live.
+docs/ui-ux-audit/21-government-website-complete-design-v1.0.md:generic-api-key:814
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+frontend/test-challenger-m2-frontend.mjs:generic-api-key:120
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+frontend/test-challenger-m2-frontend.mjs:generic-api-key:46
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+frontend/test-challenger-m2-frontend.mjs:generic-api-key:48
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+frontend/test-challenger-m2-frontend.mjs:generic-api-key:80
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+frontend/test-challenger-m2-frontend.mjs:generic-api-key:82
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+frontend/test-challenger-m2-frontend.mjs:generic-api-key:86
+# frontend/test-challenger-m2-frontend.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+frontend/test-challenger-m2-frontend.mjs:generic-api-key:88
+# frontend/test-challenger-m2-ssr-dom.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+frontend/test-challenger-m2-ssr-dom.mjs:generic-api-key:21
+# frontend/test-challenger-m2-ssr-dom.mjs — Synthetic fixture, placeholder, or documentation example; not live.
+frontend/test-challenger-m2-ssr-dom.mjs:generic-api-key:22
+# mobile_app/lib/features/auth/screens/login_screen.dart — Google-published reCAPTCHA v2 test site key; not production.
+mobile_app/lib/features/auth/screens/login_screen.dart:generic-api-key:1914
+# tests/e2e/test_harness.py — Synthetic fixture, placeholder, or documentation example; not live.
+tests/e2e/test_harness.py:generic-api-key:66

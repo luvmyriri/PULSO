@@ -67,6 +67,7 @@ class PassportParser(BaseIDParser):
         # Passports don't carry a local address
         result['address']  = ''
         result['barangay'] = ''
+        result['id_number'] = result['passport_no']
         return result
 
     def _extract_mrz_names(self, lines: List[str], upper: str) -> Tuple[str, str, str]:

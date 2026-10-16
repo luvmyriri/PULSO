@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Search, UserCheck, UserX, AlertTriangle, RefreshCw, Mail, Phone, MapPin, ChevronDown, MoreVertical, History, Shield } from 'lucide-react';
+import { Users, Search, UserCheck, UserX, AlertTriangle, RefreshCw, Mail, Phone, MapPin, ChevronDown, MoreVertical, History, Shield } from '../icons';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getToken } from '../utils/auth';
 import GovSidebar from '../components/GovSidebar';
+import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
+import ThemeToggle from '../components/ThemeToggle';
+import GovUserDropdown from '../components/GovUserDropdown';
+import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovBreadcrumb from '../components/GovBreadcrumb';
 
-export default function ResidentAccountManagementPage() {
+export default function ResidentAccountManagementPage({ workspace }) {
     const token = getToken();
     const [currentUser] = useState(() => {
         try { return JSON.parse(localStorage.getItem('pulso_user')); } catch { return null; }
@@ -111,11 +116,12 @@ export default function ResidentAccountManagementPage() {
             
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Header */}
-                <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4">
+                <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 relative z-50">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                            <Users className="text-indigo-600" />
+                    <div className="flex flex-col text-left">
+                        <GovBreadcrumb category="System Admin" current="Resident Directory & Identity" />
+                        <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-snug whitespace-nowrap flex items-center gap-2 mt-0.5">
+                            <Users className="text-orange-600 dark:text-orange-400" size={22} />
                             Resident Account Management
                         </h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -133,9 +139,14 @@ export default function ResidentAccountManagementPage() {
                                 <div className="text-xs text-slate-500 uppercase tracking-wider">Suspended</div>
                             </div>
                         </div>
+                        <ThemeToggle />
+                        <GovNotificationDropdown />
+                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </div>
             </div>
+
+            {workspace && <GovernmentWorkspaceTabs workspace={workspace} currentUser={currentUser} />}
 
             {/* Filters */}
             <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4">

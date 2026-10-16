@@ -879,6 +879,8 @@ def seed_audit_logs(session, reports, workorders, projects):
 # =====================================================================
 
 def main():
+    if os.getenv("PULSO_ALLOW_DESTRUCTIVE_SEED") != "true":
+        raise RuntimeError("Refusing broad seed. Set PULSO_ALLOW_DESTRUCTIVE_SEED=true explicitly.")
     print("\n" + "="*60)
     print("  PULSO COMPREHENSIVE SEED SCRIPT")
     print("  Final Seed Plan Implementation")

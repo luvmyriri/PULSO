@@ -1,0 +1,13 @@
+Use case: photorealistic-natural
+Asset type: governed municipal evidence placeholder for a Figma government case-detail interface
+Input image 1: visual/material reference only; do not reproduce its UI, text, logo, or map
+Primary request: generate one standalone, true-color documentary photograph of an exposed electrical-wire hazard on a dense urban street in North Caloocan, Philippines
+Scene/backdrop: concrete mixed-use building facade and utility pole with dense overhead cabling, believable tropical daylight and ordinary street wear
+Subject: the hazardous exposed wire and overloaded pole are unmistakably the focal evidence
+Style/medium: realistic resident smartphone evidence photo, neutral municipal documentary photography, natural sensor texture and imperfections
+Composition/framing: landscape, medium-wide 4:3 framing, pole slightly off-center, enough surrounding facade and cables to establish location; no people are identifiable
+Lighting/mood: clear daylight, sober and factual, not sensational
+Color palette: unfiltered natural color
+Constraints: standalone photograph only; no interface chrome, no aperture corners, no captions, no text, no logos, no watermark, no filters, no cinematic teal-orange grade, no fake recording overlays
+
+Generated with the built-in OpenAI image generation tool on 23 August 2026 for PULSO Civic Aperture v0.2. Synthetic design evidence; replace with governed representative evidence before production.

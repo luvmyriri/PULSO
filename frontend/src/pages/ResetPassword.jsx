@@ -5,7 +5,7 @@ import {
     ShieldAlert, Lock, ShieldCheck, ArrowLeft, Loader2, 
     CheckCircle2, AlertCircle, Activity, Shield, KeyRound,
     Eye, EyeOff, Check
-} from 'lucide-react';
+} from '../icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { API_BASE_URL } from '../utils/apiBase';
 
@@ -71,8 +71,7 @@ export default function ResetPassword() {
         setError('');
 
         try {
-            const apiBase = API_BASE_URL;
-            const response = await fetch(`${apiBase}/api/auth/reset-password`, {
+            const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token, new_password: password })

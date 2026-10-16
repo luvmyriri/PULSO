@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
@@ -92,7 +93,7 @@ class IDVerificationScreen extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded, color: AppTheme.errorRed, size: 20),
+                          const PulsoIcon(Icons.error_outline_rounded, color: AppTheme.errorRed, size: 20),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -193,7 +194,7 @@ class _IDCardSlot extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (file == null) ...[
-                      Icon(icon, size: 48, color: Colors.white30),
+                      PulsoIcon(icon, size: 48, color: Colors.white30),
                       const SizedBox(height: 12),
                       Text(
                         label,
@@ -270,7 +271,7 @@ class _IDCardSlot extends StatelessWidget {
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white24),
                           ),
-                          child: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+                          child: const PulsoIcon(Icons.refresh_rounded, size: 16, color: Colors.white),
                         ),
                       ),
                     ),
@@ -311,7 +312,7 @@ class _ActionButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          icon: Icon(icon, size: 18, color: AppTheme.primaryOrange),
+          icon: PulsoIcon(icon, size: 18, color: AppTheme.primaryOrange),
           label: Text(
             label,
             style: const TextStyle(

@@ -3,8 +3,8 @@ gemini_service.py — PULSO AI Intelligence Layer
 Caloocan City Engineering Office — PULSO System
 
 SDK:   google-genai (Vertex AI mode via service account)
-Auth:  Service Account — vertex-express@pulso-backend-system
-Model: gemini-2.5-flash (Vertex AI — region-independent)
+Auth:  Configured service account credentials
+Model: Configurable Vertex AI model and serving region
 """
 
 import os
@@ -20,9 +20,9 @@ from typing import Dict, Any, Optional
 load_dotenv()
 
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google-credentials.json")
-GCP_PROJECT        = "pulso-backend-system"
-GCP_LOCATION       = "us-central1"          # Vertex AI serving region
-GEMINI_MODEL       = "gemini-2.5-flash"     # Latest stable 2026 High-Speed Flash model
+GCP_PROJECT        = os.getenv("GOOGLE_CLOUD_PROJECT", "pulso-509010")
+GCP_LOCATION       = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+GEMINI_MODEL       = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ── SDK Init ──────────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ def _init():
         print(f"[AI] [SUCCESS] Vertex AI SDK ready  |  Model: {GEMINI_MODEL}")
         print(f"[AI]    Project  : {GCP_PROJECT}")
         print(f"[AI]    Location : {GCP_LOCATION}")
-        print(f"[AI]    Auth     : Service Account (vertex-express@{GCP_PROJECT}) [OK]")
+        print("[AI]    Auth     : Configured service account; request access verified on use")
     except Exception as e:
         print(f"[AI] [ERROR] Vertex AI SDK init failed: {e}")
 
@@ -266,6 +266,49 @@ def _generate(prompt: str, json_mode: bool = True, user_id: str = "system") -> O
         return None
 
 
+def _generate_with_tools(prompt: str, tools: list, user_id: str = "system") -> Optional[str]:
+    """Call Gemini with Python callable tools for automatic grounding and tool calling."""
+    if not _SDK_READY or _client is None:
+        return None
+
+    # Rate limit check
+    allowed, reason = _rate_limiter.check_and_consume(user_id)
+    if not allowed:
+        print(f"[AI] Rate limited: {reason}")
+        return None
+
+    try:
+        from google.genai import types
+        cfg = types.GenerateContentConfig(
+            tools=tools,
+            temperature=0.1
+        )
+        resp = _client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=cfg,
+        )
+        if resp and resp.text:
+            return resp.text.strip()
+    except Exception as e:
+        print(f"[AI] generate_with_tools error: {e}")
+    return None
+
+
+
+def _detect_image_mime(image_bytes: bytes, default_mime: str = "image/jpeg") -> str:
+    """Detect image MIME from magic bytes."""
+    if not image_bytes:
+        return default_mime
+    if image_bytes.startswith(b'\x89PNG\r\n\x1a\n') or image_bytes.startswith(b'\x89PNG'):
+        return "image/png"
+    if image_bytes.startswith(b'RIFF') and len(image_bytes) >= 12 and image_bytes[8:12] == b'WEBP':
+        return "image/webp"
+    if image_bytes.startswith(b'\xff\xd8\xff'):
+        return "image/jpeg"
+    return default_mime
+
+
 def _generate_multimodal(prompt: str, image_bytes: bytes, mime: str = "image/jpeg", user_id: str = "system") -> Optional[str]:
     """Call Gemini with a text + image prompt (Vision) — rate-limited + cached."""
     if not _SDK_READY or _client is None:
@@ -285,7 +328,8 @@ def _generate_multimodal(prompt: str, image_bytes: bytes, mime: str = "image/jpe
 
     try:
         from google.genai import types
-        img_part = types.Part.from_bytes(data=image_bytes, mime_type=mime)
+        real_mime = _detect_image_mime(image_bytes, mime)
+        img_part = types.Part.from_bytes(data=image_bytes, mime_type=real_mime)
         cfg = types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.0,
@@ -324,8 +368,8 @@ def _generate_multimodal_dual(prompt: str, img1: bytes, img2: bytes, mime: str =
 
     try:
         from google.genai import types
-        part1 = types.Part.from_bytes(data=img1, mime_type=mime)
-        part2 = types.Part.from_bytes(data=img2, mime_type=mime)
+        part1 = types.Part.from_bytes(data=img1, mime_type=_detect_image_mime(img1, mime))
+        part2 = types.Part.from_bytes(data=img2, mime_type=_detect_image_mime(img2, mime))
         cfg = types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.0,
@@ -349,22 +393,23 @@ def _generate_multimodal_dual(prompt: str, img1: bytes, img2: bytes, mime: str =
 
 def _clean_response(text: str) -> str:
     """
-    Strip markdown formatting symbols from AI responses so they display
-    cleanly in the PULSO chat UI without raw asterisks or hashes.
+    Sanitizes AI assistant responses:
+    - Strips all emojis and emoji variation selectors to enforce official civic tone.
+    - Normalizes line breaks and whitespace.
+    - Preserves all markdown formatting (**bold**, *italic*, headers, lists, code, tables).
     """
+    if not text:
+        return ""
     import re
-    # Remove bold (**text** or __text__)
-    text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', text)
-    text = re.sub(r'_{1,2}(.*?)_{1,2}', r'\1', text)
-    # Remove heading markers
-    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-    # Replace bullet points (* item or - item) with a clean dash
-    text = re.sub(r'^[\*\-]\s+', '• ', text, flags=re.MULTILINE)
-    # Remove leftover lone asterisks
-    text = text.replace('**', '').replace('*', '')
-    # Collapse 3+ blank lines into 2
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    return text.strip()
+    # Strip emojis, transport/map symbols, pictographs, and variation selectors
+    EMOJI_PATTERN = re.compile(
+        r'[\U00010000-\U0010ffff]|[\u2600-\u27bf]|[\u2300-\u23ff]|[\u2b50\u2b55\u203c\u2049\u2122\u2139\u2194-\u2199\u21a9-\u21aa]|[\ufe00-\ufe0f]',
+        flags=re.UNICODE
+    )
+    cleaned = EMOJI_PATTERN.sub('', text)
+    # Collapse 3+ consecutive newlines into 2
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip()
 
 
 def analyze_report(description: str, image_data: Optional[bytes] = None) -> Dict:
@@ -392,6 +437,7 @@ Return ONLY a valid JSON object with EXACTLY these keys (no extra text before or
   "reasoning": "Brief justification for the severity score and category choice based on Scope of Service",
   "image_analysis": "Detailed description of detected hazards, infrastructure types, and technical markers seen in the image",
   "auto_description": "A 1-3 sentence technical description of what is visible in the image, suitable as a citizen report body (e.g. 'Severe pothole approximately 1 meter wide on Main Avenue near Deparo. Road surface has deteriorated significantly, exposing the aggregate base.')",
+  "is_infrastructure": true,
   "is_inappropriate": false,
   "rejection_reason": ""
 }}
@@ -409,7 +455,7 @@ Intelligence Rules (STRICT SCOPE OF SERVICE):
    - Examine images CAREFULLY for infrastructure markers (city-owned vs private utility).
    - Look for specific technical details: pavement cracks, clogged drainage grates, burnt out LED modules, or structural fractures in public school walls.
 
-3. ZERO-GUESS POLICY: If the issue is NOT within the Engineering Office scope (e.g., private indoor plumbing, Maynilad water leaks, Meralco power line issues without post damage) or is ambiguous, you MUST set "category": "Undetermined".
+3. ZERO-GUESS POLICY: If the issue is NOT within the Engineering Office scope (e.g., private indoor plumbing, Maynilad water leaks, Meralco power line issues without post damage) or is ambiguous, you MUST set "category": "Undetermined" and "is_infrastructure": false, "is_inappropriate": true.
 
 4. Urgency options: Low | Medium | High | Critical
 
@@ -417,19 +463,23 @@ Severity Guidelines:
 - Downed electrical wires / structural collapse / active fire → Critical, score 9–10
 - Missing manhole covers / deep potholes on main roads / major flooding → High, score 7–8
 - Minor potholes / uncollected garbage / flickering streetlights → Low–Medium, score 2–5
-- Spam, joke, hate speech, or offensive content → is_inappropriate: true
+- Spam, joke, hate speech, or offensive content → is_inappropriate: true, is_infrastructure: false
 
 5. CRITICAL IMAGE CONTENT MODERATION — MANDATORY:
    If an image is attached, you MUST perform content screening BEFORE any infrastructure analysis:
-   a) FACE / SELFIE DETECTION: If the image is primarily a selfie, portrait, or close-up of a human face (not an incidental bystander in the background of an infrastructure photo), this is NOT a valid infrastructure report. Set:
+   a) FACE / SELFIE DETECTION: If the image is primarily a selfie, portrait, person, or close-up of a human face (not an incidental bystander in the background of an infrastructure photo), this is NOT a valid infrastructure report. Set:
+      - "is_infrastructure": false
       - "is_inappropriate": true
-      - "rejection_reason": "Image rejected: This appears to be a selfie or portrait photo, not an infrastructure issue. Please submit a photo showing the actual infrastructure problem (pothole, broken pipe, damaged road, etc.)."
+      - "rejection_reason": "This looks like a personal photo or selfie. Please take a photo showing the actual road damage, street lighting, drainage, or city hazard instead."
       - "category": "Inappropriate Content"
-   b) NON-INFRASTRUCTURE CONTENT: If the image shows food, animals, random objects, memes, screenshots, social media posts, or any content clearly unrelated to city infrastructure, set:
+   b) NON-INFRASTRUCTURE CONTENT: If the image shows food, animals, random objects, memes, indoor rooms, screenshots, or any content clearly unrelated to city public works and infrastructure, set:
+      - "is_infrastructure": false
       - "is_inappropriate": true  
-      - "rejection_reason": "Image rejected: The uploaded photo does not show a valid infrastructure issue. Please take a photo of the actual hazard or damage."
+      - "rejection_reason": "We couldn't clearly see a city infrastructure issue in this photo. Please take a photo showing the actual problem (such as a pothole, broken streetlight, or drainage hazard)."
       - "category": "Inappropriate Content"
-   c) VALID INFRASTRUCTURE images should show roads, drainage, streetlights, buildings, public facilities, or visible physical damage/hazards.
+   c) VALID INFRASTRUCTURE images:
+      - "is_infrastructure": true
+      - "is_inappropriate": false
 
 6. AUTO-DESCRIPTION: If the image shows a legitimate infrastructure issue, generate a professional 1-3 sentence description in "auto_description" that describes the visible problem as if a citizen is reporting it. This should be factual, specific, and include observable details (size of damage, type of infrastructure, visible severity). If the image is inappropriate or no image is provided, set "auto_description" to an empty string.
 """
@@ -437,7 +487,21 @@ Severity Guidelines:
         raw = (_generate_multimodal(prompt, image_data) if image_data
                else _generate(prompt, json_mode=True))
         if raw:
-            return json.loads(raw)
+            parsed = json.loads(raw)
+            # Enforce strict infrastructure validity
+            is_infra = parsed.get("is_infrastructure", True)
+            is_inapp = parsed.get("is_inappropriate", False)
+            cat = str(parsed.get("category", "")).lower()
+
+            if is_inapp or not is_infra or "inappropriate" in cat or cat == "undetermined":
+                parsed["is_inappropriate"] = True
+                parsed["is_infrastructure"] = False
+                if not parsed.get("rejection_reason"):
+                    parsed["rejection_reason"] = "We couldn't clearly see a city infrastructure issue in this photo. Please take a photo showing the actual problem."
+            else:
+                parsed["is_inappropriate"] = False
+                parsed["is_infrastructure"] = True
+            return parsed
     except Exception as e:
         print(f"[AI] analyze_report parse error: {e}")
 
@@ -450,27 +514,33 @@ def extract_id_data(
     id_type: str = "unknown", 
     front_image: Optional[bytes] = None, 
     back_image: Optional[bytes] = None,
-    heuristic_context: str = ""
+    heuristic_context: str = "",
+    expected_id_type: Optional[str] = None
 ) -> Optional[Dict]:
     """
     AI Multi-Side ID Parser & Visual Auditor — Structures OCR and performs 
-    Multimodal Vision analysis to ensure front and back portraits match.
+    Multimodal Vision analysis to ensure front and back portraits match and
+    extracts fields according to known Philippine ID templates.
     """
     if not _SDK_READY:
         return None
 
+    target_type = expected_id_type or id_type or "unknown"
     ocr_context = f"FRONT SIDE OCR:\n{front_ocr}\n\nBACK SIDE OCR:\n{back_ocr}" if back_ocr else f"FRONT SIDE ONLY:\n{front_ocr}"
+    advisory_context = f"ADVISORY: System suspects a potential data/surface inconsistency.\n{heuristic_context}\n" if heuristic_context else ""
+    image_context = "Two images (FRONT and BACK) are attached for Visual Verification." if back_image else "One image (FRONT) is attached."
+
     prompt = f"""You are an elite ID Verification agent for the Caloocan City Engineering Office.
-You are performing a MULTIMODAL AUDIT of a Philippine ID (type: {id_type}).
+You are performing a TEMPLATE-AWARE MULTIMODAL AUDIT of a Philippine ID (Declared Type: {target_type}).
 
 {ocr_context}
 
-{"ADVISORY: System suspects a potential data/surface inconsistency.\n" + heuristic_context if heuristic_context else ""}
-
-{"Two images (FRONT and BACK) are attached for Visual Verification." if back_image else "One image (FRONT) is attached."}
+{advisory_context}
+{image_context}
 
 Extract into a JSON object with these exact fields:
 {{
+  "id_number": "",
   "first_name": "",
   "last_name": "",
   "middle_name": "",
@@ -493,38 +563,74 @@ Extract into a JSON object with these exact fields:
   "front_id_type": "unknown",
   "back_id_type": "unknown",
   "is_front_correct": true,
-  "is_back_correct": true
+  "is_back_correct": true,
+  "field_confidences": {{
+    "id_number": "high",
+    "first_name": "high",
+    "last_name": "high",
+    "dob": "high",
+    "address": "high"
+  }}
 }}
 
 Intelligence Rules (STRICT ZERO TOLERANCE FOR ERROR):
-1. VISUAL OCR OVERRIDE:
-   If the provided "FRONT SIDE OCR" or "BACK SIDE OCR" text is messy, incomplete, or contains obvious spelling errors (e.g., "B4gumBong" instead of "Bagumbong"), you MUST ignore the OCR text and perform a fresh, high-precision visual scan of the images.
+1. TEMPLATE-BASED ID NUMBER EXTRACTION:
+   - "id_number" is the MOST CRITICAL FIELD. Extract the primary identification number for this card:
+     * PhilSys National ID: 16 digits (PCN), format XXXX-XXXX-XXXX-XXXX or 16 continuous digits.
+     * Driver's License (LTO): License number at top right, format [A-Z]XX-XX-XXXXXX.
+     * UMID: 12-digit Common Reference Number (CRN) at top right, format XXXX-XXXXXXX-X.
+     * Passport (DFA): Passport number at top right and on MRZ line, format [A-Z]XXXXXXX.
+     * PhilHealth: 12-digit PIN at top, format XX-XXXXXXXXX-X.
+     * Voter's ID / Cert: Voter ID / VIN (Voter Identification Number) or Precinct Number.
+     * SSS / GSIS: 10-digit SSS Number (XX-XXXXXXX-X) or GSIS BP Number.
+     * Postal ID: 16-character Postal Reference Number (PRN) or PH- number.
+     * Barangay ID: Control number or Certificate number.
+   - Populate "id_number" with the clean, formatted number without label prefixes.
 
-2. Side & ID Type Verification (AUTHENTICITY AUDIT):
-   - You MUST identify the side (Front or Back) of EACH image.
-   - If BOTH the FRONT and BACK images provided appear to be the same side (e.g., front of card sent twice), you MUST set "is_document_mismatch": true and "mismatch_reason": "SCAN ERROR: You have scanned the same side of the ID twice. Please scan the Front side and then the Back side separately."
-   - Identify the exact ID type for EACH side (e.g., "UMID", "PhilID", "LTO").
-   - ADVISORIAL SCRUTINY: If a system advisory was provided above (e.g., regarding a PhilHealth vs PhilID mismatch), you MUST perform a deep visual inspection of the card templates to confirm or professionally debunk the mismatch. Do not lazily categorize them as the same type if they differ in layout, logo, or color scheme.
-   - If the ID type on the Front doesn't match the ID type on the Back (e.g. Front is UMID but Back is PhilID), set "is_document_mismatch": true and "mismatch_reason": "DOCUMENT MISMATCH: The front and back images belong to different types of government IDs."
+2. PHILIPPINE NATIONAL ID (PhilSys) TWO-SIDED STRUCTURE — CRITICAL:
+   - The FRONT of PhilSys contains:
+     * PCN: 16-digit card number (e.g. 2197-1609-8154-0734)
+     * Full Name: Last Name (Apelyido), Given Names (Mga Pangalan), Middle Name (Gitnang Apelyido)
+     * Date of Birth (Petsa ng Kapanganakan)
+     * RESIDENCE ADDRESS (Tirahan): e.g. "PH8A PKG14 BLK15 LOT11, BARANGAY 176, CITY OF CALOOCAN, NCR, THIRD DISTRICT"
+     * Portrait Photo
+   - The BACK of PhilSys contains:
+     * Large QR Code
+     * Sex (Kasarian / Sex: MALE or FEMALE)
+     * Blood Type (Uri ng Dugo)
+     * Marital Status (Kalagayang Sibil)
+     * PLACE OF BIRTH (Lugar ng Kapanganakan): e.g. "CAMALIGAN, CAMARINES SUR" or any Philippine province/town.
+   - RESIDENCE ADDRESS vs PLACE OF BIRTH:
+     * "Lugar ng Kapanganakan" on the back is the PLACE OF BIRTH, NOT the residence address.
+     * The RESIDENCE ADDRESS is printed strictly on the FRONT ("Tirahan").
+     * NEVER compare the front Residence Address to the back Place of Birth! It is completely expected and normal for someone born in another province to now reside in Caloocan City. This is NEVER an address discrepancy or document mismatch.
+   - COMBINE BOTH SIDES:
+     * Extract Name, ID Number, DOB, and Address from the FRONT.
+     * Extract Sex (Kasarian) from the BACK.
 
-3. VISUAL FACE MATCH — CRITICAL BIOMETRIC AUDIT:
-   - Perform a detailed person-identity comparison between the main portrait on the Front and any secondary photo/watermark/ghost image on the Back.
-   - If the faces belong to DIFFERENT individuals, set "is_visual_face_match": false, "is_document_mismatch": true, "mismatch_reason": "IDENTITY MISMATCH: The portrait photo on the front does not match the individual detected on the back image."
-   - Check for signs of "Digital Re-photography": If you detect moiré patterns or signs that the user is scanning a photo of a phone screen or a computer monitor, flag it as a mismatch.
+3. VISUAL OCR OVERRIDE:
+   - The provided images are the ultimate source of truth. If raw OCR text has typos or misread characters, use your visual reading of the images. NEVER report a mismatch due to minor OCR character noise.
 
-4. DATA CONSISTENCY & MERGING:
-   - Extract the full name and DOB from BOTH images if they appear on both.
-   - If the Name or Birthdate on the Back (often in QR codes or text) contradicts the Front, set "is_document_mismatch": true.
+4. ID Type & Mismatch Check:
+   - Identify the exact ID type on Front and Back.
+   - If the resident declared "{target_type}" but the uploaded card is clearly a completely different government document (e.g. resident declared Driver's License but uploaded a Passport or PhilHealth), set "is_document_mismatch": true and "mismatch_reason": "You selected [declared type], but the uploaded card appears to be [actual card type]. Please choose the matching ID type or upload the correct card."
+   - If BOTH the FRONT and BACK images are the same side, set "is_document_mismatch": true and "mismatch_reason": "SCAN ERROR: You have scanned the same side of the ID twice. Please scan Front and Back separately."
+
+5. VISUAL FACE MATCH — BIOMETRIC AUDIT:
+   - Compare portrait on Front with secondary photo/ghost portrait on Back if present.
+   - If different people, set "is_visual_face_match": false, "is_document_mismatch": true, "mismatch_reason": "IDENTITY MISMATCH: The portrait photo on the front does not match the individual on the back."
+
+6. PHILIPPINE ADDRESS & NAME INTELLIGENCE:
+   - Names: Separate into first_name, middle_name, last_name, suffix.
    - Birthdate: Must be YYYY-MM-DD.
-   - Fix OCR Noise: Be aggressive about correcting (0 vs O, 1 vs I).
+   - house_no: House / Unit / Lot number.
+   - block_lot: Block and Lot if specified (e.g. "BLK 15 LOT 11").
+   - subdivision: Phase / Package / Subdivision name (e.g. "PH8A PKG14").
+   - barangay: Exact number for Caloocan (e.g. "176") or name. Priority: numeric string without "Barangay" prefix.
+   - Assign confidence ("high", "medium", "low") for key fields based on image legibility.
 
-5. PHILIPPINE ADDRESS INTELLIGENCE:
-   - house_no: Numeric only.
-   - subdivision: Include PH, PKG, and NV identifiers (e.g. "PH8A PKG14").
-   - barangay: Exact number for Caloocan (e.g. "171") or name for others (e.g. "Bagumbong"). Priority: numeric.
-
-6. RESPONSE FORMAT:
-   - If "is_document_mismatch" is true, ensure "mismatch_reason" is descriptive and professional.
+7. RESPONSE FORMAT:
+   - If "is_document_mismatch" is true, ensure "mismatch_reason" is descriptive and professional. Do NOT flag mismatch for normal multi-side ID card structures.
 
 """
     try:
@@ -588,51 +694,283 @@ Priority options: High | Medium | Info
     }
 
 
-def get_ai_assistant_response(query: str, context: Optional[str] = None) -> Dict:
+def get_ai_assistant_response(
+    query: str,
+    context: Optional[str] = None,
+    user: Optional[Any] = None,
+    db: Optional[Any] = None
+) -> Dict:
     """
-    PULSO Omni-Assistant — Domain-aware AI chat for LGU staff and Citizens.
-    Covers DPWH standards, procurement law, city workflows, and system guidance.
+    PULSO Omni-Assistant — Domain-aware AI chat grounded in real PULSO database records.
+    Provides tool calling for resident report statuses, verified city hotlines,
+    real-time advisories, and disaster guidance. Enforces professional civic tone with zero emojis.
     """
+    # ── Tool Tracking & Definitions ───────────────────────────────────────────
+    invoked_tools = []
+
+    def get_my_reports(status_filter: Optional[str] = None) -> str:
+        """Retrieve the authenticated resident's real filed and claimed infrastructure hazard reports from the PULSO database, including Ticket IDs, categories, statuses, locations, and filing dates."""
+        if not user or not hasattr(user, "id"):
+            msg = "User is not authenticated. Please log in to check your filed reports."
+            invoked_tools.append({"tool": "get_my_reports", "data": msg})
+            return msg
+        if not db:
+            msg = "Database connection unavailable to retrieve reports."
+            invoked_tools.append({"tool": "get_my_reports", "data": msg})
+            return msg
+        try:
+            from sqlalchemy import or_
+            import models
+            reports = db.query(models.Report).filter(
+                or_(
+                    models.Report.resident_id == user.id,
+                    models.Report.claimed_by_user_id == user.id
+                )
+            ).order_by(models.Report.created_at.desc()).limit(8).all()
+
+            if not reports:
+                msg = (
+                    "No infrastructure reports were found under your resident account. "
+                    "If you submitted a report earlier as a guest, you can track it on the Track page using your Ticket ID and private access token."
+                )
+                invoked_tools.append({"tool": "get_my_reports", "data": msg})
+                return msg
+
+            lines = ["Reports on record for your account:"]
+            for r in reports:
+                date_str = r.created_at.strftime('%B %d, %Y') if r.created_at else 'Recent'
+                loc = r.location_barangay or r.location_string or 'Caloocan City'
+                lines.append(
+                    f"- Ticket ID: **{r.ticket_id}** | Category: **{r.category}** | Status: **{r.status}** | Location: {loc} | Filed: {date_str} | Urgency: {r.ai_urgency or 'Normal'}"
+                )
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_my_reports", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"Error querying reports: {err}"
+            invoked_tools.append({"tool": "get_my_reports", "data": err_msg})
+            return err_msg
+
+    def get_city_hotlines() -> str:
+        """Retrieve verified official emergency hotline telephone numbers for Caloocan City (NDRRMC, PNP, BFP, DRRMO, and City Engineering Office)."""
+        res = (
+            "Official Caloocan City Emergency Hotlines:\n"
+            "- **NDRRMC Rescue**: **911** (National Emergency & Disaster Rescue)\n"
+            "- **Caloocan PNP (Philippine National Police)**: **(02) 8892-6166** / **8892-6166**\n"
+            "- **BFP Caloocan (Bureau of Fire Protection)**: **(02) 8896-5700** / **8896-5700**\n"
+            "- **Caloocan DRRMO (Disaster Risk Reduction and Management Office)**: **(02) 8397-6212** / **8397-6212**\n"
+            "- **Caloocan City Engineering Office / Action Center**: **(02) 8288-8811 to 8830**\n"
+            "- **Caloocan City North Action Center**: **(02) 8288-8811** (Local 2200 / 2201)"
+        )
+        invoked_tools.append({"tool": "get_city_hotlines", "data": res[:500]})
+        return res
+
+    def get_active_advisories() -> str:
+        """Retrieve active city engineering notices, roadwork advisories, and emergency alerts from the Caloocan City Engineering Office."""
+        if not db:
+            msg = "Advisory service temporarily unavailable."
+            invoked_tools.append({"tool": "get_active_advisories", "data": msg})
+            return msg
+        try:
+            import models
+            advisories = db.query(models.Advisory).order_by(models.Advisory.created_at.desc()).limit(5).all()
+            if not advisories:
+                msg = "There are currently no active public advisories or emergency notices from the Caloocan City Engineering Office. Check the Updates tab for real-time announcements."
+                invoked_tools.append({"tool": "get_active_advisories", "data": msg})
+                return msg
+            lines = ["Active Public Advisories:"]
+            for adv in advisories:
+                date_str = adv.created_at.strftime('%B %d, %Y') if adv.created_at else 'Recent'
+                lines.append(
+                    f"- **[{adv.priority.upper()}] {adv.title}** ({adv.department or 'City Engineering Office'} — {date_str}): {adv.description[:220]}"
+                )
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_active_advisories", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"Error retrieving advisories: {err}"
+            invoked_tools.append({"tool": "get_active_advisories", "data": err_msg})
+            return err_msg
+
+    def get_evacuation_routes(barangay: Optional[str] = None) -> str:
+        """Check designated evacuation routes and emergency evacuation centers for Caloocan City."""
+        res = (
+            "Official mapped evacuation route data is not yet available in the PULSO digital system. "
+            "Residents requiring emergency evacuation guidance or shelter locations during severe weather or flooding "
+            "should immediately contact **Caloocan DRRMO** at **(02) 8397-6212**, **NDRRMC** at **911**, "
+            "or consult their local **Barangay Hall** for designated emergency evacuation centers."
+        )
+        invoked_tools.append({"tool": "get_evacuation_routes", "data": res[:500]})
+        return res
+
+    def get_staff_reports_overview(status_or_scope: Optional[str] = None) -> str:
+        """Retrieve real administrative citizen reports for government staff triage, including unassigned, pending verification, and today's priority cases."""
+        if not db:
+            return "I couldn't load that right now. You can open Reports to check."
+        try:
+            import models
+            from sqlalchemy import or_
+            query = db.query(models.Report)
+            s_lower = (status_or_scope or "").lower()
+            if "unassigned" in s_lower:
+                reports = query.filter(
+                    models.Report.status.in_(['unverified', 'pending_approval', 'verified', 'pending']),
+                    or_(models.Report.assigned_to == None, models.Report.assigned_to == "")
+                ).order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Unassigned citizen reports requiring dispatch:"
+            elif "verification" in s_lower or "needs_verification" in s_lower or "unverified" in s_lower:
+                reports = query.filter(models.Report.status == 'unverified').order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Reports awaiting administrative verification:"
+            elif "priority" in s_lower or "critical" in s_lower or "today" in s_lower:
+                reports = query.filter(
+                    or_(models.Report.ai_urgency == 'Critical', models.Report.priority == 'critical')
+                ).order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Today's high and critical priority reports:"
+            else:
+                reports = query.order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Recent incoming reports in Caloocan Engineering theater:"
+
+            if not reports:
+                return f"No reports matching '{status_or_scope or 'current query'}' were found in the queue."
+
+            lines = [title_label]
+            for r in reports:
+                ticket_str = r.ticket_id or f"PUL-2026-{r.id:04d}"
+                loc = r.location_barangay or r.location_string or "North Caloocan"
+                cat = r.ai_category or r.category or "Infrastructure"
+                urg = r.ai_urgency or r.priority or "Normal"
+                lines.append(f"- Ticket **#{ticket_str}** | **{cat}** | Status: **{r.status}** | Priority: **{urg}** | Location: {loc}")
+            lines.append("\nNote: Suggestions are informational. Please confirm any status or assignment changes directly in the Reports docket.")
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_staff_reports_overview", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"I couldn't load that right now. You can open Reports to check. ({err})"
+            invoked_tools.append({"tool": "get_staff_reports_overview", "data": err_msg})
+            return err_msg
+
+    def get_staff_work_orders_overview(status_or_scope: Optional[str] = None) -> str:
+        """Retrieve real government work orders from the PULSO engineering operations system."""
+        if not db:
+            return "I couldn't load that right now. You can open Work Orders to check."
+        try:
+            import models
+            from sqlalchemy import or_
+            query = db.query(models.WorkOrder)
+            s_lower = (status_or_scope or "").lower()
+            if "overdue" in s_lower or "late" in s_lower:
+                wos = query.filter(models.WorkOrder.status.in_(['assigned', 'in_progress'])).order_by(models.WorkOrder.created_at.asc()).limit(5).all()
+                title_label = "Active work orders requiring scheduling review:"
+            else:
+                wos = query.order_by(models.WorkOrder.created_at.desc()).limit(5).all()
+                title_label = "Current engineering work orders:"
+
+            if not wos:
+                return "There are no overdue or active work orders flagged in your current division queue."
+
+            lines = [title_label]
+            for wo in wos:
+                wo_id = getattr(wo, "wo_number", None) or getattr(wo, "tracking_number", None) or f"WO-2026-{wo.id:03d}"
+                lines.append(f"- Order **#{wo_id}** | **{wo.title or 'Field Maintenance'}** | Status: **{wo.status}** | Priority: **{wo.priority or 'Normal'}**")
+            lines.append("\nPlease review team dispatch and verify progress in the Operations workspace.")
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_staff_work_orders_overview", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            return f"I couldn't load that right now. You can open Work Orders to check. ({err})"
+
+    # ── Grounded Knowledge: Filing a report in PULSO ───────────────────────────
+    REPORTING_GUIDE = (
+        "To file an infrastructure report in PULSO, follow these steps:\n\n"
+        "1. **Access Report Flow**: Tap the orange **Report Issue** action button on the resident dashboard.\n"
+        "2. **Upload Photo Evidence**: Capture or upload a clear photo of the hazard. PULSO's AI vision system verifies the image, detects the issue type (e.g., pothole, broken streetlight, clogged drainage), and assesses initial urgency.\n"
+        "3. **Pin Location**: Confirm or adjust the pin on the North Caloocan interactive map (Barangays 165 to 188).\n"
+        "4. **Review & Confirm**: Review the auto-detected category and enter any additional notes, then tap **Submit**.\n"
+        "5. **Track Progress**: You will receive a unique **Ticket ID** (e.g., **CE-2026-XXXX**) and private tracking token. You can track real-time inspection, dispatch, and completion under **My Reports**."
+    )
+
+    # ── Deterministic Keyword Fallback Handler ─────────────────────────────────
+    def _deterministic_fallback(q: str) -> str:
+        ql = q.lower()
+        if any(w in ql for w in ["unassigned", "unassigned report", "unassigned reports"]):
+            return get_staff_reports_overview("unassigned")
+        if any(w in ql for w in ["overdue", "overdue work", "overdue work order", "overdue work orders"]):
+            return get_staff_work_orders_overview("overdue")
+        if any(w in ql for w in ["needs verification", "unverified", "awaiting verification"]):
+            return get_staff_reports_overview("needs_verification")
+        if any(w in ql for w in ["priority", "priorities", "today's priorities", "critical reports"]):
+            return get_staff_reports_overview("today_priorities")
+        if any(w in ql for w in ["hotline", "emergency", "police", "pnp", "fire", "bfp", "drrmo", "contact number"]):
+            return get_city_hotlines()
+        if any(w in ql for w in ["my report", "report status", "ticket status", "track report", "check report", "my ticket"]):
+            return get_my_reports()
+        if any(w in ql for w in ["evacuation", "evacuate", "flood route", "evacuation center"]):
+            return get_evacuation_routes()
+        if any(w in ql for w in ["advisory", "advisories", "bulletin", "announcement"]):
+            return get_active_advisories()
+        if any(w in ql for w in ["how to file", "how to report", "file a report", "submit a report"]):
+            return REPORTING_GUIDE
+        return (
+            "I couldn't load that right now. You can open Reports to check. "
+            "For urgent emergencies or infrastructure hazards, please contact the **Caloocan City Action Center** at **(02) 8288-8811** "
+            "or **Caloocan DRRMO** at **(02) 8397-6212**."
+        )
+
     if not _SDK_READY:
-        return {"response": (
-            "Pagpasensya na, ang PULSO AI ay pansamantalang hindi available. "
-            "Subukan muli sa ilang sandali.\n"
-            "PULSO AI is temporarily unavailable. Please try again shortly."
-        )}
 
-    prompt = f"""You are PULSO AI, the official intelligent assistant for the Caloocan City Infrastructure Management System.
-You assist both LGU Staff (Engineers, Dispatchers, Clerks) and Citizens.
+        fallback_res = _deterministic_fallback(query)
+        return {
+            "response": _clean_response(fallback_res),
+            "tool_name": invoked_tools[0]["tool"] if invoked_tools else None,
+            "tool_data": invoked_tools[0]["data"] if invoked_tools else None
+        }
 
-Knowledge Domain:
-- DPWH engineering standards (roads, drainage, electrical, structural)
-- Philippine government ID verification (PhilSys, LTO, UMID)
-- RA 9184 Government Procurement Law
-- Caloocan City Engineering Office procedures
-- PULSO system navigation, features, and workflows
-- Barangay-level infrastructure issues in Caloocan City
+    prompt = f"""You are PULSO AI, the official intelligent assistant for the Caloocan City Engineering Office (PULSO System).
+You assist citizens and LGU staff with infrastructure management, hazard reporting, and city operations.
 
-Communication Style:
-- Technical and precise for engineers/dispatchers
-- Friendly and bilingual (English/Tagalog) for citizens
-- Always helpful, clear, and professional
-- IMPORTANT: Do NOT use markdown formatting. No asterisks, no bold (**), no bullet symbols (*), no headers (#). Use plain text only. For lists, use numbered items (1. 2. 3.) or write in full sentences.
+STRICT OPERATIONAL & TONE RULES:
+1. NO EMOJIS: Do not use emojis in any response. Maintain a professional, helpful tone appropriate for an official city government service.
+2. MARKDOWN STRUCTURE: Always structure responses with clean paragraph breaks (double newlines). Use markdown bold (**text**) for all key terms: hotline numbers, ticket IDs, report statuses (**pending**, **in_progress**, **resolved**), department names, and important notices. Use bullet points (- ) or numbered lists (1. ) for readability.
+3. GROUNDING IN REAL DATA (MANDATORY TOOL USE):
+   - When asked about the user's reports or report status: You MUST call `get_my_reports` to fetch their real database records. Present the actual ticket IDs, categories, and statuses. Never invent a status or ticket ID.
+   - When asked about city hotlines or emergency contacts: You MUST call `get_city_hotlines`. Present the official Caloocan City emergency numbers exactly as retrieved. Never fabricate hotline numbers.
+   - When asked about active advisories, roadworks, or city notices: You MUST call `get_active_advisories`.
+   - When asked about evacuation routes: You MUST call `get_evacuation_routes`. Plainly state that mapped digital evacuation route data is not yet available, and instruct them to contact Caloocan DRRMO at (02) 8397-6212 or NDRRMC at 911.
+   - When asked how to file a report: Describe the 5-step PULSO workflow (Tap **Report Issue**, upload evidence photo for AI scan, pin location on North Caloocan map, review & submit, receive unique **Ticket ID** to track under **My Reports**).
+4. HONEST FALLBACK: If requested data is genuinely not available or a tool returns no records, state this plainly (e.g., "I don't have that information right now — you can check the Updates tab or call the relevant hotline.") rather than guessing.
 
-System Context: {context or "General system inquiry"}
+System Context: {context or "General citizen inquiry"}
 User Query: {query}
+"""
 
-Provide a helpful, accurate, plain-text response:"""
+    tools = [
+        get_my_reports,
+        get_city_hotlines,
+        get_active_advisories,
+        get_evacuation_routes,
+        get_staff_reports_overview,
+        get_staff_work_orders_overview
+    ]
+    user_id = str(getattr(user, "id", "citizen"))
 
     try:
-        raw = _generate(prompt, json_mode=False)
+        raw = _generate_with_tools(prompt, tools=tools, user_id=user_id)
         if raw:
-            return {"response": _clean_response(raw)}
+            return {
+                "response": _clean_response(raw),
+                "tool_name": invoked_tools[0]["tool"] if invoked_tools else None,
+                "tool_data": invoked_tools[0]["data"] if invoked_tools else None
+            }
     except Exception as e:
-        print(f"[AI] Assistant error: {e}")
+        print(f"[AI] Assistant tool-calling error: {e}")
 
-    return {"response": (
-        "Pagpasensya na, ang PULSO Brain ay abala ngayon. Subukan muli sa ilang sandali.\n"
-        "The PULSO Brain is currently processing. Please try again in a moment."
-    )}
+    # Fallback if API fails or is rate limited
+    fallback_res = _deterministic_fallback(query)
+    return {
+        "response": _clean_response(fallback_res),
+        "tool_name": invoked_tools[0]["tool"] if invoked_tools else None,
+        "tool_data": invoked_tools[0]["data"] if invoked_tools else None
+    }
 
 
 # ── Public Vision API Wrapper (used by philsys_service.py) ───────────────────
@@ -705,11 +1043,7 @@ def generate_maintenance_plan(asset_data: Dict[str, Any]) -> Dict[str, Any]:
     AI Engineering Planner — Generates a detailed maintenance strategy for an asset.
     """
     if not _SDK_READY:
-        return {
-            "plan": "AI maintenance planner is currently unavailable.",
-            "steps": [],
-            "estimated_cost": 0
-        }
+        return {}
 
     prompt = f"""You are the Lead Maintenance Engineer for the Caloocan City Engineering Office.
 Generate a structured maintenance plan for the following infrastructure asset.
@@ -754,12 +1088,4 @@ Engineering Rules:
     except Exception as e:
         print(f"[AI] Maintenance plan generation error: {e}")
 
-    return {
-        "priority": "HIGH",
-        "maintenance_plan": f"Urgent preventive maintenance required for {asset_data.get('asset_name')}.",
-        "steps": ["Site inspection", "Surface cleanup", "Material patching"],
-        "estimated_cost": 45000,
-        "estimated_duration_days": 3,
-        "required_personnel": ["Field Inspector", "Maintenance Team"],
-        "technical_justification": "Fallback plan generated due to AI processing error."
-    }
+    return {}

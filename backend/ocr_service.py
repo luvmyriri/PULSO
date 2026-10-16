@@ -28,6 +28,13 @@ from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 from dotenv import load_dotenv
 from id_parsers import get_parser
+from id_templates import (
+    SUPPORTED_ID_TYPES,
+    normalize_id_type,
+    get_template,
+    validate_and_normalize_id_number,
+    is_id_type_compatible
+)
 import gemini_service
 
 load_dotenv()
@@ -392,12 +399,12 @@ def extract_barangay(text: str) -> str:
     return ''
 
 # ---------------------------------------------------------------------------
-# North Caloocan Residency Verification
+# Caloocan Residency Verification
 # ---------------------------------------------------------------------------
 
-def verify_north_caloocan_residency(address_text: str, barangay_num: str) -> Tuple[bool, str]:
+def verify_caloocan_residency(address_text: str, barangay_num: str) -> Tuple[bool, str]:
     """
-    Verifies if address is in North Caloocan (Barangays 165–188).
+    Verifies if address is in Caloocan City (Barangays 1–188).
     Also accepts common OCR misspellings: KALOOKAN, KALOOCAN, CALOOCAN.
     """
     u = address_text.upper()
@@ -405,16 +412,14 @@ def verify_north_caloocan_residency(address_text: str, barangay_num: str) -> Tup
         k in u for k in ('CALOOCAN', 'KALOOKAN', 'KALOOCAN', 'CALOOCAN CITY', 'CALOOCAN,')
     )
 
-    # Helper function to check if the extracted brgy integer is in North Caloocan
-    def check_brgy_int(brgy_str: str) -> Tuple[Optional[bool], Optional[str]]:
+    # Helper function to check if the extracted brgy integer is in Caloocan (1-188)
+    def check_brgy_int(brgy_str: str) -> Tuple[Optional[bool], Optional[int]]:
         if not brgy_str:
             return None, None
         try:
             brgy_int = int(re.sub(r'[^0-9]', '', brgy_str))
-            if 165 <= brgy_int <= 188:
+            if 1 <= brgy_int <= 188:
                 return True, brgy_int
-            elif 1 <= brgy_int <= 164:
-                return False, brgy_int
             else:
                 return False, brgy_int
         except (ValueError, TypeError):
@@ -423,33 +428,22 @@ def verify_north_caloocan_residency(address_text: str, barangay_num: str) -> Tup
     if not is_caloocan:
         # Check for Metro Manila (less specific, borderline case)
         if 'METRO MANILA' in u or 'NCR' in u:
-            # Can't verify barangay without city name
             valid, brgy_int = check_brgy_int(barangay_num)
-            
-            # If the directly passed barangay_num had no numbers, fallback to text regex
             if valid is None:
                 valid, brgy_int = check_brgy_int(extract_barangay(u))
-                
             if valid is True:
-                return True, "Likely North Caloocan Resident (barangay in range, Metro Manila detected)."
-                
+                return True, f"Likely Caloocan Resident (barangay {brgy_int} in range, Metro Manila detected)."
         return False, "Verification Failed: Address does not appear to be in Caloocan City."
 
-    # Try checking the originally passed barangay_num
+    # Try checking the passed barangay_num, then fallback to regex extraction
     valid, brgy_int = check_brgy_int(barangay_num)
-    
-    # If the originally passed barangay_num didn't have digits (e.g. "BAGUMBONG")
-    # or was empty, perform a regex fallback on the full address text
     if valid is None:
         valid, brgy_int = check_brgy_int(extract_barangay(u))
 
     if valid is True:
-        return True, f"North Caloocan Resident Verified (Barangay {brgy_int})."
-    elif valid is False:
-        if 1 <= brgy_int <= 164:
-            return False, f"Verification Failed: Barangay {brgy_int} is in South Caloocan, not North Caloocan (165–188)."
-        else:
-            return False, f"Verification Failed: Barangay {brgy_int} is not a valid Caloocan barangay."
+        return True, f"Caloocan Resident Verified (Barangay {brgy_int})."
+    elif valid is False and brgy_int is not None:
+        return False, f"Verification Failed: Barangay {brgy_int} is not a valid Caloocan barangay (1–188)."
 
     # Caloocan found but no clear barangay — partial pass
     return False, "Verification Failed: Caloocan City detected but could not determine barangay number."
@@ -813,14 +807,16 @@ def compare_names(name1: str, name2: str) -> bool:
     
     return True
 
-def extract_id_details(front_text: str, back_text: str = "", front_image: bytes = None, back_image: bytes = None) -> Dict[str, Any]:
+def extract_id_details(front_text: str, back_text: str = "", front_image: bytes = None, back_image: bytes = None, expected_id_type: Optional[str] = None) -> Dict[str, Any]:
     """
     Dispatch OCR text from both sides to the AI parser for multi-side intelligence,
-    then enrich with residency verification.
+    then enrich with residency verification and template-aware ID extraction.
     """
     full_text = f"{front_text}\n{back_text}"
     upper_text = full_text.upper()
     lines = [line.strip() for line in full_text.split('\n') if len(line.strip()) > 1]
+
+    declared_norm = normalize_id_type(expected_id_type)
 
     # 1. Detect which Philippine ID this is (Cross-Validation)
     id_type_front = detect_id_type(front_text)
@@ -835,9 +831,12 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
         heuristic_reason = f"Heuristic Warning: Document type may mismatch (Front={id_type_front.upper()}, Back={id_type_back.upper()}). Refining with AI..."
         print(f"[OCR] {heuristic_reason}")
 
-    # Starting heuristic, will be refined by AI below
-    id_type = id_type_front if id_type_front != 'unknown' else id_type_back
-    print(f"[OCR] Heuristic ID types: Front={id_type_front}, Back={id_type_back}")
+    # Starting heuristic, will be refined by declared type or AI below
+    if declared_norm != 'unknown':
+        id_type = declared_norm
+    else:
+        id_type = id_type_front if id_type_front != 'unknown' else id_type_back
+    print(f"[OCR] Active baseline ID type: {id_type} (Declared: {expected_id_type}, Heuristic Front={id_type_front}, Back={id_type_back})")
 
     # 2. Route to the appropriate modular parser
     parser = get_parser(id_type)
@@ -854,7 +853,8 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
         id_type=id_type, 
         front_image=front_image, 
         back_image=back_image,
-        heuristic_context=heuristic_reason if heuristic_mismatch else ""
+        heuristic_context=heuristic_reason if heuristic_mismatch else "",
+        expected_id_type=declared_norm if declared_norm != 'unknown' else None
     )
     
     if llm_extracted:
@@ -873,6 +873,19 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
         # If AI says there's a mismatch, we block IMMEDIATELY.
         ai_detected_mismatch = llm_extracted.get('is_document_mismatch', False)
         ai_mismatch_reason   = llm_extracted.get('mismatch_reason', "")
+
+        if ai_detected_mismatch:
+            lower_reason = ai_mismatch_reason.lower()
+            false_positive_indicators = (
+                "place of birth", "camaligan", "kapanganakan", "ocr reading",
+                "address displayed on the front", "does not match the address on the back",
+                "inconsistency detected: the address", "differs from the ocr reading",
+                "does not match the address"
+            )
+            if any(fp in lower_reason for fp in false_positive_indicators):
+                print(f"[OCR] False-positive mismatch detected and suppressed: {ai_mismatch_reason}")
+                ai_detected_mismatch = False
+                ai_mismatch_reason = ""
 
         if ai_detected_mismatch:
             mismatch_detected = True
@@ -900,36 +913,35 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
                 mismatch_detected = True
                 mismatch_reason = "Identity Mismatch: The portrait photo on the front does not match the individual on the back image. Potential fraudulent scan."
 
-            # D. High-Confidence Type Conflict (Be Smarter Override)
-            # If Heuristic detected a type mismatch (e.g. Health vs ID) but AI claims match,
-            # we check if both identifications are "unknown". If they are specific, 
-            # we reject for safety unless both identifications perfectly align.
+            # D. Declared Type vs Detected Type Mismatch Check
+            if declared_norm != 'unknown' and ai_front_type != 'unknown' and ai_front_type != 'other':
+                if not is_id_type_compatible(ai_front_type, declared_norm):
+                    declared_label = SUPPORTED_ID_TYPES.get(declared_norm, {}).get('label', declared_norm.upper())
+                    detected_label = SUPPORTED_ID_TYPES.get(normalize_id_type(ai_front_type), {}).get('label', ai_front_type.upper())
+                    mismatch_detected = True
+                    mismatch_reason = f"ID Type Mismatch: You selected '{declared_label}', but the uploaded card appears to be '{detected_label}'. Please select the matching ID type or upload the corresponding document."
+
+            # E. High-Confidence Type Conflict (Be Smarter Override)
             high_confidence_conflict = False
             if heuristic_mismatch and "may mismatch" in heuristic_reason:
                 if id_type_front != 'unknown' and id_type_back != 'unknown':
-                    # Heuristic saw two distinct ID types. If AI didn't catch a mismatch, 
-                    # we verify if the AI's identified types mirror the heuristic.
-                    if ai_front_type == ai_back_type:
-                        # AI says match, but heuristic said Front=X, Back=Y.
-                        # This is the "Lazy AI" scenario. Reject.
+                    if ai_front_type != ai_back_type and ai_front_type != 'unknown' and ai_back_type != 'unknown':
                         high_confidence_conflict = True
             
             if high_confidence_conflict:
                 mismatch_detected = True
                 mismatch_reason = f"Security Conflict: {heuristic_reason}. AI verification failed to professionally debunk this system suspicion."
             elif not mismatch_detected and heuristic_mismatch:
-                # Suppress only low-confidence or non-type warnings (e.g. name formatting)
                 print(f"[OCR] AI override: Heuristic warning ({heuristic_reason}) suppressed by AI confirmation.")
 
         # FINAL BLOCK: If any hardening check failed, ensure it sticks.
         if mismatch_detected:
             print(f"[OCR] [BLOCKED] SCAN BLOCKED: {mismatch_reason}")
-            # Ensure the flag is back-propagated
             mismatch_detected = True 
 
         # AI-FIRST EXTRACTION: Gemini is now the primary source of truth for intelligence.
         # We trust AI for semantic cleaning and structural decomposition.
-        for key in ('first_name', 'last_name', 'middle_name', 'suffix', 'dob', 'sex', 'address', 'barangay', 'pcn', 'postal_code', 'license_no'):
+        for key in ('id_number', 'first_name', 'last_name', 'middle_name', 'suffix', 'dob', 'sex', 'address', 'barangay', 'pcn', 'postal_code', 'license_no'):
             ai_val = llm_extracted.get(key)
             if ai_val is not None and str(ai_val).strip() != "":
                 parsed[key] = ai_val
@@ -962,12 +974,12 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
     # If the AI yielded a word (like "BAGUMBONG"), extract the integer ourselves before verification
     # so the frontend dropdown gets the actual numbered barangay
     if barangay and not re.search(r'\d', barangay):
-        # AI returned a word like "BAGUMBONG". Pass it through our extraction logic.
         fallback_brgy = extract_barangay(barangay) or extract_barangay(upper_text)
         if fallback_brgy:
             barangay = fallback_brgy
             
-    is_nc, msg = verify_north_caloocan_residency(upper_text, barangay)
+    residency_text = f"{upper_text}\n{address}".upper()
+    is_nc, msg = verify_caloocan_residency(residency_text, barangay)
 
     # Priority: AI > Regex Fallback
     # If the AI produces an output (even an empty string), we explicitly respect it.
@@ -986,12 +998,48 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
 
     print(f"[OCR] Address Components: house_no='{final_house_no}' | block_lot='{final_block_lot}' | subdivision='{final_subdiv}' | street='{final_street}'")
 
+    # 6. ID Number Resolution and Template Validation
+    raw_id_num = ""
+    if llm_extracted and llm_extracted.get('id_number'):
+        raw_id_num = str(llm_extracted['id_number']).strip()
+    elif parsed.get('id_number'):
+        raw_id_num = str(parsed['id_number']).strip()
+    elif parsed.get('pcn'):
+        raw_id_num = str(parsed['pcn']).strip()
+    elif parsed.get('license_no'):
+        raw_id_num = str(parsed['license_no']).strip()
+    elif parsed.get('crn'):
+        raw_id_num = str(parsed['crn']).strip()
+    elif parsed.get('pin'):
+        raw_id_num = str(parsed['pin']).strip()
+    elif parsed.get('passport_no'):
+        raw_id_num = str(parsed['passport_no']).strip()
+    elif parsed.get('prn'):
+        raw_id_num = str(parsed['prn']).strip()
+
+    effective_type = declared_norm if declared_norm != 'unknown' else (normalize_id_type(id_type) if id_type != 'unknown' else 'unknown')
+    normalized_id_number, is_id_valid, format_hint = validate_and_normalize_id_number(effective_type, raw_id_num)
+    tmpl = get_template(effective_type)
+    trust_tier = tmpl.get('trust_tier', 'standard_high') if tmpl else 'standard_high'
+    requires_manual_review = tmpl.get('requires_manual_review', False) if tmpl else False
+
+    # Get user-friendly label
+    id_label = tmpl.get('label') if tmpl else ID_TYPE_LABELS.get(id_type, 'Unknown Document')
+
     res = {
         'id_type':              id_type,
-        'id_type_label':        ID_TYPE_LABELS.get(id_type, 'Unknown Document'),
+        'id_type_label':        id_label,
+        'selected_id_type':     declared_norm if declared_norm != 'unknown' else None,
+        'id_number':            normalized_id_number,
+        'id_format_valid':      is_id_valid,
+        'id_format_hint':       format_hint,
+        'trust_tier':           trust_tier,
+        'requires_manual_review': requires_manual_review,
+        'field_confidences':    llm_extracted.get('field_confidences', {}) if llm_extracted else {},
         'first_name':           first_name,
         'last_name':            last_name,
         'middle_name':          middle_name,
+        'suffix':               parsed.get('suffix', ''),
         'dob':                  dob,
         'sex':                  sex,
         'address':              address,
@@ -1010,7 +1058,7 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
         if k not in res:
             res[k] = v
 
-    # 6. Set Mismatch Flags
+    # 7. Set Mismatch Flags
     res['is_document_mismatch'] = mismatch_detected
     res['mismatch_reason']      = mismatch_reason
 
@@ -1145,7 +1193,20 @@ async def perform_ocrspace_ocr(image_bytes: bytes, filename: str = 'id.jpg') -> 
 # Main Entry Point
 # ---------------------------------------------------------------------------
 
-async def perform_ocr(front_bytes: bytes, back_bytes: bytes) -> Dict[str, Any]:
+async def get_ocr_text_with_fallback(image_bytes: bytes, filename: str) -> str:
+    if not image_bytes:
+        return ""
+    try:
+        return await perform_google_vision_ocr(image_bytes)
+    except Exception as e:
+        print(f"[OCR] Google Vision failed for {filename}: {e}. Falling back to OCR.space...")
+        try:
+            return await perform_ocrspace_ocr(image_bytes, filename)
+        except Exception as fallback_e:
+            print(f"[OCR] OCR.space fallback failed for {filename}: {fallback_e}")
+            raise Exception(f"Vision error: {e} | Fallback error: {fallback_e}")
+
+async def perform_ocr(front_bytes: bytes, back_bytes: bytes, id_type: Optional[str] = None) -> Dict[str, Any]:
     """
     Main Multi-Side OCR pipeline with concurrent execution.
     Requires both front and back images for maximum AI accuracy.
@@ -1153,10 +1214,10 @@ async def perform_ocr(front_bytes: bytes, back_bytes: bytes) -> Dict[str, Any]:
     """
     start_total = time.time()
     
-    # 1. Concurrent extraction
-    tasks = [perform_google_vision_ocr(front_bytes)]
+    # 1. Concurrent extraction of both sides with fallback logic
+    tasks = [get_ocr_text_with_fallback(front_bytes, 'front.jpg')]
     if back_bytes:
-        tasks.append(perform_google_vision_ocr(back_bytes))
+        tasks.append(get_ocr_text_with_fallback(back_bytes, 'back.jpg'))
     
     # Run both sides in parallel, capture exceptions
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -1187,14 +1248,23 @@ async def perform_ocr(front_bytes: bytes, back_bytes: bytes) -> Dict[str, Any]:
             print(f"[OCR] OCR.space fallback also failed for BACK: {fb_err}")
 
     if not front_text and not back_text:
+        err_details = []
+        for r in results:
+            if isinstance(r, Exception):
+                err_details.append(str(r))
+        
+        err_msg = "OCR failed for both sides. Please ensure images are clear and well-lit."
+        if err_details:
+            err_msg += " System details: " + " | ".join(err_details)
+            
         return {
             "success": False,
-            "error": "OCR failed for both sides (Google Vision + OCR.space). Please ensure images are clear and well-lit.",
+            "error": err_msg,
             "extracted_data": None
         }
 
     # 2. Multi-Side Logic Extraction (passed to AI Intelligence layer with original images)
-    extracted = extract_id_details(front_text, back_text, front_image=front_bytes, back_image=back_bytes)
+    extracted = extract_id_details(front_text, back_text, front_image=front_bytes, back_image=back_bytes, expected_id_type=id_type)
     
     print(f"[OCR] Multi-side pipeline took {time.time() - start_total:.3f}s")
     

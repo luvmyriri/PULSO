@@ -1,8 +1,0 @@
-{
-    "timestamp": "2026-03-12T23:01:25.411318",
-    "raw_text": "FAILURE_LOG: Google Vision: HTTPSConnectionPool(host='vision.googleapis.com', port=443): Max retries exceeded with url: /v1/images:annotate?key=AIzaSyBSwaxu9T9aLyliwzyO5u8b6--FxCz5e4I (Caused by NameResolutionError(\"HTTPSConnection(host='vision.googleapis.com', port=443): Failed to resolve 'vision.googleapis.com' ([Errno 11001] getaddrinfo failed)\")) | OCR.space: HTTPSConnectionPool(host='api.ocr.space', port=443): Max retries exceeded with url: /parse/image (Caused by NameResolutionError(\"HTTPSConnection(host='api.ocr.space', port=443): Failed to resolve 'api.ocr.space' ([Errno 11001] getaddrinfo failed)\"))",
-    "parsed_data": {
-        "error": "All engines failed",
-        "mock_returned": true
-    }
-}

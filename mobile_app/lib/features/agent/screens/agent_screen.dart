@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -96,7 +97,7 @@ class _AgentScreenState extends State<AgentScreen> {
           color: isSelected ? AppTheme.primaryOrange.withOpacity(0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Icon(icon, size: 22),
+        child: PulsoIcon(icon, size: 22),
       ),
       label: label,
     );
@@ -193,7 +194,7 @@ class _HomeTab extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [BoxShadow(color: AppTheme.primaryOrange.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
             ),
-            child: const Icon(Icons.shield_rounded, color: Colors.white, size: 24),
+            child: const PulsoIcon(Icons.shield_rounded, color: Colors.white, size: 24),
           ).animate().scale(delay: 100.ms),
           const SizedBox(width: 16),
           Expanded(
@@ -267,7 +268,7 @@ class _HomeTab extends StatelessWidget {
                 children: [
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                     const Text('Field Operations Stat', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
-                    Icon(Icons.radar_rounded, color: provider.isTracking ? AppTheme.primaryOrange : Colors.white24, size: 20),
+                    PulsoIcon(Icons.radar_rounded, color: provider.isTracking ? AppTheme.primaryOrange : Colors.white24, size: 20),
                   ]),
                   const Spacer(),
                   const Text('Current Location', style: TextStyle(color: Colors.white38, fontSize: 11)),
@@ -294,7 +295,7 @@ class _HomeTab extends StatelessWidget {
   Widget _statItem(IconData icon, String val, String label) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Icon(icon, size: 12, color: AppTheme.primaryOrange),
+        PulsoIcon(icon, size: 12, color: AppTheme.primaryOrange),
         const SizedBox(width: 4),
         Text(val, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
       ]),
@@ -336,7 +337,7 @@ class _HomeTab extends StatelessWidget {
               borderRadius: BorderRadius.circular(22),
               border: Border.all(color: color.withOpacity(0.25), width: 1.5),
             ),
-            child: Icon(icon, color: color, size: 28),
+            child: PulsoIcon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 10),
           Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
@@ -373,7 +374,7 @@ class _HomeTab extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 40),
       decoration: BoxDecoration(color: Colors.white.withOpacity(0.02), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white.withOpacity(0.05))),
       child: Column(children: [
-        Icon(Icons.task_alt_rounded, size: 48, color: AppTheme.successGreen.withOpacity(0.4)),
+        PulsoIcon(Icons.task_alt_rounded, size: 48, color: AppTheme.successGreen.withOpacity(0.4)),
         const SizedBox(height: 16),
         const Text('Standby Mode', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         const Text('Waiting for new assignments...', style: TextStyle(color: Colors.white38, fontSize: 13)),
@@ -437,12 +438,12 @@ class _HomeTab extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? color : Colors.white54, size: 24),
+            PulsoIcon(icon, color: isSelected ? color : Colors.white54, size: 24),
             const SizedBox(width: 16),
             Expanded(
               child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 15, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
             ),
-            if (isSelected) Icon(Icons.check_circle, color: color, size: 20),
+            if (isSelected) PulsoIcon(Icons.check_circle, color: color, size: 20),
           ],
         ),
       ),
@@ -469,7 +470,7 @@ class _HomeTab extends StatelessWidget {
                 shaderCallback: (bounds) => const LinearGradient(colors: [AppTheme.primaryOrange, AppTheme.primaryOrangeLight]).createShader(bounds),
                 child: const Text('New Field Report', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
               ),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: Colors.white54)),
+              IconButton(onPressed: () => Navigator.pop(context), icon: const PulsoIcon(Icons.close, color: Colors.white54)),
             ]),
             const SizedBox(height: 8),
             // GPS badge
@@ -478,7 +479,7 @@ class _HomeTab extends StatelessWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: AppTheme.successGreen.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.successGreen.withOpacity(0.2))),
                 child: Row(children: [
-                  const Icon(Icons.location_on, color: AppTheme.successGreen, size: 16),
+                  const PulsoIcon(Icons.location_on, color: AppTheme.successGreen, size: 16),
                   const SizedBox(width: 8),
                   Text('GPS: ${provider.currentLocation!['latitude']?.toStringAsFixed(5)}, ${provider.currentLocation!['longitude']?.toStringAsFixed(5)}',
                     style: const TextStyle(color: AppTheme.successGreen, fontSize: 12)),
@@ -521,7 +522,7 @@ class _HomeTab extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                        child: const Icon(Icons.close, color: Colors.white, size: 16),
+                        child: const PulsoIcon(Icons.close, color: Colors.white, size: 16),
                       ),
                     ),
                   ),
@@ -594,7 +595,7 @@ class _HomeTab extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(color: AppTheme.errorRed.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.sos_rounded, color: AppTheme.errorRed, size: 24),
+            child: const PulsoIcon(Icons.sos_rounded, color: AppTheme.errorRed, size: 24),
           ),
           const SizedBox(width: 12),
           const Text('Send SOS Alert', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
@@ -690,7 +691,7 @@ class _AssignmentCardPremium extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: (isCritical ? AppTheme.errorRed : AppTheme.primaryOrange).withOpacity(0.1), borderRadius: BorderRadius.circular(14)),
-                child: Icon(isCritical ? Icons.priority_high_rounded : Icons.engineering_rounded, color: isCritical ? AppTheme.errorRed : AppTheme.primaryOrange, size: 22),
+                child: PulsoIcon(isCritical ? Icons.priority_high_rounded : Icons.engineering_rounded, color: isCritical ? AppTheme.errorRed : AppTheme.primaryOrange, size: 22),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -705,7 +706,7 @@ class _AssignmentCardPremium extends StatelessWidget {
                     Text(wo['title'] ?? 'Title Unavailable', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 8),
                     Row(children: [
-                      const Icon(Icons.location_on_rounded, color: Colors.white24, size: 14),
+                      const PulsoIcon(Icons.location_on_rounded, color: Colors.white24, size: 14),
                       const SizedBox(width: 6),
                       Expanded(child: Text(wo['location_string'] ?? 'No location details', style: const TextStyle(color: Colors.white38, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                     ]),
@@ -838,7 +839,7 @@ class _MapTabState extends State<_MapTab> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(color: AppTheme.darkSlate.withOpacity(0.8), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(0.1))),
                       child: Row(children: [
-                        const Icon(Icons.my_location_rounded, size: 16, color: AppTheme.primaryOrange),
+                        const PulsoIcon(Icons.my_location_rounded, size: 16, color: AppTheme.primaryOrange),
                         const SizedBox(width: 10),
                         Text(location != null ? '${location['latitude']?.toStringAsFixed(5)}, ${location['longitude']?.toStringAsFixed(5)}' : 'Awaiting GPS signal…',
                           style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
@@ -857,7 +858,7 @@ class _MapTabState extends State<_MapTab> {
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [BoxShadow(color: AppTheme.primaryOrange.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))],
                   ),
-                  child: const Icon(Icons.my_location, color: Colors.white, size: 22),
+                  child: const PulsoIcon(Icons.my_location, color: Colors.white, size: 22),
                 ),
               ),
             ]),
@@ -928,7 +929,7 @@ class _ReportsTab extends StatelessWidget {
               Container(
                 width: 50, height: 50,
                 decoration: BoxDecoration(color: (r['color'] as Color).withOpacity(0.12), borderRadius: BorderRadius.circular(16), border: Border.all(color: (r['color'] as Color).withOpacity(0.2))),
-                child: Icon(r['icon'] as IconData, color: r['color'] as Color, size: 24),
+                child: PulsoIcon(r['icon'] as IconData, color: r['color'] as Color, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -939,7 +940,7 @@ class _ReportsTab extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(color: (r['color'] as Color).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                child: Icon(Icons.arrow_forward_rounded, color: r['color'] as Color, size: 18),
+                child: PulsoIcon(Icons.arrow_forward_rounded, color: r['color'] as Color, size: 18),
               ),
             ]),
           ).animate().fadeIn(delay: (200 + entry.key * 100).ms).slideX(begin: 0.05),
@@ -981,7 +982,7 @@ class _ProfileTab extends StatelessWidget {
                   child: Container(
                     width: 74, height: 74,
                     decoration: BoxDecoration(color: AppTheme.darkSlateLight, borderRadius: BorderRadius.circular(23)),
-                    child: const Icon(Icons.shield_rounded, color: AppTheme.primaryOrange, size: 34),
+                    child: const PulsoIcon(Icons.shield_rounded, color: AppTheme.primaryOrange, size: 34),
                   ),
                 ).animate().fadeIn().scale(begin: const Offset(0.8, 0.8)),
                 const SizedBox(height: 16),
@@ -1012,7 +1013,7 @@ class _ProfileTab extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(color: AppTheme.errorRed.withOpacity(0.08), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.errorRed.withOpacity(0.2))),
                     child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(Icons.logout_rounded, color: AppTheme.errorRed, size: 20),
+                      PulsoIcon(Icons.logout_rounded, color: AppTheme.errorRed, size: 20),
                       SizedBox(width: 8),
                       Text('Log Out', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.errorRed)),
                     ]),
@@ -1034,10 +1035,10 @@ class _ProfileTab extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.06))),
       child: Row(children: [
-        Icon(icon, color: Colors.white54, size: 22),
+        PulsoIcon(icon, color: Colors.white54, size: 22),
         const SizedBox(width: 14),
         Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500))),
-        const Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 22),
+        const PulsoIcon(Icons.chevron_right_rounded, color: Colors.white24, size: 22),
       ]),
     );
   }

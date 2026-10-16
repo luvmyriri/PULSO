@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text, or_
+from sqlalchemy import func, text, or_, case
 from sqlalchemy.exc import IntegrityError
+from fastapi import HTTPException
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import models, gov_models, schemas
 import json
@@ -110,12 +112,105 @@ def get_user(db: Session, user_id: int):
     if off: return off
     return None
 
-def get_user_by_email(db: Session, email: str):
-    res = db.query(models.Resident).filter(func.lower(models.Resident.email) == email.lower()).first()
+def normalize_ph_phone(raw: str) -> Optional[str]:
+    """
+    Normalizes Philippine mobile phone numbers into standard 11-digit format: 09XXXXXXXXX.
+    Handles:
+    - +639XXXXXXXXX -> 09XXXXXXXXX
+    - 639XXXXXXXXX  -> 09XXXXXXXXX
+    - 9XXXXXXXXX   -> 09XXXXXXXXX
+    - 09XXXXXXXXX  -> 09XXXXXXXXX
+    - Strip dashes, spaces, parentheses, dots.
+    """
+    if not raw or not isinstance(raw, str):
+        return None
+    digits = re.sub(r"\D", "", raw)
+    if digits.startswith("639") and len(digits) == 12:
+        return "0" + digits[2:]
+    if digits.startswith("9") and len(digits) == 10:
+        return "0" + digits
+    if digits.startswith("09") and len(digits) == 11:
+        return digits
+    return digits if digits else None
+
+def get_users_by_identifier(db: Session, identifier: str):
+    """
+    Finds all potential users (Resident or Official) matching an email or phone number.
+    Returns newest accounts first so recent credentials take precedence.
+    """
+    if not identifier:
+        return []
+    clean_id = identifier.strip()
+    
+    # 1. If it contains '@', query by email directly
+    if "@" in clean_id:
+        res = db.query(models.Resident).filter(func.lower(models.Resident.email) == clean_id.lower()).all()
+        if res: return res
+        off = db.query(models.Official).filter(func.lower(models.Official.email) == clean_id.lower()).all()
+        if off: return off
+        return []
+        
+    # 2. Treat as potential phone number
+    norm_phone = normalize_ph_phone(clean_id)
+    candidates = []
+    if norm_phone:
+        suffix_10 = norm_phone[-10:] if len(norm_phone) >= 10 else norm_phone
+        res_list = db.query(models.Resident).filter(
+            or_(
+                models.Resident.phone_number == norm_phone,
+                models.Resident.phone_number == clean_id,
+                models.Resident.phone_number.endswith(suffix_10)
+            )
+        ).order_by(models.Resident.id.desc()).all()
+        candidates.extend(res_list)
+        
+        off_list = db.query(models.Official).filter(
+            or_(
+                models.Official.phone_number == norm_phone,
+                models.Official.phone_number == clean_id,
+                models.Official.phone_number.endswith(suffix_10)
+            )
+        ).order_by(models.Official.id.desc()).all()
+        candidates.extend(off_list)
+
+    if candidates:
+        return candidates
+
+    # 3. Fallback: try raw match on email just in case
+    res = db.query(models.Resident).filter(func.lower(models.Resident.email) == clean_id.lower()).all()
     if res: return res
-    off = db.query(models.Official).filter(func.lower(models.Official.email) == email.lower()).first()
+    off = db.query(models.Official).filter(func.lower(models.Official.email) == clean_id.lower()).all()
     if off: return off
-    return None
+
+    return []
+
+def get_user_by_identifier(db: Session, identifier: str):
+    """
+    Finds a user (Resident or Official) by email or phone number.
+    Returns the newest registered account.
+    """
+    users = get_users_by_identifier(db, identifier)
+    return users[0] if users else None
+
+def get_resident_by_phone(db: Session, phone_number: str) -> Optional[models.Resident]:
+    """Finds a resident by normalized Philippine phone number."""
+    if not phone_number:
+        return None
+    norm_phone = normalize_ph_phone(phone_number)
+    if not norm_phone:
+        return None
+    suffix_10 = norm_phone[-10:] if len(norm_phone) >= 10 else norm_phone
+    return db.query(models.Resident).filter(
+        or_(
+            models.Resident.phone_number == norm_phone,
+            models.Resident.phone_number == phone_number.strip(),
+            models.Resident.phone_number.endswith(suffix_10)
+        )
+    ).first()
+
+def get_user_by_email(db: Session, email: str):
+    # Delegate to get_user_by_identifier to support both email and phone numbers seamlessly
+    return get_user_by_identifier(db, identifier=email)
 
 def update_resident(db: Session, resident_id: int, resident_update: schemas.ResidentUpdate):
     db_resident = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
@@ -179,18 +274,31 @@ def update_user(db: Session, user_id: int, user_update: schemas.UserUpdate):
     return None
 
 
-def get_report(db: Session, report_id: int):
-    return db.query(models.Report).filter(models.Report.id == report_id).first()
+def get_report(db: Session, report_id: int, for_update: bool = False):
+    query = db.query(models.Report).filter(models.Report.id == report_id)
+    return (query.with_for_update() if for_update else query).first()
 
 def get_reports(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Report).order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_reports_by_user(db: Session, resident_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.Report).filter(models.Report.resident_id == resident_id).order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
+    return db.query(models.Report).filter(
+        or_(
+            models.Report.resident_id == resident_id,
+            models.Report.claimed_by_user_id == resident_id
+        )
+    ).order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
 
-def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, ai_analysis: dict = None):
+def create_report(
+    db: Session,
+    report: schemas.ReportCreate,
+    resident_id: Optional[int] = None,
+    ai_analysis: Optional[dict] = None,
+    tracking_token_hash: Optional[str] = None
+) -> models.Report:
     from sqlalchemy.exc import IntegrityError
     import logging
+    from typing import Optional
     
     attempts = 0
     max_attempts = 5
@@ -198,6 +306,9 @@ def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, a
     while attempts < max_attempts:
         try:
             report_data = report.model_dump()
+            if tracking_token_hash:
+                report_data["tracking_token_hash"] = tracking_token_hash
+                
             if ai_analysis:
                 report_data["ai_category"] = ai_analysis.get("category")
                 report_data["ai_urgency"] = ai_analysis.get("urgency")
@@ -206,19 +317,16 @@ def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, a
                 report_data["severity_score"] = ai_analysis.get("severity_score", 0.0)
                 report_data["ai_metadata"] = json.dumps(ai_analysis) if ai_analysis else None
                 
-            # Now that Report model has barangay_id, we no longer need to pop it.
-            pass
-            
             if not report_data.get("location_barangay"):
                 # 1. Try to extract from location_string first (e.g., "Plus Code | Address | Barangay Name")
                 loc_str = report_data.get("location_string", "")
                 if loc_str and "Barangay" in loc_str:
-                    match = re.search(r"(Barangay\s+[^|]+)", loc_str, re.IGNORECASE)
+                    match = re.search(r"(Barangay\s+[^|,]+)", loc_str, re.IGNORECASE)
                     if match:
                         report_data["location_barangay"] = match.group(1).strip()
                 
                 # 2. Fallback to reporter's home barangay if still missing
-                if not report_data.get("location_barangay"):
+                if not report_data.get("location_barangay") and resident_id:
                     res = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
                     if res:
                         if res.barangay_ref:
@@ -228,11 +336,33 @@ def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, a
                         report_data["kyc_tier_at_report"] = res.kyc_level
                         report_data["citizen_trust_score"] = res.trust_score
 
-            # 3. AUTO-DETECT BARANGAY_ID
+            # 3. SPATIAL & POSTGIS AUTO-ASSIGNMENT (Sector, Barangay, PostGIS geometry)
+            lat = report_data.get("location_lat")
+            lng = report_data.get("location_lng")
+            if lat is not None and lng is not None:
+                try:
+                    from services.spatial_service import locate_point
+                    from geoalchemy2.elements import WKTElement
+                    loc_info = locate_point(db, float(lat), float(lng))
+                    
+                    # Store PostGIS Point geometry (SRID 4326)
+                    report_data["location"] = WKTElement(f"POINT({lng} {lat})", srid=4326)
+                    
+                    if loc_info.get("sector"):
+                        report_data["sector"] = loc_info["sector"]
+                    if loc_info.get("barangay_id"):
+                        report_data["barangay_id"] = loc_info["barangay_id"]
+                    if loc_info.get("barangay_display") and not report_data.get("location_barangay"):
+                        report_data["location_barangay"] = loc_info["barangay_display"]
+                    elif loc_info.get("barangay_name") and not report_data.get("location_barangay"):
+                        report_data["location_barangay"] = loc_info["barangay_name"]
+                except Exception as e:
+                    logging.warning(f"Spatial auto-assignment failed: {e}")
+
+            # 4. AUTO-DETECT BARANGAY_ID FALLBACK
             # If we have a location_barangay string, try to find the canonical ID
-            if report_data.get("location_barangay"):
+            if not report_data.get("barangay_id") and report_data.get("location_barangay"):
                 brgy_name = report_data["location_barangay"].lower().replace("barangay", "").strip()
-                # Try exact name match or number match
                 brgy = db.query(models.Barangay).filter(
                     (func.lower(models.Barangay.name) == brgy_name) | 
                     (models.Barangay.name == report_data["location_barangay"])
@@ -241,14 +371,14 @@ def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, a
                     report_data["barangay_id"] = brgy.id
             
             # If still missing barangay_id, check if resident has one
-            if not report_data.get("barangay_id"):
+            if not report_data.get("barangay_id") and resident_id:
                 res = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
                 if res and res.barangay_id:
                     report_data["barangay_id"] = res.barangay_id
 
-            # Explicitly generate ticket_id if it failed previously or to be safe
-            # models.Report.ticket_id has a default=generate_ticket_id, 
-            # but setting it explicitly ensures it's fresh in each retry.
+            if not report_data.get("reporter_type"):
+                report_data["reporter_type"] = "registered" if resident_id else "guest"
+
             new_ticket_id = models.generate_ticket_id()
             db_report = models.Report(**report_data, resident_id=resident_id, ticket_id=new_ticket_id)
             db.add(db_report)
@@ -256,14 +386,15 @@ def create_report(db: Session, report: schemas.ReportCreate, resident_id: int, a
             db.refresh(db_report)
             
             # Initial Timeline Entry
-            _append_timeline(db, report_id=db_report.id, status="pending", note="Report successfully filed via mobile. Awaiting verification.")
+            _append_timeline(db, report_id=db_report.id, status="pending", note="Report logged and queued for engineering assessment.", is_public=True)
+            db.commit()
             
             return db_report
         except IntegrityError as e:
             db.rollback()
             error_msg = str(e).lower()
             # Stricter check: only retry if the TICKET_ID constraint is specifically mentioned
-            if "ix_reports_ticket_id" in error_msg or "unique constraint \"reports_ticket_id_key\"" in error_msg:
+            if "ix_reports_ticket_id" in error_msg or "unique constraint \"reports_ticket_id_key\"" in error_msg or "reports_ticket_id_key" in error_msg:
                 attempts += 1
                 logging.getLogger(__name__).warning(f"Ticket ID collision detected (msg: {error_msg}). ID: {new_ticket_id}. Retry {attempts}/{max_attempts}")
                 continue
@@ -282,7 +413,7 @@ def _create_notification(db: Session, title: str, message: str, resident_id: int
     db.add(db_notification)
     db.commit()
 
-def update_report_status(db: Session, report_id: int, status: str, actor_id: int = None, budget: float = None, deployment_date: datetime = None):
+def update_report_status(db: Session, report_id: int, status: str, actor_id: int = None, budget: float = None, deployment_date: datetime = None, reason: str = None):
     db_report = db.query(models.Report).filter(models.Report.id == report_id).first()
     if db_report:
         previous_status = db_report.status
@@ -291,9 +422,6 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
             db_report.budget = budget
         if deployment_date is not None:
             db_report.deployment_date = deployment_date
-        db.commit()
-        db.refresh(db_report)
-        
         # 1. Process Timeline Log
         timeline_entry = gov_models.ProcessTimeline(
             report_id=db_report.id,
@@ -301,9 +429,11 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
             previous_status=previous_status,
             actor_id=actor_id,
             actor_role="dispatcher" if actor_id else "system",
+            note=reason,
             created_at=datetime.now(timezone.utc)
         )
         db.add(timeline_entry)
+        db.flush()
         
         # 2. Immutable Audit Log
         audit_msg = f"Report {db_report.ticket_id} status changed from {previous_status} to {status}."
@@ -311,6 +441,8 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
             audit_msg += f" Budget Allocated: PHP {budget:,.2f}."
         if deployment_date is not None:
             audit_msg += f" Scheduled Deployment: {deployment_date.strftime('%Y-%m-%d')}."
+        if reason:
+            audit_msg += f" Reason: {reason}"
 
         audit_entry = gov_models.AuditLog(
             trigger_type="status_change",
@@ -334,8 +466,6 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
                     user.trust_score += 2
                 elif status == "resolved" and previous_status != "resolved":
                     user.trust_score += 3
-                elif status == "rejected" and previous_status != "rejected":
-                    user.trust_score -= 10
                 elif status == "cancelled" and previous_status != "cancelled":
                     user.trust_score -= 1
                 
@@ -343,10 +473,8 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
                 user.trust_score = max(0, min(100, user.trust_score))
                 db.add(user)
         
-        db.commit()
-        
         # Notification messages for each status transition
-        ticket = db_report.ticket_id or f"RPT-{db_report.id}"
+        ticket = db_report.ticket_id or f"PUL-{datetime.now().year}-{db_report.id:04d}"
         status_messages = {
             "pending_approval": (
                 "Report Verified",
@@ -372,7 +500,12 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
         
         if status in status_messages:
             title, message = status_messages[status]
-            _create_notification(db, title, message, resident_id=db_report.resident_id)
+            if db_report.resident_id is not None:
+                db.add(gov_models.OutboxEvent(
+                    event_key=f"report-status:{timeline_entry.id}:resident:{db_report.resident_id}",
+                    event_type="resident_in_app_notification",
+                    payload={"resident_id": db_report.resident_id, "title": title, "message": message},
+                ))
 
         # 4. Integration Hook: Automated Asset Resolution & Archival
         if status == "resolved":
@@ -391,23 +524,24 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
                     
                     # b) Archive to System Document Registry (Evidence Fingerprinting)
                     # We treat the resolution proof as a 'Survey Report' or 'Final Audit' context
-                    resolution_doc = gov_models.SystemDocument(
-                        document_type="survey_report",
-                        file_name=f"RESOLUTION_PROOF_{db_report.ticket_id}.jpg",
-                        file_path=db_report.resolution_image_url or "system_link",
-                        category="Infrastructure",
-                        target_model="WorkOrder",
-                        target_id=wo.id,
-                        uploader_id=actor_id,
-                        uploaded_at=datetime.now(timezone.utc),
-                        metadata_json={
-                            "report_ticket": db_report.ticket_id,
-                            "asset_id": wo.asset_id,
-                            "category": db_report.category,
-                            "resolution_status": "Finalized"
-                        }
-                    )
-                    db.add(resolution_doc)
+                    if db_report.resolution_image_url:
+                        resolution_doc = gov_models.SystemDocument(
+                            document_type="survey_report",
+                            file_name=f"RESOLUTION_PROOF_{db_report.ticket_id}.jpg",
+                            file_path=db_report.resolution_image_url,
+                            category="Infrastructure",
+                            target_model="WorkOrder",
+                            target_id=wo.id,
+                            uploader_id=actor_id,
+                            uploaded_at=datetime.now(timezone.utc),
+                            metadata_json={
+                                "report_ticket": db_report.ticket_id,
+                                "asset_id": wo.asset_id,
+                                "category": db_report.category,
+                                "resolution_status": "Finalized"
+                            }
+                        )
+                        db.add(resolution_doc)
                     
                     # c) Log Asset-Specific Maintenance Audit
                     asset_audit = gov_models.AuditLog(
@@ -420,7 +554,8 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
                     )
                     db.add(asset_audit)
 
-            db.commit() # Commit all side effects
+        db.commit()
+        db.refresh(db_report)
 
     return db_report
 
@@ -437,23 +572,35 @@ def confirm_report_resolution(
     """
     report = db.query(models.Report).filter(
         models.Report.id == report_id,
-        models.Report.resident_id == resident_id
-    ).first()
+        or_(
+            models.Report.claimed_by_user_id == resident_id,
+            (models.Report.claimed_by_user_id.is_(None)) &
+            (models.Report.resident_id == resident_id),
+        ),
+    ).with_for_update().first()
     
     if not report:
         return None
         
+    note = (note.strip() or None) if note is not None else None
+    if report.status == "closed_by_citizen":
+        if report.satisfaction_rating == rating and report.citizen_feedback_note == note:
+            return report
+        raise HTTPException(status_code=409, detail="Resolution has already been confirmed with different feedback")
+    if report.status != "resolved":
+        raise HTTPException(status_code=409, detail="Only a resolved report can be confirmed")
+
     previous_status = report.status
     report.status = "closed_by_citizen"
-    report.citizen_confirmed_at = func.now()
+    report.citizen_confirmed_at = datetime.now(timezone.utc)
     report.satisfaction_rating = rating
     report.citizen_feedback_note = note
     
     # Reward participation
-    res = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
+    res = db.query(models.Resident).filter(models.Resident.id == resident_id).with_for_update().first()
     if res:
         if rating >= 4:
-            res.trust_score = min(100, (res.trust_score or 100) + 5)
+            res.trust_score = min(100, (100 if res.trust_score is None else res.trust_score) + 5)
         elif rating <= 2:
             # Low rating doesn't penalize trust, but we might want to flag for follow-up
             pass
@@ -463,17 +610,67 @@ def confirm_report_resolution(
         status="closed_by_citizen", 
         previous_status=previous_status, 
         report_id=report.id,
-        note=f"Citizen confirmed resolution. Rating: {rating}/5. Note: {note[:50] if note else 'None'}"
+        actor_role="resident",
+        note=f"Resident confirmed resolution. Rating: {rating}/5."
     )
-    
-    _append_audit(
-        db, 
-        trigger_type="citizen_action", 
+
+    # AuditLog.actor_id references officials, so identify the resident in details.
+    db.add(gov_models.AuditLog(
+        trigger_type="citizen_action",
         action=f"Report {report.ticket_id} confirmed resolved by resident. Rating: {rating}",
         report_id=report.id,
-        actor_id=resident_id
-    )
+        actor_role="resident",
+        details=json.dumps({"resident_id": resident_id, "rating": rating}),
+    ))
     
+    db.commit()
+    db.refresh(report)
+    return report
+
+
+def cancel_report(db: Session, report_id: int, actor: models.Resident | models.Official) -> Optional[models.Report]:
+    report = db.query(models.Report).filter(models.Report.id == report_id).with_for_update().first()
+    if report is None:
+        return None
+
+    is_staff = isinstance(actor, models.Official) and actor.role in ("dispatcher", "manager")
+    is_owner = isinstance(actor, models.Resident) and (
+        report.claimed_by_user_id == actor.id or
+        (report.claimed_by_user_id is None and report.resident_id == actor.id)
+    )
+    if not (is_staff or is_owner):
+        raise HTTPException(status_code=403, detail="Not authorized to cancel this report")
+    if report.status == "cancelled":
+        return report
+    if report.status not in (
+        "pending", "received", "unverified", "unvalidated",
+        "under_review", "needs_information", "rejected", "pending_approval",
+    ):
+        raise HTTPException(status_code=409, detail=f"Cannot cancel report with status '{report.status}'")
+    if db.query(gov_models.WorkOrder.id).filter(
+        gov_models.WorkOrder.report_id == report.id,
+        gov_models.WorkOrder.status != "cancelled",
+    ).first():
+        raise HTTPException(status_code=409, detail="Report has an active work order")
+
+    previous_status = report.status
+    report.status = "cancelled"
+    actor_role = actor.role if is_staff else "resident"
+    official_id = actor.id if is_staff else None
+    _append_timeline(
+        db, status="cancelled", previous_status=previous_status,
+        report_id=report.id, actor_id=official_id, actor_role=actor_role,
+        note="Report cancelled.",
+    )
+    db.add(gov_models.AuditLog(
+        trigger_type="status_change", report_id=report.id,
+        actor_id=official_id, actor_role=actor_role,
+        action=f"Report {report.ticket_id} cancelled from {previous_status}.",
+        details=json.dumps({"resident_id": actor.id}) if is_owner else None,
+    ))
+    if is_owner:
+        resident = db.query(models.Resident).filter(models.Resident.id == actor.id).with_for_update().one()
+        resident.trust_score = max(0, (100 if resident.trust_score is None else resident.trust_score) - 1)
     db.commit()
     db.refresh(report)
     return report
@@ -536,97 +733,8 @@ def _append_audit(db: Session, trigger_type: str, action: str, actor_id: int, re
     db.add(audit)
     # commit deferred
 
-def reject_report(db: Session, report_id: int, actor_id: int = None):
-    return update_report_status(db, report_id, "rejected", actor_id=actor_id)
-
-def delete_report(db: Session, report_id: int) -> bool:
-    """
-    Surgically purges a report using raw SQL in strict bottom-up FK order.
-    Bypasses the ORM entirely to avoid attribute resolution issues.
-    """
-    from sqlalchemy import text
-
-    # First confirm the report exists
-    exists = db.execute(text("SELECT id FROM reports WHERE id = :rid"), {"rid": report_id}).fetchone()
-    if not exists:
-        return False
-
-    try:
-        # Step 1: Find all work_order IDs linked to this report
-        wo_rows = db.execute(text("SELECT id FROM work_orders WHERE report_id = :rid"), {"rid": report_id}).fetchall()
-        wo_ids = [row[0] for row in wo_rows]
-
-        # Step 2: Find all procurement_request IDs linked to those work orders
-        prq_ids = []
-        if wo_ids:
-            placeholders = ", ".join(str(i) for i in wo_ids)
-            prq_rows = db.execute(text(f"SELECT id FROM procurement_requests WHERE work_order_id IN ({placeholders})")).fetchall()
-            prq_ids = [row[0] for row in prq_rows]
-
-        # Step 3: Delete BoQ Items (deepest level, depends on procurement_requests)
-        if prq_ids:
-            placeholders = ", ".join(str(i) for i in prq_ids)
-            db.execute(text(f"DELETE FROM boq_items WHERE procurement_request_id IN ({placeholders})"))
-
-        # Step 4: Delete Procurement Requests
-        if prq_ids:
-            placeholders = ", ".join(str(i) for i in prq_ids)
-            db.execute(text(f"DELETE FROM procurement_requests WHERE id IN ({placeholders})"))
-
-        # Step 5: Delete Audit Logs tied to the report or its work orders
-        db.execute(text("DELETE FROM audit_logs WHERE report_id = :rid"), {"rid": report_id})
-        if wo_ids:
-            placeholders = ", ".join(str(i) for i in wo_ids)
-            db.execute(text(f"DELETE FROM audit_logs WHERE work_order_id IN ({placeholders})"))
-
-        # Step 6: Delete Process Timelines tied to the report or its work orders
-        db.execute(text("DELETE FROM process_timelines WHERE report_id = :rid"), {"rid": report_id})
-        if wo_ids:
-            placeholders = ", ".join(str(i) for i in wo_ids)
-            db.execute(text(f"DELETE FROM process_timelines WHERE work_order_id IN ({placeholders})"))
-
-        # Step 7: Delete Work Orders
-        if wo_ids:
-            placeholders = ", ".join(str(i) for i in wo_ids)
-            db.execute(text(f"DELETE FROM work_orders WHERE id IN ({placeholders})"))
-
-        # Step 8: Delete OBO Inspections — use SAVEPOINT so a failure doesn't abort the transaction
-        try:
-            db.execute(text("SAVEPOINT obo_cleanup"))
-            db.execute(text("DELETE FROM obo_inspections WHERE source_report_id = :rid"), {"rid": report_id})
-            db.execute(text("RELEASE SAVEPOINT obo_cleanup"))
-        except Exception as e:
-            db.execute(text("ROLLBACK TO SAVEPOINT obo_cleanup"))
-            db.execute(text("RELEASE SAVEPOINT obo_cleanup"))
-            import logging
-            logging.getLogger(__name__).debug(f"obo_inspections skipped (safe): {e}")
-
-        # Step 9: Silently clean up optional/external tables using SAVEPOINTs
-        optional_cleanups = [
-            "DELETE FROM dispatch_incidents WHERE report_id = :rid",
-        ]
-        for sql in optional_cleanups:
-            try:
-                db.execute(text("SAVEPOINT opt_cleanup"))
-                db.execute(text(sql), {"rid": report_id})
-                db.execute(text("RELEASE SAVEPOINT opt_cleanup"))
-            except Exception as e:
-                db.execute(text("ROLLBACK TO SAVEPOINT opt_cleanup"))
-                db.execute(text("RELEASE SAVEPOINT opt_cleanup"))
-                import logging
-                logging.getLogger(__name__).debug(f"Optional cleanup skipped: {e}")
-
-        # Step 10: Finally, delete the report itself
-        db.execute(text("DELETE FROM reports WHERE id = :rid"), {"rid": report_id})
-
-        db.commit()
-        print(f"[SUCCESS] Report {report_id} purged via raw SQL.")
-        return True
-
-    except Exception as e:
-        db.rollback()
-        print(f"[ERROR] Raw SQL Purge Failed for Report {report_id}: {e}")
-        return False
+def reject_report(db: Session, report_id: int, actor_id: int, reason: str):
+    return update_report_status(db, report_id, "rejected", actor_id=actor_id, reason=reason)
 
 def get_report_stats(db: Session) -> dict:
     """Get aggregated report counts by status for KPI dashboard."""
@@ -756,3 +864,70 @@ def create_work_order(db: Session, wo: schemas.WorkOrderCreate, assigned_by_id: 
     db.commit()
     
     return db_wo
+
+# ---------------------------------------------------------------------------
+# City News & Announcements CRUD
+# ---------------------------------------------------------------------------
+
+def get_news(db: Session, category: Optional[str] = None, page: int = 1, limit: int = 10):
+    query = db.query(models.NewsItem)
+    
+    if category and category.lower() != 'all':
+        query = query.filter(models.NewsItem.category.ilike(f"%{category}%"))
+    
+    # Priority sorting: urgent items pinned first (0), then normal (1), followed by published_at desc
+    priority_order = case(
+        (models.NewsItem.priority == 'urgent', 0),
+        else_=1
+    )
+    
+    total = query.count()
+    offset = (page - 1) * limit
+    items = query.order_by(priority_order, models.NewsItem.published_at.desc()).offset(offset).limit(limit).all()
+    
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": total_pages
+    }
+
+def create_news(db: Session, news_data: schemas.NewsItemCreate, image_url: Optional[str] = None, posted_by: Optional[str] = None):
+    data = news_data.model_dump()
+    if image_url:
+        data["image_url"] = image_url
+    if posted_by:
+        data["posted_by"] = posted_by
+    if not data.get("published_at"):
+        from datetime import datetime, timezone
+        data["published_at"] = datetime.now(timezone.utc)
+        
+    db_item = models.NewsItem(**data)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+def update_news(db: Session, news_id: int, update_data: schemas.NewsItemUpdate, image_url: Optional[str] = None):
+    db_item = db.query(models.NewsItem).filter(models.NewsItem.id == news_id).first()
+    if not db_item:
+        return None
+    data = update_data.model_dump(exclude_unset=True)
+    if image_url:
+        data["image_url"] = image_url
+    for k, v in data.items():
+        setattr(db_item, k, v)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+def delete_news(db: Session, news_id: int) -> bool:
+    db_item = db.query(models.NewsItem).filter(models.NewsItem.id == news_id).first()
+    if not db_item:
+        return False
+    db.delete(db_item)
+    db.commit()
+    return True
+

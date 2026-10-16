@@ -25,141 +25,596 @@
     "landing": {
       "nav": {
         "home": "Home",
-        "platform": "Plataporma",
-        "solutions": "Solusyon",
-        "about": "Tungkol sa LGU",
-        "login": "Mag-login"
+        "scope": "Imprastraktura",
+        "platform": "Imprastraktura",
+        "howitworks": "Paano Gumagana",
+        "howItWorks": "Paano Gamitin",
+        "solutions": "Paano Gumagana",
+        "services": "Mga Serbisyo",
+        "about": "Inhinyerya",
+        "report": "Mag-ulat ng Problema",
+        "reportIssue": "Mag-ulat ng Problema",
+        "reportAnIssue": "Mag-ulat ng Isyu",
+        "track": "Subaybayan",
+        "trackReport": "Sundan ang Ulat",
+        "map": "Live na Mapa",
+        "hotlines": "Mga Hotline",
+        "login": "Mag-sign In",
+        "register": "Mag-rehistro",
+        "openDashboard": "Mag-rehistro",
+        "staff": "Portal ng Kawani",
+        "staffGateway": "Portal ng Kawani"
       },
       "hero": {
-        "status": "SISTEMA ONLINE • CALOOCAN NORTH",
-        "title1": "Matalinong Imprastraktura,",
-        "title2": "Mas Matalinong Lungsod.",
-        "subtitle": "Isang pampublikong plataporma na tumutulong sa mga mamamayan na mag-ulat ng mga panganib sa imprastraktura. Pinapatakbo ang mas mabilis at mas ligtas na Caloocan North gamit ang teknolohiya.",
+        "tag": "PAGSUSUBAYBAY NG MGA PAMPUBLIKONG UTILITY PARA SA CALOOCAN CITY",
+        "title1": "PAMPUBLIKONG GAWAIN",
+        "title2": "PAGSUSUBAYBAY AT PAGKUKUMPUNI",
+        "title3": "PORTAL",
+        "subtitle": "Pabubutihin ang pang-araw-araw na buhay ng mga residente ng Caloocan City sa pamamagitan ng pagtulong sa mga inhinyero na agad na matukoy ang mga panganib sa utility, mabilis na maayos ang mga outage, at mapanatili ang maaasahang pampublikong serbisyo.",
+        "reportCta": "Mag-ulat ng Problema",
+        "noAccountRequired": "Hindi kailangan ng account",
+        "trackCta": "Subaybayan ang Ulat",
+        "trackSubtext": "Hanapin gamit ang Ticket ID at Token",
+        "staffGateway": "Portal ng Pamahalaan at Kawani",
         "register": "Mag-rehistro",
-        "docs": "Gabay sa Portal"
+        "openDashboard": "Mag-rehistro",
+        "exploreFeatures": "Galugarin ang mga Tampok",
+        "docs": "Dokumentasyon",
+        "status": "Aktibong Operasyon"
+      },
+      "cinematic": {
+        "ariaLabel": "PULSO Serbisyong Pampublikong Gawain ng Caloocan",
+        "report": "Mag-ulat ng Problema",
+        "noAccountRequired": "Hindi kailangan ng account",
+        "reportSubtext": "Hindi kailangan ng account",
+        "track": "Subaybayan ang Ulat",
+        "staff": "Portal ng Kawani",
+        "explore": "Alamin kung paano gumagana ang PULSO",
+        "slideControls": "Mga eksena sa panimula",
+        "previous": "Nakaraang eksena",
+        "next": "Susunod na eksena",
+        "showSlide": "Ipakita ang {{number}}: {{label}}",
+        "slides": {
+          "observe": {
+            "label": "Pansinin",
+            "eyebrow": "Pag-uulat ng pampublikong gawain · Lungsod ng Caloocan",
+            "title1": "Pansinin ang problema.",
+            "title2": "Simulan ang pagtugon.",
+            "body": "Iulat ang problema sa kalsada, kanal, ilaw, at utility sa Caloocan—at subaybayan ang bawat update.",
+            "alt": "Malawak na tanawin ng Caloocan sa himpapawid na may mga komunidad at kalsada."
+          },
+          "report": {
+            "label": "Iulat",
+            "eyebrow": "Mula sa kalsada patungo sa tamang pangkat ng lungsod",
+            "title1": "Kapag nagsalita ang kalsada, dapat",
+            "title2": "makinig ang lungsod.",
+            "body": "Ipakita ang problema, ilagay ang lokasyon, at subaybayan ang tugon ng lungsod sa isang malinaw na tala.",
+            "alt": "Pangkat ng pampublikong gawain sa Caloocan na sumusuri ng kalsada."
+          },
+          "follow": {
+            "label": "Subaybayan",
+            "eyebrow": "Isang ulat · Isang malinaw na pampublikong tala",
+            "title1": "Ang iyong ulat ang",
+            "title2": "nagpapakilos",
+            "title3": "sa lungsod.",
+            "body": "Ibahagi ang ebidensya. Ituro ang lugar. Alamin ang susunod na mangyayari.",
+            "alt": "Tanawin ng Caloocan sa bukang-liwayway patungo sa skyline ng lungsod."
+          }
+        }
+      },
+      "emergency": {
+        "badge": "Emerhensiya sa Buhay at Kaligtasan",
+        "notice": "Para sa agarang emerhensiya sa buhay, matinding pagbaha, o naputol na kable ng kuryente, tumawag agad sa 24/7 hotline.",
+        "call911": "Tumawag sa 911",
+        "rescueHotline": "Caloocan Rescue: (02) 888-1234"
+      },
+      "quickSteps": {
+        "step1Title": "Ituro ang Lokasyon at Hangganan",
+        "step1Desc": "Tukuyin ang eksaktong lugar sa Hilaga o Timog Caloocan gamit ang GPS o interactive na mapa.",
+        "step2Title": "Mag-upload ng Ebidensya",
+        "step2Desc": "Kumuha ng tunay na kulay na larawan na may awtomatikong pagsusuri ng AI.",
+        "step3Title": "Subaybayan ang Pagkukumpuni",
+        "step3Desc": "Sundan ang 6-yugtong talaan ng pagkukumpuni sa publiko o ikabit sa iyong account."
+      },
+      "mobileNav": {
+        "home": "Home",
+        "track": "Subaybayan",
+        "report": "Mag-ulat",
+        "updates": "Balita",
+        "account": "Account"
       },
       "features": {
-        "title": "Optimisado para sa Komunidad",
-        "subtitle": "Isang espesyal na plataporma na nagbibigay-kapangyarihan sa mga residente ng Caloocan North na aktibong lumahok sa pagpapanatili ng imprastraktura at kaligtasan.",
-        "f1_title": "GEOSPATIAL TRIAGE",
-        "f1_desc": "Tumpak na pag-mapa ng mga ulat upang matukoy ang mga isyu sa imprastraktura sa buong lungsod.",
-        "f2_title": "OPISYAL NA PAGPAPATUNAY",
-        "f2_desc": "Pinagsamang pagpapatunay ng tao at AI upang masigurong lehitimo at prayoridad ang bawat ulat.",
-        "f3_title": "PROAKTIBONG PAG-AALAGA",
-        "f3_desc": "Patuloy na pagsusuri sa imprastraktura upang matukoy ang mga isyu bago pa ito maging malaking problema."
-      },
-      "solutions": {
-        "badge": "Pinagsamang Solusyon",
-        "title": "Tiyak na Tugon para sa Kritikal na Imprastraktura.",
-        "subtitle": "Awtomatikong kinakategorya ng PULSO ang mga ulat, inililipat ang mga partikular na sakuna sa mga dalubhasang pangkat ng inhinyero kaagad.",
-        "s1_title": "Mga Daan & Tulay",
-        "s1_desc": "Pag-aayos ng lubak, pagkukumpuni ng bangketa, at pagsusuri sa integridad ng mga kalsada at tulay ng lungsod.",
-        "s1_l1": "Kumpuni ng Lokal na Kalsada",
-        "s1_l2": "Pavement Markings",
-        "s2_title": "Sistema ng Tubig & Baha",
-        "s2_desc": "Paglilinis ng mga baradong kanal, pagpapanatili ng manhole, at flood control para sa drainage system ng lungsod.",
-        "s2_l1": "De-clogging ng Drainage",
-        "s2_l2": "Flood Control",
-        "s3_title": "Mga Ilaw sa Daan",
-        "s3_desc": "Paglalagay at pagkukumpuni ng mga streetlights, electrical wiring, at mga poste upang masiguro ang kaligtasan sa gabi.",
-        "s3_l1": "Pagpapalit ng Bumbilya",
-        "s3_l2": "Kaligtasan ng Grid",
-        "s4_title": "Kaligtasan ng Publiko & Regulasyon",
-        "s4_desc": "Inspeksyon ng mga gusali, paglilinis ng mga debris pagkatapos ng sakuna, at pagsunod sa mga safety regulation.",
-        "s4_l1": "Kaligtasan ng Istruktura",
-        "s4_l2": "Paglilinis ng Debris",
-        "s5_title": "Mga Pampublikong Pasilidad",
-        "s5_desc": "Pagpapanatili ng mga pampublikong paaralan, health centers, mga plaza, at iba pang city-owned buildings.",
-        "s5_l1": "Kumpuni ng Pasilidad",
-        "s5_l2": "Pagpapanatili ng Parke"
-      },
-      "about": {
-        "badge": "Tungkol sa Caloocan LGU",
-        "title": "Isang Makabagong Inisyatiba ng Pamamahala.",
-        "p1": "Inilunsad ng Pamahalaang Lungsod ng Caloocan ang PULSO Project upang tulay ang agwat sa pagitan ng mga mamamayan at operasyon ng inhinyeriya. Sa pamamagitan ng crowdsourcing ng data sa imprastraktura, binabago namin ang bawat smartphone bilang isang mahalagang sensor ng lungsod.",
-        "p2": "Lumilipat mula sa makaluma at nakabatay sa papel na pag-uulat, niyayakap ng Caloocan North ang proaktibo, data-driven na pamamahala. Ang aming layunin ay hindi lamang upang ayusin ang mga problema nang mas mabilis, kundi upang asahan at maiwasan ang mga ito nang buo.",
-        "stat1_val": "13",
-        "stat1_lbl": "Barangay",
-        "stat2_val": "24/7",
-        "stat2_lbl": "Pagsusubaybay",
-        "stat3_val": "<2h",
-        "stat3_lbl": "Target na Tugon",
-        "analytics": "System Analytics",
-        "analytics_desc": "Real-time na mga metric sa resolusyon na mahigpit na sinusubaybayan ng LGU.",
-        "metric1": "Naresolvang Mga Ulat ng Sakuna",
-        "metric2": "Rate ng Preventative Dispatch",
-        "metric3": "Rate ng Paggamit ng Resident Portal",
-        "portal_btn": "Tingnan ang Open Data Portal"
+        "badge": "Nasasakupang Imprastraktura",
+        "title": "MGA URI NG PAMPUBLIKONG IMPRASTRAKTURA",
+        "subtitle": "Mga pampublikong imprastraktura na pinamamahalaan sa Caloocan City ng Kagawaran ng Inhinyeriya.",
+        "f1_title": "Pahalang na Imprastraktura",
+        "f1_desc": "Mga kalsada, lokal na tulay, eskinita, daanan ng tao, at paradahan.",
+        "f2_title": "Patayong Imprastraktura",
+        "f2_desc": "Mga city hall, pampublikong paaralan, lokal na health center, multipurpose gym, at imbakan.",
+        "f3_title": "Sistema ng Kanal at Tubig",
+        "f3_desc": "Mga bukas na kanal, daluyan sa ilalim ng lupa, linya ng imburnal, at network ng declogging.",
+        "f4_title": "Pampublikong Lugar",
+        "f4_desc": "Mga liwasan, parke, monumento, at mga bukas na palaruan."
       },
       "howitworks": {
-        "badge": "Paano Gumagana",
-        "title": "Mag-ulat ng Isyu sa 5 Simpleng Hakbang.",
-        "subtitle": "Sinisiguro ng PULSO ang mabilis na proseso mula sa ulat ng mamamayan hangsang sa napatunayang resolusyon — gamit ang AI triage at mabilis na tugon.",
-        "s1_title": "Mag-rehistro at I-verify",
-        "s1_desc": "Gumawa ng iyong resident account at i-verify ang iyong paninirahan gamit ang isang government-issued ID. Tanging mga na-verify na residente ng Caloocan North lamang ang maaaring magsumite ng mga ulat.",
-        "s2_title": "Kumuha ng Litrato sa Lugar",
-        "s2_desc": "Kumuha ng malinaw na litrato ng panganib sa imprastraktura sa lugar. Awtomatikong nita-tag ang iyong GPS coordinates para sa tumpak na lokasyon.",
-        "s3_title": "AI Triage",
-        "s3_desc": "Awtomatikong sinusuri ng Gemini AI ang iyong litrato at paglalarawan, kinakategorya ang isyu, nagtatakda ng urgency score, at gumagawa ng ticket.",
-        "s4_title": "Opisyal na Pagpapatunay",
-        "s4_desc": "Sinusuri ng opisyal ng lungsod ang AI-verified ticket, kinukumpirma ang priyoridad, at itinatakda ang pinakamalapit na kwalipikadong field crew.",
-        "s5_title": "Nireresolba ng Crew",
-        "s5_desc": "Kumpleto ng pag-aayos ang field crew at nag-a-upload ng Proof of Repair na litrato. Makakatanggap ka ng notipikasyon kapag naresolba na ang iyong ulat."
+        "badge": "Simpleng Proseso",
+        "title": "PAANO GUMAGANA ANG PULSO",
+        "subtitle": "Mula sa pag-uulat ng problema hanggang sa matagumpay na pagkumpuni sa Lungsod ng Caloocan.",
+        "s1_title": "1. Naitalang Problema",
+        "s1_desc": "Nag-uulat ang mga mamamayan ng problema sa utility sa mapa ng lungsod.",
+        "s2_title": "2. Pagsusuri sa Lugar",
+        "s2_desc": "Sinusuri ng mga inspektor ang lokasyon gamit ang litrato at GPS.",
+        "s3_title": "3. Matalinong Prayoridad",
+        "s3_desc": "Iniraranggo ng PULSO ang mga ulat upang mauna ang mga kritikal na kumpuni.",
+        "s4_title": "4. Pagtatalaga ng Grupo",
+        "s4_desc": "Nagpapadala ang mga inhinyero ng work order at gamit sa field team.",
+        "s5_title": "5. Natapos ang Pag-aayos",
+        "s5_desc": "Kinukumpuni ng mga manggagawa ang sira at ina-update ang mapa."
+      },
+      "solutions": {
+        "badge": "Mga Utility",
+        "title": "MAHAHALAGANG SERBISYO NG LUNGSOD",
+        "subtitle": "Komprehensibong suporta sa inhinyeriya sa mga kritikal na sistema ng lungsod.",
+        "s1_title": "Suplay at Distribusyon ng Tubig",
+        "s1_desc": "Pagsubaybay sa presyon ng tubig, pagtukoy sa tagas ng tubo, at pagsusuri sa pangunahing linya.",
+        "s1_l1": "Live telemetry ng presyon",
+        "s1_l2": "Mabilis na pagpigil sa tagas",
+        "s2_title": "Kuryente at Ilaw sa Daan",
+        "s2_desc": "Pagsusubaybay sa kable ng kuryente at mabilis na pagkumpuni sa mga patay na poste ng ilaw.",
+        "s2_l1": "Mapa ng pagkawala ng kuryente",
+        "s2_l2": "Patrolya sa ilaw sa gabi",
+        "s3_title": "Mga Kalsada at Tulay",
+        "s3_desc": "Pagsusuri sa kondisyon ng aspalto, pagtatapal ng lubak, at inspeksyon sa istruktura ng tulay.",
+        "s3_l1": "Tuloy-tuloy na survey sa kalsada",
+        "s3_l2": "Pagsubaybay sa daanan ng mabibigat na sasakyan",
+        "s4_title": "Kaligtasan ng Publiko at mga Panganib",
+        "s4_desc": "Pang-emerhensyang pag-aalis ng sagabal, pagputol ng nabuwal na puno, at pagpapatibay ng dike.",
+        "s4_l1": "24/7 na pagtugon sa sakuna",
+        "s4_l2": "Sensor sa mga mapanganib na dalisdis",
+        "s5_title": "Pampublikong Gusali at Pasilidad",
+        "s5_desc": "Pagsusuri sa katatagan ng istruktura ng paaralan, health center, at evacuation center.",
+        "s5_l1": "Taunang seismic audit",
+        "s5_l2": "Pagsunod sa accessibility"
       },
       "services": {
-        "badge": "Mga Serbisyo ng LGU",
-        "title": "I-access ang Mga Serbisyo ng Lungsod ng Caloocan Online.",
-        "subtitle": "Bukod sa pag-uulat ng imprastraktura, nag-aalok ang Lungsod ng Caloocan ng mga digital na serbisyo para sa mga residente. Pinapagana ng City Services Portal.",
-        "senior_title": "Senior Citizen ID (OSCA)",
-        "senior_desc": "Mag-rehistro para sa iyong opisyal na PVC ID card upang ma-access ang mga benepisyo at serbisyo ng senior citizen sa ilalim ng OSCA.",
-        "senior_l1": "Bagong Senior Registration",
-        "senior_l2": "Pagpapalit ng PVC Card",
-        "senior_l3": "Pagsubaybay ng ID Status",
-        "pwd_title": "PWD Registration",
-        "pwd_desc": "Mag-rehistro para sa iyong opisyal na PVC ID card upang ma-access ang mga benepisyo at serbisyo ng PWD mula sa pamahalaan ng lungsod.",
-        "pwd_l1": "Mag-rehistro bilang PWD",
-        "pwd_l2": "PWD ID Verifier",
-        "pwd_l3": "Pagsubaybay ng ID Status",
-        "solo_title": "Solo Parent Registration",
-        "solo_desc": "Mag-rehistro para sa iyong Solo Parent ID card upang ma-access ang mga benepisyo at serbisyo sa ilalim ng RA 8972 (Solo Parents Welfare Act).",
-        "solo_l1": "Bagong Solo Parent Registration",
-        "solo_l2": "Pagsubaybay ng ID Status",
-        "gad_title": "GAD Plan at Budget",
-        "gad_desc": "Para sa mga barangay: Isumite at subaybayan ang inyong Gender and Development Plan, Budget, at Accomplishment Reports.",
-        "gad_l1": "Isumite ang GAD Report",
-        "gad_l2": "Suriin ang Status ng Ulat",
-        "portal_link": "Bisitahin ang City Services Portal"
+        "badge": "Mga Portal ng Lungsod",
+        "title": "GATEWAY NG MGA SERBISYONG PAMPUBLIKO SA CALOOCAN",
+        "subtitle": "Direktang access sa mga espesyal na portal para sa kapakanan ng mamamayan at pamamahala.",
+        "senior_title": "Portal ng Senior Citizen",
+        "senior_desc": "Talaan ng pagpaparehistro at pagpapatunay ng Senior ID.",
+        "senior_l1": "Bagong Aplikasyon",
+        "senior_l2": "Desk ng Pagpapatunay",
+        "senior_l3": "Katayuan ng QR Code",
+        "pwd_title": "Portal para sa Kapakanan ng PWD",
+        "pwd_desc": "Direktoryo ng tulong para sa mga May Kapansanan.",
+        "pwd_l1": "Online na Rehistrasyon",
+        "pwd_l2": "Talaan ng Pagpapatunay",
+        "pwd_l3": "Pagsusuri sa Katunayan ng ID",
+        "solo_title": "Portal ng Solo Parent",
+        "solo_desc": "Pagsubaybay sa mga benepisyo at suporta sa mga solong magulang.",
+        "solo_l1": "Mag-apply Online",
+        "solo_l2": "Tagasubaybay ng Aplikasyon",
+        "gad_title": "Portal ng GAD Plan",
+        "gad_desc": "Direktoryo ng mga proyekto para sa Gender and Development.",
+        "gad_l1": "Direktoryo ng Plano",
+        "gad_l2": "Talaan ng Pag-apruba",
+        "portal_link": "Tingnan ang Lahat ng Online Serbisyo sa Caloocan"
+      },
+      "about": {
+        "badge": "Tungkol sa Amin",
+        "title": "TANGGAPAN NG INHINYERO NG LUNGSOD",
+        "p1": "Ang <1>Tanggapan ng Inhinyero ng Lungsod ng Caloocan</1> ay naatasang magplano, magdisenyo, magtayo, at magpanatili ng pampublikong imprastraktura sa lahat ng 188 barangay.",
+        "p2": "Sa pamamagitan ng PULSO, pinag-uugnay ng aming mga inhinyero ang mga ulat ng mamamayan sa mga field work crew upang magbigay ng mabilis, transparent, at maaasahang serbisyo.",
+        "stat1_val": "188",
+        "stat1_lbl": "Barangay na Sakop",
+        "stat2_val": "24/7",
+        "stat2_lbl": "Pagsubaybay sa Operasyon",
+        "stat3_val": "<24h",
+        "stat3_lbl": "Target na Pagsusuri",
+        "performance_title": "Pagganap ng Sistema",
+        "metric1_lbl": "Katumpakan ng Mapa ng Utility",
+        "metric2_lbl": "Bilis ng Pagtukoy sa Panganib"
       },
       "footer": {
-        "desc": "Ang Digital Heartbeat ng Caloocan North. Isang advanced na Sistema ng Lokasyon para sa Pampublikong Utility at Imprastraktura na dinisenyo para sa proaktibong pamamahala ng lungsod.",
-        "portals": "Mga Portal",
-        "p_resident": "Resident Portal",
-        "p_engineering": "Engineering Dashboard",
-        "p_admin": "Administrator ng LGU",
-        "p_api": "Mga Pampublikong API",
-        "p_resident_app": "Resident Mobile App",
-        "platform": "Plataporma",
-        "cityservices": "Mga Serbisyo ng Lungsod",
-        "cs_senior": "Senior Citizen ID (OSCA)",
-        "cs_pwd": "PWD Registration",
-        "cs_solo": "Solo Parent ID",
-        "cs_gad": "GAD Plan at Budget",
-        "contact": "Kontakin ang Inhinyeriya",
-        "address": "Caloocan City Hall,<br />Zapote Street, Barangay 177,<br />Caloocan City 1400, Metro Manila",
-        "hours": "Lun – Biy, 8:00 AM – 5:00 PM",
-        "hours_label": "Oras ng Opisina",
-        "copyright": "PULSO Infrastructure Network. Dinisenyo para sa Caloocan LGU.",
+        "desc": "PULSO: Transparent na Pamamahala sa Inhinyeriya ng Lungsod at Pag-uulat ng Pampublikong Gawain sa Caloocan.",
+        "portals_header": "Mga Portal",
+        "resident_portal": "Portal ng Residente",
+        "gov_gateway": "Portal ng Pamahalaan",
+        "dispatch_ops": "Operasyon ng Dispatch",
+        "track_report": "Subaybayan ang Ulat",
+        "report_issue": "Mag-ulat ng Problema",
+        "office_header": "Tanggapan",
+        "office_dept": "City Engineering Department",
+        "office_hall": "Caloocan City Hall",
+        "office_road": "Camarin Road, Caloocan City",
+        "contact_header": "Kontak",
+        "rights": "Pamahalaang Lungsod ng Caloocan. Lahat ng karapatan ay nakalaan.",
         "privacy": "Patakaran sa Privacy",
         "terms": "Mga Tuntunin ng Serbisyo",
-        "cookie": "Mga Setting ng Cookie"
+        "cookies": "Patakaran sa Cookie"
+      }
+    },
+    "reportWizard": {
+      "title": "Mag-ulat ng Problema",
+      "subtitle": "Magsumite ng kahilingan sa pagkumpuni nang direkta sa City Engineering Department ng Caloocan.",
+      "guestBadge": "Walang Sign-In na Kailangan",
+      "stepCounter": "Hakbang {{current}} ng {{total}}",
+      "saveDraft": "Kusang nase-save ang draft",
+      "draftResumed": "Matagumpay na naibalik ang iyong draft mula sa nakaraang sesyon.",
+      "draftFound": "Mayroon kang hindi natapos na ulat. Nais mo ba itong ipagpatuloy?",
+      "resumeDraft": "Ipagpatuloy ang Draft",
+      "startFresh": "Magsimula Muli",
+      "emergencyBanner": {
+        "title": "Agarang banta ba ito sa buhay o kaligtasan?",
+        "body": "Para sa sunog, malubhang sakuna, krimen, o nakalantad na kuryente sa baha, tumawag agad sa mga emergency hotline. Ang PULSO ay para sa karaniwang pagkukumpuni ng imprastraktura.",
+        "call911": "Tumawag sa 911 (Pambansang Emergency)",
+        "callCDRRMO": "Tumawag sa 888-1234 (Caloocan CDRRMO)",
+        "callMaynilad": "Maynilad: 1626",
+        "callMeralco": "Meralco: 16211",
+        "dismiss": "Nauunawaan ko, ito ay karaniwang pagkukumpuni ng utility"
+      },
+      "nav": {
+        "back": "Bumalik",
+        "next": "Magpatuloy",
+        "submit": "Isumite ang Opisyal na Ulat",
+        "submitting": "Isinusumite...",
+        "cancel": "Kanselahin",
+        "step": "Hakbang",
+        "edit": "I-edit"
+      },
+      "steps": {
+        "step1": "Kategorya",
+        "step2": "Lokasyon",
+        "step3": "Ebidensya",
+        "step4": "Detalye",
+        "step5": "Kontak",
+        "step6": "Pagsusuri",
+        "step7": "Isumite",
+        "category": "Kategorya",
+        "location": "Lokasyon",
+        "evidence": "Ebidensya",
+        "details": "Detalye",
+        "contact": "Kontak",
+        "review": "Pagsusuri"
+      },
+      "step1Category": {
+        "title": "Pumili ng Kategorya ng Problema",
+        "subtitle": "Anong uri ng pampublikong imprastraktura ang nangangailangan ng kumpuni o inspeksyon?",
+        "selectPlaceholder": "Pumili ng kategorya...",
+        "categories": {
+          "water_supply_distribution": {
+            "label": "Suplay ng Tubig at Kanal",
+            "desc": "Baradong kanal, nawawalang manhole, baha sa kalsada, sirang tubo"
+          },
+          "drainage_flooding": {
+            "label": "Suplay ng Tubig at Kanal",
+            "desc": "Baradong kanal, nawawalang manhole, baha sa kalsada, sirang tubo"
+          },
+          "power_street_lighting": {
+            "label": "Kuryente at Ilaw sa Daan",
+            "desc": "Pundidong poste, nakalaylay na kable, madilim na daan, sirang poste"
+          },
+          "streetlights_electrical": {
+            "label": "Kuryente at Ilaw sa Daan",
+            "desc": "Pundidong poste, nakalaylay na kable, madilim na daan, sirang poste"
+          },
+          "roads_bridges": {
+            "label": "Kalsada at Tulay",
+            "desc": "Mga lubak, sirang aspalto, basag na tulay, bitak sa bangketa"
+          },
+          "traffic_signage": {
+            "label": "Trapiko at Karatula",
+            "desc": "Sirang traffic light, nawawalang signage, sirang harang sa daan"
+          },
+          "public_safety": {
+            "label": "Kaligtasan ng Publiko at Sagabal",
+            "desc": "Nabuwal na puno sa daan, mapanganib na kalat sa kalsada, gumuguhong pader"
+          },
+          "public_facilities": {
+            "label": "Pampublikong Gusali at Pasilidad",
+            "desc": "Sirang health center, paaralan, o kagamitan sa pampublikong parke"
+          },
+          "others": {
+            "label": "Iba pa",
+            "desc": "Iba pang pampublikong imprastraktura na wala sa listahan (kailangan ng detalye)"
+          }
+        },
+        "validationError": "Pumili ng kategorya upang magpatuloy."
+      },
+      "step2Location": {
+        "title": "Ituro ang Lokasyon ng Problema",
+        "subtitle": "Ituro ang eksaktong lugar sa Lungsod ng Caloocan kung saan naroroon ang problema.",
+        "searchPlaceholder": "Maghanap ng kalsada, landmark, o barangay sa Caloocan...",
+        "useMyLocation": "Gamitin ang Aking Kasalukuyang GPS",
+        "locating": "Kinukuha ang eksaktong GPS...",
+        "locationSuccess": "Nai-tag ang lokasyon ng GPS (katumpakan: {{accuracy}}m)",
+        "locationError": "Hindi makuha ang GPS. Mangyaring maghanap o i-drag ang pin.",
+        "boundaryChecking": "Sinusuri ang hangganan ng Lungsod ng Caloocan...",
+        "insideBoundary": "Kumpirmadong sakop ng Lungsod ng Caloocan ({{district}})",
+        "outsideBoundaryWarning": "Ang napiling lokasyon ay nasa labas ng Caloocan",
+        "outsideBoundaryDesc": "Ang PULSO ay maaari lamang magpadala ng repair crew sa loob ng Caloocan. Pakilipat ang pin sa loob ng lungsod.",
+        "landmarkLabel": "Palatandaan o Reperensya sa Kalsada (Opsyonal)",
+        "landmarkPlaceholder": "hal. Sa tapat ng Caloocan High School, malapit sa Gate 2",
+        "barangayLabel": "Barangay / Distrito",
+        "coordinatesLabel": "Mga Coordinate ng GPS",
+        "listAlternative": "Kailangan ng text mode? Ilagay ang address nang manu-mano",
+        "validationError": "Mangyaring maglagay ng pin sa loob ng Caloocan City upang magpatuloy."
+      },
+      "step3Evidence": {
+        "title": "Mag-upload ng Litrato Bilang Ebidensya",
+        "subtitle": "Ang malinaw na litrato ay tumutulong sa mga inhinyero na ihanda ang tamang gamit bago pumunta.",
+        "dropzone": "I-drag at i-drop ang litrato rito, o i-click upang pumili",
+        "openCamera": "Kumuha ng Litrato Gamit ang Camera",
+        "chooseFile": "Pumili ng Litrato Mula sa Device",
+        "uploadLimits": "PNG, JPG, WebP hanggang 10MB bawat litrato",
+        "safetyWarningTitle": "Kaligtasan ang Una",
+        "safetyWarningDesc": "Huwag tatapak sa gitna ng umaandar na trapiko o lalapit sa sirang kable ng kuryente para lang kumuha ng litrato.",
+        "removePhoto": "Alisin ang litrato",
+        "replacePhoto": "Palitan ang litrato",
+        "previewAlt": "Preview ng na-upload na ebidensya",
+        "aiScanning": "Sinusuri ng AI Assistant ang litrato...",
+        "aiCategoryDetected": "Natukoy ng AI: {{category}} (Kumpiyansa: {{confidence}}%)",
+        "aiConfidenceLow": "Hindi tiyak ang AI. Ang iyong manu-manong kategorya ang gagamitin.",
+        "aiAcceptSuggestion": "Gamitin ang Kategorya ng AI",
+        "aiKeepSelected": "Panatilihin ang Napiling Kategorya",
+        "fileSizeError": "Lumagpas sa 10MB limit ang laki ng file (Sukat: {{size}}MB).",
+        "fileTypeError": "Hindi suportadong format. Mag-upload ng JPEG, PNG, o WebP.",
+        "validationError": "Inirerekomenda ang litrato. Maaari kang magpatuloy o mag-attach ng litrato."
+      },
+      "step4Details": {
+        "title": "Ilarawan ang Problema",
+        "subtitle": "Magbigay ng malinaw na impormasyon sa laki, tagal, at panganib upang maihanda ng mga inhinyero ang kagamitan.",
+        "descriptionLabel": "Detalyadong Paglalarawan",
+        "descriptionPlaceholder": "Ilarawan ang sira (hal. Malalim na lubak sa northbound lane na nagdudulot ng panganib sa mga motorista. Lumala sa nakaraang 3 araw)...",
+        "descriptionHelp": "{{current}} / 5000 titik (kailangan ng hindi bababa sa 10)",
+        "urgencyLabel": "Tinatayang Antas ng Urgency",
+        "urgencyOptions": {
+          "low": "Mababa — Maliit na sira o hindi nakakaharang na depekto",
+          "medium": "Katamtaman — Nakakaabala o paulit-ulit na problema",
+          "high": "Mataas — Nakakaharang sa trapiko, kaligtasan, o daloy ng tubig",
+          "critical": "Kritikal — Agarang panganib sa kaligtasan ng publiko"
+        },
+        "duplicateBannerTitle": "May Katulad na Aktibong Ulat sa Malapit",
+        "duplicateBannerDesc": "May aktibo nang ulat sa kategoryang ito sa loob ng {{distance}}m mula sa iyong pin (Ticket: {{ticketId}}).",
+        "duplicateViewBtn": "Tingnan ang Aktibong Ticket",
+        "duplicateAttachBtn": "Isama ang Ebidensya sa Naunang Ulat",
+        "duplicateProceedBtn": "Magpatuloy sa Pagsumite Bilang Bagong Ulat",
+        "validationError": "Maglagay ng paglalarawan na may hindi bababa sa 10 titik."
+      },
+      "step5Contact": {
+        "title": "Paraan ng Pakikipag-ugnayan at Notipikasyon",
+        "subtitle": "Pumili kung paano mo nais makatanggap ng mga update sa progreso ng ulat.",
+        "guestOption": {
+          "title": "Hindi Kilalang Bisita / Anonymous (Walang kailangang account)",
+          "desc": "Walang kailangang email o telepono. Makakatanggap ka ng pribadong tracking token sa susunod na screen."
+        },
+        "emailOption": {
+          "title": "Notipikasyon sa Email at SMS",
+          "desc": "Makatanggap ng update sa cellphone at email kapag itinalaga ang repair team at natapos ang kumpuni."
+        },
+        "signInOption": {
+          "title": "Mag-sign in sa Resident Account",
+          "desc": "Iugnay ang ulat na ito sa iyong resident dashboard para sa madaling pagsubaybay."
+        },
+        "authenticatedBadge": "Isinusumite bilang Rehistradong Residente: {{name}}",
+        "emailLabel": "Email Address",
+        "emailPlaceholder": "juan@halimbawa.com",
+        "phoneLabel": "Numero ng Cellphone",
+        "phonePlaceholder": "0917 123 4567",
+        "privacyNotice": "Ang iyong impormasyon sa pakikipag-ugnayan ay protektado sa ilalim ng Data Privacy Act of 2012 (RA 10173) at hindi kailanman ilalabas sa publiko.",
+        "signInLink": "May account na? Mag-sign in dito",
+        "validationEmailError": "Maglagay ng wastong email address.",
+        "validationPhoneError": "Maglagay ng wastong 11-digit na numero ng mobile sa Pilipinas (hal. 0917 123 4567)."
+      },
+      "step6Review": {
+        "title": "Pagsusuri at Pahintulot",
+        "subtitle": "Pakisuri ang mga detalye ng iyong ulat bago ito opisyal na isumite sa engineering queue.",
+        "sectionCategory": "Kategorya ng Problema",
+        "sectionLocation": "Lokasyon at Coordinate",
+        "sectionEvidence": "Kalakip na Ebidensya",
+        "sectionDetails": "Paglalarawan at Detalye",
+        "sectionContact": "Paraan ng Notipikasyon",
+        "editAction": "I-edit",
+        "noPhotoProvided": "Walang kalakip na litrato (manu-manong ulat)",
+        "anonymousReporter": "Anonymous Guest (Susubaybayan gamit ang Pribadong Token)",
+        "notifyReporter": "Alerto sa SMS / Email ({{contact}})",
+        "consentCheckbox": "Pinatutunayan ko na ang impormasyong ibinigay sa ulat na ito ay totoo at tumpak. Nauunawaan ko na ang pagsumite ng maling ulat ay ipinagbabawal sa ilalim ng batas.",
+        "privacyStatement": "Ang litrato at lokasyon ay gagamitin lamang para sa pagsasaayos ng imprastraktura ng Lungsod ng Caloocan.",
+        "validationConsentError": "Kailangan mong patunayan ang katumpakan ng iyong ulat bago magsumite."
+      },
+      "step7Submitting": {
+        "title": "Isinusumite ang Iyong Ulat",
+        "uploading": "Ligtas na ina-upload ang litrato...",
+        "triaging": "Sinisimulan ang pagsusuri...",
+        "generatingToken": "Bumubuo ng pribadong tracking credentials...",
+        "finalizing": "Tinatapos ang talaan ng ticket...",
+        "errorTitle": "Nabigo ang Pagsumite",
+        "errorDesc": "Nagkaroon ng problema sa pagpapadala ng iyong ulat. Naka-save ang iyong draft.",
+        "retryBtn": "Subukang Isumite Muli"
+      }
+    },
+    "receipt": {
+      "title": "Matagumpay na Naitatala ang Ulat",
+      "subtitle": "Natanggap na ng Kagawaran ng Inhinyeriya ng Lungsod ng Caloocan ang iyong ulat.",
+      "ticketIdLabel": "Opisyal na Ticket ID",
+      "timestampLabel": "Oras ng Pagsumite",
+      "statusLabel": "Kasalukuyang Katayuan",
+      "statusReceived": "Natanggap at Nakapila para sa Pagsusuri",
+      "trackingTokenSection": {
+        "title": "Ang Iyong Pribadong Tracking Code",
+        "subtitle": "I-save ang code na ito! Kakailanganin mo ito kasama ang iyong Ticket ID upang masubaybayan ang ulat o maiugnay ito sa iyong account mamaya.",
+        "tokenWarning": "Panatilihing lihim ito. Ang sinumang may hawak ng code na ito ay makakakita ng pampublikong progreso ng ticket.",
+        "copyToken": "Kopyahin ang Tracking Code",
+        "tokenCopied": "Nakopya sa Clipboard!",
+        "copyUrl": "Kopyahin ang Link sa Pagsubaybay",
+        "urlCopied": "Nakopya ang Link!"
+      },
+      "qrSection": {
+        "title": "QR Quick Pass sa Cellphone",
+        "desc": "I-scan gamit ang camera ng cellphone upang mabilis na mabuksan ang ticket na ito sa mobile.",
+        "downloadQr": "I-download ang QR Code"
+      },
+      "actions": {
+        "trackNow": "Subaybayan ang Ulat Ngayon",
+        "saveToAccount": "I-save sa Mga Ulat Ko (Iugnay sa Account)",
+        "saveToAccountDesc": "Gumawa ng account o mag-sign in upang mapagsama-sama ang iyong mga ticket at makatanggap ng notipikasyon.",
+        "returnHome": "Bumalik sa Home",
+        "reportAnother": "Magsumite ng Isa Pang Ulat"
+      },
+      "nextSteps": {
+        "title": "Ano ang Susunod na Mangyayari?",
+        "step1": "1. Susuriin ng AI at mga inhinyero ang lokasyon at antas ng sira sa loob ng 2 oras.",
+        "step2": "2. Gagawa ng work order at itatalaga ito sa nararapat na field team ng distrito.",
+        "step3": "3. Pupunta ang mga manggagawa upang siyasatin at kumpunihin ang sira, at mag-a-upload ng litrato bilang patunay.",
+        "step4": "4. Mamarkahan ang ticket bilang naresolba at maisasara sa pampublikong talaan."
+      }
+    },
+    "track": {
+      "header": {
+        "title": "Subaybayan ang Pampublikong Ulat sa Imprastraktura",
+        "subtitle": "Tingnan ang pinakahuling naitalang katayuan at pampublikong timeline ng iyong ticket sa Caloocan City.",
+        "badge": "Civic Aperture · Transparent na Pampublikong Gawain"
+      },
+      "lookup": {
+        "title": "Paghahanap ng Ticket",
+        "subtitle": "Ilagay ang iyong Ticket ID at Secret Tracking Token mula sa iyong resibo.",
+        "ticketLabel": "Ticket ID",
+        "ticketPlaceholder": "hal. RPT-20260902-8F92E1B4 o PULSO-10492",
+        "tokenLabel": "Lihim na Tracking Token",
+        "tokenPlaceholder": "TRK-XXXX-XXXX-XXXX-XXXX",
+        "submitBtn": "Subaybayan ang Ulat",
+        "searching": "Hinahanap sa Talaan ng Lungsod...",
+        "errorNotFound": "Hindi nahanap ang ulat o mali ang tracking credentials. Pakisuri ang Ticket ID at Token.",
+        "networkError": "Hindi makontak ang talaan ng lungsod. Suriin ang koneksiyon at subukan muli."
+      },
+      "reply": {
+        "title": "May hinihinging karagdagang impormasyon",
+        "instructions": "Basahin ang pinakahuling kahilingan sa ibaba. Idagdag ang impormasyong hiniling ng kawani. Mag-sign in bilang may-ari ng ulat o gamitin ang lihim na tracking token.",
+        "label": "Iyong tugon",
+        "send": "Ipadala ang impormasyon",
+        "sending": "Ipinapadala…",
+        "success": "Naitala ang iyong impormasyon para sa pagsusuri ng inhinyeriya.",
+        "credentialsError": "Mag-sign in bilang may-ari ng ulat o ilagay ang lihim na tracking token para makapagpadala ng impormasyon.",
+        "sendError": "Hindi naitala ang iyong impormasyon. Suriin ang katayuan ng ulat at subukan muli.",
+        "networkError": "Hindi maipadala ang impormasyon. Suriin ang koneksiyon at subukan muli."
+      },
+      "status": {
+        "pending": "Naghihintay ng pagsusuri",
+        "unverified": "Naghihintay ng beripikasyon",
+        "needs_information": "Kailangan ng karagdagang impormasyon",
+        "pending_approval": "Naghihintay ng pag-apruba ng inhinyeriya",
+        "approved_internal": "Inaprubahan para sa gawaing pang-field",
+        "dispatched": "Naitalaga ang field team",
+        "in_progress": "Kasalukuyang ginagawa",
+        "resolved": "Naresolba",
+        "rejected": "Tinanggihan",
+        "cancelled": "Kinansela"
+      },
+      "result": {
+        "ticketHeader": "Mga Detalye ng Ticket",
+        "statusLabel": "Naitalang katayuan",
+        "categoryLabel": "Kategorya",
+        "barangayLabel": "Barangay / Lugar",
+        "submittedOn": "Petsa ng Pag-uulat",
+        "lastUpdated": "Huling Na-update",
+        "currentStageLabel": "Kasalukuyang Yugto ng Operasyon",
+        "publicSummary": "Buod ng Lokasyon",
+        "privacyNotice": "Aktibo ang Public Privacy Mode: Ang mga personal na detalye ng nag-ulat at panloob na tala ng kawani ay protektado at hindi nakikita.",
+        "pulseLineTitle": "6-Yugtong Progreso ng PulseLine",
+        "timelineTitle": "Timeline ng mga Pampublikong Yugto",
+        "claimPrompt": "Iyo ba ang ulat na ito? Iugnay ito sa iyong account para sa pinag-isang pamamahala",
+        "claimBtn": "I-claim ang Ulat na Ito"
+      },
+      "stages": {
+        "received": {
+          "label": "Natanggap",
+          "description": "Naitala ang ulat at nakapila para sa pagsusuri ng inhinyeriya."
+        },
+        "under_review": {
+          "label": "Sinusuri",
+          "description": "Sinusuri ng dispatch engineers ang nasasakupan, bigat ng sira, at kagamitang kailangan."
+        },
+        "validated": {
+          "label": "Kumpirmado",
+          "description": "Nakumpirma ang problema at pinahintulutan ang paggawa ng work order."
+        },
+        "assigned": {
+          "label": "Itinalaga",
+          "description": "Nai-dispatch ang work order sa District Maintenance Crew."
+        },
+        "in_progress": {
+          "label": "Ginagawa",
+          "description": "Kasalukuyang inaayos ng field team ang sira sa mismong lugar."
+        },
+        "resolved": {
+          "label": "Naresolba",
+          "description": "Tapos na ang pag-aayos; nakumpirma gamit ang litrato ng natapos na gawa."
+        },
+        "closed": {
+          "label": "Isinara",
+          "description": "Panghuling pagtatala at pag-archive sa talaan ng lungsod."
+        }
+      }
+    },
+    "residentDashboard": {
+      "header": {
+        "title": "Portal ng Residente at Mga Ulat Ko",
+        "subtitle": "Pamahalaan ang lahat ng iyong ginawa at iniugnay na ticket sa imprastraktura.",
+        "claimAction": "+ I-claim ang Ulat ng Bisita"
+      },
+      "tabs": {
+        "all": "Lahat ng Ulat",
+        "active": "Aktibo",
+        "needs_information": "Kailangan ng Impormasyon",
+        "resolved": "Naresolba",
+        "ariaLabel": "Mga tab sa pagsasala ng katayuan ng ulat"
+      },
+      "emptyStates": {
+        "all": {
+          "title": "Walang Nahanap na Ulat",
+          "desc": "Wala ka pang naisusumite o naiuugnay na ulat sa imprastraktura.",
+          "action": "Mag-ulat ng Problema"
+        },
+        "active": {
+          "title": "Walang Aktibong Ulat",
+          "desc": "Lahat ng iyong iniulat na problema ay naaksyunan o naresolba na.",
+          "action": "Mag-ulat ng Bagong Panganib"
+        },
+        "needs_information": {
+          "title": "Walang Kinakailangang Aksyon",
+          "desc": "Wala sa iyong mga ulat ang nangangailangan ng karagdagang impormasyon o litrato sa ngayon."
+        },
+        "resolved": {
+          "title": "Wala Pang Naresolbang Ulat",
+          "desc": "Ang mga natapos na kumpuni na may kalakip na litrato bilang patunay ay lilitaw rito."
+        }
+      },
+      "claimModal": {
+        "triggerBtn": "I-claim ang Ticket ng Bisita",
+        "title": "Iugnay ang Ulat ng Bisita sa Iyong Account",
+        "subtitle": "Ilagay ang Ticket ID at pribadong tracking token mula sa iyong resibo upang maiugnay ito sa iyong account.",
+        "ticketLabel": "Ticket ID",
+        "ticketPlaceholder": "hal. RPT-20260902-8F92E1B4",
+        "tokenLabel": "Pribadong Tracking Token",
+        "tokenPlaceholder": "TRK-XXXX-XXXX-XXXX-XXXX",
+        "submitBtn": "I-claim at Iugnay ang Ulat",
+        "claiming": "Iniugnay ang Ulat...",
+        "cancelBtn": "Kanselahin",
+        "successTitle": "Matagumpay na Naiugnay ang Ulat!",
+        "successDesc": "Idinagdag na ang ticket na ito sa iyong dashboard. Makakatanggap ka na ngayon ng mga notipikasyon sa tuwing magbabago ang katayuan nito.",
+        "viewReportBtn": "Tingnan ang Ulat sa Dashboard",
+        "error403": "Maling tracking token. Pakisuring muli ang token code sa iyong resibo.",
+        "error409": "Ang ulat na ito ay na-claim na ng ibang resident account.",
+        "error404": "Hindi natagpuan ang Ticket ID. Pakisuri ang numero ng ticket.",
+        "error500": "Hindi maiugnay ang ulat dahil sa problema sa server. Pakisubukan muli mamaya."
       }
     },
     "register": {
       "home": "Home",
       "welcome": "Maligayang pagdating sa",
       "pulso": "PULSO",
-      "desc": "Lumikha ng iyong account upang ma-access ang premium na mga tampok sa pag-uulat ng istraktura at manatiling napapanahon sa pinakabagong balita sa komunidad. Sumali sa aming network at simulan ang isang kapana-panabik na paglalakbay kasama namin!",
-      "createAccount": "Gumawa ng account",
+      "desc": "Gumawa ng iyong account upang ma-unlock ang mga advanced na tampok sa pag-uulat at manatiling updated sa pinakabagong balita sa komunidad. Sumali sa aming network ngayon!",
+      "createAccount": "Gumawa ng iyong account",
       "fullName": "Buong pangalan",
       "enterFullName": "Ilagay ang buong pangalan",
       "mobile": "Numero ng Mobile",
@@ -172,7 +627,7 @@
       "brgy_deparo": "Deparo (168, 170)",
       "password": "Password",
       "enterPassword": "Ilagay ang Password",
-      "terms": "Sumasang-ayon ako sa mga tuntunin at kundisyon",
+      "terms": "Sumasang-ayon ako sa mga Tuntunin at Kundisyon",
       "signUp": "Mag-sign Up",
       "haveAccount": "May account na?",
       "signIn": "Mag-sign In"
@@ -180,20 +635,25 @@
     "dashboard": {
       "sidebar": {
         "portal": "Portal ng Residente",
-        "overview": "Pangkalahatang-ideya",
+        "overview": "Pangkalahatan",
         "reports": "Mga Ulat Ko",
         "profile": "Profile",
         "settings": "Mga Setting",
         "help": "Tulong at Suporta",
-        "signOut": "Mag-sign Out"
+        "signOut": "Mag-sign Out",
+        "map": "Mapa ng Barangay",
+        "services": "Mga Serbisyo ng LGU",
+        "knowledge": "Sentro ng Kaalaman",
+        "track": "Subaybayan ang Ulat",
+        "shortcuts": "Mga Shortcut"
       },
       "overview": {
-        "greeting": "Magandang umaga, {{name}}!",
-        "greetingSubtitle": "Ang iyong pagiging mapagmatyag ay nagpapanatiling ligtas sa '{{barangay}}'. Narito ang buod ng status ng imprastraktura ng iyong komunidad.",
+        "greeting": "Magandang araw, {{name}}!",
+        "greetingSubtitle": "Ang iyong pagbabantay ay nagpapanatiling ligtas sa '{{barangay}}'. Narito ang buod ng aktibong imprastraktura sa iyong komunidad.",
         "active": "Aktibo",
         "resolved": "Naresolba",
         "trustScore": "Trust Score",
-        "topReporters": "Nangungunang 5% na Nag-uulat",
+        "topReporters": "Nangungunang 5% ng Nag-ulat",
         "recentActivity": "Kamakailang Aktibidad",
         "viewAll": "Tingnan Lahat",
         "latestUpdate": "Pinakabagong Update",
@@ -201,100 +661,154 @@
       },
       "quickReport": {
         "title": "Mabilisang Ulat",
-        "desc": "Kuhanan ang pangunahing panganib sa imprastraktura",
+        "desc": "Kumuha ng litrato ng panganib sa imprastraktura",
         "remove": "Alisin",
-        "tapCamera": "I-tap upang buksan ang Camera",
-        "coordsTagged": "Na-tag ang Coordinates",
-        "acquiringGPS": "Kumukuha ng GPS...",
-        "gpsStandby": "GPS Standby",
-        "requirePhoto": "Kinakailangang kumuha ng litrato",
-        "placeholder": "Maikling detalye tungkol sa panganib...",
-        "submit": "Isumite ang Pangunahing Ulat",
-        "submitBtn": "Mag-submit ng Ulat",
-        "zoneCoverage": "Saklaw ng Zone 15",
+        "tapCamera": "Pindutin para buksan ang Camera",
+        "coordsTagged": "Nai-tag ang Coordinates",
+        "acquiringGPS": "Kinukuha ang GPS...",
+        "gpsStandby": "Naka-standby ang GPS",
+        "requirePhoto": "Kailangan ng litrato",
+        "placeholder": "Maikling detalye tungkol sa problema...",
+        "submit": "Isumite ang Priority Report",
+        "submitBtn": "Mag-ulat ng Problema",
+        "zoneCoverage": "Sakop ng Zone 15",
         "gpsAccuracy": "Katumpakan ng GPS:",
         "scanning": "Sinusuri...",
         "aiDetected": "Natukoy ng AI"
       },
-      "offline": "Offline Mode: Ang mga ulat ay ise-save nang lokal.",
+      "offline": "Offline Mode: Ang mga ulat ay ise-save sa device.",
       "reports": {
         "history": "Kasaysayan ng Ulat",
-        "historyDesc": "Sundan ang katayuan ng lahat ng iyong isinumiteng isyu sa imprastraktura.",
+        "historyDesc": "Subaybayan ang katayuan ng lahat ng iyong naisumiteng ulat sa imprastraktura.",
         "all": "Lahat",
         "pending": "Nakabinbin",
         "resolved": "Naresolba",
-        "allUpdates": "Lahat ng Updates"
+        "allUpdates": "Lahat ng Balita"
       },
       "profile": {
-        "verified": "Na-verify na Residente",
+        "verified": "Kumpirmadong Residente",
         "personalInfo": "Personal na Impormasyon",
-        "regName": "Nakarehistrong Pangalan",
+        "regName": "Rehistradong Pangalan",
         "accountId": "Account ID",
-        "regAddress": "Nakarehistrong Address (Barangay)",
+        "regAddress": "Rehistradong Tirahan (Barangay)",
         "barangay": "Barangay",
-        "memberSince": "Miyembro Mula Noong",
-        "update": "I-update ang Impormasyon"
+        "memberSince": "Miyembro Mula Pa",
+        "update": "I-update ang Impormasyon",
+        "resAddress": "Tirahan / Address",
+        "connectivity": "Koneksyon sa Pakikipag-ugnayan",
+        "secureEmail": "Ligtas na Email",
+        "mobileNumber": "Numero ng Mobile"
       },
       "settings": {
         "portal": "Portal ng Seguridad",
-        "portalDesc": "Pamahalaan ang iyong proteksyon sa account at mga kredensyal",
+        "portalDesc": "Pamahalaan ang proteksyon at kredensyal ng iyong account",
         "identity": "Pagpapatunay ng Pagkakakilanlan",
         "currentPass": "Kasalukuyang Password",
-        "transition": "Paglipat sa Bagong Kredensyal",
+        "transition": "Baguhin ang Kredensyal",
         "newPass": "Bagong Password",
-        "confirmPass": "I-kumpirma ang Bagong Password",
-        "secStrength": "Lakas ng Security",
+        "confirmPass": "Kumpirmahin ang Bagong Password",
+        "secStrength": "Lakas ng Seguridad",
         "updatePass": "I-update ang Password",
         "securing": "Sinisigurado...",
         "confirmTitle": "Baguhin ang Password?",
-        "confirmText": "Sigurado ka bang gusto mong i-update ang iyong security credentials? Kakailanganin mong gamitin ang iyong bagong password para sa lahat ng susunod na logins.",
-        "confirmBtn": "I-kumpirma ang Pagbabago",
+        "confirmText": "Sigurado ka bang nais mong baguhin ang iyong password? Kakailanganin mong gamitin ang bagong password sa mga susunod na pag-login.",
+        "confirmBtn": "Kumpirmahin ang Pagbabago",
         "alerts": "Mga Anunsyo at Alerto",
-        "alertsDesc": "Pamahalaan kung paano nakikipag-ugnayan ang LGU sa iyo para sa mga update.",
-        "push": "Mga Push Notification",
-        "pushDesc": "Real-time na alerto para sa iyong mga isinumiteng ulat.",
-        "sms": "Mga SMS na Pang-emergency na Alerto",
-        "smsDesc": "Kritikal na pagkabigo ng imprastraktura sa iyong lugar.",
-        "email": "Lingguhang Buod na Email",
-        "emailDesc": "Isang buod ng mga pag-aayos na natapos sa inyong barangay.",
-        "privacy": "Pagkapribado at Seguridad",
-        "privacyDesc": "Pamahalaan ang iyong data at seguridad ng account.",
-        "pw": "Palitan ang Password",
-        "loginActivity": "Suriin ang Aktibidad sa Pag-login",
-        "delete": "Humiling na Tanggalin ang Account"
+        "alertsDesc": "Pamahalaan kung paano ka kokontakin ng pamahalaang lungsod.",
+        "push": "Push Notifications",
+        "pushDesc": "Real-time na alerto para sa iyong mga ulat.",
+        "sms": "Alerto sa SMS",
+        "smsDesc": "Kritikal na abiso sa imprastraktura sa iyong agarang lugar.",
+        "email": "Lingguhang Buod sa Email",
+        "emailDesc": "Buod ng mga natapos na kumpuni sa iyong barangay.",
+        "privacy": "Privacy at Seguridad",
+        "privacyDesc": "Pamahalaan ang iyong datos at seguridad.",
+        "pw": "Baguhin ang Password",
+        "loginActivity": "Suriin ang Login Activity",
+        "delete": "Humiling ng Pagbura ng Account"
       },
       "help": {
         "assist": "Kailangan ng direktang tulong?",
-        "assistDesc": "Available ang aming support team sa mga oras ng pagpapatakbo upang tumulong sa mga isyu sa application.",
-        "contact": "Makipag-ugnayan sa Suporta",
-        "hotlines": "Mga Hotline Pang-emergency",
-        "hotlinesDesc": "Para sa agad na mga pagkabigo sa imprastraktura na nagbabanta sa buhay, tawagan nang direkta ang mga numerong ito.",
+        "assistDesc": "Handang tumulong ang aming support team sa oras ng operasyon.",
+        "contact": "Makipag-ugnayan sa Support",
+        "hotlines": "Mga Emergency Hotline",
+        "hotlinesDesc": "Para sa agarang panganib sa buhay o kaligtasan, tumawag agad sa mga numerong ito.",
         "cityEng": "City Engineering Desk",
         "maynilad": "Maynilad Emergency",
         "meralco": "Meralco Hotline",
-        "faq": "Mga Madalas Itanong",
-        "q1": "Gaano katagal bago ma-verify ang isang ulat?",
-        "a1": "Ang karamihan sa mga pangunahing ulat na isinumite na may malinaw na GPS at litrato ay sinusuri ng engineering AI sa loob ng 15 minuto. Maaaring abutin nang hanggang 2 oras kapag manu-mano.",
+        "faq": "Mga Madalas Itanong (FAQ)",
+        "q1": "Gaano katagal bago masuri ang isang ulat?",
+        "a1": "Karamihan sa mga priority report na may malinaw na litrato at GPS ay nasusuri ng AI sa loob ng 15 minuto. Ang manu-manong pagsusuri ay umaabot hanggang 2 oras.",
         "q2": "Ano ang Trust Score?",
-        "a2": "Tumataas ang iyong Trust Score kapag nagsumite ka ng tumpak, may mataas na kalidad na mga ulat na nabe-verify at nareresolba. Ang mas matataas na marka ay nagbibigay ng priyoridad sa iyong mga ulat.",
-        "q3": "Maaari ba akong mag-ulat ng mga isyu sa labas ng aking nakarehistrong barangay?",
-        "a3": "Oo. Habang nakapako ang iyong home base sa iyong profile, ginagamit ng Quick Report tool ang iyong live na GPS upang i-tag ang eksaktong coordinate ng panganib, nasaan ka man sa lungsod."
+        "a2": "Tumataas ang iyong Trust Score kapag nagsumite ka ng tumpak at de-kalidad na ulat na nakukumpirma at naisasaayos. Ang mataas na score ay nagbibigay ng mas mabilis na routing sa iyong mga susunod na ulat.",
+        "q3": "Maaari ba akong mag-ulat ng problema sa labas ng aking barangay?",
+        "a3": "Oo. Kahit naka-pin ang iyong profile sa iyong barangay, ginagamit ng Quick Report tool ang live GPS ng iyong telepono upang ituro ang eksaktong lugar saanman sa lungsod."
       },
       "mock": {
-        "r1Type": "Pumutok na Tubo ng Tubig",
-        "r1Desc": "Malaking tubo na tumutulo sa pangunahing kalsada na nagdudulot ng panganib sa pagkadulas.",
-        "r1u1": "Ulat na na-verify ng engineering AI.",
-        "r1u2": "Ipinadala ang Team Beta sa lokasyon.",
-        "r2Type": "Mga Natumbang Sanga ng Puno",
-        "r2Desc": "Mga sanga na humaharang sa daanan ng mga naglalakad pagkatapos ng hangin kagabi.",
-        "r2u1": "Ulat na natanggap at nakapila para sa pagsusuri.",
-        "r3Type": "Patay na Ilaw sa Kalye",
-        "r3Desc": "Tatlong sunod-sunod na ilaw sa kalye ang patay, kaya't napakadilim.",
-        "r3u1": "Ulat na na-verify.",
-        "r3u2": "Pinalitan ng mga maintenance crew ang bombilya. Isyu isinara.",
-        "alertSuccess": "Matagumpay na isinumite ang ulat sa Engineering Office!",
+        "r1Type": "Pumutok na Tubo",
+        "r1Desc": "Malaking tagas sa kalsada na nagdudulot ng madulas na daan.",
+        "r1u1": "Nakumpirma ang ulat ng engineering AI.",
+        "r1u2": "Nai-dispatch ang Team Beta sa lokasyon.",
+        "r2Type": "Nabuwal na Sanga ng Puno",
+        "r2Desc": "Nakaharang sa daanan ng tao matapos ang malakas na hangin.",
+        "r2u1": "Natanggap ang ulat at nakapila para sa pagsusuri.",
+        "r3Type": "Pundidong Ilaw sa Daan",
+        "r3Desc": "Tatlong magkakasunod na poste ang walang ilaw, madilim ang kalsada.",
+        "r3u1": "Nakumpirma ang ulat.",
+        "r3u2": "Pinalitan ng crew ang mga bumbilya. Isinara ang ulat.",
+        "alertSuccess": "Matagumpay na naisumite ang ulat sa Tanggapan ng Inhinyero!",
         "newReportText": "Ligtas na naipadala ang ulat."
+      },
+      "footer": {
+        "privacy": "Patakaran sa Pagkapribado",
+        "terms": "Mga Tuntunin ng Serbisyo",
+        "cookie": "Patakaran sa Cookie"
+      },
+      "privacy": {
+        "s1_title": "1. Pagkolekta ng Impormasyon",
+        "s1_desc": "Nangongolekta ang PULSO ng data na may kinalaman sa pag-uulat ng imprastraktura, kabilang ang eksaktong GPS coordinates, ebidensyang litrato, at impormasyon ng residente para sa beripikasyon."
+      },
+      "terms": {
+        "s1_title": "1. Tapat na Pag-uulat",
+        "s1_desc": "May pananagutan ang mga residente sa katumpakan ng kanilang mga ulat. Ang pagsusumite ng maling ulat ay maaaring magresulta sa limitasyon o suspensyon ng account."
+      },
+      "topNav": {
+        "searchPlaceholder": "Maghanap sa PULSO",
+        "searchCompactPlaceholder": "Maghanap",
+        "recentSearches": "Mga Nakaraang Paghahanap"
       }
-    }
+    },
+    "knowledge": {
+      "cat": {
+        "tech": "Gabay sa Teknolohiya",
+        "emergency": "Kagipitan",
+        "publicWorks": "Pampublikong Gawain",
+        "community": "Komunidad"
+      },
+      "art1": {
+        "title": "Paano Gumagana ang Pag-uulat gamit ang AI",
+        "excerpt": "Alamin kung paano sinusuri ng Gemini AI ang iyong mga ulat sa real-time."
+      },
+      "art2": {
+        "title": "Mga Ruta sa Paglikas sa Baha",
+        "excerpt": "Mga ligtas na sonang evacuation para sa mga residente sa mababang lugar sa North Caloocan."
+      },
+      "art3": {
+        "title": "Gabay sa Permit sa Inhinyerya",
+        "excerpt": "Hakbang-hakbang na gabay sa pag-apply ng permit sa pagtatayo at paghuhukay sa Caloocan North."
+      },
+      "art4": {
+        "title": "Impormasyon sa Ordinansa sa Ingay",
+        "excerpt": "Pag-unawa sa mga regulasyon sa kapayapaan at kaayusan sa buong lungsod."
+      }
+    },
+    "footer": {
+      "privacy": "Pagkapribado",
+      "terms": "Mga Tuntunin",
+      "cookie": "Mga Cookie"
+    },
+    "Synchronizing Data...": "Isinasabay ang Datos...",
+    "No new advisories today": "Walang bagong paalala ngayong araw",
+    "All Notifications": "Lahat ng Notipikasyon"
   }
 }

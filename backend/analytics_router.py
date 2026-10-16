@@ -52,28 +52,27 @@ SENIOR_ROLES = (
     "manager", "system_admin",
 )
 
+ANALYTICS_VIEW_ROLES = set(GOV_ROLES) - {"field_worker"}
+ANALYTICS_REVIEW_ROLES = set(SENIOR_ROLES) | {"project_engineer", "design_engineer"}
+ANALYTICS_EXPORT_ROLES = set(SENIOR_ROLES) | {"records_officer"}
+PROCUREMENT_DRAFT_ROLES = {"city_engineer", "manager", "system_admin", "admin_officer", "estimator", "project_engineer"}
+REPORT_DETAIL_ROLES = {"city_engineer", "asst_city_engineer", "manager", "system_admin", "dispatcher", "project_engineer"}
+
+
 def _assert_permission(user, db, module, action):
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    # Allow any authenticated user for analytics (simplified for dev)
-    if user.role in ["system_admin", "city_engineer", "manager"]:
-        return True
-    
-    # Allow analytics for these roles
-    allowed = ["city_engineer", "asst_city_engineer", "admin_officer", "records_officer", 
-              "division_chief", "division_chief_arch", "division_chief_structural", 
-              "division_chief_electrical", "project_engineer", "design_engineer", 
-              "estimator", "construction_foreman", "building_inspector",
-              "electrical_inspector", "mechanical_inspector", "admin_clerk"]
-    if user.role in allowed:
-        return True
-        
-    logger.warning(f"Permission denied for role: {user.role}")
-    raise HTTPException(
-        status_code=403,
-        detail=f"User lacks required capability: {module}:{action}"
-    )
+    """Check the requested operation, not merely membership in a broad staff list."""
+    if not isinstance(user, models.Official):
+        raise HTTPException(status_code=403, detail="Government capability required")
+    role_matrix = {
+        ("analytics", "view"): ANALYTICS_VIEW_ROLES,
+        ("analytics", "narrative"): ANALYTICS_REVIEW_ROLES,
+        ("analytics", "export"): ANALYTICS_EXPORT_ROLES,
+        ("procurement", "manage"): PROCUREMENT_DRAFT_ROLES,
+        ("reports", "detail"): REPORT_DETAIL_ROLES,
+    }
+    allowed = role_matrix.get((module, action), set())
+    if user.role not in allowed and not roles_service.has_permission(db, user, module, action):
+        raise HTTPException(status_code=403, detail=f"User lacks required capability: {module}:{action}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -91,22 +90,50 @@ def analytics_summary(
     try:
         _assert_permission(current_user, db, "analytics", "view")
         return analytics_service.get_analytics_summary(db)
+    except HTTPException:
+        raise
     except Exception as e:
         import logging
         logging.getLogger(__name__).error(f"Analytics summary error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Analytics summary unavailable")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Spatial Clusters (Infrastructure Stress Zones)
 # ─────────────────────────────────────────────────────────────────────────────
 
+@router.get("/stress-zones")
+def list_stress_zones(
+    category: Optional[str] = Query(None, description="Filter by infrastructure category"),
+    days_back: int = Query(90, ge=7, le=365, description="Lookback window in days"),
+    min_points: int = Query(analytics_service.DEFAULT_DBSCAN_MIN_POINTS, ge=2, le=20, description="Minimum reports to form a cluster"),
+    eps: float = Query(analytics_service.DEFAULT_DBSCAN_EPS_METERS, ge=10, le=2000, description="Clustering radius in meters"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Run DBSCAN spatial clustering on active reports to detect stress zones.
+    Powered by PostgreSQL PostGIS ST_ClusterDBSCAN (units: meters).
+    """
+    _assert_permission(current_user, db, "analytics", "view")
+    clusters = analytics_service.get_infrastructure_clusters(
+        db,
+        category_filter=category,
+        days_back=days_back,
+        min_samples=min_points,
+        radius_meters=eps,
+    )
+    return {"clusters": clusters, "count": len(clusters), "eps": eps, "min_points": min_points}
+
+
 @router.get("/clusters")
 def list_clusters(
     category: Optional[str] = Query(None, description="Filter by infrastructure category"),
     days_back: int = Query(90, ge=7, le=365, description="Lookback window in days"),
-    min_reports: int = Query(3, ge=2, le=20, description="Minimum reports to form a cluster"),
-    radius_m: float = Query(200.0, ge=50, le=1000, description="Clustering radius in meters"),
+    min_reports: Optional[int] = Query(None, ge=2, le=20, description="Minimum reports to form a cluster"),
+    radius_m: Optional[float] = Query(None, ge=10, le=2000, description="Clustering radius in meters"),
+    min_points: Optional[int] = Query(None, ge=2, le=20, description="Alias for min_reports"),
+    eps: Optional[float] = Query(None, ge=10, le=2000, description="Alias for radius_m"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -116,14 +143,16 @@ def list_clusters(
     estimated costs, and barangay mapping.
     """
     _assert_permission(current_user, db, "analytics", "view")
+    effective_min_points = min_points or min_reports or analytics_service.DEFAULT_DBSCAN_MIN_POINTS
+    effective_eps = eps or radius_m or analytics_service.DEFAULT_DBSCAN_EPS_METERS
     clusters = analytics_service.get_infrastructure_clusters(
         db,
         category_filter=category,
         days_back=days_back,
-        min_samples=min_reports,
-        radius_meters=radius_m,
+        min_samples=effective_min_points,
+        radius_meters=effective_eps,
     )
-    return {"clusters": clusters, "count": len(clusters)}
+    return {"clusters": clusters, "count": len(clusters), "eps": effective_eps, "min_points": effective_min_points}
 
 
 @router.get("/clusters/{cluster_id}")
@@ -230,7 +259,7 @@ def get_analytics_reports(
     from datetime import datetime, timedelta, timezone
     import re as re_module
 
-    _assert_permission(current_user, db, "analytics", "view")
+    _assert_permission(current_user, db, "reports", "detail")
 
     since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_back)
     q = db.query(models.Report).filter(
@@ -240,7 +269,8 @@ def get_analytics_reports(
     if status:
         q = q.filter(models.Report.status == status)
     if category:
-        q = q.filter(models.Report.category.ilike(f"%{category}%"))
+        clean_cat = category.replace('_', '%')
+        q = q.filter(models.Report.category.ilike(f"%{clean_cat}%"))
 
     reports = q.order_by(models.Report.created_at.desc()).limit(limit).all()
 
@@ -450,10 +480,24 @@ def create_procurement_from_cluster(
 # CSV Export Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _safe_csv_cell(value):
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
+
+
+class _SafeCSVWriter:
+    def __init__(self, output):
+        self.writer = csv.writer(output)
+
+    def writerow(self, row):
+        self.writer.writerow([_safe_csv_cell(value) for value in row])
+
+
 def _csv_response(rows: list, headers: list, filename: str) -> StreamingResponse:
     """Helper to build a streaming CSV response."""
     buf = io.StringIO()
-    writer = csv.writer(buf)
+    writer = _SafeCSVWriter(buf)
     writer.writerow(headers)
     for row in rows:
         writer.writerow(row)
@@ -472,7 +516,7 @@ def export_clusters_csv(
     current_user=Depends(get_current_user),
 ):
     """Export infrastructure stress zones as CSV."""
-    _assert_permission(current_user, db, "analytics", "view")
+    _assert_permission(current_user, db, "analytics", "export")
     clusters = analytics_service.get_infrastructure_clusters(db, days_back=days_back)
     headers = [
         "Cluster ID", "Barangay", "Category", "Threat Level",
@@ -500,7 +544,7 @@ def export_forecast_csv(
     current_user=Depends(get_current_user),
 ):
     """Export forecast trends as CSV."""
-    _assert_permission(current_user, db, "analytics", "view")
+    _assert_permission(current_user, db, "analytics", "export")
     forecast = analytics_service.get_forecast(db, weeks_back=weeks_back, weeks_forward=weeks_forward)
     headers = [
         "Barangay", "Category", "Status", "Total Reports",
@@ -524,7 +568,7 @@ def export_recurrence_csv(
     current_user=Depends(get_current_user),
 ):
     """Export chronic failure recurrence events as CSV."""
-    _assert_permission(current_user, db, "analytics", "narrative")
+    _assert_permission(current_user, db, "analytics", "export")
     events = analytics_service.get_recurrence_events(db, days_window=days_window)
     headers = [
         "Prior Report ID", "New Report ID", "Category", "Location",
@@ -548,7 +592,7 @@ def export_full_report_csv(
     current_user=Depends(get_current_user),
 ):
     """Combined analytics export — summary KPIs + clusters + forecast + recurrence in one CSV."""
-    _assert_permission(current_user, db, "analytics", "narrative")
+    _assert_permission(current_user, db, "analytics", "export")
 
     summary = analytics_service.get_analytics_summary(db)
     clusters = analytics_service.get_infrastructure_clusters(db, days_back=days_back)
@@ -556,7 +600,7 @@ def export_full_report_csv(
     recurrence = analytics_service.get_recurrence_events(db, days_window=days_back)
 
     buf = io.StringIO()
-    writer = csv.writer(buf)
+    writer = _SafeCSVWriter(buf)
 
     # Section 1 — Summary KPIs
     writer.writerow(["=== PULSO ANALYTICS REPORT ==="])

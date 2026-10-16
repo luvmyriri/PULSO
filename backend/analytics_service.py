@@ -224,6 +224,11 @@ def _classify_threat(severity_score: float, recurrence_score: float,
     return "MONITORING"
 
 
+# DBSCAN spatial clustering defaults
+DEFAULT_DBSCAN_EPS_METERS: float = 100.0  # 100 meters
+DEFAULT_DBSCAN_MIN_POINTS: int = 3        # At least 3 reports
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Core: Spatial Clustering
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,11 +237,13 @@ def get_infrastructure_clusters(
     db: Session,
     category_filter: Optional[str] = None,
     days_back: int = 90,
-    min_samples: int = 3,
-    radius_meters: float = 200.0,
+    min_samples: int = DEFAULT_DBSCAN_MIN_POINTS,
+    radius_meters: float = DEFAULT_DBSCAN_EPS_METERS,
 ) -> List[Dict[str, Any]]:
     """
     DBSCAN clustering of georeferenced citizen reports.
+    Uses PostGIS ST_ClusterDBSCAN (EPSG:32651, units: meters) when available,
+    falling back to scikit-learn DBSCAN (Haversine metric).
 
     Returns a list of infrastructure stress zone clusters, each with:
       - centroid, radius, report_ids, threat_level, severity_score,
@@ -245,45 +252,99 @@ def get_infrastructure_clusters(
     since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_back)
 
     q = db.query(models.Report).options(joinedload(models.Report.reporter)).filter(
-        models.Report.location_lat.isnot(None),
-        models.Report.location_lng.isnot(None),
         models.Report.created_at >= since,
         models.Report.status.notin_(["rejected", "spam"]),
     )
     if category_filter:
         q = q.filter(models.Report.category.ilike(f"%{category_filter}%"))
 
-    reports = q.all()
-    
-    # Apply strict jurisdictional filter (North Caloocan: 165-188)
-    reports = [r for r in reports if _is_in_jurisdiction(_resolve_barangay(r))]
-    
-    if len(reports) < min_samples:
+    raw_reports = q.all()
+    logger.info(f"DBSCAN: Loaded {len(raw_reports)} total reports within last {days_back} days (filter={category_filter})")
+
+    # Filter reports with valid geographic coordinates (drop null, NaN, and out-of-range coordinates)
+    valid_reports = []
+    for r in raw_reports:
+        lat = r.location_lat
+        lng = r.location_lng
+        if lat is None or lng is None:
+            continue
+        try:
+            lat_f = float(lat)
+            lng_f = float(lng)
+            if math.isnan(lat_f) or math.isnan(lng_f) or math.isinf(lat_f) or math.isinf(lng_f):
+                continue
+            if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lng_f <= 180.0):
+                continue
+            valid_reports.append(r)
+        except (ValueError, TypeError):
+            continue
+
+    logger.info(f"DBSCAN: {len(valid_reports)}/{len(raw_reports)} reports have valid geographic coordinates")
+
+    # Apply jurisdictional filter
+    valid_reports = [r for r in valid_reports if _is_in_jurisdiction(_resolve_barangay(r))]
+
+    if len(valid_reports) < min_samples:
+        logger.info(f"DBSCAN: Insufficient valid points ({len(valid_reports)} < min_samples {min_samples}). Returning 0 clusters.")
         return []
 
-    coords = np.array([[r.location_lat, r.location_lng] for r in reports])
-    # Convert radius from meters to radians for haversine DBSCAN
-    eps_rad = radius_meters / 6_371_000
-    db_model = DBSCAN(eps=eps_rad, min_samples=min_samples, algorithm="ball_tree", metric="haversine")
-    labels = db_model.fit_predict(np.radians(coords))
-
-    # Build cluster groups
+    # Build cluster groups using PostGIS ST_ClusterDBSCAN or Scikit-learn fallback
     label_map: Dict[int, List[models.Report]] = defaultdict(list)
-    for report, label in zip(reports, labels):
-        if label >= 0:   # -1 = noise/outlier
-            label_map[label].append(report)
+    used_postgis = False
+
+    try:
+        from sqlalchemy import text
+        valid_ids = [r.id for r in valid_reports]
+        postgis_sql = text("""
+            SELECT r.id,
+                   ST_ClusterDBSCAN(
+                       ST_Transform(COALESCE(r.location, ST_SetSRID(ST_MakePoint(r.location_lng, r.location_lat), 4326)), 32651),
+                       eps := :eps,
+                       minpoints := :min_points
+                   ) OVER () AS cluster_label
+            FROM reports r
+            WHERE r.id = ANY(:report_ids)
+        """)
+        rows = db.execute(postgis_sql, {
+            "eps": float(radius_meters),
+            "min_points": int(min_samples),
+            "report_ids": valid_ids
+        }).fetchall()
+
+        id_to_report = {r.id: r for r in valid_reports}
+        for row in rows:
+            rep_id = row[0]
+            c_label = row[1]
+            if c_label is not None and c_label >= 0 and rep_id in id_to_report:
+                label_map[int(c_label)].append(id_to_report[rep_id])
+        used_postgis = True
+        logger.info(f"DBSCAN: PostGIS ST_ClusterDBSCAN identified {len(label_map)} clusters")
+    except Exception as e:
+        logger.warning(f"PostGIS ST_ClusterDBSCAN failed or unavailable ({e}); falling back to scikit-learn DBSCAN")
+        label_map.clear()
+
+    if not used_postgis:
+        coords = np.array([[float(r.location_lat), float(r.location_lng)] for r in valid_reports])
+        # Convert radius from meters to radians for Haversine DBSCAN
+        eps_rad = float(radius_meters) / 6_371_000.0
+        db_model = DBSCAN(eps=eps_rad, min_samples=int(min_samples), algorithm="ball_tree", metric="haversine")
+        labels = db_model.fit_predict(np.radians(coords))
+        for report, label in zip(valid_reports, labels):
+            if label >= 0:
+                label_map[int(label)].append(report)
+        logger.info(f"DBSCAN: scikit-learn Haversine identified {len(label_map)} clusters")
 
     clusters = []
     for label, group in label_map.items():
-        lats = [r.location_lat for r in group]
-        lngs = [r.location_lng for r in group]
+        lats = [float(r.location_lat) for r in group]
+        lngs = [float(r.location_lng) for r in group]
         centroid_lat = float(np.mean(lats))
         centroid_lng = float(np.mean(lngs))
 
         # Cluster radius = max distance from centroid to any member
-        radii = [_haversine_meters(centroid_lat, centroid_lng, r.location_lat, r.location_lng)
+        radii = [_haversine_meters(centroid_lat, centroid_lng, float(r.location_lat), float(r.location_lng))
                  for r in group]
-        cluster_radius = max(max(radii), radius_meters / 4)  # minimum visible radius
+        cluster_radius = max(max(radii), radius_meters / 4.0) if radii else radius_meters
 
         # Severity score — weighted AI urgency sum
         severity_score = 0.0

@@ -49,6 +49,13 @@ class LTOParser(BaseIDParser):
              parts: List[str] = [addr_fields[k] for k in ('block_lot', 'street', 'subdivision', 'barangay', 'city') if addr_fields.get(k)]  # type: ignore[misc]
              result['address'] = ', '.join(parts)
 
+        # License Number Extraction (e.g. N02-14-012345)
+        lic_match = re.search(r'\b([A-Z]\d{2}[-\s]?\d{2}[-\s]?\d{6})\b', upper)
+        if lic_match:
+            raw_lic = lic_match.group(1).replace(' ', '-')
+            result['license_no'] = raw_lic
+            result['id_number'] = raw_lic
+
         return result
 
 

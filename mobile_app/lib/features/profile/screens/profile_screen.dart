@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
@@ -6,6 +7,7 @@ import 'package:pulso_mobile/core/api/api_client.dart';
 import 'package:pulso_mobile/features/notifications/screens/notifications_screen.dart';
 import 'package:pulso_mobile/features/advisories/screens/advisories_screen.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,7 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const PulsoIcon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -81,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CircleAvatar(
             radius: 40,
             backgroundColor: Colors.white.withValues(alpha: 0.2),
-            child: Icon(Icons.person, size: 40, color: Colors.white),
+            child: PulsoIcon(Icons.person, size: 40, color: Colors.white),
           ),
           const SizedBox(width: 20),
           Expanded(
@@ -183,7 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppTheme.primaryOrange),
+          PulsoIcon(icon, size: 20, color: AppTheme.primaryOrange),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -249,6 +251,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: Colors.red,
             onTap: () => _showLogoutDialog(context),
           ),
+          ListTile(
+            title: const Text('Icon credits'),
+            subtitle: const Text('Solar Icons by 480 Design · CC BY 4.0'),
+            onTap: () => launchUrl(
+              Uri.parse('https://www.figma.com/community/file/1166831539721848736'),
+              mode: LaunchMode.externalApplication,
+            ),
+          ),
         ],
       ),
     );
@@ -262,12 +272,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Color? color,
   }) {
     return ListTile(
-      leading: Icon(icon, color: color ?? AppTheme.primaryOrange),
+      leading: PulsoIcon(icon, color: color ?? AppTheme.primaryOrange),
       title: Text(title, style: TextStyle(color: color)),
       subtitle: subtitle != null
           ? Text(subtitle, style: const TextStyle(fontSize: 11))
           : null,
-      trailing: const Icon(Icons.chevron_right),
+      trailing: const PulsoIcon(Icons.chevron_right),
       onTap: onTap,
     );
   }

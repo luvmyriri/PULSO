@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Resident Portal & Mobile App: SDLC Specification</title>
+    <style>
+        
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@page {
+    size: A4 portrait;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-center {
+        content: counter(page);
+    }
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.6;
+    color: #1e293b;
+    background-color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+/* Document Header & Cover */
+.doc-cover {
+    page-break-after: always;
+    padding: 30px 10px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 88vh;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.pulse-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 2px solid #f97316;
+    border-radius: 10px;
+    color: #f97316;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-title {
+    font-size: 15pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #0f172a;
+    text-transform: uppercase;
+}
+
+.brand-sub {
+    font-size: 8pt;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.cover-main {
+    margin: 30px 0;
+}
+
+.cover-badge {
+    display: inline-block;
+    padding: 5px 14px;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
+    border-radius: 20px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.cover-title {
+    font-size: 24pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+}
+
+.cover-subtitle {
+    font-size: 11.5pt;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.6;
+    max-width: 650px;
+    margin-bottom: 24px;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.meta-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+}
+
+.meta-value {
+    font-size: 9pt;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.cover-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8pt;
+    color: #64748b;
+}
+
+/* Headings */
+h1 {
+    font-size: 16pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-top: 28px;
+    margin-bottom: 12px;
+    letter-spacing: -0.3px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h2 {
+    font-size: 12.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    border-left: 3.5px solid #f97316;
+    padding-left: 10px;
+    letter-spacing: -0.2px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h4 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+p {
+    margin: 0 0 10px 0;
+}
+
+/* Lists */
+ul, ol {
+    margin: 0 0 12px 0;
+    padding-left: 22px;
+}
+
+li {
+    margin-bottom: 4px;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 18px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+thead {
+    display: table-header-group;
+}
+
+tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid #1e293b;
+    letter-spacing: 0.2px;
+}
+
+td {
+    padding: 7px 10px;
+    border: 1px solid #e2e8f0;
+    vertical-align: top;
+    color: #334155;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+/* Blockquotes / Callouts */
+blockquote {
+    margin: 14px 0;
+    padding: 10px 16px;
+    background-color: #f8fafc;
+    border-left: 4px solid #f97316;
+    border-radius: 0 6px 6px 0;
+    color: #334155;
+    font-size: 9pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* Code & Preformatted */
+code {
+    font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+    font-size: 8.2pt;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+pre {
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 8pt;
+    line-height: 1.45;
+    margin: 12px 0 16px 0;
+    border: 1px solid #334155;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+    border: none;
+    font-size: inherit;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 20px 0;
+}
+
+/* Scenario Highlighting */
+strong {
+    color: #0f172a;
+}
+
+    </style>
+</head>
+<body>
+    
+    <div class="doc-cover">
+        <div class="cover-brand">
+            <div class="pulse-logo">P</div>
+            <div class="brand-text">
+                <span class="brand-title">PULSO PLATFORM</span>
+                <span class="brand-sub">Civic Operations & Engineering</span>
+            </div>
+        </div>
+        <div class="cover-main">
+            <span class="cover-badge">RESIDENT SDLC SPECIFICATION</span>
+            <h1 class="cover-title">Resident Portal & Mobile App: SDLC Specification</h1>
+            <div class="cover-subtitle">Agile dual-track engineering methodology, 7-phase lifecycle framework, Flutter & React branching strategy, DoR/DoD governance, and App Store release protocols.</div>
+            <div class="meta-grid">
+                
+        <div class="meta-item">
+            <span class="meta-label">Document Title</span>
+            <span class="meta-value">Resident Experience Software Development Life Cycle (SDLC)</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">System</span>
+            <span class="meta-value">PULSO Civic Engagement & Infrastructure Intelligence Platform</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Target Audience</span>
+            <span class="meta-value">Engineering Leads, Mobile/Web Developers, Product Owners, DevOps</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Version</span>
+            <span class="meta-value">1.0 (Focused Specification)</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Authority</span>
+            <span class="meta-value">Caloocan City Digital Transformation & Engineering Operations</span>
+        </div>
+        
+            </div>
+        </div>
+        <div class="cover-footer">
+            <span>City Government of Caloocan &bull; Engineering & Resident Operations</span>
+            <span>OFFICIAL PRODUCT & ENGINEERING SPECIFICATION</span>
+        </div>
+    </div>
+    
+    <div class="content-body">
+        <hr />
+<h2 id="1-sdlc-methodology-delivery-paradigm">1. SDLC Methodology &amp; Delivery Paradigm</h2>
+<p>The PULSO Resident Portal (React Web) and Mobile Client (Flutter Cross-Platform) follow an <strong>Agile Dual-Track Delivery Framework</strong>, balancing continuous resident user discovery with rapid, high-reliability sprint engineering.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│                      DUAL-TRACK RESIDENT SDLC MODEL                     │
+├───────────────────────────────────┬─────────────────────────────────────┤
+│   TRACK 1: PRODUCT DISCOVERY      │     TRACK 2: SPRINT DELIVERY        │
+│   • Barangay Field Interviews     │     • Architecture &amp; Token Binding  │
+│   • Usability Testing (390px)     │     • 2-Week Engineering Sprints    │
+│   • Accessibility Audits (WCAG)   │     • Automated Build &amp; Test Gates  │
+│   • PhilSys &amp; OCR Benchmarking    │     • App Store / TestFlight Deploy │
+└───────────────────────────────────┴─────────────────────────────────────┘
+</code></pre>
+<p>The resident surface operates under strict citizen-facing SLAs: 99.9% uptime, sub-3-second AI triage response, zero tolerance for unencrypted PII exposure, and complete functional parity between English and Tagalog.</p>
+<hr />
+<h2 id="2-seven-phase-lifecycle-workflow">2. Seven-Phase Lifecycle Workflow</h2>
+<pre><code>[Phase 1: Discovery &amp; Scoping] ──► [Phase 2: UI/UX &amp; Design Tokens] ──► [Phase 3: Sprint Development]
+                                                                                │
+[Phase 6: Production Launch]  ◄── [Phase 5: Staging &amp; Beta Testing]  ◄── [Phase 4: Verification Gates]
+          │
+          ▼
+[Phase 7: Maintenance &amp; Telemetry]
+</code></pre>
+<h3 id="phase-1-resident-discovery-requirement-formulation">Phase 1: Resident Discovery &amp; Requirement Formulation</h3>
+<ul>
+<li><strong>Objective:</strong> Validate real-world civic interaction patterns, mobile device constraints (low-end Android devices, intermittent 3G/4G connectivity), and accessibility requirements.</li>
+<li><strong>Key Activities:</strong><ul>
+<li>Conduct field sessions with Barangay leaders and residents across District 1, 2, and 3 of Caloocan City.</li>
+<li>Formulate testable user stories with explicit Given/When/Then scenarios.</li>
+<li>Establish data privacy boundaries adhering to RA 10173 (Data Privacy Act of 2012).</li>
+</ul>
+</li>
+<li><strong>Deliverables:</strong> Approved User Story Catalog, Data Minimization Register, Wireframes.</li>
+</ul>
+<hr />
+<h3 id="phase-2-design-system-token-integration">Phase 2: Design System &amp; Token Integration</h3>
+<ul>
+<li><strong>Objective:</strong> Construct accessible, responsive, and aesthetically commanding UI interfaces using the <strong>Civic Aperture</strong> design language.</li>
+<li><strong>Key Activities:</strong><ul>
+<li>Establish unified Figma tokens (Color, Typography, Spacing, Elevation) synchronized with the Flutter and React codebases.</li>
+<li>Enforce contrast ratios (&gt;4.5:1 for standard text, &gt;3:1 for graphical controls) in both Light and Dark themes.</li>
+<li>Design responsive layouts optimized for small screens (320px, 390px) and desktop viewports.</li>
+</ul>
+</li>
+<li><strong>Deliverables:</strong> Figma UI Kit, Shared CSS/Theme Tokens, Component Storybook.</li>
+</ul>
+<hr />
+<h3 id="phase-3-sprint-execution-iterative-development">Phase 3: Sprint Execution &amp; Iterative Development</h3>
+<ul>
+<li><strong>Objective:</strong> Develop modular, clean-architecture features in structured two-week sprint cycles.</li>
+<li><strong>Sprint Cadence:</strong><ul>
+<li><em>Day 1:</em> Sprint Planning &amp; Story Point Estimation.</li>
+<li><em>Days 2–8:</em> Feature Development &amp; Pair Programming.</li>
+<li><em>Day 9:</em> Code Freeze, Sprint Review &amp; Stakeholder Demo.</li>
+<li><em>Day 10:</em> Sprint Retrospective &amp; Release Candidate Tagging.</li>
+</ul>
+</li>
+<li><strong>Core Architectural Standards:</strong><ul>
+<li><em>Mobile App:</em> Flutter Clean Architecture with Riverpod state management.</li>
+<li><em>Web App:</em> React with modular components, Zustand state store, and standard CSS modules.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h3 id="phase-4-multi-tier-verification-gates">Phase 4: Multi-Tier Verification Gates</h3>
+<ul>
+<li><strong>Objective:</strong> Ensure all features satisfy stringent quality, security, and performance standards before entering release pipelines.</li>
+<li><strong>Mandatory Verification Gates:</strong><ol>
+<li><strong>Static Analysis:</strong> Lint zero-warning enforcement on all modified PR files.</li>
+<li><strong>Unit &amp; Widget Testing:</strong> Minimum 85% branch coverage for business logic and data providers.</li>
+<li><strong>End-to-End Flow Validation:</strong> Automated tests validating registration, ID OCR parsing, GPS tagging, and report submission.</li>
+<li><strong>Network Resilience Simulation:</strong> Verifying offline drafting and automatic sync under simulated 2G/3G network conditions.</li>
+<li><strong>Accessibility Compliance:</strong> Automated axe-core audits and screen reader validation (TalkBack / VoiceOver).</li>
+</ol>
+</li>
+</ul>
+<hr />
+<h3 id="phase-5-staging-resident-closed-beta">Phase 5: Staging &amp; Resident Closed Beta</h3>
+<ul>
+<li><strong>Objective:</strong> Deploy release candidates to a controlled pilot environment for real-world validation.</li>
+<li><strong>Key Activities:</strong><ul>
+<li>Deploy web builds to isolated Staging environment (<code>staging.pulso.caloocan.gov.ph</code>).</li>
+<li>Distribute mobile builds via Google Play Internal App Sharing and Apple TestFlight.</li>
+<li>Execute a 14-day closed beta test with 100 verified residents from pilot barangays.</li>
+</ul>
+</li>
+<li><strong>Sign-off Criteria:</strong> Zero P0/P1 open issues, 95% task completion rate on ID onboarding and issue reporting.</li>
+</ul>
+<hr />
+<h3 id="phase-6-production-deployment-staged-rollout">Phase 6: Production Deployment &amp; Staged Rollout</h3>
+<ul>
+<li><strong>Objective:</strong> Seamless, zero-downtime production deployment across web and mobile platforms.</li>
+<li><strong>Deployment Architecture:</strong><ul>
+<li><em>Web Deployment:</em> Blue/Green deployment on containerized cloud infrastructure with instantaneous rollback capability.</li>
+<li><em>Mobile App Store Deployment:</em> Phased staged rollout on Google Play (10% -&gt; 25% -&gt; 50% -&gt; 100%) and App Store phased release over 7 days.</li>
+</ul>
+</li>
+<li><strong>Production Smoke Test:</strong> Immediate verification of critical paths (User Login, Map Pinning, Push Notifications, Photo Upload).</li>
+</ul>
+<hr />
+<h3 id="phase-7-post-launch-telemetry-continuous-maintenance">Phase 7: Post-Launch Telemetry &amp; Continuous Maintenance</h3>
+<ul>
+<li><strong>Objective:</strong> Proactively monitor application performance, crash rates, and citizen satisfaction.</li>
+<li><strong>Operational Metrics:</strong><ul>
+<li><em>Crash-Free Session Rate:</em> &gt;99.5% across all active mobile installations.</li>
+<li><em>API P95 Latency:</em> &lt;250ms for report feeds, &lt;4.0s for Gemini AI vision triage.</li>
+<li><em>Resident CSAT Rating:</em> Target &gt;4.2 / 5.0 stars on post-resolution surveys.</li>
+<li><em>Patch Management:</em> Weekly scheduled patch releases for minor fixes; 4-hour SLA for critical security hotfixes.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2 id="3-branching-strategy-release-governance">3. Branching Strategy &amp; Release Governance</h2>
+<p>The repository follows an optimized <strong>GitFlow Workflow</strong> tailored for multi-client deployment:</p>
+<pre><code>[main] ──────────────────────────● (Production v1.0.0) ──● (v1.0.1)
+  │                                ▲                       ▲
+  │                                │                       │
+[release/v1.0] ────────────────────┴───────────────────────┘
+  │                                ▲
+  │                                │
+[develop] ──────●────────●─────────┴─ (Sprint Integration)
+  │             ▲        ▲
+  ├──[feature/id-ocr]    │
+  └──[feature/offline-sync]
+</code></pre>
+<h3 id="branch-taxonomy">Branch Taxonomy</h3>
+<ul>
+<li><code>main</code>: Always represents production-ready, signed release code. Direct commits are strictly prohibited.</li>
+<li><code>develop</code>: The primary integration branch for ongoing sprint deliverables. Nightly staging builds trigger automatically from <code>develop</code>.</li>
+<li><code>feature/RES-&lt;ID&gt;-&lt;name&gt;</code>: Isolated feature branches created from <code>develop</code>. Must pass all CI checks before merge via Pull Request.</li>
+<li><code>release/vX.Y.Z</code>: Staging candidate branches for final regression testing, metadata compilation, and store submission.</li>
+<li><code>hotfix/RES-&lt;ID&gt;-&lt;name&gt;</code>: Emergency branches branched directly from <code>main</code> to address critical production defects.</li>
+</ul>
+<hr />
+<h2 id="4-governance-definition-of-ready-dor-definition-of-done-dod">4. Governance: Definition of Ready (DoR) &amp; Definition of Done (DoD)</h2>
+<h3 id="definition-of-ready-dor">Definition of Ready (DoR)</h3>
+<p>A user story can only be brought into an active sprint when:<br />
+1. The story is written in standard user narrative format with clear business rationale.<br />
+2. Complete functional and UI acceptance criteria are defined and signed off by the Product Owner.<br />
+3. Figma designs exist for both Mobile (390px) and Desktop (1440px) in Light and Dark themes.<br />
+4. All required backend API schemas and contracts are documented and agreed upon.<br />
+5. All sensitive data fields are mapped to security and privacy policies.</p>
+<h3 id="definition-of-done-dod">Definition of Done (DoD)</h3>
+<p>A story is considered complete and deployable only when:<br />
+1. Code compiles without errors or lint warnings on Flutter, Web, and Backend pipelines.<br />
+2. 100% of acceptance criteria have been verified through automated or manual tests.<br />
+3. Unit and integration tests pass with required coverage.<br />
+4. Filipino and English localization strings are complete with zero hardcoded text strings.<br />
+5. Code review has been approved by at least two senior peer engineers.<br />
+6. The feature has been demonstrated and formally accepted in the Sprint Review.</p>
+    </div>
+</body>
+</html>

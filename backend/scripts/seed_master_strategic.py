@@ -305,6 +305,8 @@ def seed_noise_reports(power_users, noise_users):
     print("Seeded 55 mixed-tier reports for triage pressure testing.")
 
 if __name__ == "__main__":
+    if os.getenv("PULSO_ALLOW_DESTRUCTIVE_SEED") != "true":
+        raise SystemExit("Refusing broad seed. Set PULSO_ALLOW_DESTRUCTIVE_SEED=true explicitly.")
     clear_all_data()
     city_eng, officials, power, noise = seed_users()
     seed_assets()

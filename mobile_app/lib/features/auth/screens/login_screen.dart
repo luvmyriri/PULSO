@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -478,7 +479,7 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: onSurface.withOpacity(0.1)),
           ),
-          child: Icon(Icons.person_outline, size: 32, color: brandOrange),
+          child: PulsoIcon(Icons.person_outline, size: 32, color: brandOrange),
         ),
         const SizedBox(height: 20),
         Text(
@@ -514,7 +515,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    const PulsoIcon(
                       Icons.error_outline,
                       color: Colors.redAccent,
                       size: 16,
@@ -557,7 +558,7 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: InputDecoration(
                 hintText: "Enter your credential",
                 hintStyle: TextStyle(color: onSurface.withOpacity(0.2)),
-                prefixIcon: Icon(
+                prefixIcon: PulsoIcon(
                   Icons.person_outline,
                   color: onSurface.withOpacity(0.3),
                   size: 20,
@@ -614,13 +615,13 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: InputDecoration(
                 hintText: "Enter Password",
                 hintStyle: TextStyle(color: onSurface.withOpacity(0.2)),
-                prefixIcon: Icon(
+                prefixIcon: PulsoIcon(
                   Icons.shield_outlined,
                   color: onSurface.withOpacity(0.3),
                   size: 20,
                 ),
                 suffixIcon: IconButton(
-                  icon: Icon(
+                  icon: PulsoIcon(
                     _obscurePassword
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
@@ -720,7 +721,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Icon(
+                            const PulsoIcon(
                               Icons.chevron_right,
                               size: 18,
                               color: Colors.white,
@@ -795,7 +796,7 @@ class _LoginScreenState extends State<LoginScreen> {
     ),
     child: Row(
       children: [
-        const Icon(Icons.error_outline, color: Colors.redAccent, size: 16),
+        const PulsoIcon(Icons.error_outline, color: Colors.redAccent, size: 16),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -827,7 +828,7 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: brandOrange.withOpacity(0.2)),
           ),
-          child: Icon(Icons.shield_outlined, color: brandOrange, size: 32),
+          child: PulsoIcon(Icons.shield_outlined, color: brandOrange, size: 32),
         ),
         const SizedBox(height: 16),
         Text(
@@ -869,7 +870,7 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: InputDecoration(
             hintText: "your@email.com",
             hintStyle: TextStyle(color: onSurface.withOpacity(0.2)),
-            prefixIcon: Icon(
+            prefixIcon: PulsoIcon(
               Icons.mail_outline,
               color: onSurface.withOpacity(0.3),
               size: 18,
@@ -924,7 +925,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       SizedBox(width: 8),
-                      Icon(Icons.chevron_right, size: 18),
+                      PulsoIcon(Icons.chevron_right, size: 18),
                     ],
                   ),
           ),
@@ -935,7 +936,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _viewMode = 'login';
             _recoveryError = null;
           }),
-          icon: Icon(
+          icon: PulsoIcon(
             Icons.arrow_back,
             size: 14,
             color: onSurface.withOpacity(0.5),
@@ -1013,7 +1014,7 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.blue.withOpacity(0.2)),
           ),
-          child: const Icon(Icons.mark_email_read_outlined,
+          child: const PulsoIcon(Icons.mark_email_read_outlined,
               color: Colors.blue, size: 30),
         ),
         const SizedBox(height: 16),
@@ -1153,7 +1154,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _viewMode = 'login';
             _errorMessage = "";
           }),
-          icon: Icon(
+          icon: PulsoIcon(
             Icons.arrow_back,
             size: 14,
             color: onSurface.withOpacity(0.5),
@@ -1185,7 +1186,7 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: brandOrange.withOpacity(0.2)),
           ),
-          child: Icon(Icons.lock_outline, color: brandOrange, size: 30),
+          child: PulsoIcon(Icons.lock_outline, color: brandOrange, size: 30),
         ),
         const SizedBox(height: 16),
         Text(
@@ -1326,7 +1327,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _viewMode = 'forgot_password';
             _recoveryError = null;
           }),
-          icon: Icon(
+          icon: PulsoIcon(
             Icons.arrow_back,
             size: 14,
             color: onSurface.withOpacity(0.5),
@@ -1365,7 +1366,7 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: brandOrange.withOpacity(0.2)),
             ),
-            child: Icon(Icons.lock_reset, color: brandOrange, size: 30),
+            child: PulsoIcon(Icons.lock_reset, color: brandOrange, size: 30),
           ),
           const SizedBox(height: 16),
           Text(
@@ -1424,13 +1425,13 @@ class _LoginScreenState extends State<LoginScreen> {
             decoration: InputDecoration(
               hintText: "New Password",
               hintStyle: TextStyle(color: onSurface.withOpacity(0.2)),
-              prefixIcon: Icon(
+              prefixIcon: PulsoIcon(
                 Icons.lock_outline,
                 color: onSurface.withOpacity(0.3),
                 size: 18,
               ),
               suffixIcon: IconButton(
-                icon: Icon(
+                icon: PulsoIcon(
                   _obscureNewPassword
                       ? Icons.visibility_outlined
                       : Icons.visibility_off_outlined,
@@ -1541,13 +1542,13 @@ class _LoginScreenState extends State<LoginScreen> {
             decoration: InputDecoration(
               hintText: "Confirm Password",
               hintStyle: TextStyle(color: onSurface.withOpacity(0.2)),
-              prefixIcon: Icon(
+              prefixIcon: PulsoIcon(
                 Icons.lock_outline,
                 color: onSurface.withOpacity(0.3),
                 size: 18,
               ),
               suffixIcon: IconButton(
-                icon: Icon(
+                icon: PulsoIcon(
                   _obscureConfirmPassword
                       ? Icons.visibility_outlined
                       : Icons.visibility_off_outlined,
@@ -1629,7 +1630,7 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(32),
             border: Border.all(color: Colors.green.withOpacity(0.2)),
           ),
-          child: const Icon(
+          child: const PulsoIcon(
             Icons.check_circle_outline,
             color: Colors.green,
             size: 32,
@@ -1679,7 +1680,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.arrow_back, size: 16),
+                PulsoIcon(Icons.arrow_back, size: 16),
                 SizedBox(width: 8),
                 Text(
                   "BACK TO SIGN IN",
@@ -1851,7 +1852,7 @@ class _LoginScreenState extends State<LoginScreen> {
           color: isSelected ? onSurface.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(15),
         ),
-        child: Icon(
+        child: PulsoIcon(
           icon,
           size: 14,
           color: isSelected ? brandOrange : onSurface.withOpacity(0.35),
@@ -1941,7 +1942,7 @@ class _CaptchaDialogState extends State<CaptchaDialog> {
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
-                  const Icon(
+                  const PulsoIcon(
                     Icons.shield_outlined,
                     color: Color(0xFFFF6600),
                     size: 40,

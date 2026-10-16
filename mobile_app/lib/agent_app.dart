@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -144,7 +145,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                     color: Colors.orange.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(
+                  child: const PulsoIcon(
                     Icons.engineering,
                     size: 60,
                     color: Colors.orange,
@@ -180,7 +181,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
-                    prefixIcon: Icon(
+                    prefixIcon: PulsoIcon(
                       Icons.email,
                       color: Colors.white.withOpacity(0.5),
                     ),
@@ -200,7 +201,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
-                    prefixIcon: Icon(
+                    prefixIcon: PulsoIcon(
                       Icons.lock,
                       color: Colors.white.withOpacity(0.5),
                     ),

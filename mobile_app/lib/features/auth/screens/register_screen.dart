@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:animate_do/animate_do.dart';
@@ -141,7 +142,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: AppTheme.primaryOrange.withOpacity(0.1), shape: BoxShape.circle),
-              child: const Icon(Icons.mark_email_read_outlined, size: 48, color: AppTheme.primaryOrange),
+              child: const PulsoIcon(Icons.mark_email_read_outlined, size: 48, color: AppTheme.primaryOrange),
             ),
             const SizedBox(height: 24),
             Text("Verify Email", style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w900, color: onSurface)),
@@ -231,7 +232,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 64),
+              const PulsoIcon(Icons.check_circle_outline_rounded, color: Colors.green, size: 64),
               const SizedBox(height: 16),
               Text("Verified!", style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w900)),
               const SizedBox(height: 8),
@@ -449,10 +450,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: _currentStep > 0 ? IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: onSurface),
+          icon: PulsoIcon(Icons.arrow_back_ios_new, color: onSurface),
           onPressed: _prevPage,
         ) : IconButton(
-          icon: Icon(Icons.close, color: onSurface),
+          icon: PulsoIcon(Icons.close, color: onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -510,7 +511,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                  // Home Button
                                  TextButton.icon(
                                    onPressed: () => Navigator.of(context).pop(),
-                                   icon: const Icon(Icons.home_outlined, color: AppTheme.primaryOrange, size: 22),
+                                   icon: const PulsoIcon(Icons.home_outlined, color: AppTheme.primaryOrange, size: 22),
                                    label: Text("Home", style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primaryOrange, letterSpacing: 1)),
                                    style: TextButton.styleFrom(
                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -603,7 +604,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
                 const SizedBox(height: 20),
                 Row(children: [
-                  Icon(isTerms ? Icons.article_outlined : Icons.privacy_tip_outlined, color: AppTheme.primaryOrange, size: 22),
+                  PulsoIcon(isTerms ? Icons.article_outlined : Icons.privacy_tip_outlined, color: AppTheme.primaryOrange, size: 22),
                   const SizedBox(width: 8),
                   Text(isTerms ? 'Terms of Service' : 'Privacy Policy', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900)),
                 ]),
@@ -661,7 +662,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 border: Border.all(color: Colors.blue.withOpacity(0.15))
               ),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Icon(Icons.info_outline_rounded, size: 16, color: Colors.blue[400]),
+                PulsoIcon(Icons.info_outline_rounded, size: 16, color: Colors.blue[400]),
                 const SizedBox(width: 8),
                 Expanded(child: Text(
                   'Tips for best results: Lay ID on a flat surface with good lighting. Avoid glare and shadows. Ensure all text is clearly readable.',
@@ -685,7 +686,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     color: AppTheme.primaryOrange.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.info_outline, size: 17, color: AppTheme.primaryOrange),
+                  child: const PulsoIcon(Icons.info_outline, size: 17, color: AppTheme.primaryOrange),
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: Column(
@@ -718,7 +719,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   child: _agreedToTerms
-                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    ? const PulsoIcon(Icons.check, size: 14, color: Colors.white)
                     : null,
                 ),
                 const SizedBox(width: 10),
@@ -785,7 +786,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               : Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_a_photo_outlined, size: 32, color: isDark ? Colors.white24 : Colors.black26),
+                    PulsoIcon(Icons.add_a_photo_outlined, size: 32, color: isDark ? Colors.white24 : Colors.black26),
                     const SizedBox(height: 12),
                     Text("Tap to capture or upload", style: TextStyle(fontSize: 12, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
                   ],
@@ -813,7 +814,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(color: Colors.green.withOpacity(0.15), shape: BoxShape.circle),
-                      child: const Icon(Icons.verified_user_outlined, size: 20, color: Colors.green),
+                      child: const PulsoIcon(Icons.verified_user_outlined, size: 20, color: Colors.green),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1077,8 +1078,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           onChanged: onChanged,
           style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 14),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, size: 20, color: isDark ? Colors.white38 : Colors.black38),
-            suffixIcon: toggleObscure != null ? IconButton(icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18), onPressed: toggleObscure) : null,
+            prefixIcon: PulsoIcon(icon, size: 20, color: isDark ? Colors.white38 : Colors.black38),
+            suffixIcon: toggleObscure != null ? IconButton(icon: PulsoIcon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18), onPressed: toggleObscure) : null,
             filled: true,
             fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -1171,7 +1172,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03), borderRadius: BorderRadius.circular(16)),
             child: Row(
               children: [
-                Icon(Icons.calendar_today_outlined, size: 20, color: isDark ? Colors.white38 : Colors.black38),
+                PulsoIcon(Icons.calendar_today_outlined, size: 20, color: isDark ? Colors.white38 : Colors.black38),
                 const SizedBox(width: 12),
                 Text(
                   _dob == null ? "Select Date" : DateFormat('MMMM dd, yyyy').format(_dob!),
@@ -1195,12 +1196,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt_outlined, color: AppTheme.primaryOrange),
+              leading: const PulsoIcon(Icons.camera_alt_outlined, color: AppTheme.primaryOrange),
               title: const Text("Take Photo", style: TextStyle(fontWeight: FontWeight.bold)),
               onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera, isFront); },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined, color: AppTheme.primaryOrange),
+              leading: const PulsoIcon(Icons.photo_library_outlined, color: AppTheme.primaryOrange),
               title: const Text("Upload from Gallery", style: TextStyle(fontWeight: FontWeight.bold)),
               onTap: () { Navigator.pop(context); _pickImage(ImageSource.gallery, isFront); },
             ),
@@ -1221,7 +1222,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           color: isActive ? AppTheme.primaryOrange : Colors.transparent,
           shape: BoxShape.circle,
         ),
-        child: Icon(
+        child: PulsoIcon(
           icon,
           size: 14,
           color: isActive ? Colors.white : onSurface.withOpacity(0.4),

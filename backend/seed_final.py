@@ -10,8 +10,11 @@ import random
 import datetime
 from sqlalchemy import text
 import sys
+import os
 
 def seed_final():
+    if os.getenv("PULSO_ALLOW_DESTRUCTIVE_SEED") != "true":
+        raise RuntimeError("Refusing broad seed. Set PULSO_ALLOW_DESTRUCTIVE_SEED=true explicitly.")
     print("=" * 60)
     print("  PULSO — Final System Seeding (Universal Edition)")
     print("=" * 60)

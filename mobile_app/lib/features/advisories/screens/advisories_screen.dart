@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
@@ -32,7 +33,7 @@ class _AdvisoriesScreenState extends State<AdvisoriesScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const PulsoIcon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -71,7 +72,7 @@ class _AdvisoriesScreenState extends State<AdvisoriesScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.campaign_outlined, size: 80, color: Colors.grey[400]),
+          PulsoIcon(Icons.campaign_outlined, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No advisories available',
@@ -120,7 +121,7 @@ class _AdvisoriesScreenState extends State<AdvisoriesScreen> {
             ),
             child: Row(
               children: [
-                Icon(_getTypeIcon(type), color: _getTypeColor(type), size: 20),
+                PulsoIcon(_getTypeIcon(type), color: _getTypeColor(type), size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -165,14 +166,14 @@ class _AdvisoriesScreenState extends State<AdvisoriesScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.business, size: 16, color: Colors.grey[500]),
+                    PulsoIcon(Icons.business, size: 16, color: Colors.grey[500]),
                     const SizedBox(width: 4),
                     Text(
                       advisory['dept'] ?? 'LGU',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                     const Spacer(),
-                    Icon(Icons.access_time, size: 16, color: Colors.grey[500]),
+                    PulsoIcon(Icons.access_time, size: 16, color: Colors.grey[500]),
                     const SizedBox(width: 4),
                     Text(
                       _formatTime(advisory['created_at']),

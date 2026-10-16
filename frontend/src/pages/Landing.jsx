@@ -1,803 +1,159 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-    MapPinned, Activity, BrainCircuit, ArrowRight, ActivitySquare,
-    Menu, X, Trash2, Route as RouteIcon, Zap, Shield, BarChart3,
-    Users, CheckCircle2, Sun, Moon, Monitor, ClipboardCheck, Camera,
-    Bot, Headphones, Wrench, ExternalLink, Clock, Phone, Mail,
-    UserCheck, Accessibility, Heart, FileText, Droplets, Lightbulb,
-    Building2, ShieldCheck, User, Smartphone, QrCode, Download
-} from 'lucide-react';
-import { useTheme } from '../contexts/ThemeContext';
-import Branding from '../components/Branding';
-import Hero3D from '../Hero3D';
-import PremiumHeroBackground from '../components/PremiumHeroBackground';
-import ErrorBoundary from '../components/ErrorBoundary';
-import TermsModal from '../components/TermsModal';
-import '../index.css';
-
-// Using unified Branding component instead of inline SVG
-
-function Landing() {
-    const { t } = useTranslation();
-    const navigate = useNavigate();
-    const [scrolled, setScrolled] = useState(false);
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-    // Modal state for legal content
-    const [modalConfig, setModalConfig] = useState({
-        isOpen: false,
-        type: 'terms'
-    });
-
-    const [downloadUrl, setDownloadUrl] = useState(`http://${window.location.hostname}:33159/api/download/resident-app`);
-
-    useEffect(() => {
-        // Dynamically fetch the actual server IP for cross-device downloads (WiFi compatibility)
-        const fetchServerIp = async () => {
-            try {
-                // We try to fetch from the hostname the user is currently using
-                const baseUrl = `http://${window.location.hostname}:33159`;
-                const response = await fetch(`${baseUrl}/api/system/ip`);
-                const data = await response.json();
-                
-                if (data.ip) {
-                    setDownloadUrl(`http://${data.ip}:33159/api/download/resident-app`);
-                }
-            } catch (error) {
-                console.error("Failed to fetch server IP:", error);
-                // Fallback to current hostname if fetch fails
-                if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                    setDownloadUrl(`http://${window.location.hostname}:33159/api/download/resident-app`);
-                }
-            }
-        };
-
-        fetchServerIp();
-    }, []);
-
-    const openModal = (type) => {
-        setModalConfig({
-            isOpen: true,
-            type: type
-        });
-    };
-
-    const closeModal = () => {
-        setModalConfig(prev => ({ ...prev, isOpen: false }));
-    };
-
-    useEffect(() => {
-        const handleScroll = () => setScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    // Animation variants
-    const fadeUp = {
-        hidden: { opacity: 0, y: 30 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
-    };
-
-    const staggerContainer = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.2 }
-        }
-    };
-
-    const { theme, changeTheme } = useTheme();
-
-    return (
-        <div className="min-h-screen flex flex-col font-sans bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative transition-colors duration-500">
-            <PremiumHeroBackground>
-                <div className="absolute inset-0">
-                    <ErrorBoundary fallback={<div className="w-full h-full" />}>
-                        <Hero3D />
-                    </ErrorBoundary>
-                </div>
-                {/* Bottom transition gradient to help text readability */}
-                <div className="absolute bottom-0 left-0 w-full h-[30vh] bg-gradient-to-t from-white dark:from-[#020617] to-transparent z-30 pointer-events-none" />
-            </PremiumHeroBackground>
-
-            {/* Navbar Fixed */}
-
-            {/* Navbar Fixed */}
-            <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? 'glass-nav py-3' : 'bg-transparent py-6'}`}>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
-                    <div className="flex items-center">
-                        <Branding size={scrolled ? "h-9" : "h-11"} />
-                    </div>
-                    <ul className="hidden md:flex gap-8 items-center text-sm font-medium text-slate-600 dark:text-slate-300">
-                        <li><a href="#home" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.home')}</a></li>
-                        <li><a href="#features" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.platform')}</a></li>
-                        <li><a href="#solutions" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.solutions')}</a></li>
-                        <li><a href="#about" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">{t('landing.nav.about')}</a></li>
-                    </ul>
-
-                    <div className="hidden md:flex gap-4 items-center">
-                        {/* Theme Switcher Toggle */}
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
-                            <button onClick={() => changeTheme('light')} className={`p-1.5 rounded-md transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Sun size={14} /></button>
-                            <button onClick={() => changeTheme('system')} className={`p-1.5 rounded-md transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Monitor size={14} /></button>
-                            <button onClick={() => changeTheme('dark')} className={`p-1.5 rounded-md transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Moon size={14} /></button>
-                        </div>
-
-                        <a href="/login" className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
-                            {t('landing.nav.login')} <ArrowRight size={16} />
-                        </a>
-                    </div>
-
-                    {/* Mobile Menu Toggle */}
-                    <button className="md:hidden text-orange-500 p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                        {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
-                    </button>
-                </div>
-
-                {/* Mobile Navigation Dropdown */}
-                {mobileMenuOpen && (
-                    <div className="absolute top-full left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl py-6 px-6 flex flex-col gap-4 md:hidden transition-colors relative">
-                        <div className="absolute -bottom-8 left-0 w-full h-8 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-800/80 dark:to-transparent pointer-events-none"></div>
-                        <a href="#home" className="text-slate-800 dark:text-slate-200 font-bold py-2 border-b border-slate-200 dark:border-slate-700" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.home')}</a>
-                        <a href="#features" className="text-slate-800 dark:text-slate-200 font-bold py-2 border-b border-slate-200 dark:border-slate-700" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.platform')}</a>
-                        <a href="#solutions" className="text-slate-800 dark:text-slate-200 font-bold py-2 border-b border-slate-200 dark:border-slate-700" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.solutions')}</a>
-                        <a href="#about" className="text-slate-800 dark:text-slate-200 font-bold py-2 mb-4" onClick={() => setMobileMenuOpen(false)}>{t('landing.nav.about')}</a>
-
-                        {/* Mobile Theme Switcher Toggle */}
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 mb-2">
-                            <button onClick={() => { changeTheme('light'); setMobileMenuOpen(false); }} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Sun size={18} /></button>
-                            <button onClick={() => { changeTheme('system'); setMobileMenuOpen(false); }} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Monitor size={18} /></button>
-                            <button onClick={() => { changeTheme('dark'); setMobileMenuOpen(false); }} className={`flex-1 flex justify-center p-2 rounded-md transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-orange-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Moon size={18} /></button>
-                        </div>
-
-                        <a href="/login" className="w-full justify-center flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white px-5 py-3 rounded-lg font-bold text-base transition-all shadow-md">
-                            {t('landing.nav.login')} <ArrowRight size={18} />
-                        </a>
-                    </div>
-                )}
-            </nav>
-
-            {/* Hero Interactivity */}
-            <section id="home" className="relative min-h-[90vh] flex items-center pt-32 pb-20 overflow-hidden transition-colors duration-500">
-                {/* Dark Mode Background */}
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-slate-950 dark:block hidden z-0"></div>
-                
-                {/* Light Mode Aurora Borealis Background */}
-                <div className="absolute inset-0 dark:hidden overflow-hidden z-0">
-                    <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-orange-300/30 rounded-full blur-[120px] mix-blend-multiply opacity-80 animate-blob pointer-events-none"></div>
-                    <div className="absolute top-1/4 left-1/4 w-[700px] h-[700px] bg-emerald-300/20 rounded-full blur-[140px] mix-blend-multiply opacity-80 animate-blob animation-delay-2000 pointer-events-none"></div>
-                    <div className="absolute -bottom-32 left-1/2 w-[800px] h-[800px] bg-teal-200/30 rounded-full blur-[120px] mix-blend-multiply opacity-70 animate-blob animation-delay-4000 pointer-events-none"></div>
-                </div>
-
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 mt-12 items-center relative z-10">
-
-                    {/* Left: Copy & Actions */}
-                    <motion.div
-                        className="max-w-xl bg-white/70 dark:bg-slate-950/70 p-8 rounded-3xl backdrop-blur-3xl border border-white/50 dark:border-slate-700/50 shadow-2xl transition-colors duration-500"
-                        initial="hidden"
-                        animate="visible"
-                        variants={staggerContainer}
-                    >
-
-
-                        <motion.h1 variants={fadeUp} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl leading-[1.1] tracking-tight mb-6 text-slate-900 dark:text-white">
-                            {t('landing.hero.title1')}<br /><span className="text-gradient">{t('landing.hero.title2')}</span>
-                        </motion.h1>
-
-                        <motion.p variants={fadeUp} className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed font-medium">
-                            {t('landing.hero.subtitle')}
-                        </motion.p>
-
-                        <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
-                            <a href="/register" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-2">
-                                {t('landing.hero.register')}
-                            </a>
-                            <button className="bg-white/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 px-6 py-3 rounded-lg font-semibold transition-all">
-                                {t('landing.hero.docs')}
-                            </button>
-                        </motion.div>
-                    </motion.div>
-
-                    {/* Right side is empty to let the background map shine through clearly */}
-                    <div className="hidden lg:block"></div>
-                </div>
-                
-                {/* Clean gradient fade at the bottom of the hero section so it blends into the rest of the page */}
-                <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white dark:from-slate-950 to-transparent pointer-events-none z-20" />
-            </section>
-
-            {/* Features Grid */}
-            <section id="features" className="relative z-10 py-24 bg-white/10 dark:bg-slate-950/40 backdrop-blur-xl transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
-                    <motion.div
-                        className="text-center max-w-3xl mx-auto mb-16"
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true, margin: "-100px" }}
-                        variants={fadeUp}
-                    >
-                        <h2 className="font-display font-bold text-3xl md:text-4xl tracking-tight mb-4 text-slate-900 dark:text-white">{t('landing.features.title')}</h2>
-                        <p className="text-lg text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
-                            {t('landing.features.subtitle')}
-                        </p>
-                    </motion.div>
-
-                    <motion.div
-                        className="grid grid-cols-1 md:grid-cols-3 gap-8"
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true, margin: "-50px" }}
-                        variants={staggerContainer}
-                    >
-                        {/* Feature 1 */}
-                        <motion.div variants={fadeUp} className="glass-card p-8 rounded-2xl">
-                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-6">
-                                <MapPinned size={28} />
-                            </div>
-                            <h3 className="font-display font-bold text-xl mb-3 text-slate-800 dark:text-slate-100 uppercase tracking-wide">{t('landing.features.f1_title')}</h3>
-                            <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm">
-                                {t('landing.features.f1_desc')}
-                            </p>
-                        </motion.div>
-
-                        {/* Feature 2 */}
-                        <motion.div variants={fadeUp} className="glass-card p-8 rounded-2xl">
-                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-6">
-                                <Activity size={28} />
-                            </div>
-                            <h3 className="font-display font-bold text-xl mb-3 text-slate-800 dark:text-slate-100 uppercase tracking-wide">{t('landing.features.f2_title')}</h3>
-                            <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm">
-                                {t('landing.features.f2_desc')}
-                            </p>
-                        </motion.div>
-
-                        {/* Feature 3 */}
-                        <motion.div variants={fadeUp} className="glass-card p-8 rounded-2xl">
-                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-6">
-                                <BrainCircuit size={28} />
-                            </div>
-                            <h3 className="font-display font-bold text-xl mb-3 text-slate-800 dark:text-slate-100 uppercase tracking-wide">{t('landing.features.f3_title')}</h3>
-                            <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm">
-                                {t('landing.features.f3_desc')}
-                            </p>
-                        </motion.div>
-                    </motion.div>
-                </div>
-            </section>
-
-            {/* How It Works Section */}
-            <section id="howitworks" className="relative z-10 py-24 bg-slate-50 dark:bg-slate-900 transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
-                    <motion.div
-                        className="text-center max-w-3xl mx-auto mb-16"
-                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
-                    >
-                        <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-400 font-bold text-sm tracking-widest uppercase mb-4">
-                            <ClipboardCheck size={16} /> {t('landing.howitworks.badge')}
-                        </div>
-                        <h2 className="font-display font-bold text-3xl md:text-4xl tracking-tight mb-4 text-slate-900 dark:text-white">{t('landing.howitworks.title')}</h2>
-                        <p className="text-lg text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
-                            {t('landing.howitworks.subtitle')}
-                        </p>
-                    </motion.div>
-
-                    {/* Steps */}
-                    <motion.div
-                        className="relative"
-                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
-                    >
-                        {/* Connector line (desktop) */}
-                        <div className="hidden lg:block absolute top-10 left-[10%] right-[10%] h-0.5 bg-gradient-to-r from-orange-200 via-orange-400 to-orange-200 dark:from-orange-500/20 dark:via-orange-500/60 dark:to-orange-500/20" />
-
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-                            {[
-                                { icon: <UserCheck size={22} />, key: 's1', color: 'from-orange-500 to-orange-600' },
-                                { icon: <Camera size={22} />, key: 's2', color: 'from-amber-500 to-orange-500' },
-                                { icon: <Bot size={22} />, key: 's3', color: 'from-violet-500 to-indigo-500' },
-                                { icon: <Headphones size={22} />, key: 's4', color: 'from-blue-500 to-cyan-500' },
-                                { icon: <Wrench size={22} />, key: 's5', color: 'from-emerald-500 to-teal-500' },
-                            ].map((step, i) => (
-                                <motion.div key={step.key} variants={fadeUp} className="flex flex-col items-center text-center group">
-                                    <div className="relative mb-6">
-                                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                                            {step.icon}
-                                        </div>
-                                        <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center text-xs font-extrabold shadow-md border-2 border-white dark:border-slate-900">
-                                            {i + 1}
-                                        </div>
-                                    </div>
-                                    <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 mb-2">
-                                        {t(`landing.howitworks.${step.key}_title`)}
-                                    </h3>
-                                    <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
-                                        {t(`landing.howitworks.${step.key}_desc`)}
-                                    </p>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </motion.div>
-                </div>
-            </section>
-
-            {/* Solutions Section */}
-            <section id="solutions" className="relative z-10 py-24 bg-white dark:bg-slate-950 transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
-
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
-                    <motion.div
-                        className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6"
-                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
-                    >
-                        <div className="max-w-2xl">
-                            <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-400 font-bold text-sm tracking-widest uppercase mb-3">
-                                <Shield size={16} /> {t('landing.solutions.badge')}
-                            </div>
-                            <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-tight">
-                                {t('landing.solutions.title')}
-                            </h2>
-                        </div>
-                        <p className="text-slate-500 dark:text-slate-400 font-medium max-w-sm">
-                            {t('landing.solutions.subtitle')}
-                        </p>
-                    </motion.div>
-
-                    <motion.div
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6"
-                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
-                    >
-                        {[
-                            { id: 's1', icon: <RouteIcon size={24} />, color: 'orange' },
-                            { id: 's2', icon: <Droplets size={24} />, color: 'blue' },
-                            { id: 's3', icon: <Lightbulb size={24} />, color: 'yellow' },
-                            { id: 's4', icon: <Shield size={24} />, color: 'red' },
-                            { id: 's5', icon: <Building2 size={24} />, color: 'green' },
-                        ].map((solution, i) => {
-                            const colors = {
-                                orange: 'hover:border-orange-200 dark:hover:border-orange-500/50 group-hover:bg-orange-50/50 dark:group-hover:bg-orange-900/20 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 check:text-orange-500',
-                                blue: 'hover:border-blue-200 dark:hover:border-blue-500/50 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 check:text-blue-500',
-                                yellow: 'hover:border-yellow-200 dark:hover:border-yellow-500/50 group-hover:bg-yellow-50/50 dark:group-hover:bg-yellow-900/20 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 check:text-yellow-600',
-                                red: 'hover:border-red-200 dark:hover:border-red-500/50 group-hover:bg-red-50/50 dark:group-hover:bg-red-900/20 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 check:text-red-500',
-                                green: 'hover:border-emerald-200 dark:hover:border-emerald-500/50 group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/20 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 check:text-emerald-500',
-                            }[solution.color];
-
-                            const colorParts = colors.split(' ');
-                            const hoverBorder = colorParts[0] + ' ' + colorParts[1];
-                            const hoverBg = colorParts[2] + ' ' + colorParts[3];
-                            const iconBg = colorParts[4] + ' ' + colorParts[5];
-                            const iconText = colorParts[6] + ' ' + colorParts[7];
-                            const checkText = colorParts[8].replace('check:', '');
-
-                            // Alignment logic: 
-                            // 3 per row on LG (cols 1-2, 3-4, 5-6). 
-                            // Bottom row has 2 cards staggered (col-start-2: cols 2-3, col-start-4: cols 4-5)
-                            const gridClasses = i < 3 
-                                ? "lg:col-span-2" 
-                                : i === 3 ? "lg:col-span-2 lg:col-start-2" : "lg:col-span-2 lg:col-start-4";
-
-                            // Tablet logic: 2 per row. 5th card is centered.
-                            const tabletClasses = i === 4 ? "md:col-span-2 md:max-w-md md:mx-auto" : "";
-
-                            return (
-                                <motion.div key={solution.id} variants={fadeUp} className={`group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 ${hoverBorder} ${gridClasses} ${tabletClasses}`}>
-                                    <div className={`bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-8 h-full transition-colors ${hoverBg}`}>
-                                        <div className={`w-12 h-12 ${iconBg} ${iconText} rounded-xl flex items-center justify-center mb-6 shadow-sm`}>
-                                            {solution.icon}
-                                        </div>
-                                        <h3 className="font-bold text-xl mb-3 text-slate-900 dark:text-slate-100">{t(`landing.solutions.${solution.id}_title`)}</h3>
-                                        <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-6">
-                                            {t(`landing.solutions.${solution.id}_desc`)}
-                                        </p>
-                                        <ul className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                            <li className="flex items-center gap-2"><CheckCircle2 size={14} className={checkText} /> {t(`landing.solutions.${solution.id}_l1`)}</li>
-                                            <li className="flex items-center gap-2"><CheckCircle2 size={14} className={checkText} /> {t(`landing.solutions.${solution.id}_l2`)}</li>
-                                        </ul>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
-                    </motion.div>
-                </div>
-            </section>
-
-            {/* City Services Section */}
-            <section id="cityservices" className="relative z-10 py-24 bg-slate-50 dark:bg-slate-900 transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
-                    <motion.div
-                        className="flex flex-col md:flex-row justify-between items-end mb-14 gap-6"
-                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
-                    >
-                        <div>
-                            <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-500 font-bold text-sm tracking-widest uppercase mb-3">
-                                <ExternalLink size={16} /> {t('landing.services.badge')}
-                            </div>
-                            <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-tight">
-                                {t('landing.services.title')}
-                            </h2>
-                        </div>
-                        <p className="text-slate-500 dark:text-slate-400 font-medium max-w-sm">
-                            {t('landing.services.subtitle')}
-                        </p>
-                    </motion.div>
-
-                    <motion.div
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={staggerContainer}
-                    >
-                        {/* Senior ID */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-7 h-full flex flex-col group-hover:bg-indigo-50/50 dark:group-hover:bg-indigo-900/20 transition-colors">
-                                <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center mb-5 shadow-sm">
-                                    <Users size={24} />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">{t('landing.services.senior_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-5 flex-grow">{t('landing.services.senior_desc')}</p>
-                                <ul className="space-y-2 text-sm">
-                                    <li><a href="http://oscanew.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.senior_l1')}</a></li>
-                                    <li><a href="https://osca.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.senior_l2')}</a></li>
-                                    <li><a href="https://oscaverify.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.senior_l3')}</a></li>
-                                </ul>
-                            </div>
-                        </motion.div>
-
-                        {/* PWD */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-purple-200 dark:hover:border-purple-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-7 h-full flex flex-col group-hover:bg-purple-50/50 dark:group-hover:bg-purple-900/20 transition-colors">
-                                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl flex items-center justify-center mb-5 shadow-sm">
-                                    <Accessibility size={24} />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">{t('landing.services.pwd_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-5 flex-grow">{t('landing.services.pwd_desc')}</p>
-                                <ul className="space-y-2 text-sm">
-                                    <li><a href="https://pwd.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.pwd_l1')}</a></li>
-                                    <li><a href="https://pwdverify.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.pwd_l2')}</a></li>
-                                    <li><a href="https://pwd.caloocanservices.online/verify" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.pwd_l3')}</a></li>
-                                </ul>
-                            </div>
-                        </motion.div>
-
-                        {/* Solo Parent */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-7 h-full flex flex-col group-hover:bg-rose-50/50 dark:group-hover:bg-rose-900/20 transition-colors">
-                                <div className="w-12 h-12 bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center mb-5 shadow-sm">
-                                    <Heart size={24} />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">{t('landing.services.solo_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-5 flex-grow">{t('landing.services.solo_desc')}</p>
-                                <ul className="space-y-2 text-sm">
-                                    <li><a href="https://soloparent.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.solo_l1')}</a></li>
-                                    <li><a href="https://soloparent.caloocanservices.online/tracker/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.solo_l2')}</a></li>
-                                </ul>
-                            </div>
-                        </motion.div>
-
-                        {/* GAD */}
-                        <motion.div variants={fadeUp} className="group bg-white dark:bg-slate-800 p-1 rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-200 dark:border-slate-700 hover:border-teal-200 dark:hover:border-teal-500/50">
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-[1.3rem] p-7 h-full flex flex-col group-hover:bg-teal-50/50 dark:group-hover:bg-teal-900/20 transition-colors">
-                                <div className="w-12 h-12 bg-teal-100 dark:bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded-xl flex items-center justify-center mb-5 shadow-sm">
-                                    <FileText size={24} />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2 text-slate-900 dark:text-slate-100">{t('landing.services.gad_title')}</h3>
-                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-sm mb-5 flex-grow">{t('landing.services.gad_desc')}</p>
-                                <ul className="space-y-2 text-sm">
-                                    <li><a href="https://gadplan.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.gad_l1')}</a></li>
-                                    <li><a href="https://gadplan.caloocanservices.online/verify.php" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 font-semibold transition-colors"><CheckCircle2 size={13} /> {t('landing.services.gad_l2')}</a></li>
-                                </ul>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-
-                    {/* Portal CTA */}
-                    <motion.div
-                        className="mt-10 text-center"
-                        initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
-                    >
-                        <a
-                            href="https://caloocanservices.online/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 border-2 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-500 hover:border-indigo-600 dark:hover:border-indigo-500 font-bold px-8 py-3 rounded-xl transition-all duration-300"
-                        >
-                            {t('landing.services.portal_link')} <ExternalLink size={16} />
-                        </a>
-                    </motion.div>
-                </div>
-            </section>
-
-            {/* About LGU Section */}
-            <section id="about" className="relative z-10 py-32 bg-white dark:bg-slate-950 overflow-hidden transition-colors">
-                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-900/80 dark:to-transparent pointer-events-none"></div>
-                <div className="absolute top-1/2 left-0 w-[800px] h-[800px] bg-orange-50 dark:bg-orange-500/5 rounded-full blur-[120px] -translate-y-1/2 -translate-x-1/2 opacity-50 pointer-events-none"></div>
-
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 relative grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-
-                    {/* Left: Content */}
-                    <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}>
-                        <div className="inline-flex items-center gap-2 text-orange-600 dark:text-orange-400 font-bold text-sm tracking-widest uppercase mb-4">
-                            <Users size={16} /> {t('landing.about.badge')}
-                        </div>
-                        <h2 className="font-display font-bold text-3xl md:text-5xl tracking-tight text-slate-900 dark:text-white leading-[1.15] mb-6">
-                            {t('landing.about.title')}
-                        </h2>
-                        <div className="space-y-6 text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
-                            <p dangerouslySetInnerHTML={{ __html: t('landing.about.p1').replace('<1>', '<strong>').replace('</1>', '</strong>') }} />
-                            <p>
-                                {t('landing.about.p2')}
-                            </p>
-                        </div>
-
-                        <div className="mt-10 pt-10 flex flex-col sm:flex-row items-center gap-8 relative">
-                            <div className="absolute top-0 left-0 w-full h-8 bg-gradient-to-b from-slate-200/50 to-transparent dark:from-slate-800/50 dark:to-transparent pointer-events-none"></div>
-                            <div className="flex flex-col">
-                                <span className="text-4xl font-display font-bold text-slate-900 dark:text-white">{t('landing.about.stat1_val')}</span>
-                                <span className="text-sm font-bold text-orange-500 uppercase tracking-widest mt-1">{t('landing.about.stat1_lbl')}</span>
-                            </div>
-                            <div className="hidden sm:block w-px h-12 bg-gradient-to-b from-slate-200 dark:from-slate-800 to-transparent pointer-events-none"></div>
-                            <div className="flex flex-col">
-                                <span className="text-4xl font-display font-bold text-slate-900 dark:text-white">{t('landing.about.stat2_val')}</span>
-                                <span className="text-sm font-bold text-orange-500 uppercase tracking-widest mt-1">{t('landing.about.stat2_lbl')}</span>
-                            </div>
-                            <div className="hidden sm:block w-px h-12 bg-gradient-to-b from-slate-200 dark:from-slate-800 to-transparent pointer-events-none"></div>
-                            <div className="flex flex-col">
-                                <span className="text-4xl font-display font-bold text-slate-900 dark:text-white">{t('landing.about.stat3_val')}</span>
-                                <span className="text-sm font-bold text-orange-500 uppercase tracking-widest mt-1">{t('landing.about.stat3_lbl')}</span>
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    {/* Right: Graphic / Stats Box */}
-                    <motion.div
-                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}
-                        className="relative"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-tr from-orange-200 to-orange-50 dark:from-orange-500/20 dark:to-orange-500/5 rounded-3xl transform rotate-3 scale-105 opacity-50"></div>
-                        <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-3xl p-10 overflow-hidden transition-colors">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-100 dark:bg-orange-500/20 rounded-bl-[100px] -mr-8 -mt-8 flex items-end pb-6 pl-6">
-                                <BarChart3 size={32} className="text-orange-500 dark:text-orange-400" />
-                            </div>
-
-                            <h3 className="font-display font-bold text-2xl text-slate-900 dark:text-white mb-2">{t('landing.about.analytics')}</h3>
-                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8">{t('landing.about.analytics_desc')}</p>
-
-                            <div className="space-y-6">
-                                <div>
-                                    <div className="flex justify-between text-sm font-bold mb-2">
-                                        <span className="text-slate-700 dark:text-slate-300">{t('landing.about.metric1')}</span>
-                                        <span className="text-orange-600 dark:text-orange-400">87%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                        <div className="bg-orange-500 h-full rounded-full w-[87%] relative overflow-hidden">
-                                            <div className="absolute top-0 left-0 w-full h-full bg-white/20 -skew-x-12 translate-x-[-100%] animate-[shimmer_2s_infinite]"></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between text-sm font-bold mb-2">
-                                        <span className="text-slate-700 dark:text-slate-300">{t('landing.about.metric2')}</span>
-                                        <span className="text-slate-900 dark:text-white">92%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                        <div className="bg-slate-800 dark:bg-slate-400 h-full rounded-full w-[92%]"></div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between text-sm font-bold mb-2">
-                                        <span className="text-slate-700 dark:text-slate-300">{t('landing.about.metric3')}</span>
-                                        <span className="text-slate-900 dark:text-white">64%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                        <div className="bg-slate-300 dark:bg-slate-600 h-full rounded-full w-[64%]"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button className="w-full mt-10 border-2 border-slate-200 dark:border-slate-700 hover:border-orange-500 dark:hover:border-orange-500 text-slate-700 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 font-bold p-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-                                {t('landing.about.portal_btn')} <ArrowRight size={16} />
-                            </button>
-                        </div>
-                    </motion.div>
-                </div>
-            </section>
-
-            {/* Agent Mobile App Download Section */}
-            <section className="relative z-10 py-24 bg-gradient-to-br from-indigo-900 to-slate-900 overflow-hidden">
-                {/* Background Pattern */}
-                <div className="absolute inset-0 opacity-10">
-                    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px]"></div>
-                </div>
-                
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 relative grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                    <motion.div 
-                        initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
-                        className="text-left"
-                    >
-                        <div className="inline-flex items-center gap-2 text-orange-400 font-bold text-sm tracking-[0.2em] uppercase mb-6">
-                            <Smartphone size={16} /> Citizen Services
-                        </div>
-                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white mb-6 leading-[1.1]">
-                            PULSO Resident App<br/>
-                            <span className="text-orange-500">City in your pocket.</span>
-                        </h2>
-                        <p className="text-indigo-100/70 text-lg mb-10 leading-relaxed max-w-xl font-medium">
-                            Report issues, track community projects, and access city services directly from your mobile device. Stay connected with North Caloocan anywhere, anytime.
-                        </p>
-                        <div className="flex flex-wrap gap-6 items-center">
-                            <a 
-                                href={downloadUrl}
-                                className="flex items-center gap-3 bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-2xl font-black text-lg transition-all hover:scale-105 active:scale-95 shadow-xl shadow-orange-950/20 group"
-                            >
-                                <Download size={24} className="group-hover:bounce" />
-                                Download APK
-                            </a>
-                            <div className="flex flex-col border-l border-white/10 pl-6">
-                                <span className="text-white font-bold text-[10px] uppercase tracking-widest mb-1 opacity-50">Latest Production</span>
-                                <span className="text-white font-black text-sm tracking-tight">v2.5.0-Stable</span>
-                            </div>
-                        </div>
-                    </motion.div>
-                    
-                    <motion.div 
-                        initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
-                        className="flex justify-center lg:justify-end"
-                    >
-                        <div className="bg-white p-8 rounded-[3rem] shadow-2xl relative group transition-all duration-700 hover:rotate-2 hover:scale-[1.02]">
-                            <div className="absolute -top-6 -right-6 w-24 h-24 bg-orange-500 rounded-full flex flex-col items-center justify-center text-white font-black text-[10px] rotate-12 shadow-2xl border-4 border-white">
-                                <QrCode size={24} className="mb-1" />
-                                SCAN ME
-                            </div>
-                            <div className="bg-slate-50 p-4 rounded-[2rem] border border-slate-100">
-                                <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(downloadUrl)}`}
-                                    alt="App QR Code"
-                                    className="w-64 h-64 md:w-72 md:h-72"
-                                />
-                            </div>
-                            <p className="mt-8 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">
-                                Point camera to install
-                            </p>
-                        </div>
-                    </motion.div>
-                </div>
-            </section>
-
-            {/* Comprehensive Professional Footer */}
-            <footer className="relative z-10 bg-slate-900 pt-24 pb-12 text-slate-300">
-                <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-slate-800 to-transparent"></div>
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
-
-                        <div className="flex flex-col gap-6">
-                            <Branding size="h-10" />
-                            <p className="text-slate-400 text-sm leading-relaxed pr-4">
-                                {t('landing.footer.desc')}
-                            </p>
-                            <div className="flex items-center gap-4 mt-2">
-                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors cursor-pointer text-slate-400">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
-                                </div>
-                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors cursor-pointer text-slate-400">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" /></svg>
-                                </div>
-                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors cursor-pointer text-slate-400">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.portals')}</h4>
-                            <ul className="flex flex-col gap-3 font-medium text-sm">
-                                <li><a href="/login" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ArrowRight size={14} className="text-orange-500" /> Resident Login</a></li>
-                                <li><a href="/gov" className="hover:text-orange-400 transition-colors flex items-center gap-2 font-bold text-white bg-white/5 p-2 rounded-lg border border-white/10 hover:bg-orange-500/20 transition-all"><Shield size={14} className="text-orange-500" /> Internal Gateway (Staff)</a></li>
-                                <li><a href={downloadUrl} className="hover:text-orange-400 transition-colors flex items-center gap-2"><Smartphone size={14} className="text-orange-500" /> {t('landing.footer.p_resident_app')}</a></li>
-                            </ul>
-                        </div>
-
-                        {/* City Services */}
-                        <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.cityservices')}</h4>
-                            <ul className="flex flex-col gap-3 font-medium text-sm">
-                                <li><a href="http://oscanew.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ExternalLink size={13} className="text-slate-500" /> {t('landing.footer.cs_senior')}</a></li>
-                                <li><a href="https://pwd.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ExternalLink size={13} className="text-slate-500" /> {t('landing.footer.cs_pwd')}</a></li>
-                                <li><a href="https://soloparent.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ExternalLink size={13} className="text-slate-500" /> {t('landing.footer.cs_solo')}</a></li>
-                                <li><a href="https://gadplan.caloocanservices.online/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ExternalLink size={13} className="text-slate-500" /> {t('landing.footer.cs_gad')}</a></li>
-                            </ul>
-                        </div>
-
-                        {/* Platform Features */}
-                        <div>
-                            <h4 className="text-white font-bold text-lg mb-6 tracking-tight">{t('landing.footer.platform')}</h4>
-                            <ul className="flex flex-col gap-3 font-medium text-sm">
-                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><ActivitySquare size={14} className="text-slate-500" /> {t('landing.features.f1_title')}</a></li>
-                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><Activity size={14} className="text-slate-500" /> {t('landing.features.f2_title')}</a></li>
-                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><BrainCircuit size={14} className="text-slate-500" /> {t('landing.features.f3_title')}</a></li>
-                                <li><a href="#features" className="hover:text-orange-400 transition-colors flex items-center gap-2"><MapPinned size={14} className="text-slate-500" /> Caloocan North Grid</a></li>
-                            </ul>
-                        </div>
-
-                        {/* Contact Info - Full Width Horizontal */}
-                        <div className="lg:col-span-4 mt-8 pt-12 border-t border-slate-800/30">
-                            <h4 className="text-white font-bold text-lg mb-8 tracking-tight">{t('landing.footer.contact')}</h4>
-                            <ul className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 text-sm">
-                                <li className="flex items-start gap-3 max-w-xs">
-                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0"><MapPinned size={16} /></div>
-                                    <span className="text-slate-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('landing.footer.address') }} />
-                                </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
-                                        <Phone size={16} />
-                                    </div>
-                                    <span className="text-slate-400 font-bold">(02) 336-5576</span>
-                                </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
-                                        <Clock size={16} />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">{t('landing.footer.hours_label')}</span>
-                                        <span className="text-slate-400">{t('landing.footer.hours')}</span>
-                                    </div>
-                                </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="p-2 bg-slate-800 rounded-lg text-orange-500 shrink-0">
-                                        <Mail size={16} />
-                                    </div>
-                                    <span className="text-slate-400 font-medium">engineering@caloocancity.gov.ph</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    {/* Footer Bottom Sheet */}
-                    <div className="mt-12 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
-                        <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 text-slate-400 text-xs tracking-wide">
-                            <span className="opacity-80">&copy; {new Date().getFullYear()} PULSO Infrastructure Network.</span>
-                            <div className="hidden md:block w-px h-3 bg-white/10"></div>
-                            <span className="text-slate-500 font-medium">Designed for Caloocan LGU</span>
-                        </div>
-                        
-                        <div className="flex items-center gap-8 text-[10px] font-bold uppercase tracking-[0.2em]">
-                            <button 
-                                onClick={() => openModal('privacy')} 
-                                className="text-slate-400 hover:text-orange-400 transition-all duration-300 flex items-center gap-2 group ring-offset-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 rounded-sm"
-                            >
-                                <div className="w-1 h-1 rounded-full bg-orange-500/20 group-hover:bg-orange-500 transition-colors"></div>
-                                {t('landing.footer.privacy')}
-                            </button>
-                            <button 
-                                onClick={() => openModal('terms')} 
-                                className="text-slate-400 hover:text-orange-400 transition-all duration-300 flex items-center gap-2 group ring-offset-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 rounded-sm"
-                            >
-                                <div className="w-1 h-1 rounded-full bg-orange-500/20 group-hover:bg-orange-500 transition-colors"></div>
-                                {t('landing.footer.terms')}
-                            </button>
-                            <button 
-                                onClick={() => openModal('cookies')} 
-                                className="text-slate-400 hover:text-orange-400 transition-all duration-300 flex items-center gap-2 group ring-offset-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 rounded-sm"
-                            >
-                                <div className="w-1 h-1 rounded-full bg-orange-500/20 group-hover:bg-orange-500 transition-colors"></div>
-                                {t('landing.footer.cookie')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </footer>
-
-            {/* Legal Modals */}
-            <TermsModal 
-                isOpen={modalConfig.isOpen} 
-                onClose={closeModal} 
-                type={modalConfig.type} 
-            />
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { Navigate } from 'react-router-dom';
+import OfficialBanner from '../components/landing/OfficialBanner';
+import CivicNavbar from '../components/landing/CivicNavbar';
+import HeroSection from '../components/landing/HeroSection';
+import QuickActionsSection from '../components/landing/QuickActionsSection';
+import CivicFooter from '../components/landing/CivicFooter';
+import TrackReportModal from '../components/landing/TrackReportModal';
+import LegalModal from '../components/LegalModal';
+import MobileAppTutorial from '../components/mobile/MobileAppTutorial';
+import MobileAppSplashScreen from '../components/mobile/MobileAppSplashScreen';
+import PulsoPulseLine from '../components/common/PulsoPulseLine';
+import { isInstalledApp, isTutorialCompleted } from '../utils/appContext';
+import { getAuthToken } from '../utils/authSession';
+
+// Lazy-load below-the-fold components for ultra-fast initial paint
+const MapPreviewSection = lazy(() => import('../components/landing/MapPreviewSection'));
+const HowItWorksSection = lazy(() => import('../components/landing/HowItWorksSection'));
+const EmergencyHotlinesSection = lazy(() => import('../components/landing/EmergencyHotlinesSection'));
+
+// Lightweight section skeleton fallback with signature traveling pulse line
+function SectionSkeleton({ height = 'h-72', title = 'Loading...' }) {
+  return (
+    <div className={`w-full ${height} max-w-7xl mx-auto my-8 px-4 flex items-center justify-center`} aria-busy="true">
+      <div className="w-full h-full rounded-2xl bg-slate-100 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 text-xs font-sans gap-3">
+        <div className="w-36">
+          <PulsoPulseLine />
         </div>
-    );
+        <span>{title}</span>
+      </div>
+    </div>
+  );
 }
 
-export default Landing;
+/**
+ * Landing (PULSO Civic Portal)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * - Public Website: Retains full civic portal landing page (Hero, Map, News, etc.)
+ * - Installed Mobile App: Does NOT render landing page.
+ *   - First launch: routes to 5-step MobileAppTutorial.
+ *   - Returning user: routes to resident dashboard (if signed in) or guest report flow.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export default function Landing() {
+  const inApp = isInstalledApp();
+  const tutorialCompleted = isTutorialCompleted();
+  const isAuthenticated = Boolean(getAuthToken());
+
+  // Cold start splash state
+  const [splashFinished, setSplashFinished] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    if (!inApp) return true;
+    return Boolean(sessionStorage.getItem('pulso_session_started'));
+  });
+
+  // Hide static placeholder HTML splash once React mounts
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const initialSplash = document.getElementById('pulso-initial-splash');
+      if (initialSplash) {
+        initialSplash.style.display = 'none';
+      }
+    }
+  }, []);
+
+  // 1. Installed Mobile App Context:
+  if (inApp) {
+    // Show splash screen on cold start
+    if (!splashFinished) {
+      return (
+        <MobileAppSplashScreen
+          onFinish={() => {
+            sessionStorage.setItem('pulso_session_started', 'true');
+            setSplashFinished(true);
+          }}
+        />
+      );
+    }
+
+    if (!tutorialCompleted) {
+      return <MobileAppTutorial />;
+    }
+
+    if (isAuthenticated) {
+      return <Navigate to="/dashboard" replace />;
+    }
+
+    // Returning unauthenticated app user: send straight to guest Report flow
+    return <Navigate to="/report" replace />;
+  }
+
+  // 2. Public Website Context: Render current website landing page unchanged
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
+  const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
+
+  return (
+    <div className="min-h-screen w-full flex flex-col bg-[#fffbf9] dark:bg-[#070a12] text-slate-900 dark:text-slate-100 font-sans selection:bg-[#ff6b00] selection:text-white transition-colors duration-200 overflow-x-clip">
+      
+      {/* Skip to Main Content Link for Keyboard / Screen Reader Accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 px-4 py-2 bg-[#ff6b00] text-white text-xs font-bold rounded-lg shadow-lg"
+      >
+        Skip to main content
+      </a>
+
+      {/* Official Republic of the Philippines / Caloocan City Header Ribbon */}
+      <OfficialBanner />
+
+      {/* Semantic Navigation Header */}
+      <CivicNavbar onOpenTrackModal={() => setIsTrackModalOpen(true)} />
+
+      {/* 3. Main Landmark Content */}
+      <main id="main-content" className="flex-1 focus:outline-hidden">
+        
+        {/* Section 1: Hero (One-sentence purpose + single primary CTA + Supporting Landmark Slideshow) */}
+        <HeroSection onOpenTrackModal={() => setIsTrackModalOpen(true)} />
+
+        {/* Section 3: Quick Actions (4 large tappable cards with vertical mobile stack) */}
+        <QuickActionsSection onOpenTrackModal={() => setIsTrackModalOpen(true)} />
+
+        {/* Section 4: Map Preview (Visual proof with real Caloocan barangay pins) */}
+        <Suspense fallback={<SectionSkeleton height="h-96" title="Loading Caloocan Utility Map..." />}>
+          <MapPreviewSection />
+        </Suspense>
+
+        {/* Section 5: How It Works (3-step plain-language visual guide) */}
+        <Suspense fallback={<SectionSkeleton height="h-72" title="Loading Process Guide..." />}>
+          <HowItWorksSection />
+        </Suspense>
+
+        {/* Section 6: Emergency & Utility Hotlines */}
+        <Suspense fallback={<SectionSkeleton height="h-64" title="Loading Hotlines Directory..." />}>
+          <EmergencyHotlinesSection />
+        </Suspense>
+
+      </main>
+
+      {/* 4. Semantic Footer (City government affiliation, contacts, legal compliance) */}
+      <CivicFooter
+        onOpenLegalModal={(tab) => setLegalModal({ isOpen: true, tab })}
+      />
+
+      {/* Interactive Citizen Tracking Lookup Modal */}
+      <TrackReportModal
+        isOpen={isTrackModalOpen}
+        onClose={() => setIsTrackModalOpen(false)}
+      />
+
+      {/* Official Legal & Citizen's Charter Modal */}
+      <LegalModal
+        isOpen={legalModal.isOpen}
+        onClose={() => setLegalModal((prev) => ({ ...prev, isOpen: false }))}
+        initialTab={legalModal.tab}
+      />
+
+    </div>
+  );
+}

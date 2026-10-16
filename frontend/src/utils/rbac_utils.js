@@ -7,17 +7,19 @@
 
 const MODULE_MAPPING = {
     'admin': ['admin', 'ops'],
-    'analytics': ['analytics'],
+    'analytics': ['analytics', 'reports', 'public_works'],
     'records': ['records'],
     'reports': ['reports'],
-    'permits': ['permits'],
+    'permits': ['permits', 'inspections'],
+    'inspections': ['inspections', 'permits'],
     'public_works': ['public_works'],
     'infrastructure': ['public_works'],
-    'ops': ['ops', 'reports'],
+    'ops': ['ops', 'reports', 'dispatch', 'public_works'],
+    'dispatch': ['dispatch', 'ops', 'reports'],
     'design': ['public_works'],
     'survey': ['public_works'],
-    'obo': ['permits'],
-    'procurement': ['procurement'],
+    'obo': ['permits', 'inspections'],
+    'procurement': ['procurement', 'public_works'],
 };
 
 const ROLE_EXECUTIVE = ['city_engineer', 'asst_city_engineer'];
@@ -32,7 +34,7 @@ const ROLE_PROCUREMENT = ['project_engineer', 'admin_officer', 'estimator'];
 const hasRole = (userRole, allowedRoles) => {
     if (!userRole) return false;
     if (allowedRoles.includes(userRole)) return true;
-    if (userRole === 'system_admin') return true;
+    if (userRole === 'system_admin' || userRole === 'city_engineer') return true;
     return false;
 };
 
@@ -42,7 +44,8 @@ export const checkPermission = (user, rawModule, action) => {
     const userRole = user.role;
     const capabilities = user.capabilities || {};
     
-    if (userRole === 'system_admin') return true;
+    if (userRole === 'system_admin' || userRole === 'city_engineer' || userRole === 'asst_city_engineer' || userRole === 'manager') return true;
+    if (userRole === 'dispatcher' && (rawModule === 'ops' || rawModule === 'reports' || rawModule === 'dispatch')) return true;
     if (userRole === 'resident') {
         const residentAllowed = { 'reports': ['create', 'view'], 'profile': ['view', 'edit'] };
         return (residentAllowed[rawModule] || []).includes(action);

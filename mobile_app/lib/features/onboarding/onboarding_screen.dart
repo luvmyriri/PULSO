@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
@@ -46,7 +47,7 @@ class OnboardingScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Spacer(),
-                    const Icon(
+                    const PulsoIcon(
                       Icons.flash_on_rounded,
                       size: 100,
                       color: AppTheme.primaryOrange,

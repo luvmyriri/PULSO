@@ -1,3 +1,4 @@
+import 'package:pulso_mobile/widgets/pulso_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
@@ -94,7 +95,7 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                   obscureText: _obscurePassword,
                   icon: Icons.lock_outline_rounded,
                   suffix: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.white24, size: 20),
+                    icon: PulsoIcon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.white24, size: 20),
                     onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
@@ -122,7 +123,7 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded, color: AppTheme.errorRed, size: 20),
+                          const PulsoIcon(Icons.error_outline_rounded, color: AppTheme.errorRed, size: 20),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -218,7 +219,7 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.05),
-                  prefixIcon: icon != null ? Icon(icon, color: AppTheme.primaryOrange.withOpacity(0.5), size: 20) : null,
+                  prefixIcon: icon != null ? PulsoIcon(icon, color: AppTheme.primaryOrange.withOpacity(0.5), size: 20) : null,
                   suffixIcon: suffix,
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),

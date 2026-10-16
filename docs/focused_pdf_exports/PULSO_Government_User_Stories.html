@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Government Command Center: User Stories Specification</title>
+    <style>
+        
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@page {
+    size: A4 portrait;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-center {
+        content: counter(page);
+    }
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.6;
+    color: #1e293b;
+    background-color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+/* Document Header & Cover */
+.doc-cover {
+    page-break-after: always;
+    padding: 30px 10px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 88vh;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.pulse-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 2px solid #f97316;
+    border-radius: 10px;
+    color: #f97316;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-title {
+    font-size: 15pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #0f172a;
+    text-transform: uppercase;
+}
+
+.brand-sub {
+    font-size: 8pt;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.cover-main {
+    margin: 30px 0;
+}
+
+.cover-badge {
+    display: inline-block;
+    padding: 5px 14px;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
+    border-radius: 20px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.cover-title {
+    font-size: 24pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+}
+
+.cover-subtitle {
+    font-size: 11.5pt;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.6;
+    max-width: 650px;
+    margin-bottom: 24px;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.meta-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+}
+
+.meta-value {
+    font-size: 9pt;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.cover-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8pt;
+    color: #64748b;
+}
+
+/* Headings */
+h1 {
+    font-size: 16pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-top: 28px;
+    margin-bottom: 12px;
+    letter-spacing: -0.3px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h2 {
+    font-size: 12.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    border-left: 3.5px solid #f97316;
+    padding-left: 10px;
+    letter-spacing: -0.2px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h4 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+p {
+    margin: 0 0 10px 0;
+}
+
+/* Lists */
+ul, ol {
+    margin: 0 0 12px 0;
+    padding-left: 22px;
+}
+
+li {
+    margin-bottom: 4px;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 18px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+thead {
+    display: table-header-group;
+}
+
+tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid #1e293b;
+    letter-spacing: 0.2px;
+}
+
+td {
+    padding: 7px 10px;
+    border: 1px solid #e2e8f0;
+    vertical-align: top;
+    color: #334155;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+/* Blockquotes / Callouts */
+blockquote {
+    margin: 14px 0;
+    padding: 10px 16px;
+    background-color: #f8fafc;
+    border-left: 4px solid #f97316;
+    border-radius: 0 6px 6px 0;
+    color: #334155;
+    font-size: 9pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* Code & Preformatted */
+code {
+    font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+    font-size: 8.2pt;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+pre {
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 8pt;
+    line-height: 1.45;
+    margin: 12px 0 16px 0;
+    border: 1px solid #334155;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+    border: none;
+    font-size: inherit;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 20px 0;
+}
+
+/* Scenario Highlighting */
+strong {
+    color: #0f172a;
+}
+
+    </style>
+</head>
+<body>
+    
+    <div class="doc-cover">
+        <div class="cover-brand">
+            <div class="pulse-logo">P</div>
+            <div class="brand-text">
+                <span class="brand-title">PULSO PLATFORM</span>
+                <span class="brand-sub">Civic Operations & Engineering</span>
+            </div>
+        </div>
+        <div class="cover-main">
+            <span class="cover-badge">GOVERNMENT USER STORIES SPECIFICATION</span>
+            <h1 class="cover-title">Government Command Center: User Stories Specification</h1>
+            <div class="cover-subtitle">Operational user stories across confirmed Caloocan City Engineering Plantilla positions, incident dispatch, 13-stage project lifecycle, BoQ/RA 9184 procurement, and OBO inspection tracks.</div>
+            <div class="meta-grid">
+                
+        <div class="meta-item">
+            <span class="meta-label">Document Title</span>
+            <span class="meta-value">Government Operations User Stories Specification</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">System</span>
+            <span class="meta-value">PULSO Civic Engagement & Infrastructure Intelligence Platform</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Target Audience</span>
+            <span class="meta-value">LGU Department Heads, City Engineers, Dispatchers, Inspectors, Enterprise Developers</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Version</span>
+            <span class="meta-value">1.0 (Focused Specification)</span>
+        </div>
+        
+        <div class="meta-item">
+            <span class="meta-label">Authority</span>
+            <span class="meta-value">City Engineering Office & Office of the Mayor, Caloocan City</span>
+        </div>
+        
+            </div>
+        </div>
+        <div class="cover-footer">
+            <span>City Government of Caloocan &bull; Engineering & Resident Operations</span>
+            <span>OFFICIAL PRODUCT & ENGINEERING SPECIFICATION</span>
+        </div>
+    </div>
+    
+    <div class="content-body">
+        <hr />
+<h2 id="1-executive-summary-lgu-stakeholder-matrix">1. Executive Summary &amp; LGU Stakeholder Matrix</h2>
+<p>The PULSO Government Command Center is a mission-critical enterprise operating system built for the City Government of Caloocan. It centralizes civic incident response, coordinates field engineering crews, automates public procurement workflows adhering to the Government Procurement Reform Act (RA 9184), monitors private construction permits via the Office of the Building Official (OBO), and delivers predictive infrastructure maintenance intelligence.</p>
+<h3 id="confirmed-plantilla-roles-system-capabilities">Confirmed Plantilla Roles &amp; System Capabilities</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      CITY ENGINEERING OFFICE — CALOOCAN CITY                    │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  City Engineer (Dept. Head II) &amp; Assistant City Engineer (Asst. Dept. Head II)  │
+└──────────────────────────────────────┬──────────────────────────────────────────┘
+                                       │
+       ┌───────────────────────────────┼───────────────────────────────┐
+       ▼                               ▼                               ▼
+┌──────────────┐       ┌───────────────────────────────┐       ┌────────────────┐
+│    ADMIN     │       │   PLANNING, DESIGN &amp; PROG.    │       │ CONSTRUCTION &amp; │
+│   DIVISION   │       │           DIVISION            │       │  MAINTENANCE   │
+├──────────────┤       ├───────────────────────────────┤       ├────────────────┤
+│ Admin Off. V │       │ Division Chief (Engr IV)      │       │ Engr III (Lead)│
+│ Admin Clerk  │       │ Architect I/II/III            │       │ Foreman        │
+│ Records Off. │       │ Civil Engineer I/II/III       │       │ Skilled Crew   │
+│              │       │ Estimator (Engr II) / CAD     │       │                │
+└──────────────┘       └───────────────┬───────────────┘       └────────────────┘
+                                       │
+                                       ▼
+                       ┌───────────────────────────────┐
+                       │  OFFICE OF BUILDING OFFICIAL  │
+                       ├───────────────────────────────┤
+                       │ Building Inspector            │
+                       │ Electrical Inspector (PEE)    │
+                       │ Mechanical Inspector          │
+                       └───────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="2-epic-1-command-center-triage-incident-dispatch">2. Epic 1: Command Center Triage &amp; Incident Dispatch</h2>
+<h3 id="us-gov-01-real-time-incident-map-density-heatmap">US-GOV-01: Real-Time Incident Map &amp; Density Heatmap</h3>
+<ul>
+<li><strong>As an</strong> LGU Command Center Dispatcher,</li>
+<li><strong>I want to</strong> view all incoming citizen reports plotted on an interactive geospatial map of Caloocan City with severity color-coding,</li>
+<li><strong>So that</strong> I can immediately assess high-risk incident clusters and prioritize emergency interventions.</li>
+</ul>
+<h4 id="acceptance-criteria">Acceptance Criteria</h4>
+<ol>
+<li>The Command Center displays a full-screen dynamic map supporting Satellite, Street, and Dark operational layers.</li>
+<li>Incidents are clustered using geospatial algorithms (Haversine/DBSCAN) to group reports within a 50-meter radius into a single master ticket.</li>
+<li>Incidents are color-coded by urgency: <strong>Red (Critical/Emergency)</strong>, <strong>Amber (High Priority)</strong>, <strong>Blue (Moderate)</strong>, and <strong>Green (Scheduled/Low)</strong>.</li>
+<li>Clicking any cluster opens a split-pane drawer showing the master ticket, resident-submitted photos, AI triage assessment, and verified citizen count.</li>
+<li>The dispatcher can filter the map view by Barangay, Department Division (Roads, Drainage, Electrical), Severity Score, and Date Range.</li>
+</ol>
+<hr />
+<h3 id="us-gov-02-ai-assisted-incident-triage-division-routing">US-GOV-02: AI-Assisted Incident Triage &amp; Division Routing</h3>
+<ul>
+<li><strong>As an</strong> Operations Intake Clerk,</li>
+<li><strong>I want to</strong> review AI-classified incident details and route them to the appropriate engineering division with one click,</li>
+<li><strong>So that</strong> actionable reports reach responsible field teams without bureaucratic delay.</li>
+</ul>
+<h4 id="acceptance-criteria_1">Acceptance Criteria</h4>
+<ol>
+<li>The triage interface displays the incoming report alongside Gemini 2.5 Flash analysis: Confidence Score, Damage Classification, and Recommended Division.</li>
+<li>The clerk can accept the recommended routing or re-assign to another division via a single dropdown.</li>
+<li>The clerk can flag reports that fall outside public jurisdiction with status <code>Outside LGU Jurisdiction</code>, triggering an automated polite notification to the citizen citing property boundary policies.</li>
+<li>Actions update the ticket state to <code>AI Verified</code> -&gt; <code>Assigned to Division</code> and log the clerk's ID into the immutable audit trail.</li>
+</ol>
+<hr />
+<h2 id="3-epic-2-work-order-generation-field-crew-execution">3. Epic 2: Work Order Generation &amp; Field Crew Execution</h2>
+<h3 id="us-gov-03-work-order-assignment-mobile-field-dispatch">US-GOV-03: Work Order Assignment &amp; Mobile Field Dispatch</h3>
+<ul>
+<li><strong>As a</strong> Maintenance Division Chief,</li>
+<li><strong>I want to</strong> generate a formal Work Order from a verified ticket and assign it to a Project Engineer and Construction Foreman,</li>
+<li><strong>So that</strong> field crews receive exact job specifications, GPS navigation, and required equipment lists.</li>
+</ul>
+<h4 id="acceptance-criteria_2">Acceptance Criteria</h4>
+<ol>
+<li>Generating a Work Order creates a unique WO tracking number linked to the originating citizen report(s).</li>
+<li>The dispatcher selects the lead Project Engineer, Foreman, and assigned vehicle/equipment from an active personnel registry.</li>
+<li>The assigned field crew receives an immediate push notification and mobile app task entry containing: GPS navigation pin, hazard photos, and safety notes.</li>
+<li>The ticket state automatically advances to <code>Dispatched</code>.</li>
+</ol>
+<hr />
+<h3 id="us-gov-04-mobile-punch-list-field-evidence-logging">US-GOV-04: Mobile Punch List &amp; Field Evidence Logging</h3>
+<ul>
+<li><strong>As a</strong> Senior Project Engineer or Construction Foreman on site,</li>
+<li><strong>I want to</strong> check in at the repair site via mobile GPS and log before/after repair photos and milestone check-offs,</li>
+<li><strong>So that</strong> the LGU has verified proof of work execution before closing the ticket.</li>
+</ul>
+<h4 id="acceptance-criteria_3">Acceptance Criteria</h4>
+<ol>
+<li>The mobile field app requires the crew to be within 100 meters of the ticket GPS coordinates to tap <strong>"Start Work"</strong> (geofenced check-in).</li>
+<li>The crew completes digital punch list milestones (e.g., Excavation Done, Cable Replaced, Asphalt Poured, Site Cleaned).</li>
+<li>The engineer must capture and upload mandatory <strong>"Proof of Resolution"</strong> photos directly through the app camera (gallery uploads disabled to prevent spoofing).</li>
+<li>Submitting completion advances the ticket state to <code>Resolved</code> and notifies the citizen for resolution review.</li>
+</ol>
+<hr />
+<h2 id="4-epic-3-13-stage-infrastructure-project-lifecycle">4. Epic 3: 13-Stage Infrastructure Project Lifecycle</h2>
+<h3 id="us-gov-05-capital-project-workflow-tracking">US-GOV-05: Capital Project Workflow Tracking</h3>
+<ul>
+<li><strong>As the</strong> City Engineer or Planning Division Chief,</li>
+<li><strong>I want to</strong> track large-scale municipal infrastructure projects through the official 13-stage engineering lifecycle,</li>
+<li><strong>So that</strong> all engineering, design, estimation, approval, and execution phases are systematically governed.</li>
+</ul>
+<h4 id="lifecycle-stages-governed">Lifecycle Stages Governed:</h4>
+<p><code>1. Project Request</code> ──► <code>2. Site Survey</code> ──► <code>3. Architectural/CAD Design</code> ──► <code>4. Bill of Quantities (BoQ)</code> ──► <code>5. Budget Review</code> ──► <code>6. City Engineer Sign-off</code> ──► <code>7. BAC Procurement</code> ──► <code>8. Notice to Proceed (NTP)</code> ──► <code>9. Construction Kickoff</code> ──► <code>10. Milestone Inspections</code> ──► <code>11. Punch List Resolution</code> ──► <code>12. Certificate of Completion</code> ──► <code>13. Final Archiving</code></p>
+<h4 id="acceptance-criteria_4">Acceptance Criteria</h4>
+<ol>
+<li>Project dashboards display a visual Gantt chart and milestone progress tracker corresponding to the 13 defined phases.</li>
+<li>Advancing between major milestone gates requires mandatory document attachments (e.g., AutoCAD drawings for Design phase, signed BoQ for Budget phase).</li>
+<li>Role-based signatures are strictly enforced: only the Administrative Officer V can confirm budget availability; only the City Engineer can issue final technical sign-off.</li>
+<li>The system automatically computes stage durations, highlighting schedule slippage or pending approval bottlenecks.</li>
+</ol>
+<hr />
+<h2 id="5-epic-4-bill-of-quantities-boq-ra-9184-procurement">5. Epic 4: Bill of Quantities (BoQ) &amp; RA 9184 Procurement</h2>
+<h3 id="us-gov-06-bill-of-quantities-boq-digital-estimation">US-GOV-06: Bill of Quantities (BoQ) Digital Estimation</h3>
+<ul>
+<li><strong>As an</strong> Estimator (Engineer II),</li>
+<li><strong>I want to</strong> compile an itemized Bill of Quantities with standard item codes, unit quantities, and current market unit rates,</li>
+<li><strong>So that</strong> project costing is standardized, accurate, and ready for budget appropriation.</li>
+</ul>
+<h4 id="acceptance-criteria_5">Acceptance Criteria</h4>
+<ol>
+<li>The estimator creates a BoQ record linked to a project ticket, utilizing a standardized LGU materials catalog (e.g., Concrete Class A, Reinforced Steel Bars, 4-inch PVC Conduits).</li>
+<li>The interface automatically calculates Subtotals, Contingency Margins, Labor Rates, and Total Estimated Project Cost.</li>
+<li>Exporting produces an official, printable BoQ summary sheet in PDF and Excel formats conforming to Philippine DPWH/COA standards.</li>
+<li>Once finalized, the BoQ is locked and submitted to the Administrative Division for budget certification.</li>
+</ol>
+<hr />
+<h3 id="us-gov-07-ra-9184-procurement-request-letter-generation">US-GOV-07: RA 9184 Procurement Request Letter Generation</h3>
+<ul>
+<li><strong>As an</strong> Administrative Officer V,</li>
+<li><strong>I want to</strong> generate formal procurement request letters and track items through the Bids and Awards Committee (BAC) queue,</li>
+<li><strong>So that</strong> material acquisition strictly follows the Government Procurement Reform Act (RA 9184).</li>
+</ul>
+<h4 id="acceptance-criteria_6">Acceptance Criteria</h4>
+<ol>
+<li>Approved BoQ items automatically populate a <strong>Procurement Requisition Package</strong>.</li>
+<li>The system generates an official <strong>Procurement Request Letter</strong> pre-populated with Project Title, Account Codes, Itemized Quantities, and Approving Signatures.</li>
+<li>The procurement lifecycle is tracked across transparent states: <code>Requisition Drafted</code> -&gt; <code>Budget Certified</code> -&gt; <code>Forwarded to BAC</code> -&gt; <code>Bidding/Canvass</code> -&gt; <code>Purchase Order Issued</code> -&gt; <code>Delivered on Site</code>.</li>
+<li>Material receipt confirmations automatically trigger notification to the project field engineer to commence construction.</li>
+</ol>
+<hr />
+<h2 id="6-epic-6-office-of-the-building-official-obo-permitting-inspections">6. Epic 6: Office of the Building Official (OBO) Permitting &amp; Inspections</h2>
+<h3 id="us-gov-08-building-electrical-mechanical-inspection-logging">US-GOV-08: Building, Electrical &amp; Mechanical Inspection Logging</h3>
+<ul>
+<li><strong>As a</strong> Building, Electrical (PEE), or Mechanical Inspector,</li>
+<li><strong>I want to</strong> log on-site inspection findings against private building permits or citizen construction complaints,</li>
+<li><strong>So that</strong> structural and fire safety code compliance is rigorously enforced across the city.</li>
+</ul>
+<h4 id="acceptance-criteria_7">Acceptance Criteria</h4>
+<ol>
+<li>The inspector accesses scheduled inspections on their mobile/tablet with attached architectural blueprints and permit files.</li>
+<li>The inspector records checklist items (e.g., Setback compliance, Fire exit clearance, Load capacity wiring).</li>
+<li>If violations are detected, the inspector can issue a digital <strong>Notice of Violation</strong> with attached photographic evidence, automatically scheduling a mandatory re-inspection within 15 days.</li>
+<li>If all checks pass, the inspector submits a <strong>Recommendation for Certificate of Occupancy</strong>, which routes directly to the City Engineer for digital clearance.</li>
+</ol>
+<hr />
+<h2 id="7-epic-7-citywide-analytics-predictive-maintenance-heatmaps">7. Epic 7: Citywide Analytics, Predictive Maintenance &amp; Heatmaps</h2>
+<h3 id="us-gov-09-predictive-infrastructure-failure-intelligence">US-GOV-09: Predictive Infrastructure Failure Intelligence</h3>
+<ul>
+<li><strong>As the</strong> City Engineer and Urban Planning Chiefs,</li>
+<li><strong>I want to</strong> analyze historical failure heatmaps and AI predictive models,</li>
+<li><strong>So that</strong> we can allocate infrastructure rehabilitation budgets proactively before major seasonal disruptions (e.g., monsoon flooding).</li>
+</ul>
+<h4 id="acceptance-criteria_8">Acceptance Criteria</h4>
+<ol>
+<li>The analytics suite models historical incident recurrence, drainage slope data, and asset age to highlight high-risk failure zones.</li>
+<li>The City Engineer can simulate maintenance interventions and generate "Preventive Work Orders" directly from predictive risk alerts.</li>
+<li>Executive KPI cards display: Average Resolution Time, Department Efficiency Index, Citizen CSAT Rating, and Total Capital Budget Deployed.</li>
+<li>All reports are exportable to publication-grade executive PDF summaries for presentation to the City Council and Mayor.</li>
+</ol>
+    </div>
+</body>
+</html>
