@@ -81,6 +81,7 @@ const IDCameraModal = ({
     side = 'front', 
     title = 'Take a photo', 
     subtitle = 'Photos are saved with your location and time.', 
+    theme,
     metadata, 
     guideText,
     idTypeName = 'ID',
@@ -92,6 +93,25 @@ const IDCameraModal = ({
     ratioOverride = null,
     onRatioChange = null
 }) => {
+    // Dynamic theme awareness: uses prop if supplied, otherwise observes html.dark class
+    const [isSystemDark, setIsSystemDark] = useState(() => {
+        if (typeof document !== 'undefined') {
+            return document.documentElement.classList.contains('dark');
+        }
+        return true;
+    });
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const checkDark = () => setIsSystemDark(document.documentElement.classList.contains('dark'));
+        checkDark();
+        const observer = new MutationObserver(checkDark);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
+
+    const isDark = theme ? theme === 'dark' : isSystemDark;
+
     const isIssue = side === 'ISSUE';
     const isBack = typeof side === 'string' && (side.toLowerCase().includes('back') || side.toLowerCase() === 'secondback');
     const sideWord = isBack ? 'BACK' : 'FRONT';
@@ -362,13 +382,19 @@ const IDCameraModal = ({
 
     const getFrameRatioClass = (ratio, isLand) => {
         if (ratio === '16:9') {
-            return isLand ? 'aspect-[16/9] max-w-2xl' : 'aspect-[9/16] max-h-[64vh]';
+            return isLand
+                ? 'aspect-[16/9] h-[min(56vh,320px)] sm:h-[min(62vh,420px)] md:h-[min(66vh,500px)] w-auto max-w-full'
+                : 'aspect-[9/16] h-[min(46vh,340px)] min-[390px]:h-[min(50vh,420px)] sm:h-[min(54vh,480px)] md:h-[min(58vh,540px)] w-auto max-w-full';
         }
         if (ratio === '1:1') {
-            return 'aspect-square max-h-[48vh] sm:max-h-[52vh]';
+            return isLand
+                ? 'aspect-square h-[min(48vh,280px)] sm:h-[min(54vh,360px)] md:h-[min(58vh,420px)] w-auto max-w-full'
+                : 'aspect-square h-[min(38vh,290px)] min-[390px]:h-[min(42vh,340px)] sm:h-[min(46vh,400px)] md:h-[min(50vh,460px)] w-auto max-w-full';
         }
         // '4:3'
-        return isLand ? 'aspect-[4/3] max-w-xl' : 'aspect-[3/4] max-h-[56vh] sm:max-h-[60vh]';
+        return isLand
+            ? 'aspect-[4/3] h-[min(56vh,320px)] sm:h-[min(62vh,420px)] md:h-[min(66vh,500px)] w-auto max-w-full'
+            : 'aspect-[3/4] h-[min(46vh,340px)] min-[390px]:h-[min(50vh,420px)] sm:h-[min(54vh,480px)] md:h-[min(58vh,540px)] w-auto max-w-full';
     };
 
     const handleCapture = () => {
@@ -594,7 +620,9 @@ const IDCameraModal = ({
                     aria-modal="true"
                     aria-labelledby="camera-screen-title"
                     ref={modalRef}
-                    className={`${standalone ? 'absolute inset-0 z-20 w-full h-full' : 'fixed inset-0 z-[200] w-full h-[100dvh]'} bg-[#070d1a] text-white flex flex-col justify-between overflow-hidden select-none`}
+                    className={`${standalone ? 'absolute inset-0 z-20 w-full h-full' : 'fixed inset-0 z-[200] w-full h-[100dvh]'} ${
+                        isDark ? 'bg-[#070d1a] text-white' : 'bg-slate-50 text-slate-900'
+                    } flex flex-col justify-between overflow-hidden select-none transition-colors duration-200`}
                     style={{
                         paddingTop: standalone ? '0px' : 'env(safe-area-inset-top, 0px)',
                         paddingBottom: standalone ? '0px' : 'env(safe-area-inset-bottom, 0px)'
@@ -613,6 +641,7 @@ const IDCameraModal = ({
                         subtitle={displaySubtitle}
                         onClose={onClose}
                         titleId="camera-screen-title"
+                        isDark={isDark}
                     />
 
                     {/* ─────────────────────────────────────────────────────────── */}
@@ -627,6 +656,7 @@ const IDCameraModal = ({
                                 primaryButtonText="Try again"
                                 onSecondaryAction={onPickFromGallery}
                                 secondaryButtonText={onPickFromGallery ? "Choose from gallery instead" : undefined}
+                                isDark={isDark}
                             />
                         )}
 
@@ -637,6 +667,7 @@ const IDCameraModal = ({
                                 reason={typeof error === 'string' && !error.startsWith('Camera error:') ? error : undefined}
                                 onPrimaryAction={startStream}
                                 primaryButtonText="Try again"
+                                isDark={isDark}
                             />
                         )}
 
@@ -647,12 +678,15 @@ const IDCameraModal = ({
                                 reason={validationError}
                                 onPrimaryAction={handleRetake}
                                 primaryButtonText="Retake photo"
+                                isDark={isDark}
                             />
                         )}
 
                         {/* ── State D: Checking State (Verifying with PULSO Pulse Line) ── */}
                         {isCheckingState && (
-                            <div className={`relative w-full max-w-md ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center shadow-lg transition-all duration-200 motion-reduce:transition-none`}>
+                            <div className={`relative ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden ${
+                                isDark ? 'bg-black border border-slate-800' : 'bg-slate-100 border border-slate-200'
+                            } flex items-center justify-center shadow-lg transition-all duration-200 motion-reduce:transition-none`}>
                                 {capturedPreviewUrl && (
                                     <img
                                         src={capturedPreviewUrl}
@@ -660,21 +694,13 @@ const IDCameraModal = ({
                                         className="w-full h-full object-cover opacity-35 filter brightness-75"
                                     />
                                 )}
-                                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center space-y-4">
+                                <div className={`absolute inset-0 ${isDark ? 'bg-slate-950/70' : 'bg-white/90'} backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center space-y-3`}>
                                     <div className="w-14 h-14 rounded-2xl bg-[#ff6b00]/15 border border-[#ff6b00]/30 flex items-center justify-center text-[#ff6b00] shadow-inner">
                                         <Loader2 size={26} className="animate-spin text-[#ff6b00]" />
                                     </div>
-                                    <div className="space-y-1">
-                                        <h3 className="text-lg font-bold text-white">
-                                            Checking your photo...
-                                        </h3>
-                                        <p className="text-xs text-slate-300 max-w-xs">
-                                            PULSO Vision Eye is confirming infrastructure clarity
-                                        </p>
-                                    </div>
-                                    <div className="w-48 pt-1">
-                                        <PulsoPulseLine />
-                                    </div>
+                                    <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'} dark:text-white`}>
+                                        Checking your photo...
+                                    </h3>
                                 </div>
                             </div>
                         )}
@@ -682,7 +708,9 @@ const IDCameraModal = ({
                         {/* ── State E: Accepted Preview State ── */}
                         {isPreviewAcceptedState && (
                             <div className="w-full max-w-md flex flex-col items-center space-y-4">
-                                <div className={`relative w-full ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-md transition-all duration-200 motion-reduce:transition-none flex items-center justify-center`}>
+                                <div className={`relative ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black ${
+                                    isDark ? 'border border-slate-800' : 'border border-slate-200'
+                                } shadow-md transition-all duration-200 motion-reduce:transition-none flex items-center justify-center`}>
                                     <img
                                         src={capturedPreviewUrl}
                                         alt="Captured problem photo"
@@ -711,7 +739,7 @@ const IDCameraModal = ({
                                     <button
                                         type="button"
                                         onClick={handleConfirmAcceptedPhoto}
-                                        className="w-full h-[52px] min-h-[52px] rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-[#070d1a] font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-white"
+                                        className="w-full h-[52px] min-h-[52px] rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-white font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
                                     >
                                         <Check size={18} strokeWidth={2.75} />
                                         <span>Use this photo</span>
@@ -720,7 +748,11 @@ const IDCameraModal = ({
                                     <button
                                         type="button"
                                         onClick={handleRetake}
-                                        className="w-full h-[52px] min-h-[52px] rounded-xl border border-slate-700 bg-white/5 hover:bg-white/10 text-white font-semibold text-base flex items-center justify-center gap-2 cursor-pointer transition-colors active:scale-[0.99]"
+                                        className={`w-full h-[52px] min-h-[52px] rounded-xl border font-semibold text-base flex items-center justify-center gap-2 cursor-pointer transition-colors active:scale-[0.99] ${
+                                            isDark
+                                                ? 'border-slate-700 bg-white/5 hover:bg-white/10 text-white'
+                                                : 'border-slate-300 bg-white hover:bg-slate-100 text-slate-800 shadow-xs'
+                                        }`}
                                     >
                                         <RotateCcw size={16} strokeWidth={2.25} />
                                         <span>Retake</span>
@@ -731,9 +763,11 @@ const IDCameraModal = ({
 
                         {/* ── State F: Live Camera View ── */}
                         {isLiveState && (
-                            <div className="w-full max-w-md flex flex-col items-center space-y-2.5">
+                            <div className="w-full max-w-md flex flex-col items-center space-y-2 sm:space-y-2.5">
                                 {/* Reshaping Live Camera Frame with 200ms transition and corner marks */}
-                                <div className={`relative w-full ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl flex items-center justify-center transition-all duration-200 motion-reduce:transition-none`}>
+                                <div className={`relative ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black ${
+                                    isDark ? 'border border-slate-800 shadow-2xl' : 'border border-slate-200 shadow-xl'
+                                } flex items-center justify-center transition-all duration-200 motion-reduce:transition-none`}>
                                     {previewMode === 'live' && !streamRef.current ? (
                                         <img
                                             src={previewSamplePhoto || "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=80"}
@@ -790,15 +824,17 @@ const IDCameraModal = ({
 
                                     {/* Loading spinner while stream initializes */}
                                     {isLoading && (
-                                        <div className="absolute inset-0 bg-[#070d1a] flex flex-col items-center justify-center space-y-3 z-30">
+                                        <div className={`absolute inset-0 ${isDark ? 'bg-[#070d1a]' : 'bg-slate-100'} flex flex-col items-center justify-center space-y-3 z-30`}>
                                             <Loader2 size={32} className="animate-spin text-[#ff6b00]" />
-                                            <p className="text-xs text-slate-400">Starting camera...</p>
+                                            <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Starting camera...</p>
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Frame Helper Text: 14px, soft gray-blue */}
-                                <p className="text-sm text-slate-300 text-center font-medium">
+                                {/* Frame Helper Text: high-contrast in both themes */}
+                                <p className={`text-xs sm:text-sm text-center font-medium ${
+                                    isDark ? 'text-slate-200' : 'text-slate-700'
+                                } dark:text-slate-200`}>
                                     Show the problem clearly, in good light.
                                 </p>
 
@@ -817,6 +853,7 @@ const IDCameraModal = ({
                                             setAnnouncement(notes[newRatio] || `Photo size ${newRatio}`);
                                         }}
                                         className="pt-1"
+                                        isDark={isDark}
                                     />
                                 )}
                             </div>
@@ -826,9 +863,11 @@ const IDCameraModal = ({
                     </main>
 
                     {/* ─────────────────────────────────────────────────────────── */}
-                    {/* ZONE 3: BOTTOM BAR (slightly lighter navy panel)            */}
+                    {/* ZONE 3: BOTTOM BAR                                          */}
                     {/* ─────────────────────────────────────────────────────────── */}
-                    <footer className="w-full bg-[#0c1427] border-t border-slate-800 px-[clamp(1rem,5vw,1.5rem)] py-4 sm:py-5 z-30 shrink-0">
+                    <footer className={`w-full ${
+                        isDark ? 'bg-[#0c1427] border-t border-slate-800' : 'bg-white border-t border-slate-200 shadow-md'
+                    } px-[clamp(1rem,5vw,1.5rem)] py-4 sm:py-5 z-30 shrink-0`}>
                         <div className="max-w-md mx-auto grid grid-cols-3 items-center">
                             {/* Left: Camera Switcher (if multiple cameras exist) or Empty so shutter stays centered */}
                             <div className="flex items-center justify-start">
@@ -837,7 +876,11 @@ const IDCameraModal = ({
                                         type="button"
                                         onClick={handleSwitchCamera}
                                         aria-label="Switch camera"
-                                        className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full flex flex-col items-center justify-center text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-colors cursor-pointer"
+                                        className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-full flex flex-col items-center justify-center transition-colors cursor-pointer border ${
+                                            isDark
+                                                ? 'text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-800 border-slate-700/80'
+                                                : 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border-slate-200 shadow-xs'
+                                        }`}
                                     >
                                         <RotateCcw size={18} strokeWidth={2.25} />
                                     </button>
@@ -851,6 +894,7 @@ const IDCameraModal = ({
                                     disabled={!isLiveState || isLoading}
                                     className={isInvalidState ? 'opacity-30 pointer-events-none' : ''}
                                     ariaLabel="Take photo"
+                                    isDark={isDark}
                                 />
                             </div>
 
@@ -867,9 +911,13 @@ const IDCameraModal = ({
                                         {flashOn ? (
                                             <Zap size={22} className="text-[#ff6b00]" strokeWidth={2.5} />
                                         ) : (
-                                            <ZapOff size={22} className="text-slate-400 group-hover:text-slate-200" strokeWidth={2} />
+                                            <ZapOff size={22} className={isDark ? "text-slate-300 group-hover:text-white" : "text-slate-500 group-hover:text-slate-900"} strokeWidth={2} />
                                         )}
-                                        <span className={`text-[11px] font-bold mt-1 leading-none ${flashOn ? 'text-[#ff6b00]' : 'text-slate-400'}`}>
+                                        <span className={`text-[11px] font-bold mt-1 leading-none ${
+                                            flashOn
+                                                ? 'text-[#ff6b00]'
+                                                : (isDark ? 'text-slate-200' : 'text-slate-600')
+                                        }`}>
                                             {flashOn ? 'Flash on' : 'Flash off'}
                                         </span>
                                     </button>

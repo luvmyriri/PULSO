@@ -1,12 +1,11 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
-import OfficialBanner from '../components/landing/OfficialBanner';
 import CivicNavbar from '../components/landing/CivicNavbar';
 import HeroSection from '../components/landing/HeroSection';
-import QuickActionsSection from '../components/landing/QuickActionsSection';
 import CivicFooter from '../components/landing/CivicFooter';
 import TrackReportModal from '../components/landing/TrackReportModal';
 import LegalModal from '../components/LegalModal';
+import PwaModal from '../components/landing/PwaModal';
 import MobileAppTutorial from '../components/mobile/MobileAppTutorial';
 import MobileAppSplashScreen from '../components/mobile/MobileAppSplashScreen';
 import PulsoPulseLine from '../components/common/PulsoPulseLine';
@@ -16,6 +15,7 @@ import { getAuthToken } from '../utils/authSession';
 // Lazy-load below-the-fold components for ultra-fast initial paint
 const MapPreviewSection = lazy(() => import('../components/landing/MapPreviewSection'));
 const HowItWorksSection = lazy(() => import('../components/landing/HowItWorksSection'));
+const CityUpdatesSection = lazy(() => import('../components/landing/CityUpdatesSection'));
 const EmergencyHotlinesSection = lazy(() => import('../components/landing/EmergencyHotlinesSection'));
 
 // Lightweight section skeleton fallback with signature traveling pulse line
@@ -89,12 +89,14 @@ export default function Landing() {
     return <Navigate to="/report" replace />;
   }
 
-  // 2. Public Website Context: Render current website landing page unchanged
+  // 2. Public Website Context
+  const [activeTab, setActiveTab] = useState('home');
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
+  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
   const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-[#fffbf9] dark:bg-[#070a12] text-slate-900 dark:text-slate-100 font-sans selection:bg-[#ff6b00] selection:text-white transition-colors duration-200 overflow-x-clip">
+    <div className="min-h-screen w-full flex flex-col bg-white dark:bg-[#070a12] text-slate-900 dark:text-slate-100 font-sans selection:bg-[#ff6b00] selection:text-white transition-colors duration-200 overflow-x-clip">
       
       {/* Skip to Main Content Link for Keyboard / Screen Reader Accessibility */}
       <a
@@ -104,47 +106,61 @@ export default function Landing() {
         Skip to main content
       </a>
 
-      {/* Official Republic of the Philippines / Caloocan City Header Ribbon */}
-      <OfficialBanner />
-
       {/* Semantic Navigation Header */}
-      <CivicNavbar onOpenTrackModal={() => setIsTrackModalOpen(true)} />
+      <CivicNavbar 
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        onOpenTrackModal={() => setIsTrackModalOpen(true)} 
+        onOpenPwaModal={() => setIsPwaModalOpen(true)}
+      />
 
-      {/* 3. Main Landmark Content */}
+      {/* 3. Main Landmark Content: Full continuous scroll with zero-overlap section framing */}
       <main id="main-content" className="flex-1 focus:outline-hidden">
         
-        {/* Section 1: Hero (One-sentence purpose + single primary CTA + Supporting Landmark Slideshow) */}
-        <HeroSection onOpenTrackModal={() => setIsTrackModalOpen(true)} />
+        {/* Section 1: Hero (Full viewport height initial fold) */}
+        <HeroSection 
+          onOpenTrackModal={() => setIsTrackModalOpen(true)} 
+          onOpenPwaModal={() => setIsPwaModalOpen(true)}
+        />
 
-        {/* Section 3: Quick Actions (4 large tappable cards with vertical mobile stack) */}
-        <QuickActionsSection onOpenTrackModal={() => setIsTrackModalOpen(true)} />
+        {/* Section 2: City Updates (Minimalist Slideshow Carousel) - Placed directly next to Home */}
+        <Suspense fallback={<SectionSkeleton height="h-72" title="Loading City Updates..." />}>
+          <CityUpdatesSection />
+        </Suspense>
 
-        {/* Section 4: Map Preview (Visual proof with real Caloocan barangay pins) */}
+        {/* Section 3: Map Preview */}
         <Suspense fallback={<SectionSkeleton height="h-96" title="Loading Caloocan Utility Map..." />}>
           <MapPreviewSection />
         </Suspense>
 
-        {/* Section 5: How It Works (3-step plain-language visual guide) */}
+        {/* Section 4: How It Works */}
         <Suspense fallback={<SectionSkeleton height="h-72" title="Loading Process Guide..." />}>
-          <HowItWorksSection />
+          <HowItWorksSection onOpenTrackModal={() => setIsTrackModalOpen(true)} />
         </Suspense>
 
-        {/* Section 6: Emergency & Utility Hotlines */}
+        {/* Section 5: Emergency & Utility Hotlines */}
         <Suspense fallback={<SectionSkeleton height="h-64" title="Loading Hotlines Directory..." />}>
           <EmergencyHotlinesSection />
         </Suspense>
 
       </main>
 
-      {/* 4. Semantic Footer (City government affiliation, contacts, legal compliance) */}
+      {/* 4. Semantic Footer */}
       <CivicFooter
         onOpenLegalModal={(tab) => setLegalModal({ isOpen: true, tab })}
+        onOpenPwaModal={() => setIsPwaModalOpen(true)}
       />
 
       {/* Interactive Citizen Tracking Lookup Modal */}
       <TrackReportModal
         isOpen={isTrackModalOpen}
         onClose={() => setIsTrackModalOpen(false)}
+      />
+
+      {/* Mobile App PWA QR Code & Installation Guide Modal */}
+      <PwaModal
+        isOpen={isPwaModalOpen}
+        onClose={() => setIsPwaModalOpen(false)}
       />
 
       {/* Official Legal & Citizen's Charter Modal */}

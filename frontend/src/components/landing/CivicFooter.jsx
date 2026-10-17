@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, PhoneCall, Mail, MapPin, ExternalLink, ArrowUp } from 'lucide-react';
+import { ShieldCheck, PhoneCall, Mail, MapPin, ExternalLink, ArrowUp, QrCode } from 'lucide-react';
 import Branding from '../Branding';
+import { isInstalledApp } from '../../utils/appContext';
 
 /**
  * CivicFooter
@@ -10,7 +11,7 @@ import Branding from '../Branding';
  * Data Privacy Act (RA 10173) provisions, and direct portal navigation.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export default function CivicFooter({ onOpenLegalModal }) {
+export default function CivicFooter({ onOpenLegalModal, onOpenPwaModal }) {
   const { t } = useTranslation();
 
   const scrollToTop = () => {
@@ -23,7 +24,7 @@ export default function CivicFooter({ onOpenLegalModal }) {
       aria-label="Official Municipal Portal Footer"
       className="civic-footer bg-slate-900 dark:bg-[#03060c] text-slate-300 border-t border-slate-800 transition-colors pt-12 pb-8 text-left"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         
         {/* Top Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 pb-10 border-b border-slate-800">
@@ -85,6 +86,18 @@ export default function CivicFooter({ onOpenLegalModal }) {
                   Dispatch Operations
                 </a>
               </li>
+              {!isInstalledApp() && onOpenPwaModal && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={onOpenPwaModal}
+                    className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium flex items-center gap-1.5 cursor-pointer text-left"
+                  >
+                    <QrCode size={12} className="text-[#ff6b00]" />
+                    <span>Install Mobile App (PWA)</span>
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
 

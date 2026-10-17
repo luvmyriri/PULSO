@@ -1745,6 +1745,147 @@ def read_user_reports(
         
     return query.order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
 
+@app.get("/api/reports/heatmap")
+def get_reports_heatmap(db: Session = Depends(get_db)):
+    """
+    Authoritative public heatmap endpoint dynamically aggregating real database reports by barangay
+    using PostGIS spatial containment and returning public incident markers and density points.
+    """
+    import re
+    from services.spatial_service import locate_point
+
+    reports = db.query(models.Report).filter(
+        models.Report.location_lat.isnot(None),
+        models.Report.location_lng.isnot(None),
+        or_(
+            models.Report.status.is_(None),
+            models.Report.status.notin_(["cancelled", "rejected"])
+        )
+    ).order_by(models.Report.created_at.desc()).all()
+
+    barangay_counts = {}
+    barangay_details = {}
+    report_items = []
+    raw_points = []
+
+    for r in reports:
+        b_num = None
+        b_name = r.location_barangay
+
+        # 1. Check direct barangay relation or ID
+        if r.barangay_ref and r.barangay_ref.brgy_num:
+            b_num = r.barangay_ref.brgy_num
+            b_name = r.barangay_ref.display_name or f"Brgy. {b_num}"
+        elif r.barangay_id:
+            brgy = db.query(models.Barangay).filter(models.Barangay.id == r.barangay_id).first()
+            if brgy:
+                b_num = brgy.brgy_num
+                b_name = brgy.display_name or f"Brgy. {b_num}"
+
+        # 2. Dynamic PostGIS spatial resolution from GPS point
+        if b_num is None and r.location_lat and r.location_lng:
+            try:
+                loc = locate_point(db, float(r.location_lat), float(r.location_lng))
+                if loc and loc.get("brgy_num"):
+                    b_num = loc["brgy_num"]
+                    b_name = loc.get("barangay_display") or f"Brgy. {b_num}"
+            except Exception:
+                pass
+
+        # 3. Fallback regex extraction from string
+        if b_num is None and (r.barangay or b_name):
+            cand = r.barangay or b_name
+            num_match = re.search(r"\b(\d+)\b", cand)
+            if num_match:
+                b_num = int(num_match.group(1))
+                b_name = f"Brgy. {b_num}"
+
+        b_key = str(b_num) if b_num is not None else (b_name or "Caloocan City")
+        barangay_counts[b_key] = barangay_counts.get(b_key, 0) + 1
+
+        cat_lower = (r.category or "").lower()
+        cat_group = "road"
+        if "water" in cat_lower or "drainage" in cat_lower or "pipe" in cat_lower or "leak" in cat_lower or "flood" in cat_lower:
+            cat_group = "water"
+        elif "light" in cat_lower or "power" in cat_lower or "electric" in cat_lower or "lamp" in cat_lower:
+            cat_group = "power"
+        elif "safety" in cat_lower or "hazard" in cat_lower or "danger" in cat_lower or "debris" in cat_lower:
+            cat_group = "safety"
+        elif "facilit" in cat_lower or "building" in cat_lower or "park" in cat_lower or "hall" in cat_lower:
+            cat_group = "facilities"
+        elif "traffic" in cat_lower or "sign" in cat_lower or "signal" in cat_lower:
+            cat_group = "traffic"
+        elif "road" in cat_lower or "pothole" in cat_lower or "asphalt" in cat_lower or "bridge" in cat_lower:
+            cat_group = "road"
+        else:
+            cat_group = "others"
+
+        if b_key not in barangay_details:
+            barangay_details[b_key] = {
+                "brgy_num": b_num,
+                "display_name": b_name or (f"Brgy. {b_num}" if b_num else b_key),
+                "sector": r.sector or ("North" if r.location_lat and r.location_lat >= 14.70 else "South"),
+                "total": 0,
+                "categories": {
+                    "road": 0,
+                    "water": 0,
+                    "power": 0,
+                    "facilities": 0,
+                    "safety": 0,
+                    "traffic": 0,
+                    "others": 0
+                }
+            }
+        barangay_details[b_key]["total"] += 1
+        barangay_details[b_key]["categories"][cat_group] = barangay_details[b_key]["categories"].get(cat_group, 0) + 1
+
+        # Format public title safely from description or category
+        report_title = r.description[:90] if r.description else (r.category or "Civic Report")
+        if len(r.description or "") > 90:
+            report_title += "..."
+
+        full_addr = r.location_string or (f"{b_name or f'Brgy. {b_num}'}, Caloocan City")
+
+        report_items.append({
+            "id": r.id,
+            "ticket_id": r.ticket_id,
+            "category": r.category or "Infrastructure",
+            "category_group": cat_group,
+            "title": report_title,
+            "description": r.description or "",
+            "location_string": full_addr,
+            "full_address": full_addr,
+            "barangay": b_name or (f"Brgy. {b_num}" if b_num else "Caloocan City"),
+            "brgy_num": b_num,
+            "sector": r.sector or ("North" if r.location_lat and r.location_lat >= 14.70 else "South"),
+            "district": r.district or ("North Caloocan" if r.location_lat and r.location_lat >= 14.70 else "South Caloocan"),
+            "status": (r.status or "In Progress").replace("_", " ").title(),
+            "lat": float(r.location_lat),
+            "lng": float(r.location_lng),
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "urgency": r.urgency
+        })
+
+        raw_points.append({
+            "lat": float(r.location_lat),
+            "lng": float(r.location_lng),
+            "weight": 2.0 if r.urgency in ["critical", "high"] else 1.0,
+            "category": r.category,
+            "ticket_id": r.ticket_id
+        })
+
+    max_count = max(barangay_counts.values()) if barangay_counts else 0
+
+    return {
+        "total_reports": len(reports),
+        "barangay_counts": barangay_counts,
+        "barangay_details": barangay_details,
+        "raw_points": raw_points,
+        "max_count": max_count,
+        "reports": report_items,
+        "last_updated": datetime.now(timezone.utc).isoformat()
+    }
+
 @app.get("/api/reports/public", response_model=List[schemas.ReportResponse])
 def read_public_reports(
     skip: int = 0,

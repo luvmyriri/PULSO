@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     User, Shield, Eye, EyeOff, ChevronRight,
     Activity, Mail, ArrowLeft, CheckCircle, Lock,
-    ShieldCheck, MapPinned, Clock, Clipboard, HardHat, Check, AlertCircle, Home, UserX
+    MapPinned, Clock, Clipboard, HardHat, Check, AlertCircle, Home, UserX
 } from 'lucide-react';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -790,12 +790,6 @@ export default function Login() {
                     
                     {/* Left Column: Hero & System Context (60% / 7 cols) — Hidden on mobile/tablet (< lg), visible on desktop */}
                     <div className="hidden lg:flex lg:col-span-7 flex-col items-start text-left w-full">
-                        
-                        {/* Category Tag Pill */}
-                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
-                            <ShieldCheck size={14} className="text-[#ff6b00] shrink-0" />
-                            <span>Citizen Access Portal • Caloocan City</span>
-                        </div>
                         
                         {/* Main Display Heading */}
                         <h1 className="font-heading font-black text-3xl sm:text-5xl lg:text-[52px] text-slate-900 dark:text-white uppercase leading-[1.12] mb-4 tracking-tight">

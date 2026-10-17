@@ -377,12 +377,9 @@ export default function PulseAIChatWindow({
                                     <Brain size={18} className="text-white" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                        <h4 className="font-heading font-black text-white text-sm leading-tight tracking-tight">
-                                            PULSEAI
-                                        </h4>
-                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="System Operational" />
-                                    </div>
+                                    <h4 className="font-heading font-black text-white text-sm leading-tight tracking-tight">
+                                        PULSEAI
+                                    </h4>
                                     <p className="text-[10px] text-orange-100 font-bold uppercase tracking-wider truncate">
                                         {isStaff ? 'STAFF ASSISTANT' : 'COMMUNITY HELPER · 24/7'}
                                     </p>

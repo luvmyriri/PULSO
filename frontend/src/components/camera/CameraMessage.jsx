@@ -21,26 +21,27 @@ export default function CameraMessage({
     primaryButtonText = 'Retake photo',
     onSecondaryAction,
     secondaryButtonText,
-    className = ''
+    className = '',
+    isDark = true
 }) {
     const isPermission = type === 'permission_denied';
     const isError = type === 'error';
 
     // Content defaults
-    let icon = <AlertTriangle size={32} className="text-rose-400 shrink-0" strokeWidth={2.25} />;
+    let icon = <AlertTriangle size={32} className={isDark ? "text-rose-400 shrink-0" : "text-rose-600 shrink-0"} strokeWidth={2.25} />;
     let pillText = 'NOT AN INFRASTRUCTURE PHOTO';
     let headingText = 'Cannot proceed with this photo';
     let defaultExplanation = 'This looks like a personal photo or selfie. Please take a clear photo of the public infrastructure issue instead.';
     let buttonLabel = primaryButtonText || 'Retake photo';
 
     if (isPermission) {
-        icon = <CameraOff size={32} className="text-rose-400 shrink-0" strokeWidth={2.25} />;
+        icon = <CameraOff size={32} className={isDark ? "text-rose-400 shrink-0" : "text-rose-600 shrink-0"} strokeWidth={2.25} />;
         pillText = 'PERMISSION REQUIRED';
         headingText = 'Camera is turned off';
         defaultExplanation = 'Turn on the camera in your phone settings, then try again.';
         buttonLabel = primaryButtonText || 'Try again';
     } else if (isError) {
-        icon = <CameraOff size={32} className="text-rose-400 shrink-0" strokeWidth={2.25} />;
+        icon = <CameraOff size={32} className={isDark ? "text-rose-400 shrink-0" : "text-rose-600 shrink-0"} strokeWidth={2.25} />;
         pillText = 'CAMERA UNAVAILABLE';
         headingText = "We can't open the camera right now.";
         defaultExplanation = 'Please ensure your camera is not in use by another app and try again.';
@@ -58,39 +59,53 @@ export default function CameraMessage({
             className={`w-full max-w-md mx-auto my-auto flex flex-col items-center text-center px-[clamp(1rem,5vw,1.5rem)] py-6 space-y-6 select-none ${className}`}
         >
             {/* 1. Large 5rem (80px) round warning/camera icon with soft red tint & 1px border */}
-            <div className="w-20 h-20 min-w-[5rem] min-h-[5rem] rounded-full flex items-center justify-center bg-rose-500/10 border border-rose-500/30 text-rose-400 shrink-0">
+            <div className={`w-20 h-20 min-w-[5rem] min-h-[5rem] rounded-full flex items-center justify-center shrink-0 border ${
+                isDark
+                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-lg'
+                    : 'bg-rose-50 border-rose-200 text-rose-600 shadow-sm'
+            }`}>
                 {icon}
             </div>
 
             {/* 2. Pill label in all capital letters (11-12px bold, uppercase tracking-wider, red tint & border) */}
-            <div className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-full text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-rose-500/10 border border-rose-500/30 text-rose-300">
+            <div className={`inline-flex items-center justify-center px-3.5 py-1.5 rounded-full text-[11px] sm:text-xs font-bold uppercase tracking-wider border ${
+                isDark
+                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                    : 'bg-rose-50 border-rose-200 text-rose-700'
+            }`}>
                 <span>{pillText}</span>
             </div>
 
-            {/* 3. Heading (increased font size 24px–28px bold, white, centered) */}
+            {/* 3. Heading (increased font size 24px–28px bold, centered) */}
             {headingText === 'Cannot proceed with this photo' ? (
-                <h2 className="text-2xl sm:text-[28px] font-bold text-white leading-tight tracking-tight max-w-[340px] mx-auto">
+                <h2 className={`text-2xl sm:text-[28px] font-bold leading-tight tracking-tight max-w-[340px] mx-auto ${
+                    isDark ? 'text-white' : 'text-slate-900'
+                }`}>
                     Cannot proceed with this<br />photo
                 </h2>
             ) : (
-                <h2 className="text-2xl sm:text-[28px] font-bold text-white leading-tight tracking-tight max-w-sm mx-auto [text-wrap:balance]">
+                <h2 className={`text-2xl sm:text-[28px] font-bold leading-tight tracking-tight max-w-sm mx-auto [text-wrap:balance] ${
+                    isDark ? 'text-white' : 'text-slate-900'
+                }`}>
                     {headingText}
                 </h2>
             )}
 
-            {/* 4. Short explanation (16px, soft gray-blue text-slate-300, wraps cleanly with zero ellipsis cutoffs) */}
-            <p className="text-base text-slate-300 max-w-sm leading-relaxed">
+            {/* 4. Short explanation (16px, high contrast and fully readable in both dark and light modes) */}
+            <p className={`text-base max-w-sm leading-relaxed font-medium ${
+                isDark ? 'text-slate-200' : 'text-slate-700'
+            }`}>
                 {explanationText}
             </p>
 
-            {/* 5. Full-width solid orange action button (52px tall, 16px semibold, dark navy text) */}
+            {/* 5. Full-width solid orange action button (52px tall, 16px semibold) */}
             <div className="w-full pt-1 space-y-3">
                 <button
                     type="button"
                     onClick={onPrimaryAction}
-                    className="w-full h-[52px] min-h-[52px] rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-[#070d1a] font-semibold text-base flex items-center justify-center gap-2.5 transition-all shadow-md active:scale-[0.99] cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-white"
+                    className="w-full h-[52px] min-h-[52px] rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-white font-semibold text-base flex items-center justify-center gap-2.5 transition-all shadow-md active:scale-[0.99] cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
                 >
-                    <RefreshCw size={18} strokeWidth={2.25} className="shrink-0 text-[#070d1a]" />
+                    <RefreshCw size={18} strokeWidth={2.25} className="shrink-0 text-white" />
                     <span>{buttonLabel}</span>
                 </button>
 
@@ -99,7 +114,9 @@ export default function CameraMessage({
                     <button
                         type="button"
                         onClick={onSecondaryAction}
-                        className="text-sm font-medium text-slate-400 hover:text-white underline cursor-pointer py-1"
+                        className={`text-sm font-medium underline cursor-pointer py-1 ${
+                            isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                        }`}
                     >
                         {secondaryButtonText}
                     </button>

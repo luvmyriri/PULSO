@@ -1975,6 +1975,7 @@ function QuickReportWizardModal({
                     onClose={() => setIsCameraModalOpen(false)}
                     onCapture={handleCameraPhotoCaptured}
                     side="ISSUE"
+                    theme={theme}
                     title="Civic Evidence Camera"
                     subtitle="Capture real-time field photo with GPS & timestamp watermark"
                     metadata={{

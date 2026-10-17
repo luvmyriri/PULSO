@@ -14,21 +14,28 @@ export default function CameraTopBar({
     subtitle = 'Photos are saved with your location and time.',
     onClose,
     titleId = 'camera-screen-title',
-    className = ''
+    className = '',
+    isDark = true
 }) {
     return (
         <header
-            className={`w-full flex items-center justify-between gap-3 px-[clamp(1rem,5vw,1.5rem)] pt-[max(env(safe-area-inset-top,0px),1rem)] pb-3 z-30 shrink-0 ${className}`}
+            className={`w-full flex items-center justify-between gap-3 px-[clamp(1rem,5vw,1.5rem)] pt-[max(env(safe-area-inset-top,0px),1rem)] pb-3 z-30 shrink-0 ${
+                isDark ? 'border-b border-white/5' : 'border-b border-slate-200/80 bg-white/50 backdrop-blur-xs'
+            } ${className}`}
         >
             <div className="min-w-0 flex-1 text-left">
                 <h1
                     id={titleId}
-                    className="font-heading font-bold text-lg text-white leading-tight truncate tracking-tight"
+                    className={`font-heading font-bold text-lg leading-tight truncate tracking-tight ${
+                        isDark ? 'text-white' : 'text-slate-900'
+                    }`}
                 >
                     {title}
                 </h1>
                 {subtitle && (
-                    <p className="text-xs text-slate-400 font-normal leading-snug mt-0.5 truncate">
+                    <p className={`text-xs font-medium leading-snug mt-0.5 truncate ${
+                        isDark ? 'text-slate-200' : 'text-slate-600'
+                    } dark:text-slate-200`}>
                         {subtitle}
                     </p>
                 )}
@@ -38,7 +45,11 @@ export default function CameraTopBar({
                 type="button"
                 onClick={onClose}
                 aria-label="Close camera"
-                className="w-12 h-12 min-w-[3rem] min-h-[3rem] rounded-full flex items-center justify-center bg-white/10 hover:bg-white/15 dark:bg-[#0c1427]/80 dark:hover:bg-[#0c1427] border border-white/15 dark:border-slate-800 text-white transition-colors cursor-pointer shrink-0 shadow-sm focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
+                className={`w-12 h-12 min-w-[3rem] min-h-[3rem] rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-sm focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] border ${
+                    isDark
+                        ? 'bg-white/10 hover:bg-white/20 text-white border-white/20'
+                        : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-200 shadow-md'
+                }`}
             >
                 <X size={20} strokeWidth={2.25} />
             </button>

@@ -36,7 +36,8 @@ export default function RatioSelector({
     value = '4:3',
     onChange,
     className = '',
-    availableRatios = ['4:3', '16:9', '1:1']
+    availableRatios = ['4:3', '16:9', '1:1'],
+    isDark = true
 }) {
     const groupRef = useRef(null);
 
@@ -62,12 +63,16 @@ export default function RatioSelector({
                 {`Photo size ${currentOption?.id}. ${currentOption?.note}`}
             </div>
 
-            {/* Segmented Control Container (48px tall, 3 equal segments) */}
+            {/* Segmented Control Container (44px tall on mobile, 3 equal segments) */}
             <div
                 ref={groupRef}
                 role="radiogroup"
                 aria-label="Photo size"
-                className="w-full h-12 min-h-[48px] p-1 rounded-2xl bg-[#0c1427] border border-slate-800/90 flex items-center gap-1 shadow-inner"
+                className={`w-full h-11 min-h-[44px] p-1 rounded-2xl border flex items-center gap-1 shadow-inner ${
+                    isDark
+                        ? 'bg-[#0c1427] border-slate-800/90'
+                        : 'bg-slate-200/70 dark:bg-[#0c1427] border-slate-300/80 dark:border-slate-800/90'
+                }`}
             >
                 {filteredOptions.map((opt, idx) => {
                     const isSelected = value === opt.id;
@@ -80,10 +85,12 @@ export default function RatioSelector({
                             tabIndex={isSelected ? 0 : -1}
                             onClick={() => onChange?.(opt.id)}
                             onKeyDown={(e) => handleKeyDown(e, idx)}
-                            className={`flex-1 h-full min-h-[40px] rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.98] ${
+                            className={`flex-1 h-full min-h-[36px] rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
                                 isSelected
-                                    ? 'bg-[#ff6b00] text-[#070d1a] font-bold shadow-sm'
-                                    : 'bg-transparent text-white hover:bg-white/5 hover:text-slate-200'
+                                    ? 'bg-[#ff6b00] text-white font-bold shadow-sm'
+                                    : (isDark
+                                        ? 'bg-transparent text-slate-200 hover:bg-white/5 hover:text-white'
+                                        : 'bg-transparent text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white')
                             }`}
                         >
                             <span className="tabular-nums">{opt.label}</span>
@@ -92,8 +99,10 @@ export default function RatioSelector({
                 })}
             </div>
 
-            {/* Dynamic 12px Soft Gray Note Under Control */}
-            <p className="text-xs text-slate-400 text-center font-medium leading-tight px-1">
+            {/* Dynamic 12px High Contrast Note Under Control */}
+            <p className={`text-xs text-center font-medium leading-tight px-1 ${
+                isDark ? 'text-slate-200' : 'text-slate-700'
+            } dark:text-slate-200`}>
                 {currentOption?.note}
             </p>
         </div>

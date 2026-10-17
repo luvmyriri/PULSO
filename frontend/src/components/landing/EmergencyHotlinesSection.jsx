@@ -56,9 +56,9 @@ export default function EmergencyHotlinesSection() {
     <section
       id="hotlines"
       aria-label="Direct Municipal & Utility Hotlines"
-      className="py-14 sm:py-20 bg-white dark:bg-[#070a12] border-b border-slate-200 dark:border-slate-800 transition-colors"
+      className="min-h-[calc(100vh-73px)] py-12 sm:py-16 bg-white dark:bg-[#070a12] border-b border-slate-200 dark:border-slate-800 transition-colors flex flex-col justify-center"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         
         {/* Section Header */}
         <div className="text-left max-w-2xl mb-8">

@@ -50,12 +50,227 @@ import QuickReportWizardModal from '../components/QuickReportWizardModal';
 import IDCameraModal from '../components/IDCameraModal';
 import ReportHistoryCard from '../components/ReportHistoryCard';
 import ReportDetailView from '../components/ReportDetailView';
+import MapPin from '../components/MapPin';
+import ReportPopup from '../components/ReportPopup';
 import { REPORT_WORKFLOW_STEPS } from '../utils/reportWorkflow';
 import { getAuthUser } from '../utils/authSession';
+
+export const POPUP_TEST_PRESETS = [
+  {
+    id: 'preset-standard-photo',
+    name: 'Photo (Assigned)',
+    badge: 'Standard Case',
+    desc: '3.5rem photo pin, 16:7 photo header, Assigned status (orange), 584 m away, Street View link available.',
+    report: {
+      id: '5459',
+      ticket_id: 'PUL-2026-5459',
+      title: 'Pothole on Camarin Road near Market',
+      category: 'Roads & Bridges',
+      status: 'assigned',
+      lat: 14.7566,
+      lng: 121.0450,
+      photo_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80',
+      barangay: 'Brgy. 171',
+      formattedDistance: '584 m',
+      isOwnReport: true
+    }
+  },
+  {
+    id: 'preset-no-photo',
+    name: 'No Photo',
+    badge: 'Navy Category Icon',
+    desc: 'Report without photo: pin displays navy circle with category icon; card displays navy header area with category icon.',
+    report: {
+      id: '5460',
+      ticket_id: 'PUL-2026-5460',
+      title: 'Broken Streetlight',
+      category: 'Power & Street Lighting',
+      status: 'received',
+      lat: 14.7570,
+      lng: 121.0460,
+      photo_url: null,
+      barangay: 'Bagumbong',
+      formattedDistance: '320 m',
+      isOwnReport: false
+    }
+  },
+  {
+    id: 'preset-failed-photo',
+    name: 'Failed Image',
+    badge: 'Network Fallback',
+    desc: 'Image fails to load from network: gracefully falls back to category icon without broken image icon or layout shift.',
+    report: {
+      id: '5461',
+      ticket_id: 'PUL-2026-5461',
+      title: 'Water Pipe Rupture',
+      category: 'Water Supply & Distribution',
+      status: 'in_progress',
+      lat: 14.7580,
+      lng: 121.0470,
+      photo_url: 'https://invalid-image-url-test.fail/image.jpg',
+      barangay: 'Brgy. 167',
+      formattedDistance: '1.2 km',
+      isOwnReport: false
+    }
+  },
+  {
+    id: 'preset-long-title',
+    name: 'Long Title',
+    badge: '2-Line Wrap',
+    desc: 'Long multi-line title clamps cleanly to 2 lines (22px bold) without text truncation or card overflow.',
+    report: {
+      id: '5462',
+      ticket_id: 'PUL-2026-5462',
+      title: 'Dangerous Deep Cavity and Severe Asphalt Collapse Endangering Pedestrians and Jeepneys Near School Crosswalk',
+      category: 'Public Safety & Hazards',
+      status: 'verified',
+      lat: 14.7550,
+      lng: 121.0430,
+      photo_url: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=80',
+      barangay: 'Brgy. 172',
+      formattedDistance: '890 m',
+      isOwnReport: true
+    }
+  },
+  {
+    id: 'preset-owner',
+    name: 'Owner View',
+    badge: 'View in My Reports',
+    desc: 'Resident is owner of the report: primary button is "View in My Reports" and header has "Your Report" badge.',
+    report: {
+      id: '5463',
+      ticket_id: 'PUL-2026-5463',
+      title: 'Clogged Drainage Ditch',
+      category: 'Public Safety & Hazards',
+      status: 'received',
+      lat: 14.7560,
+      lng: 121.0440,
+      photo_url: 'https://images.unsplash.com/photo-1541888946425-d0fbb1861564?w=800&auto=format&fit=crop&q=80',
+      barangay: 'Brgy. 171',
+      formattedDistance: '410 m',
+      isOwnReport: true
+    }
+  },
+  {
+    id: 'preset-non-owner',
+    name: 'Non-Owner View',
+    badge: 'View report',
+    desc: 'Public nearby issue: primary button is "View report" and header has "Community Report · Identity Protected".',
+    report: {
+      id: '5464',
+      ticket_id: 'PUL-2026-5464',
+      title: 'Sidewalk Obstruction',
+      category: 'Roads & Bridges',
+      status: 'assigned',
+      lat: 14.7565,
+      lng: 121.0455,
+      photo_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80',
+      barangay: 'Brgy. 171',
+      formattedDistance: '750 m',
+      isOwnReport: false
+    }
+  },
+  {
+    id: 'preset-status-received',
+    name: 'Status: Received',
+    badge: 'Orange #B83A00',
+    desc: 'Active status "Received" with orange dot and #B83A00 (light) / #ff6b00 (dark).',
+    report: {
+      id: '5465',
+      ticket_id: 'PUL-2026-5465',
+      title: 'Fallen Tree Branch on Power Lines',
+      category: 'Power & Street Lighting',
+      status: 'received',
+      lat: 14.7540,
+      lng: 121.0420,
+      photo_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=80',
+      barangay: 'Brgy. 165',
+      formattedDistance: '920 m',
+      isOwnReport: false
+    }
+  },
+  {
+    id: 'preset-status-verified',
+    name: 'Status: Verified',
+    badge: 'Orange #B83A00',
+    desc: 'Active status "Verified" validated by city engineers with orange dot.',
+    report: {
+      id: '5466',
+      ticket_id: 'PUL-2026-5466',
+      title: 'Damaged Guard Rail',
+      category: 'Roads & Bridges',
+      status: 'verified',
+      lat: 14.7530,
+      lng: 121.0410,
+      photo_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80',
+      barangay: 'Brgy. 165',
+      formattedDistance: '1.1 km',
+      isOwnReport: false
+    }
+  },
+  {
+    id: 'preset-status-inprogress',
+    name: 'Status: In Progress',
+    badge: 'Orange #B83A00',
+    desc: 'Active status "In Progress" with field repair team on-site.',
+    report: {
+      id: '5467',
+      ticket_id: 'PUL-2026-5467',
+      title: 'Mainline Water Pipe Repair',
+      category: 'Water Supply & Distribution',
+      status: 'in_progress',
+      lat: 14.7575,
+      lng: 121.0465,
+      photo_url: 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=800&auto=format&fit=crop&q=80',
+      barangay: 'Brgy. 171',
+      formattedDistance: '350 m',
+      isOwnReport: true
+    }
+  },
+  {
+    id: 'preset-status-resolved',
+    name: 'Status: Resolved',
+    badge: 'Green #16a34a',
+    desc: 'Public work completed: green status dot and text (#16a34a in light, #22c55e in dark).',
+    report: {
+      id: '5468',
+      ticket_id: 'PUL-2026-5468',
+      title: 'Barangay Hall Drainage Cleanout',
+      category: 'Public Buildings & Facilities',
+      status: 'resolved',
+      lat: 14.7480,
+      lng: 121.0350,
+      photo_url: 'https://images.unsplash.com/photo-1590381105924-c72589b9ef3f?w=800&auto=format&fit=crop&q=80',
+      barangay: 'Brgy. 165',
+      formattedDistance: '2.4 km',
+      isOwnReport: false
+    }
+  },
+  {
+    id: 'preset-location-off',
+    name: 'Location Off',
+    badge: 'Distance Omitted',
+    desc: 'Resident has GPS turned off: distance is cleanly omitted from details line. Never displays "calculating".',
+    report: {
+      id: '5469',
+      ticket_id: 'PUL-2026-5469',
+      title: 'Pavement Crack Survey',
+      category: 'Roads & Bridges',
+      status: 'assigned',
+      lat: 14.7566,
+      lng: 121.0450,
+      photo_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80',
+      barangay: 'Brgy. 171',
+      formattedDistance: null,
+      isOwnReport: true
+    }
+  }
+];
 
 const SAMPLE_MAP_REPORTS = [
   {
     id: 'rep-1',
+    ticket_id: 'PUL-2026-5459',
     title: 'Pothole on main road',
     category: 'Roads & Bridges',
     raw_category: 'Roads & Bridges',
@@ -63,11 +278,13 @@ const SAMPLE_MAP_REPORTS = [
     lat: 14.7566,
     lng: 121.0450,
     barangay: 'Brgy. 171',
-    photo_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=160&auto=format&fit=crop&q=80',
+    photo_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80',
+    isOwnReport: true,
     created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString()
   },
   {
     id: 'rep-2',
+    ticket_id: 'PUL-2026-5460',
     title: 'Broken streetlight',
     category: 'Power & Street Lighting',
     raw_category: 'Power & Street Lighting',
@@ -75,11 +292,13 @@ const SAMPLE_MAP_REPORTS = [
     lat: 14.7610,
     lng: 121.0480,
     barangay: 'Bagumbong',
-    photo_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=160&auto=format&fit=crop&q=80',
+    photo_url: null,
+    isOwnReport: false,
     created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString()
   },
   {
     id: 'rep-3',
+    ticket_id: 'PUL-2026-5461',
     title: 'Water pipe leak',
     category: 'Water Supply & Distribution',
     raw_category: 'Water Supply & Distribution',
@@ -87,23 +306,27 @@ const SAMPLE_MAP_REPORTS = [
     lat: 14.7520,
     lng: 121.0410,
     barangay: 'Brgy. 167',
-    photo_url: 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=160&auto=format&fit=crop&q=80',
+    photo_url: 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=800&auto=format&fit=crop&q=80',
+    isOwnReport: false,
     created_at: new Date(Date.now() - 1000 * 3600 * 5).toISOString()
   },
   {
     id: 'rep-4',
-    title: 'Road obstruction & safety hazard',
+    ticket_id: 'PUL-2026-5462',
+    title: 'Dangerous Deep Cavity and Severe Asphalt Collapse Endangering Pedestrians and Jeepneys Near School Crosswalk',
     category: 'Public Safety & Hazards',
     raw_category: 'Public Safety & Hazards',
-    status: 'received',
+    status: 'verified',
     lat: 14.7590,
     lng: 121.0390,
     barangay: 'Brgy. 172',
-    photo_url: 'https://images.unsplash.com/photo-1541888946425-d0fbb1861564?w=160&auto=format&fit=crop&q=80',
+    photo_url: 'https://images.unsplash.com/photo-1541888946425-d0fbb1861564?w=800&auto=format&fit=crop&q=80',
+    isOwnReport: false,
     created_at: new Date(Date.now() - 1000 * 3600 * 24).toISOString()
   },
   {
     id: 'rep-5',
+    ticket_id: 'PUL-2026-5463',
     title: 'Open Drainage Canal Near School',
     category: 'Public Safety & Hazards',
     raw_category: 'Public Safety & Hazards',
@@ -111,11 +334,13 @@ const SAMPLE_MAP_REPORTS = [
     lat: 14.7650,
     lng: 121.0500,
     barangay: 'Brgy. 172',
-    photo_url: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=160&auto=format&fit=crop&q=80',
+    photo_url: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=80',
+    isOwnReport: true,
     created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString()
   },
   {
     id: 'rep-6',
+    ticket_id: 'PUL-2026-5464',
     title: 'Barangay Hall Roof Gutter Leak',
     category: 'Public Buildings & Facilities',
     raw_category: 'Public Buildings & Facilities',
@@ -123,11 +348,13 @@ const SAMPLE_MAP_REPORTS = [
     lat: 14.7480,
     lng: 121.0350,
     barangay: 'Brgy. 165',
-    photo_url: 'https://images.unsplash.com/photo-1590381105924-c72589b9ef3f?w=160&auto=format&fit=crop&q=80',
+    photo_url: 'https://images.unsplash.com/photo-1590381105924-c72589b9ef3f?w=800&auto=format&fit=crop&q=80',
+    isOwnReport: false,
     created_at: new Date(Date.now() - 1000 * 3600 * 48).toISOString()
   },
   {
     id: 'rep-7',
+    ticket_id: 'PUL-2026-5465',
     title: '10th Avenue Pavement Subsidence',
     category: 'Roads & Bridges',
     raw_category: 'Roads & Bridges',
@@ -135,11 +362,13 @@ const SAMPLE_MAP_REPORTS = [
     lat: 14.6520,
     lng: 120.9850,
     barangay: 'Brgy. 64',
-    photo_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=160&auto=format&fit=crop&q=80',
+    photo_url: 'https://invalid-image-url-test.fail/image.jpg',
+    isOwnReport: false,
     created_at: new Date(Date.now() - 1000 * 3600 * 3).toISOString()
   },
   {
     id: 'rep-8',
+    ticket_id: 'PUL-2026-5466',
     title: 'Exposed Electrical Cable on Rizal Ave',
     category: 'Power & Street Lighting',
     raw_category: 'Power & Street Lighting',
@@ -147,7 +376,8 @@ const SAMPLE_MAP_REPORTS = [
     lat: 14.6480,
     lng: 120.9820,
     barangay: 'Brgy. 52',
-    photo_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=160&auto=format&fit=crop&q=80',
+    photo_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=80',
+    isOwnReport: false,
     created_at: new Date(Date.now() - 1000 * 3600 * 6).toISOString()
   }
 ];
@@ -420,6 +650,17 @@ export default function DevAppPreviewPage() {
   const [reportPreviewKey, setReportPreviewKey] = useState(1);
   const [mapSheetPosition, setMapSheetPosition] = useState('collapsed'); // 'collapsed' | 'half' | 'full'
   const [mapSimulateLocation, setMapSimulateLocation] = useState(true);
+  const [popupPresetId, setPopupPresetId] = useState('preset-standard-photo');
+  const [popupIsOpen, setPopupIsOpen] = useState(true);
+  const [popupHasLocation, setPopupHasLocation] = useState(true);
+  const popupPinRef = useRef(null);
+  const popupCardRef = useRef(null);
+  const popupContainerRef = useRef(null);
+
+  const activePopupReport = useMemo(() => {
+    const found = POPUP_TEST_PRESETS.find(p => p.id === popupPresetId);
+    return found ? found.report : POPUP_TEST_PRESETS[0].report;
+  }, [popupPresetId]);
   const [selectedStatusIndex, setSelectedStatusIndex] = useState(2); // Default to Assigned (matching reference)
   const [splashKey, setSplashKey] = useState(1);
   const [splashSimulateMode, setSplashSimulateMode] = useState('normal'); // 'normal' | 'slow' | 'offline' | 'looping'
@@ -653,6 +894,14 @@ export default function DevAppPreviewPage() {
         badge: 'Nearby Issues Fullscreen Map & Bottom Sheet',
         text: `Live interactive preview of Nearby Hazards & Infrastructure with 100dvh edge-to-edge map, single 48px round back button in upper-right, and 3-position draggable bottom sheet (${mapSheetPosition}). Area segmented control (All, North, South) and unified category chips with synchronized pins & list.`,
         color: 'border-orange-500/40 bg-orange-500/10 text-orange-400'
+      };
+    }
+
+    if (previewTarget === 'popup') {
+      return {
+        badge: 'Map Report Popup (Photo Pin, Dotted Line & Bottom Card)',
+        text: 'Live interactive preview of the redesigned Map Report Pin, Dotted Line Tether, and Floating Bottom Card across all states (with photo, no photo, broken image, long title, owner/non-owner, all 5 statuses, and location on/off) in Light & Dark modes.',
+        color: 'border-[#ff6b00]/40 bg-[#ff6b00]/10 text-[#ff6b00]'
       };
     }
 
@@ -1160,7 +1409,7 @@ export default function DevAppPreviewPage() {
         {/* ── PHONE-SHAPED FRAME CONTAINER ── */}
         <div className="lg:col-span-5 xl:col-span-5 flex flex-col items-center">
           {/* Target Mode Switcher */}
-          <div className="grid grid-cols-5 sm:grid-cols-10 gap-1 p-1 rounded-2xl bg-slate-900 border border-slate-800 mb-3 w-full max-w-[540px]">
+          <div className="grid grid-cols-4 sm:grid-cols-11 gap-1 p-1 rounded-2xl bg-slate-900 border border-slate-800 mb-3 w-full max-w-[560px]">
             <button
               type="button"
               onClick={() => {
@@ -1265,6 +1514,20 @@ export default function DevAppPreviewPage() {
                 }`}
             >
               Map
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewTarget('popup');
+                setPopupIsOpen(true);
+                addLog('Switched preview to Map Report Popup (Pin + Tether + Card).');
+              }}
+              className={`py-2 px-0.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer text-center truncate ${previewTarget === 'popup'
+                ? 'bg-[#ff6b00] text-slate-950 font-black shadow-xs'
+                : 'text-slate-400 hover:text-white'
+                }`}
+            >
+              Popup
             </button>
             <button
               type="button"
@@ -2169,24 +2432,128 @@ export default function DevAppPreviewPage() {
               )}
 
               {/* CASE G: Nearby Issues Fullscreen Map & Draggable Bottom Sheet */}
-              {previewTarget === 'map' && (
-                <div className="relative w-full h-full overflow-hidden">
-                  <NearbyIssuesMapModal
-                    isOpen={true}
-                    standalone={true}
-                    theme={previewIsDark ? 'dark' : 'light'}
-                    reports={SAMPLE_MAP_REPORTS}
-                    reportLocation={mapSimulateLocation ? { lat: 14.7566, lng: 121.0450 } : null}
-                    locationPermissionDenied={!mapSimulateLocation}
-                    initialSheetPosition={mapSheetPosition}
-                    key={`map-preview-${previewIsDark}-${mapSheetPosition}-${mapSimulateLocation}`}
-                    onClose={() => {
-                      addLog('Back button tapped in Nearby Issues Map.');
+              <div className={`relative w-full h-full overflow-hidden ${previewTarget === 'map' ? 'block' : 'hidden'}`}>
+                <NearbyIssuesMapModal
+                  isOpen={true}
+                  standalone={true}
+                  theme={previewIsDark ? 'dark' : 'light'}
+                  reports={SAMPLE_MAP_REPORTS}
+                  reportLocation={mapSimulateLocation ? { lat: 14.7566, lng: 121.0450 } : null}
+                  locationPermissionDenied={!mapSimulateLocation}
+                  initialSheetPosition={mapSheetPosition}
+                  onClose={() => {
+                    addLog('Back button tapped in Nearby Issues Map.');
+                  }}
+                  onOpenReportDetail={(report) => {
+                    addLog(`Opened details for report: ${report.title}`);
+                  }}
+                />
+              </div>
+
+              {/* CASE G2: Map Report Popup Direct Showcase (Pin + Tether + Bottom Card) */}
+              {previewTarget === 'popup' && (
+                <div
+                  ref={popupContainerRef}
+                  className={`relative w-full h-full overflow-hidden select-none ${previewIsDark ? 'bg-[#0b1329]' : 'bg-[#e2e8f0]'}`}
+                >
+                  {/* Simulated Map Canvas Background */}
+                  <div className="absolute inset-0 opacity-40 pointer-events-none">
+                    <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                      <defs>
+                        <pattern id="grid-pattern-popup" width="36" height="36" patternUnits="userSpaceOnUse">
+                          <path d="M 36 0 L 0 0 0 36" fill="none" stroke={previewIsDark ? '#1e293b' : '#cbd5e1'} strokeWidth="1" />
+                        </pattern>
+                      </defs>
+                      <rect width="100%" height="100%" fill="url(#grid-pattern-popup)" />
+                      <path d="M -20 180 Q 150 160 220 280 T 450 320" fill="none" stroke={previewIsDark ? '#1e293b' : '#94a3b8'} strokeWidth="8" />
+                      <path d="M 120 -20 Q 140 180 180 350 T 260 700" fill="none" stroke={previewIsDark ? '#1e293b' : '#94a3b8'} strokeWidth="10" />
+                      <path d="M 60 400 Q 200 420 380 480" fill="none" stroke={previewIsDark ? '#1e293b' : '#cbd5e1'} strokeWidth="5" />
+                    </svg>
+                    <div className={`absolute top-12 left-5 text-[11px] font-extrabold tracking-wider uppercase ${previewIsDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      CALOOCAN CITY · {activePopupReport.barangay || 'BRGY. 171'}
+                    </div>
+                  </div>
+
+                  {/* Simulated Map Controls (Zoom / Recenter) elevated safely above card */}
+                  <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      aria-label="Zoom in"
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shadow-md border cursor-pointer transition-all ${previewIsDark ? 'bg-[#0f172a] text-white border-slate-700 hover:bg-slate-800' : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'}`}
+                      onClick={() => addLog('Map zoom in tapped')}
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Zoom out"
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shadow-md border cursor-pointer transition-all ${previewIsDark ? 'bg-[#0f172a] text-white border-slate-700 hover:bg-slate-800' : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'}`}
+                      onClick={() => addLog('Map zoom out tapped')}
+                    >
+                      −
+                    </button>
+                  </div>
+
+                  {/* Pin positioned in upper half above bottom card */}
+                  <div
+                    ref={popupPinRef}
+                    className="absolute z-20"
+                    style={{
+                      left: isLandscape ? '35%' : '50%',
+                      top: isLandscape ? '40%' : '26%',
+                      transform: 'translate(-50%, -50%)'
                     }}
-                    onOpenReportDetail={(report) => {
-                      addLog(`Opened details for report: ${report.title}`);
-                    }}
-                  />
+                  >
+                    <MapPin
+                      report={activePopupReport}
+                      isSelected={popupIsOpen}
+                      isDark={previewIsDark}
+                      onClick={() => {
+                        setPopupIsOpen(prev => !prev);
+                        addLog(`Toggled popup via MapPin (${!popupIsOpen ? 'OPEN' : 'CLOSED'})`);
+                      }}
+                    />
+                  </div>
+
+                  {/* Floating Bottom Card: ReportPopup */}
+                  <AnimatePresence>
+                    {popupIsOpen && (
+                      <ReportPopup
+                        key={`preview-popup-${activePopupReport.id}-${previewIsDark}-${popupHasLocation}`}
+                        cardRef={popupCardRef}
+                        report={activePopupReport}
+                        isOpen={popupIsOpen}
+                        onClose={() => {
+                          setPopupIsOpen(false);
+                          addLog(`Closed Report Popup via X button or gesture.`);
+                        }}
+                        isDark={previewIsDark}
+                        hasLocation={popupHasLocation}
+                        onOpenReport={(r) => {
+                          addLog(`Opened report detail: ${r.isOwnReport ? 'View in My Reports' : 'View report'} (#${r.ticket_id || r.id})`);
+                        }}
+                        onOpenStreetView={(r) => {
+                          addLog(`Opened Street View for report at (${r.lat}, ${r.lng})`);
+                        }}
+                      />
+                    )}
+                  </AnimatePresence>
+
+                  {/* Re-open prompt when closed */}
+                  {!popupIsOpen && (
+                    <div className="absolute bottom-6 inset-x-4 flex justify-center z-10 pointer-events-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPopupIsOpen(true);
+                          addLog('Re-opened Report Popup.');
+                        }}
+                        className="px-4 py-2.5 rounded-full bg-[#ff6b00] text-slate-950 text-xs font-black shadow-lg hover:bg-[#e05e00] transition-all cursor-pointer flex items-center gap-2"
+                      >
+                        <span>Tap Pin or Click Here to Open Popup</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2217,11 +2584,12 @@ export default function DevAppPreviewPage() {
 
               {/* CASE I: Fullscreen Camera Screens Showcase */}
               {previewTarget === 'camera' && (
-                <div className="relative w-full h-full overflow-hidden bg-[#070d1a]">
+                <div className={`relative w-full h-full overflow-hidden ${previewIsDark ? 'bg-[#070d1a]' : 'bg-slate-50'}`}>
                   <IDCameraModal
                     isOpen={true}
                     standalone={true}
                     side="ISSUE"
+                    theme={previewIsDark ? 'dark' : 'light'}
                     title="Take a photo"
                     subtitle="Photos are saved with your location and time."
                     previewMode={cameraPreviewMode}
@@ -2739,6 +3107,236 @@ export default function DevAppPreviewPage() {
                 <div className="flex items-center gap-2">
                   <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
                   <span>Google attribution & Terms elevated safely above collapsed bottom sheet</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── MAP REPORT POPUP & PIN TEST CONTROLS ── */}
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#ff6b00]" />
+                <h2 className="font-heading font-black text-lg text-white">
+                  Map Report Popup & Pin
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ff6b00]/20 text-[#ff6b00] border border-[#ff6b00]/30">
+                  v0.2 Production Spec
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewTarget('popup');
+                  setPopupIsOpen(true);
+                  addLog('Switched preview to Map Report Popup (Pin + Tether + Card).');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${previewTarget === 'popup'
+                  ? 'bg-[#ff6b00] text-slate-950 font-black shadow-sm'
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+              >
+                {previewTarget === 'popup' ? 'Active in phone' : 'Show in phone'}
+              </button>
+            </div>
+
+            <p className="text-sm text-[#C9D3EA] leading-relaxed">
+              3.5rem (56px) circular photo pin with 3px orange ring and 2px card-color outer ring, 3px round-dot tether line (3px dots, 6px spacing), and floating bottom card with 16:7 photo header, 48px round close button, category title, PUL-ticket with tabular distance, status dot with color, 3.25rem primary button, and centered Street View link.
+            </p>
+
+            {/* Presets Selector Grid */}
+            <div>
+              <span className="text-xs font-bold text-[#C9D3EA] block mb-2">
+                Select Report State Preset ({POPUP_TEST_PRESETS.length} States):
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {POPUP_TEST_PRESETS.map((preset) => {
+                  const isSelected = popupPresetId === preset.id && previewTarget === 'popup';
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setPopupPresetId(preset.id);
+                        setPopupIsOpen(true);
+                        setPreviewTarget('popup');
+                        addLog(`Selected Popup Preset: ${preset.name} - ${preset.desc}`);
+                      }}
+                      className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between gap-1 ${isSelected
+                        ? 'bg-[#ff6b00]/20 border-[#ff6b00] text-white shadow-xs'
+                        : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:border-slate-600'
+                        }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold truncate">{preset.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-semibold bg-slate-900/60 text-slate-300 border border-slate-700 shrink-0">
+                          {preset.badge}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 line-clamp-2 leading-tight">
+                        {preset.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Theme & Location & Popup State Toggles */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
+              <div>
+                <span className="text-xs font-bold text-[#C9D3EA] block mb-1.5">
+                  Theme Palette:
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewAppearance('light');
+                      addLog('Preview theme set to Light (Morning Field Sheet).');
+                    }}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${!previewIsDark
+                      ? 'bg-white text-slate-900 border-white shadow-xs'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                      }`}
+                  >
+                    Light
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewAppearance('dark');
+                      addLog('Preview theme set to Dark (Night Inspection).');
+                    }}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${previewIsDark
+                      ? 'bg-[#ff6b00] text-slate-950 border-[#ff6b00] shadow-xs font-black'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                      }`}
+                  >
+                    Dark
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xs font-bold text-[#C9D3EA] block mb-1.5">
+                  Resident Location GPS:
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPopupHasLocation(true);
+                      addLog('Resident Location enabled: Distance is visible.');
+                    }}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${popupHasLocation
+                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                      }`}
+                  >
+                    On
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPopupHasLocation(false);
+                      addLog('Resident Location disabled: Distance omitted, never displays "calculating".');
+                    }}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${!popupHasLocation
+                      ? 'bg-amber-600 text-white border-amber-500 shadow-xs'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                      }`}
+                  >
+                    Off
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xs font-bold text-[#C9D3EA] block mb-1.5">
+                  Popup Visibility:
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPopupIsOpen(true);
+                      setPreviewTarget('popup');
+                      addLog('Opened Report Popup with 200ms slide-up.');
+                    }}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${popupIsOpen && previewTarget === 'popup'
+                      ? 'bg-[#ff6b00] text-slate-950 border-[#ff6b00] shadow-xs font-black'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                      }`}
+                  >
+                    Open
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPopupIsOpen(false);
+                      addLog('Closed Report Popup (tested dismiss).');
+                    }}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${!popupIsOpen && previewTarget === 'popup'
+                      ? 'bg-slate-700 text-white border-slate-600 shadow-xs'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                      }`}
+                  >
+                    Closed
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* UX Spec Verification Checklist */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2 text-xs">
+              <span className="font-bold text-white block mb-1">
+                UX & Accessibility Acceptance Checklist:
+              </span>
+              <div className="grid grid-cols-1 gap-1.5 text-slate-300">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>3.5rem (56px) circular photo pin with 3px orange ring & 2px outer ring</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>3px round-dot tether line (dots 3px, 6px apart) following pin dynamically</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>Floating card with 0.75rem margins, max-w-[26rem], 1.25rem radius, soft shadow</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>16:7 photo header (12:5 on &lt;360px) with 48px round close button in top right</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>Title (22px bold) wraps to 2 lines cleanly without card overflow</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>Details line: PUL-ticket · tabular distance (never displays &quot;calculating&quot;)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>Status line with dot: orange (#B83A00 light) for active, green (#16a34a / #22c55e) for resolved</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>3.25rem primary button (&quot;View in My Reports&quot; owner, &quot;View report&quot; public)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>Centered 48px tap target &quot;Open Street View&quot; link with coverage check</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>Fullscreen pinch-to-zoom Lightbox on tapping card photo</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>Accessible dialog semantics (role=&quot;dialog&quot;, aria-labelledby, Esc key, aria-live)</span>
                 </div>
               </div>
             </div>

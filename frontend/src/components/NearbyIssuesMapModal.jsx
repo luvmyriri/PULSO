@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import {
     GoogleMap,
     MarkerF,
     OverlayViewF,
-    InfoWindowF,
     StreetViewPanorama
 } from '@react-google-maps/api';
 import {
@@ -14,7 +14,7 @@ import {
     ChevronRight,
     ChevronDown,
     ChevronUp,
-    MapPin,
+    MapPin as MapPinIcon,
     AlertTriangle,
     Eye,
     Maximize2,
@@ -28,6 +28,8 @@ import {
     Building2,
     MoreHorizontal
 } from 'lucide-react';
+import MapPin from './MapPin';
+import ReportPopup from './ReportPopup';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import CaloocanBoundaryLayer from './CaloocanBoundaryLayer';
 import { getCityHallMarkerSvg } from '../config/boundaryStyle';
@@ -88,10 +90,8 @@ const DARK_CIVIC_MAP_STYLE = [
     { featureType: "road.arterial", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
     { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#141d2c" }, { weight: 0.8 }] },
     { featureType: "road.local", elementType: "labels", stylers: [{ visibility: "off" }] },
-    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#7b8ea5" }] },
-    { featureType: "administrative.locality", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 3 }] },
-    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#546478" }] },
-    { featureType: "administrative.neighborhood", elementType: "labels.text.stroke", stylers: [{ color: "#0c1322" }, { weight: 2 }] }
+    { featureType: "administrative.locality", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.neighborhood", stylers: [{ visibility: "off" }] }
 ];
 
 const LIGHT_BASE_RULES = [
@@ -112,14 +112,8 @@ const LIGHT_CIVIC_MAP_STYLE = [
     { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
     { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] },
     { featureType: "road.local", elementType: "labels", stylers: [{ visibility: "off" }] },
-    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
-    { featureType: "administrative.locality", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] },
-    { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
-    { featureType: "administrative.neighborhood", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
-    { featureType: "administrative.province", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
-    { featureType: "administrative.province", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] },
-    { featureType: "administrative.country", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
-    { featureType: "administrative.country", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] }
+    { featureType: "administrative.locality", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.neighborhood", stylers: [{ visibility: "off" }] }
 ];
 
 export const MAP_CATEGORIES = [
@@ -146,28 +140,9 @@ export function getCategoryColor(category) {
 }
 
 export function getMarkerSVG(category, status, isSelected = false) {
-    let color = '#f97316';
+    const color = '#ff6b00';
     const cat = (category || '').toLowerCase();
     const isPublicFacility = (cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('court') || cat.includes('hall')) && !cat.includes('safety');
-
-    if (status === 'resolved') color = '#22c55e';
-    else if (status === 'pending' || status === 'unverified') color = '#ef4444';
-    else if (status === 'in_progress' || status === 'investigating') color = '#f59e0b';
-    else if (status === 'rejected') color = '#64748b';
-
-    if (isPublicFacility) {
-        color = isSelected ? '#16a34a' : '#22c55e';
-    } else if (cat.includes('traffic') || cat.includes('sign')) {
-        color = isSelected ? '#0891b2' : '#06b6d4';
-    } else if (cat.includes('other')) {
-        color = isSelected ? '#7c3aed' : '#8b5cf6';
-    } else if (cat.includes('water') || cat.includes('drain')) {
-        color = isSelected ? '#2563eb' : '#3b82f6';
-    } else if (cat.includes('power') || cat.includes('light')) {
-        color = isSelected ? '#d97706' : '#eab308';
-    } else if (cat.includes('safety')) {
-        color = isSelected ? '#dc2626' : '#ef4444';
-    }
 
     let svgIcon = '';
     if (cat.includes('flood') || cat.includes('water') || cat.includes('drain')) {
@@ -325,13 +300,99 @@ export default function NearbyIssuesMapModal({
     const [panorama, setPanorama] = useState(null);
     const [isSvFullscreen, setIsSvFullscreen] = useState(false);
     const [currentZoom, setCurrentZoom] = useState(11);
+    const [streetViewSession, setStreetViewSession] = useState(0);
 
     // Draggable bottom sheet state: 'collapsed' | 'half' | 'full'
     const [panelSnap, setPanelSnap] = useState(initialSheetPosition || 'half');
+    const previousPanelSnapRef = useRef(initialSheetPosition || 'half');
+    const [isPopupOpen, setIsPopupOpen] = useState(false);
+    const pinRef = useRef(null);
+    const cardRef = useRef(null);
+    const mapModalContainerRef = useRef(null);
+
+    const frameReportPin = useCallback((h) => {
+        if (!h || !map || h.lat == null || h.lng == null) return;
+        const currentZ = map.getZoom() || 11;
+        if (currentZ < 16) {
+            map.setZoom(16);
+        }
+
+        const frame = () => {
+            if (!map) return;
+            const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+            const containerH = mapModalContainerRef.current?.clientHeight || window.innerHeight || 700;
+            // Popup card height is ~380px on mobile
+            const cardH = 390;
+            const availableH = Math.max(160, containerH - cardH);
+            // Target pin center in the middle of available space above the card
+            const targetPinY = Math.max(85, availableH * 0.45);
+            const pixelOffsetY = (containerH / 2) - targetPinY;
+            const pixelOffsetX = isDesktop ? 160 : 0;
+
+            const projection = map.getProjection();
+            if (projection && window.google?.maps?.LatLng && window.google?.maps?.Point) {
+                const zoom = map.getZoom() || 16;
+                const scale = Math.pow(2, zoom);
+                const worldPoint = projection.fromLatLngToPoint(new window.google.maps.LatLng(h.lat, h.lng));
+                if (worldPoint) {
+                    const targetWorldPoint = new window.google.maps.Point(
+                        worldPoint.x + (pixelOffsetX / scale),
+                        worldPoint.y + (pixelOffsetY / scale)
+                    );
+                    const targetLatLng = projection.fromPointToLatLng(targetWorldPoint);
+                    if (targetLatLng) {
+                        map.panTo(targetLatLng);
+                        return;
+                    }
+                }
+            }
+
+            // Fallback direct pan with latitude offset (lower latitude shifts map south, placing pin north/higher)
+            map.panTo({
+                lat: h.lat - (isDesktop ? 0 : 0.0038),
+                lng: h.lng + (isDesktop ? 0.0035 : 0)
+            });
+        };
+
+        // Frame immediately and re-verify after zoom transition
+        frame();
+        setTimeout(frame, 120);
+        setTimeout(frame, 280);
+    }, [map]);
+
+    const handlePinClick = useCallback((h) => {
+        if (!h) return;
+        if (!isPopupOpen) {
+            previousPanelSnapRef.current = panelSnap;
+            setIsPopupOpen(true);
+            setPanelSnap('collapsed');
+        }
+        setSelectedHazard(h);
+        frameReportPin(h);
+    }, [isPopupOpen, panelSnap, frameReportPin]);
+
+    // Lock map dragging when report popup is active to ensure the framed pin location stays fully visible
+    useEffect(() => {
+        if (map) {
+            map.setOptions({
+                draggable: !isPopupOpen,
+                gestureHandling: isPopupOpen ? 'none' : 'greedy'
+            });
+        }
+    }, [map, isPopupOpen]);
+
+    const handleClosePopup = useCallback(() => {
+        setIsPopupOpen(false);
+        setSelectedHazard(null);
+        if (previousPanelSnapRef.current) {
+            setPanelSnap(previousPanelSnapRef.current);
+        }
+    }, []);
 
     useEffect(() => {
         if (initialSheetPosition) {
             setPanelSnap(initialSheetPosition);
+            previousPanelSnapRef.current = initialSheetPosition;
         }
     }, [initialSheetPosition]);
 
@@ -635,29 +696,100 @@ export default function NearbyIssuesMapModal({
         setActiveSector(sector);
         if (!map || !window.google?.maps) return;
 
+        const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+        const containerH = mapModalContainerRef.current?.clientHeight || window.innerHeight || 700;
+        // When bottom panel is at 'half' (50%), bottom padding accounts for the panel
+        const bottomPadding = (!isDesktop && panelSnap === 'half')
+            ? Math.round(containerH * 0.5) + 20
+            : (!isDesktop && panelSnap === 'collapsed')
+                ? 90
+                : 50;
+
         if (sector === 'north') {
-            map.panTo(NORTH_CALOOCAN_CENTROID || { lat: 14.7566, lng: 121.0450 });
+            const northCenter = NORTH_CALOOCAN_CENTROID || { lat: 14.7566, lng: 121.0450 };
+            const latOffset = (!isDesktop && panelSnap === 'half') ? -0.016 : 0;
+            map.panTo({ lat: northCenter.lat + latOffset, lng: northCenter.lng });
             map.setZoom(12);
         } else if (sector === 'south') {
-            map.panTo(SOUTH_CALOOCAN_CENTROID || { lat: 14.6500, lng: 120.9850 });
-            map.setZoom(12);
+            const southCenter = SOUTH_CALOOCAN_CENTROID || { lat: 14.6500, lng: 120.9850 };
+            // Shift center south so South Caloocan stays clearly visible in upper half above bottom panel
+            const latOffset = (!isDesktop && panelSnap === 'half') ? -0.018 : 0;
+            map.panTo({ lat: southCenter.lat + latOffset, lng: southCenter.lng });
+            map.setZoom(13);
         } else {
             const bounds = new window.google.maps.LatLngBounds(
                 new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
                 new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
             );
-            map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+            map.fitBounds(bounds, { top: 70, right: 30, bottom: bottomPadding, left: 30 });
         }
     };
 
-    const handleStreetViewClick = (loc) => {
-        setSvLocation(loc);
-    };
+    // When returning to map from Street View, re-center and frame the selected pin above the popup card
+    const prevSvLocationRef = useRef(svLocation);
+    useEffect(() => {
+        const wasInSv = Boolean(prevSvLocationRef.current);
+        prevSvLocationRef.current = svLocation;
+
+        if (wasInSv && !svLocation) {
+            if (map && window.google?.maps?.event) {
+                window.google.maps.event.trigger(map, 'resize');
+            }
+            if (selectedHazard) {
+                setIsPopupOpen(true);
+                setPanelSnap('collapsed');
+                frameReportPin(selectedHazard);
+                const t1 = setTimeout(() => {
+                    if (map && window.google?.maps?.event) {
+                        window.google.maps.event.trigger(map, 'resize');
+                    }
+                    frameReportPin(selectedHazard);
+                }, 100);
+                const t2 = setTimeout(() => {
+                    frameReportPin(selectedHazard);
+                }, 280);
+                const t3 = setTimeout(() => {
+                    frameReportPin(selectedHazard);
+                }, 500);
+                return () => {
+                    clearTimeout(t1);
+                    clearTimeout(t2);
+                    clearTimeout(t3);
+                };
+            }
+        }
+    }, [svLocation, selectedHazard, map, frameReportPin]);
+
+    const handleStreetViewClick = useCallback((loc) => {
+        if (!loc) {
+            // Exiting Street View back to Map
+            if (panorama) {
+                try { panorama.setVisible(false); } catch (_) {}
+            }
+            if (map?.getStreetView) {
+                try { map.getStreetView().setVisible(false); } catch (_) {}
+            }
+            setSvLocation(null);
+            setIsSvFullscreen(false);
+            setStreetViewSession(prev => prev + 1);
+
+            if (selectedHazard) {
+                setIsPopupOpen(true);
+                setPanelSnap('collapsed');
+            }
+        } else {
+            // Entering Street View
+            setSvLocation(loc);
+        }
+    }, [panorama, map, selectedHazard]);
 
     if (!isOpen) return null;
 
     const modalContent = (
-        <div className={`relative flex flex-col h-full w-full bg-[#0c1427] rounded-none sm:rounded-3xl overflow-hidden shadow-2xl border-0 sm:border border-slate-200 dark:border-slate-800 ${isSvFullscreen ? 'fixed inset-0 z-[100] rounded-none border-0' : ''}`}>
+        <div
+            ref={mapModalContainerRef}
+            className={`relative flex flex-col h-full w-full bg-[#0c1427] rounded-none sm:rounded-3xl overflow-hidden shadow-2xl border-0 sm:border border-slate-200 dark:border-slate-800 ${isSvFullscreen ? 'fixed inset-0 z-[100] rounded-none border-0' : ''}`}
+        >
             {/* Screen Reader Live Announcements */}
             <div className="sr-only" aria-live="polite" aria-atomic="true">{ariaAnnouncement}</div>
 
@@ -666,8 +798,8 @@ export default function NearbyIssuesMapModal({
                 {isLoaded ? (
                     <GoogleMap
                         mapContainerStyle={{ width: '100%', height: '100%' }}
-                        center={CALOOCAN_CENTER}
-                        zoom={11}
+                        center={reportLocation?.lat ? reportLocation : (NORTH_CALOOCAN_CENTROID || CALOOCAN_CENTER)}
+                        zoom={13}
                         mapTypeId={mapLayerType}
                         options={{
                             styles: mapLayerType === 'hybrid'
@@ -675,8 +807,20 @@ export default function NearbyIssuesMapModal({
                                 : (isDark ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE),
                             disableDefaultUI: true,
                             zoomControl: false,
-                            gestureHandling: 'greedy',
-                            keyboardShortcuts: false
+                            draggable: !isPopupOpen,
+                            gestureHandling: isPopupOpen ? 'none' : 'greedy',
+                            keyboardShortcuts: false,
+                            minZoom: 10,
+                            maxZoom: 18,
+                            restriction: {
+                                latLngBounds: {
+                                    north: 15.350,
+                                    south: 14.050,
+                                    west: 120.400,
+                                    east: 121.600,
+                                },
+                                strictBounds: false,
+                            }
                         }}
                         onZoomChanged={() => {
                             if (map) {
@@ -686,13 +830,6 @@ export default function NearbyIssuesMapModal({
                         }}
                         onLoad={m => {
                             setMap(m);
-                            if (window.google?.maps) {
-                                const bounds = new window.google.maps.LatLngBounds(
-                                    new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
-                                    new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
-                                );
-                                m.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-                            }
                         }}
                         onClick={(e) => {
                             if (e.latLng && setReportLocation) {
@@ -700,6 +837,13 @@ export default function NearbyIssuesMapModal({
                                 if (!checkJurisdiction || checkJurisdiction(newPos)) {
                                     setReportLocation({ ...newPos, confirmed: true, source: 'pinpoint', accuracy: 0, isExact: true });
                                     if (reverseGeocode) reverseGeocode(newPos.lat, newPos.lng);
+                                }
+                            } else {
+                                if (isPopupOpen) {
+                                    handleClosePopup();
+                                    setSelectedHazard(null);
+                                } else if (selectedHazard) {
+                                    setSelectedHazard(null);
                                 }
                             }
                         }}
@@ -728,7 +872,6 @@ export default function NearbyIssuesMapModal({
                             activeSector={activeSector}
                             onSectorClick={(sector) => handleSectorChange(sector)}
                             isDarkMode={isDark}
-                            zoom={currentZoom}
                             showBarangays={true}
                             showLabels={false}
                             interactive={true}
@@ -767,10 +910,10 @@ export default function NearbyIssuesMapModal({
                         />
 
                         {/* Animated Sonar User Location Overlay */}
-                        {reportLocation?.lat && !setReportLocation && (
+                        {!svLocation && reportLocation?.lat && !setReportLocation && (
                             <OverlayViewF
                                 position={reportLocation}
-                                mapPaneName="overlayMouseTarget"
+                                mapPaneName="floatPane"
                                 getPixelPositionOffset={() => ({ x: -24, y: -24 })}
                             >
                                 <div className="relative flex items-center justify-center w-12 h-12 pointer-events-none select-none">
@@ -780,32 +923,34 @@ export default function NearbyIssuesMapModal({
                             </OverlayViewF>
                         )}
 
-                        {/* Incident Markers — with Photo-Pins matching Government side */}
-                        {filteredReports.map(h => {
-                            const isSelected = selectedHazard?.id === h.id;
-                            const cacheKey = `${h.id}-${isSelected ? 'sel' : 'norm'}`;
+                        {/* Incident Markers — unselected rendered as MarkerF, selected rendered as MapPin via OverlayViewF */}
+                        {!svLocation && filteredReports.map(h => {
+                            const isSelected = isPopupOpen && selectedHazard?.id === h.id;
+                            if (isSelected) return null;
+
+                            const cacheKey = `${h.id}-norm`;
                             const customIconUrl = photoPinIcons[cacheKey];
 
-                            const size = isSelected ? 46 : 36;
-                            const pointerH = isSelected ? 8 : 7;
+                            const size = 36;
+                            const pointerH = 7;
                             const totalW = size + 6;
                             const totalH = size + pointerH + 2;
 
                             const iconConfig = customIconUrl
                                 ? getCachedIcon(customIconUrl, totalW, totalH, totalW / 2, totalH)
                                 : (window.google?.maps ? {
-                                    url: getMarkerSVG(h.category || h.raw_category, h.status, isSelected),
-                                    scaledSize: new window.google.maps.Size(isSelected ? 44 : 36, isSelected ? 50 : 42),
-                                    anchor: new window.google.maps.Point(isSelected ? 22 : 18, isSelected ? 50 : 42)
+                                    url: getMarkerSVG(h.category || h.raw_category, h.status, false),
+                                    scaledSize: new window.google.maps.Size(36, 42),
+                                    anchor: new window.google.maps.Point(18, 42)
                                 } : undefined);
 
                             return (
                                 <MarkerF
                                     key={`hazard-${h.id}`}
                                     position={{ lat: h.lat, lng: h.lng }}
-                                    zIndex={isSelected ? 1000 : 150}
+                                    zIndex={150}
                                     title={`${h.title} (${(h.status || 'PENDING').toUpperCase()})`}
-                                    onClick={() => setSelectedHazard(h)}
+                                    onClick={() => handlePinClick(h)}
                                     options={{
                                         optimized: true,
                                         clickable: true
@@ -815,214 +960,23 @@ export default function NearbyIssuesMapModal({
                             );
                         })}
 
-                        {/* Sleek Government-Grade InfoWindow */}
-                        {selectedHazard && (
-                            <InfoWindowF
+                        {/* Selected Pin rendered via OverlayViewF with MapPin (3.5rem round photo, dual ring) */}
+                        {!svLocation && isPopupOpen && selectedHazard?.lat != null && selectedHazard?.lng != null && (
+                            <OverlayViewF
+                                key={`selected-pin-${selectedHazard.id}-${streetViewSession}`}
                                 position={{ lat: selectedHazard.lat, lng: selectedHazard.lng }}
-                                onCloseClick={() => setSelectedHazard(null)}
-                                options={{
-                                    pixelOffset: window.google?.maps ? new window.google.maps.Size(0, -42) : undefined,
-                                    zIndex: 1000
-                                }}
+                                mapPaneName="floatPane"
+                                getPixelPositionOffset={() => ({ x: -28, y: -28 })}
                             >
-                                {(() => {
-                                    const catColor = getCategoryColor(selectedHazard.category || selectedHazard.raw_category);
-                                    const photoUrl = selectedHazard.photo_url || selectedHazard.photo_thumbnail || selectedHazard.image_url || selectedHazard.media_url || selectedHazard.image;
-                                    const distanceStr = selectedHazard.formattedDistance || selectedHazard.dynamicDistance || selectedHazard.distance;
-
-                                    return (
-                                        <div style={{
-                                            background: isDark ? 'linear-gradient(160deg,#0f172a 0%,#1e293b 100%)' : '#ffffff',
-                                            borderRadius: '16px',
-                                            padding: '16px',
-                                            minWidth: '230px',
-                                            maxWidth: '280px',
-                                            border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
-                                            margin: '-10px',
-                                            boxShadow: isDark ? '0 25px 50px rgba(0,0,0,0.7)' : '0 10px 25px rgba(0,0,0,0.1)',
-                                            fontFamily: 'Inter,system-ui,sans-serif',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            textAlign: 'center',
-                                            position: 'relative'
-                                        }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedHazard(null)}
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '10px',
-                                                    right: '10px',
-                                                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                                                    border: 'none',
-                                                    borderRadius: '50%',
-                                                    width: '26px',
-                                                    height: '26px',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: isDark ? '#94a3b8' : '#64748b'
-                                                }}
-                                            >×</button>
-
-                                            {photoUrl ? (
-                                                <div style={{ width: '56px', height: '56px', borderRadius: '14px', overflow: 'hidden', marginBottom: '10px', border: `2px solid ${catColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-                                                    <img
-                                                        src={photoUrl.startsWith('http') ? photoUrl : `${API_BASE_URL}${photoUrl.startsWith('/') ? photoUrl : `/${photoUrl}`}`}
-                                                        alt={selectedHazard.title}
-                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div style={{
-                                                    width: '44px',
-                                                    height: '44px',
-                                                    borderRadius: '50%',
-                                                    background: `${catColor}20`,
-                                                    border: `1.5px solid ${catColor}50`,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    marginBottom: '10px',
-                                                    color: catColor
-                                                }}>
-                                                    <AlertTriangle size={20} />
-                                                </div>
-                                            )}
-
-                                            {selectedHazard.ticket_id && (
-                                                <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', color: '#94a3b8', marginBottom: '4px', fontFamily: 'monospace' }}>
-                                                    {selectedHazard.ticket_id}
-                                                </div>
-                                            )}
-
-                                            <div style={{
-                                                fontSize: '10px',
-                                                fontWeight: 800,
-                                                letterSpacing: '0.12em',
-                                                color: selectedHazard.status === 'resolved' ? '#4ade80' : selectedHazard.status === 'pending' ? '#f87171' : '#fb923c',
-                                                background: selectedHazard.status === 'resolved' ? 'rgba(74,222,128,0.12)' : selectedHazard.status === 'pending' ? 'rgba(248,113,113,0.12)' : 'rgba(251,146,60,0.12)',
-                                                padding: '3px 12px',
-                                                borderRadius: '999px',
-                                                marginBottom: '6px',
-                                                textTransform: 'uppercase'
-                                            }}>
-                                                {selectedHazard.status || 'Received'}
-                                            </div>
-
-                                            {/* Ownership & Identity Protection Indicator */}
-                                            {selectedHazard.isOwnReport ? (
-                                                <div style={{
-                                                    fontSize: '10px',
-                                                    fontWeight: 700,
-                                                    color: '#ff6b00',
-                                                    background: 'rgba(255,107,0,0.12)',
-                                                    border: '1px solid rgba(255,107,0,0.25)',
-                                                    padding: '2px 10px',
-                                                    borderRadius: '999px',
-                                                    marginBottom: '8px'
-                                                }}>
-                                                    Your Report
-                                                </div>
-                                            ) : (
-                                                <div style={{
-                                                    fontSize: '10px',
-                                                    fontWeight: 600,
-                                                    color: isDark ? '#94a3b8' : '#64748b',
-                                                    background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                                                    border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
-                                                    padding: '2px 10px',
-                                                    borderRadius: '999px',
-                                                    marginBottom: '8px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px'
-                                                }}>
-                                                    <ShieldCheck size={11} /> Community Report · Identity Protected
-                                                </div>
-                                            )}
-
-                                            <h4 style={{
-                                                fontWeight: 700,
-                                                fontSize: '14px',
-                                                color: isDark ? '#f1f5f9' : '#0f172a',
-                                                lineHeight: '1.35',
-                                                margin: '0 0 4px',
-                                                padding: '0 12px'
-                                            }}>{selectedHazard.title}</h4>
-
-                                            <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.12em', color: catColor, marginBottom: '10px', textTransform: 'uppercase' }}>
-                                                {selectedHazard.category || selectedHazard.raw_category}
-                                            </p>
-
-                                            {distanceStr && (
-                                                <div style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px',
-                                                    background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                                                    border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
-                                                    borderRadius: '999px',
-                                                    padding: '4px 12px',
-                                                    marginBottom: '12px'
-                                                }}>
-                                                    <span style={{ color: catColor, display: 'flex' }}><MapPin size={12} /></span>
-                                                    <span style={{ fontSize: '11px', fontWeight: 700, color: isDark ? '#cbd5e1' : '#475569' }}>
-                                                        {distanceStr} away
-                                                    </span>
-                                                </div>
-                                            )}
-
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleStreetViewClick({ lat: selectedHazard.lat, lng: selectedHazard.lng })}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '10px 0',
-                                                        background: `linear-gradient(135deg, ${catColor}, ${catColor}dd)`,
-                                                        border: 'none',
-                                                        borderRadius: '12px',
-                                                        color: 'white',
-                                                        fontSize: '12px',
-                                                        fontWeight: 700,
-                                                        cursor: 'pointer',
-                                                        boxShadow: `0 4px 16px ${catColor}40`,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        gap: '6px'
-                                                    }}
-                                                >
-                                                    <Eye size={14} /> Open Street View
-                                                </button>
-
-                                                {onOpenReportDetail && selectedHazard.isOwnReport && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => onOpenReportDetail(selectedHazard)}
-                                                        style={{
-                                                            width: '100%',
-                                                            padding: '8px 0',
-                                                            background: 'transparent',
-                                                            border: isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid #cbd5e1',
-                                                            borderRadius: '12px',
-                                                            color: isDark ? '#f1f5f9' : '#334155',
-                                                            fontSize: '11px',
-                                                            fontWeight: 600,
-                                                            cursor: 'pointer'
-                                                        }}
-                                                    >
-                                                        View in My Reports
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
-                            </InfoWindowF>
+                                <MapPin
+                                    innerRef={pinRef}
+                                    report={selectedHazard}
+                                    isSelected={true}
+                                    isDark={isDark}
+                                    onClick={() => handlePinClick(selectedHazard)}
+                                    reportLocation={reportLocation}
+                                />
+                            </OverlayViewF>
                         )}
 
                         {/* Street View Overlay */}
@@ -1049,28 +1003,49 @@ export default function NearbyIssuesMapModal({
                                         type="button"
                                         onClick={() => handleStreetViewClick(null)}
                                         aria-label="Back to Map"
-                                        className="pointer-events-auto h-11 min-h-[44px] px-4 rounded-full bg-slate-900/90 hover:bg-orange-600 text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-2 text-xs sm:text-sm font-bold shrink-0"
+                                        title="Back to Map"
+                                        className={`pointer-events-auto h-11 min-h-[44px] px-3.5 sm:px-4 rounded-full border shadow-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-2 text-xs sm:text-sm font-bold shrink-0 group ${
+                                            isDark
+                                                ? 'bg-slate-900/90 text-white border-slate-700/80 hover:bg-[#ff6b00]'
+                                                : 'bg-white/95 text-slate-800 border-slate-200/90 hover:bg-[#ff6b00] hover:text-white hover:border-[#ff6b00]'
+                                        }`}
                                     >
-                                        <ChevronLeft size={18} strokeWidth={2.5} />
+                                        <ChevronLeft
+                                            size={19}
+                                            strokeWidth={2.5}
+                                            className={`shrink-0 transition-transform group-hover:-translate-x-0.5 ${
+                                                isDark ? 'text-white' : 'text-slate-700 group-hover:text-white'
+                                            }`}
+                                        />
                                         <span>Back to Map</span>
                                     </button>
 
                                     {selectedHazard && (
-                                        <div className="pointer-events-auto hidden xs:flex items-center gap-2 bg-slate-950/90 text-white border border-slate-700/70 shadow-2xl rounded-full px-3.5 py-2 text-xs font-semibold backdrop-blur-md max-w-[50%] sm:max-w-[60%] truncate">
+                                        <div className={`pointer-events-auto hidden xs:flex items-center gap-2 border shadow-xl rounded-full px-3.5 py-2 text-xs font-semibold backdrop-blur-md max-w-[50%] sm:max-w-[60%] truncate ${
+                                            isDark
+                                                ? 'bg-slate-950/90 text-white border-slate-700/70'
+                                                : 'bg-white/95 text-slate-800 border-slate-200/90'
+                                        }`}>
                                             <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0 animate-pulse" />
-                                            <span className="text-slate-400 font-medium shrink-0">Viewing:</span>
-                                            <span className="font-bold text-white truncate">{selectedHazard.title || 'Reported Location'}</span>
+                                            <span className={`font-medium shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Viewing:</span>
+                                            <span className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedHazard.title || 'Reported Location'}</span>
                                         </div>
                                     )}
 
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsSvFullscreen(prev => !prev)}
-                                        aria-label={isSvFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                                        className="pointer-events-auto w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-slate-900/90 hover:bg-orange-600 text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
-                                    >
-                                        {isSvFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                                    </button>
+                                    {!standalone && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsSvFullscreen(prev => !prev)}
+                                            aria-label={isSvFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                                            className={`pointer-events-auto hidden sm:flex w-11 h-11 min-h-[44px] min-w-[44px] rounded-full border shadow-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer items-center justify-center shrink-0 ${
+                                                isDark
+                                                    ? 'bg-slate-900/90 text-white border-slate-700/80 hover:bg-[#ff6b00]'
+                                                    : 'bg-white/95 text-slate-800 border-slate-200/90 hover:bg-[#ff6b00] hover:text-white hover:border-[#ff6b00]'
+                                            }`}
+                                        >
+                                            {isSvFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                                        </button>
+                                    )}
                                 </div>
                             </>
                         )}
@@ -1161,6 +1136,29 @@ export default function NearbyIssuesMapModal({
                 </div>
             )}
 
+            {/* Floating Bottom Card: ReportPopup */}
+            <AnimatePresence>
+                {isPopupOpen && selectedHazard && !svLocation && (
+                    <ReportPopup
+                        key={`report-popup-${selectedHazard.id}`}
+                        cardRef={cardRef}
+                        report={selectedHazard}
+                        isOpen={isPopupOpen}
+                        onClose={handleClosePopup}
+                        isDark={isDark}
+                        onOpenReport={(r) => {
+                            if (onOpenReportDetail) {
+                                onOpenReportDetail(r);
+                            }
+                        }}
+                        onOpenStreetView={(r) => {
+                            handleStreetViewClick({ lat: r.lat, lng: r.lng });
+                        }}
+                        hasLocation={Boolean(reportLocation?.lat && reportLocation?.lng)}
+                    />
+                )}
+            </AnimatePresence>
+
             {/* Redesigned Nearby Issues Bottom Panel */}
             {!svLocation && (
                 <div
@@ -1169,9 +1167,10 @@ export default function NearbyIssuesMapModal({
                     style={{
                         height: panelSnap === 'collapsed' ? '5.25rem' : panelSnap === 'full' ? '88%' : '50%'
                     }}
-                    className={`z-20 flex flex-col bg-white dark:bg-[#0c1427] border-t border-slate-200 dark:border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] transition-[height] duration-300 motion-reduce:transition-none ease-out select-none
+                    className={`z-20 flex flex-col bg-white dark:bg-[#0c1427] border-t border-slate-200 dark:border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] transition-all duration-300 motion-reduce:transition-none ease-out select-none
                         absolute inset-x-0 bottom-0 rounded-t-[1.25rem] pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)]
-                        ${!standalone ? 'md:left-6 md:bottom-6 md:w-[26rem] md:max-h-[720px] md:rounded-2xl md:border md:border-slate-200 md:dark:border-slate-800 md:shadow-2xl md:pb-0' : ''}
+                        ${isPopupOpen ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}
+                        ${!standalone ? 'md:left-6 md:bottom-6 md:w-[28rem] md:max-h-[720px] md:rounded-2xl md:border md:border-slate-200 md:dark:border-slate-800 md:shadow-2xl md:pb-0 overflow-hidden' : ''}
                     `}
                 >
                     {/* Centered Drag Handle & Header Row 1 */}
@@ -1199,12 +1198,12 @@ export default function NearbyIssuesMapModal({
                         />
 
                         {/* Row 1: Title, Count Chip & Expand / Collapse actions */}
-                        <div className="flex items-center justify-between gap-1.5 min-h-[3rem]">
-                            <div className="flex items-center gap-2 shrink-0">
-                                <h2 className="text-lg xs:text-xl font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
+                        <div className="flex items-center justify-between gap-1.5 sm:gap-2 min-h-[2.75rem]">
+                            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                                <h2 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0">
                                     Nearby issues
                                 </h2>
-                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white shadow-2xs shrink-0 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-slate-800 dark:text-slate-100 shadow-2xs shrink-0 whitespace-nowrap">
                                     {filteredReports.length} nearby
                                 </span>
                             </div>
@@ -1218,10 +1217,10 @@ export default function NearbyIssuesMapModal({
                                     }}
                                     aria-label="Expand list"
                                     aria-expanded="false"
-                                    className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium flex items-center gap-1.5 min-h-[48px] px-2 -mr-2 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                                    className="text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white text-xs font-semibold flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
                                 >
                                     <span className="whitespace-nowrap">Expand</span>
-                                    <ChevronUp size={14} className="shrink-0" />
+                                    <ChevronUp size={15} strokeWidth={2.5} className="shrink-0 text-slate-700 dark:text-slate-200" />
                                 </button>
                             ) : panelSnap === 'full' ? (
                                 <button
@@ -1232,13 +1231,13 @@ export default function NearbyIssuesMapModal({
                                     }}
                                     aria-label="Collapse to 2nd stage"
                                     aria-expanded="false"
-                                    className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium flex items-center gap-1.5 min-h-[48px] px-2 -mr-2 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                                    className="text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white text-xs font-semibold flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
                                 >
                                     <span className="whitespace-nowrap">Collapse</span>
-                                    <ChevronDown size={14} className="shrink-0" />
+                                    <ChevronDown size={15} strokeWidth={2.5} className="shrink-0 text-slate-700 dark:text-slate-200" />
                                 </button>
                             ) : (
-                                <div className="flex items-center gap-1 shrink-0">
+                                <div className="inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 p-0.5 shrink-0 shadow-2xs">
                                     <button
                                         type="button"
                                         onClick={(e) => {
@@ -1246,12 +1245,13 @@ export default function NearbyIssuesMapModal({
                                             setPanelSnap('full');
                                         }}
                                         aria-label="Expand to full view"
-                                        aria-expanded="false"
-                                        className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium flex items-center gap-1 min-h-[48px] px-2 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                                        title="Expand to full view"
+                                        className="text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white text-xs font-semibold flex items-center gap-1 py-1 px-1.5 sm:px-2 rounded-md hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer whitespace-nowrap"
                                     >
-                                        <span className="whitespace-nowrap">Expand</span>
-                                        <ChevronUp size={14} className="shrink-0" />
+                                        <span className="hidden xs:inline whitespace-nowrap">Expand</span>
+                                        <ChevronUp size={15} strokeWidth={2.5} className="shrink-0 text-slate-700 dark:text-slate-200" />
                                     </button>
+                                    <div className="w-px h-3.5 bg-slate-300/80 dark:bg-slate-700 shrink-0" />
                                     <button
                                         type="button"
                                         onClick={(e) => {
@@ -1259,11 +1259,11 @@ export default function NearbyIssuesMapModal({
                                             setPanelSnap('collapsed');
                                         }}
                                         aria-label="Collapse list"
-                                        aria-expanded="true"
-                                        className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium flex items-center gap-1 min-h-[48px] px-2 -mr-2 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                                        title="Collapse list"
+                                        className="text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white text-xs font-semibold flex items-center gap-1 py-1 px-1.5 sm:px-2 rounded-md hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer whitespace-nowrap"
                                     >
-                                        <span className="whitespace-nowrap">Collapse</span>
-                                        <ChevronDown size={14} className="shrink-0" />
+                                        <span className="hidden xs:inline whitespace-nowrap">Collapse</span>
+                                        <ChevronDown size={15} strokeWidth={2.5} className="shrink-0 text-slate-700 dark:text-slate-200" />
                                     </button>
                                 </div>
                             )}
@@ -1370,7 +1370,7 @@ export default function NearbyIssuesMapModal({
                             >
                                 {filteredReports.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-                                        <MapPin size={32} className="text-slate-400 dark:text-slate-500 mb-2" />
+                                        <MapPinIcon size={32} className="text-slate-400 dark:text-slate-500 mb-2" />
                                         <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                                             No issues found here.
                                         </p>
@@ -1409,29 +1409,12 @@ export default function NearbyIssuesMapModal({
                                                 role="listitem"
                                                 tabIndex={0}
                                                 onClick={() => {
-                                                    if (isSelected && onOpenReportDetail) {
-                                                        onOpenReportDetail(report);
-                                                    } else {
-                                                        setSelectedHazard(report);
-                                                        if (map && report.lat != null && report.lng != null) {
-                                                            map.panTo({ lat: report.lat, lng: report.lng });
-                                                            if (window.innerWidth < 768) {
-                                                                map.panBy(0, panelSnap === 'full' ? 140 : 80);
-                                                            }
-                                                        }
-                                                    }
+                                                    handlePinClick(report);
                                                 }}
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter' || e.key === ' ') {
                                                         e.preventDefault();
-                                                        if (isSelected && onOpenReportDetail) {
-                                                            onOpenReportDetail(report);
-                                                        } else {
-                                                            setSelectedHazard(report);
-                                                            if (map && report.lat != null && report.lng != null) {
-                                                                map.panTo({ lat: report.lat, lng: report.lng });
-                                                            }
-                                                        }
+                                                        handlePinClick(report);
                                                     }
                                                 }}
                                                 className={`p-3 rounded-2xl border transition-all cursor-pointer min-h-[4.5rem] flex items-center gap-3 ${

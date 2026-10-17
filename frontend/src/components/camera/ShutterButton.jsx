@@ -11,7 +11,8 @@ export default function ShutterButton({
     onClick,
     disabled = false,
     ariaLabel = 'Take photo',
-    className = ''
+    className = '',
+    isDark = true
 }) {
     return (
         <button
@@ -19,7 +20,11 @@ export default function ShutterButton({
             onClick={onClick}
             disabled={disabled}
             aria-label={ariaLabel}
-            className={`w-[4.5rem] h-[4.5rem] min-w-[4.5rem] min-h-[4.5rem] rounded-full border-4 border-white flex items-center justify-center transition-opacity cursor-pointer group focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] disabled:opacity-40 disabled:cursor-not-allowed select-none ${className}`}
+            className={`w-[4.5rem] h-[4.5rem] min-w-[4.5rem] min-h-[4.5rem] rounded-full border-4 flex items-center justify-center transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] disabled:opacity-40 disabled:cursor-not-allowed select-none ${
+                isDark
+                    ? 'border-white shadow-lg'
+                    : 'border-slate-300 bg-white shadow-md'
+            } ${className}`}
         >
             <div
                 className="w-14 h-14 rounded-full bg-[#ff6b00] group-hover:bg-[#e05e00] transition-transform duration-100 ease-out group-active:scale-90 motion-reduce:group-active:scale-100"

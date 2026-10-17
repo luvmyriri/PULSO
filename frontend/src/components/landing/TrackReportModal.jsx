@@ -56,10 +56,7 @@ export default function TrackReportModal({ isOpen, onClose }) {
 
         {/* Header */}
         <div className="text-left mb-5">
-          <span className="text-[10px] font-mono-data font-bold uppercase tracking-wider text-[#ff6b00]">
-            Ticket Status Lookup
-          </span>
-          <h3 id="track-modal-title" className="font-heading font-bold text-xl text-slate-900 dark:text-white mt-0.5">
+          <h3 id="track-modal-title" className="font-heading font-bold text-xl text-slate-900 dark:text-white">
             Track your report
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -99,7 +96,7 @@ export default function TrackReportModal({ isOpen, onClose }) {
               <span className="text-[11px] font-mono-data font-bold text-slate-500 dark:text-slate-400">
                 {result.id}
               </span>
-              <span className="text-[10px] font-mono-data font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300">
+              <span className="inline-flex items-center text-[10px] font-mono-data font-bold px-2 py-0.5 rounded-md bg-transparent text-black dark:text-white border border-amber-500/80 dark:border-amber-400/80">
                 {result.status}
               </span>
             </div>

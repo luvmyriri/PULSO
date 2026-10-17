@@ -1,59 +1,51 @@
 import React from 'react';
-import { Camera, Truck, CheckCircle2, ArrowRight, MapPin, HardHat, Bell } from 'lucide-react';
+import { SquarePen, MapPin, ClipboardCheck, ArrowRight, ShieldCheck, CheckCircle2, Search } from 'lucide-react';
 
 /**
  * HowItWorksSection
  * ─────────────────────────────────────────────────────────────────────────────
- * Professional 3-step visual guide (Report → Track → Resolved) for Caloocan
- * residents. Plain language, generous spacing, and realistic visual mockups.
+ * Upgraded Civic Aperture process section:
+ * - Authoritative header with civic kicker and clear description
+ * - 3 interconnected cards with step indicators, custom icons, rich details,
+ *   feature badges, and interactive hover elevation
+ * - Connected progress line visual
+ * - Bottom quick-action bar for direct reporting or tracking
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export default function HowItWorksSection() {
+export default function HowItWorksSection({ onOpenTrackModal }) {
   const steps = [
     {
-      step: '01',
-      title: 'Snap & Geotag',
-      tagline: 'Takes less than 60 seconds',
-      description: 'Take a photo of the damaged road, leaking pipe, or broken streetlight. Your exact barangay and street coordinates are detected automatically.',
-      mockup: {
-        title: 'Auto-Detected Location',
-        icon: MapPin,
-        detail: 'Camarin Rd, Brgy. 174 • 14.752° N',
-        badge: 'Photo Attached',
-        badgeColor: 'bg-orange-100 text-[#ff6b00] dark:bg-orange-950/60 dark:text-orange-400'
-      },
-      icon: Camera,
-      accent: 'border-orange-500/80 text-[#ff6b00]'
+      num: '01',
+      badge: 'Step 1',
+      title: 'Describe the Issue',
+      desc: "Tell us what's wrong—potholes, dark streetlights, water leaks, or clogged drainage. Describe the hazard in plain English or Filipino.",
+      icon: SquarePen,
+      color: 'orange',
+      accentBg: 'bg-orange-500/10 dark:bg-orange-500/20 backdrop-blur-md text-[#ff6b00] border border-orange-500/30 dark:border-orange-500/40 shadow-xs',
+      badgeBg: 'bg-slate-100/90 dark:bg-slate-800/90 text-black dark:text-white border-slate-300 dark:border-slate-700 shadow-2xs',
+      tags: ['Roads & Potholes', 'Lights & Utilities', 'Fast AI Triage']
     },
     {
-      step: '02',
-      title: 'Engineering Dispatch',
-      tagline: 'Under 2-hour triage',
-      description: 'City Engineering reviews your ticket, confirms the urgency, and routes an authorized road, water, or electrical repair crew to the location.',
-      mockup: {
-        title: 'Work Order Assigned',
-        icon: HardHat,
-        detail: 'City Electrical Maintenance Crew #3',
-        badge: 'Dispatched',
-        badgeColor: 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-      },
-      icon: Truck,
-      accent: 'border-blue-500/80 text-blue-500'
+      num: '02',
+      badge: 'Step 2',
+      title: 'Add Location & Photo',
+      desc: 'Pin the exact location on the interactive Caloocan map and attach a photo so City Engineering crews can prepare equipment beforehand.',
+      icon: MapPin,
+      color: 'sky',
+      accentBg: 'bg-sky-500/10 dark:bg-sky-500/20 backdrop-blur-md text-[#0284c7] dark:text-sky-400 border border-sky-500/30 dark:border-sky-500/40 shadow-xs',
+      badgeBg: 'bg-slate-100/90 dark:bg-slate-800/90 text-black dark:text-white border-slate-300 dark:border-slate-700 shadow-2xs',
+      tags: ['GPS Map Pin', 'Barangay Tagging', 'Photo Evidence']
     },
     {
-      step: '03',
-      title: 'Verified Resolution',
-      tagline: 'Before & after proof',
-      description: 'Once repairs are completed, city workers upload photo verification. You receive an SMS alert and the public ticket is marked resolved.',
-      mockup: {
-        title: 'Inspection Sign-Off',
-        icon: Bell,
-        detail: 'Repairs Completed • Verified OK',
-        badge: 'Resolved',
-        badgeColor: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-      },
-      icon: CheckCircle2,
-      accent: 'border-emerald-500/80 text-emerald-500'
+      num: '03',
+      badge: 'Step 3',
+      title: 'Get Your Reference Number',
+      desc: 'Receive your unique municipal tracking ID immediately. Track dispatch status, assigned engineers, and final photo verification.',
+      icon: ClipboardCheck,
+      color: 'emerald',
+      accentBg: 'bg-emerald-500/10 dark:bg-emerald-500/20 backdrop-blur-md text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 dark:border-emerald-500/40 shadow-xs',
+      badgeBg: 'bg-slate-100/90 dark:bg-slate-800/90 text-black dark:text-white border-slate-300 dark:border-slate-700 shadow-2xs',
+      tags: ['Instant Ticket ID', 'Live Status Tracking', 'Resolved Proof']
     }
   ];
 
@@ -61,88 +53,105 @@ export default function HowItWorksSection() {
     <section
       id="how-it-works"
       aria-label="How PULSO Works"
-      className="py-14 sm:py-20 bg-[#fffbf9] dark:bg-[#070a12] border-b border-slate-200 dark:border-slate-800 transition-colors"
+      className="min-h-[calc(100vh-73px)] py-12 sm:py-16 lg:py-20 bg-slate-50/60 dark:bg-[#070a12]/60 border-b border-slate-200 dark:border-slate-800 transition-colors flex flex-col justify-center"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
-          <span className="text-xs font-mono-data font-bold uppercase tracking-wider text-[#ff6b00]">
-            Simple Citizen Workflow
-          </span>
-          <h2 className="font-heading font-extrabold text-2xl sm:text-3xl md:text-4xl text-slate-900 dark:text-white mt-1">
-            How PULSO works for residents
+        <div className="max-w-3xl text-left">
+          <h2 className="font-heading font-black text-3xl sm:text-4xl lg:text-[40px] text-[#0f2347] dark:text-white tracking-tight leading-tight">
+            How It Works
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">
-            A transparent 3-step process connecting your neighborhood directly to the City Engineering Department.
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-2.5 leading-relaxed font-normal">
+            Reporting an infrastructure or road hazard is simple, transparent, and direct. Every citizen report is logged in the official Caloocan municipal docket.
           </p>
         </div>
 
         {/* 3 Step Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 relative">
-          {steps.map((item) => {
-            const Icon = item.icon;
-            const MockupIcon = item.mockup.icon;
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mt-10 sm:mt-12 relative">
+          
 
+          {steps.map((step) => {
+            const Icon = step.icon;
             return (
               <div
-                key={item.step}
-                className="relative bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 shadow-xs hover:shadow-md transition-all flex flex-col justify-between text-left"
+                key={step.num}
+                className="relative z-10 flex flex-col justify-between p-6 sm:p-7 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-lg hover:border-[#ff6b00]/60 dark:hover:border-[#ff6b00]/50 transition-all duration-300 group text-left"
               >
                 <div>
-                  {/* Step Header */}
-                  <div className="flex items-center justify-between mb-5">
-                    <span className="font-mono-data font-black text-2xl sm:text-3xl text-slate-300 dark:text-slate-700">
-                      {item.step}
+                  {/* Top Bar: Badge & Icon */}
+                  <div className="flex items-center justify-between mb-6">
+                    <span className={`font-mono-data text-xs font-bold px-3 py-1 rounded-lg border ${step.badgeBg}`}>
+                      {step.badge}
                     </span>
-                    <div className={`w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center border ${item.accent}`}>
-                      <Icon size={22} />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${step.accentBg} transition-transform duration-300 group-hover:scale-110`}>
+                      <Icon size={24} strokeWidth={2} />
                     </div>
                   </div>
 
-                  <span className="text-[11px] font-mono-data font-semibold text-[#ff6b00] uppercase tracking-wider block mb-1">
-                    {item.tagline}
-                  </span>
-                  <h3 className="font-heading font-extrabold text-xl text-slate-900 dark:text-white mb-2">
-                    {item.title}
+                  {/* Step Title */}
+                  <h3 className="font-heading font-bold text-lg sm:text-xl text-[#0f2347] dark:text-white group-hover:text-[#ff6b00] transition-colors leading-snug mb-2.5">
+                    {step.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6 font-normal">
-                    {item.description}
+
+                  {/* Step Description */}
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                    {step.desc}
                   </p>
                 </div>
 
-                {/* Visual Step Proof Mockup */}
-                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3.5 border border-slate-200/80 dark:border-slate-700/80">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <MockupIcon size={14} className="text-[#ff6b00]" />
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        {item.mockup.title}
-                      </span>
-                    </div>
-                    <span className={`text-[10px] font-mono-data font-bold px-2 py-0.5 rounded ${item.mockup.badgeColor}`}>
-                      {item.mockup.badge}
+                {/* Bottom Tags / Micro-features */}
+                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap gap-1.5">
+                  {step.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md"
+                    >
+                      {tag}
                     </span>
-                  </div>
-                  <p className="text-[11px] font-mono-data text-slate-500 dark:text-slate-400">
-                    {item.mockup.detail}
-                  </p>
+                  ))}
                 </div>
-
               </div>
             );
           })}
         </div>
 
-        {/* Bottom Call to Action */}
-        <div className="mt-12 text-center">
-          <a
-            href="/register"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white text-xs font-bold font-heading tracking-wide transition-all shadow-sm hover:shadow-md cursor-pointer"
-          >
-            <span>Start an Incident Report</span>
-            <ArrowRight size={16} />
-          </a>
+        {/* Bottom Quick-Action Banner */}
+        <div className="mt-8 sm:mt-10 p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <ShieldCheck size={22} />
+            </div>
+            <div className="text-left">
+              <p className="font-heading font-bold text-sm sm:text-base text-slate-900 dark:text-white leading-tight">
+                Ready to file a community report?
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                No app installation required. Free and accessible to all Caloocan residents 24/7.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <a
+              href="/report"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer whitespace-nowrap"
+            >
+              <span>Report an Issue</span>
+              <ArrowRight size={15} />
+            </a>
+
+            {onOpenTrackModal && (
+              <button
+                type="button"
+                onClick={onOpenTrackModal}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-heading font-bold text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap"
+              >
+                <Search size={15} />
+                <span>Track Report</span>
+              </button>
+            )}
+          </div>
         </div>
 
       </div>

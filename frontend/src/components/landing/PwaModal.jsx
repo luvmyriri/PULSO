@@ -203,46 +203,6 @@ export default function PwaModal({ isOpen, onClose }) {
         {/* Modal Scrollable Body */}
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-5">
 
-          {/* Wi-Fi vs Localhost Network Selector */}
-          {isLocalDevelopment && (
-          <div className="p-3 rounded-2xl bg-orange-50/70 dark:bg-orange-950/30 border border-orange-200/80 dark:border-orange-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2 text-xs text-slate-800 dark:text-slate-200">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${networkStatus === 'ready' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              <span className="font-bold">Development preview address:</span>
-            </div>
-
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-orange-200 dark:border-slate-700 text-xs shadow-2xs w-full sm:w-auto justify-center">
-              <button
-                type="button"
-                onClick={() => setUrlMode('wifi')}
-                disabled={networkStatus !== 'ready' && !customIp}
-                aria-pressed={urlMode === 'wifi'}
-                className={`min-h-11 px-3 py-1 rounded-lg font-extrabold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  urlMode === 'wifi'
-                    ? 'bg-[#ff6b00] text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Wifi size={13} />
-                <span>{networkStatus === 'ready' ? `Wi-Fi preview (${customIp})` : 'Wi-Fi preview unavailable'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setUrlMode('origin')}
-                aria-pressed={urlMode === 'origin'}
-                className={`min-h-11 px-3 py-1 rounded-lg font-extrabold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 ${
-                  urlMode === 'origin'
-                    ? 'bg-[#ff6b00] text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Globe size={13} />
-                <span>Current site</span>
-              </button>
-            </div>
-          </div>
-          )}
-
           {/* QR Code & Scan Prompt Card */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-orange-50/40 dark:from-slate-800/60 dark:to-orange-950/20 border border-slate-200/80 dark:border-slate-700/80">
             {/* Real Dynamic QR Code */}
@@ -336,9 +296,9 @@ export default function PwaModal({ isOpen, onClose }) {
           {/* Platform Step-by-Step Tabs */}
           <div>
             {urlMode === 'wifi' ? (
-              <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-                <p className="font-bold">Preview only</p>
-                <p className="mt-1 text-xs leading-relaxed">The same-Wi-Fi HTTP address can preview the mobile layout, but browsers require HTTPS to install PULSO. Use the current secure site for installation.</p>
+              <div className="py-2 text-left">
+                <p className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white">Preview only</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">The same-Wi-Fi HTTP address can preview the mobile layout, but browsers require HTTPS to install PULSO. Use the current secure site for installation.</p>
               </div>
             ) : (
             <>
@@ -451,13 +411,6 @@ export default function PwaModal({ isOpen, onClose }) {
           <span className="text-[11px] text-slate-500 dark:text-slate-400">
             Powered by Caloocan City Engineering Department
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-11 px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
-          >
-            Done
-          </button>
         </div>
 
       </div>
