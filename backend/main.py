@@ -84,7 +84,11 @@ class PublicUploadFiles(StaticFiles):
     async def get_response(self, path: str, scope):
         if path.replace("\\", "/").lstrip("/").split("/", 1)[0].lower() == "docs":
             raise HTTPException(status_code=404, detail="File not found")
-        return await super().get_response(path, scope)
+        response = await super().get_response(path, scope)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        return response
 
 
 app.mount("/api/uploads", PublicUploadFiles(directory="uploads"), name="uploads")
@@ -251,7 +255,12 @@ async def get_thumbnail(src: str = Query(..., description="Relative path to uplo
         return FileResponse(
             thumb_path,
             media_type="image/jpeg",
-            headers={"Cache-Control": "public, max-age=31536000, immutable"}
+            headers={
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Cross-Origin-Resource-Policy": "cross-origin",
+            }
         )
     except HTTPException:
         raise

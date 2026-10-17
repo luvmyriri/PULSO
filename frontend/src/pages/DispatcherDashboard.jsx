@@ -1474,6 +1474,10 @@ const DispatcherDashboard = () => {
                     if (thumbUrl.includes('/api/thumbnails')) {
                         const fallbackImg = new Image();
                         fallbackImg.crossOrigin = 'anonymous';
+                        fallbackImg.onload = img.onload;
+                        fallbackImg.onerror = () => {
+                            // Safely handle missing fallback image; marker will use SVG pin
+                        };
                         fallbackImg.src = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
                     }
                 };

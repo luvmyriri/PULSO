@@ -6333,11 +6333,9 @@ export default function ResidentDashboard() {
             const params = new URLSearchParams(window.location.search);
             const tabParam = params.get('tab');
             if (tabParam) {
-                console.log("PULSO: Initializing activeTab from URL:", tabParam);
                 return tabParam;
             }
         } catch (_) {}
-        console.log("PULSO: Initializing activeTab: overview");
         return 'overview';
     });
     const isHomeTab = activeTab === 'overview' || activeTab === 'home';
@@ -6445,8 +6443,6 @@ export default function ResidentDashboard() {
             return;
         }
 
-        console.log(`PULSO: Switching tab: ${activeTab} -> ${tab}`);
-
         if (tab !== 'overview' && tab !== 'home') {
             setIsAIChatOpen(false);
         }
@@ -6480,7 +6476,6 @@ export default function ResidentDashboard() {
     const fileInputRef = React.useRef(null);
 
     const handleSetModal = (modal) => {
-        console.log(`PULSO: Switching modal: ${activeModal} -> ${modal}`);
         if (modal === 'file-report') {
             setSelectedImage(null);
             setReportNotes('');
@@ -7497,6 +7492,10 @@ export default function ResidentDashboard() {
                     if (thumbUrl.includes('/api/thumbnails')) {
                         const fallbackImg = new Image();
                         fallbackImg.crossOrigin = 'anonymous';
+                        fallbackImg.onload = img.onload;
+                        fallbackImg.onerror = () => {
+                            // Safely handle missing fallback image; marker will use SVG pin
+                        };
                         fallbackImg.src = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
                     }
                 };
