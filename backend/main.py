@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status, Query, Request
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status, Query, Request, Header
 from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +45,7 @@ import sms_utils
 # Database imports
 import gov_models, gov_router, gov_schemas, gov_crud           # Government-side modules
 import models, schemas, crud
+import command_integrity
 import analytics_router                 # AI Analytics & Intelligence Engine
 import philsys_router                   # PhilSys Check Authentication (PSA)
 import predictive_router                # Predictive Maintenance Engine
@@ -2255,6 +2256,8 @@ def claim_guest_report(
 def confirm_report_resolution(
     report_id: int,
     confirm: schemas.ReportResolutionConfirm,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: models.Resident = Depends(get_current_user)
 ):
@@ -2265,12 +2268,16 @@ def confirm_report_resolution(
     if current_user.role != "resident":
         raise HTTPException(status_code=403, detail="Only residents can confirm resolution.")
         
+    key = command_integrity.validate_key(idempotency_key)
+    expected = command_integrity.parse_version(if_match)
+
     report = crud.confirm_report_resolution(
         db=db, 
         report_id=report_id, 
         resident_id=current_user.id,
         rating=confirm.rating,
-        note=confirm.note
+        note=confirm.note,
+        expected_version=expected,
     )
     
     if not report:
@@ -2399,6 +2406,8 @@ async def get_directions_proxy(
 def update_report_status(
     report_id: int,
     status_update: ReportStatusUpdate,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
@@ -2406,9 +2415,24 @@ def update_report_status(
     status = status_update.status or status_update.targetStatus
     if status != "pending_approval" or status_update.budget is not None or status_update.deployment_date is not None:
         raise HTTPException(status_code=422, detail="Use the governed report decision endpoint")
+    key = command_integrity.validate_key(idempotency_key)
+    expected = command_integrity.parse_version(if_match)
+    digest = command_integrity.request_hash(status_update.model_dump(mode="json")) if key else None
+
     report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    if hasattr(current_user, "id") and getattr(current_user, "role", None) != "resident":
+        receipt = command_integrity.find_receipt(
+            db, actor_id=current_user.id, operation="report_verify",
+            report_id=report_id, key=key, digest=digest,
+        )
+        if receipt:
+            return receipt.result_json
+
+    if expected is not None:
+        command_integrity.check_version(getattr(report, 'version', 1), expected)
+
     if report.status not in ("pending", "unverified", "needs_information"):
         raise HTTPException(status_code=409, detail="Report is not eligible for verification")
     updated_report = crud.update_report_status(
@@ -2421,12 +2445,22 @@ def update_report_status(
     )
     if not updated_report:
         raise HTTPException(status_code=404, detail="Report not found")
+    if hasattr(current_user, "id") and getattr(current_user, "role", None) != "resident" and key:
+        result_data = schemas.ReportResponse.model_validate(updated_report).model_dump(mode="json")
+        command_integrity.record_receipt(
+            db, actor_id=current_user.id, operation="report_verify",
+            report_id=report_id, key=key, digest=digest, resource_id=report_id,
+            result_json=result_data,
+        )
+        db.commit()
     return updated_report
 
 @app.patch("/api/reports/{report_id}/reject", response_model=schemas.ReportResponse)
 def reject_report(
     report_id: int,
     decision: ReportRejectionDecision,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
 ):
@@ -2434,12 +2468,35 @@ def reject_report(
     reason = decision.reason.strip()
     if len(reason) < 10:
         raise HTTPException(status_code=422, detail="A rejection reason of at least 10 characters is required")
+    key = command_integrity.validate_key(idempotency_key)
+    expected = command_integrity.parse_version(if_match)
+    digest = command_integrity.request_hash({"reason": reason}) if key else None
+
     report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    receipt = command_integrity.find_receipt(
+        db, actor_id=current_user.id, operation="report_reject",
+        report_id=report_id, key=key, digest=digest,
+    )
+    if receipt:
+        return receipt.result_json
+
+    if expected is not None:
+        command_integrity.check_version(getattr(report, 'version', 1), expected)
+
     if report.status not in ("pending", "unverified", "needs_information", "pending_approval"):
         raise HTTPException(status_code=409, detail="Report cannot be rejected after approval or dispatch")
-    return crud.reject_report(db, report_id=report_id, actor_id=current_user.id, reason=reason)
+    updated_report = crud.reject_report(db, report_id=report_id, actor_id=current_user.id, reason=reason)
+    if key:
+        result_data = schemas.ReportResponse.model_validate(updated_report).model_dump(mode="json")
+        command_integrity.record_receipt(
+            db, actor_id=current_user.id, operation="report_reject",
+            report_id=report_id, key=key, digest=digest, resource_id=report_id,
+            result_json=result_data,
+        )
+        db.commit()
+    return updated_report
 
 @app.patch("/api/reports/{report_id}/dispatch", response_model=schemas.ReportResponse)
 def dispatch_report(

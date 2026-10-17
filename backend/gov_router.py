@@ -2257,6 +2257,8 @@ def unblock_work_order_endpoint(
 def verify_work_order_endpoint(
     wo_id: int,
     payload: gov_schemas.WorkOrderVerifyRequest,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -2279,10 +2281,17 @@ def verify_work_order_endpoint(
             detail="Separation of duties violation: Assigned field worker cannot inspect or verify their own work order."
         )
 
+    key = command_integrity.validate_key(idempotency_key)
+    expected = command_integrity.parse_version(if_match)
+    digest = command_integrity.request_hash(payload.model_dump(mode="json")) if key else None
+
     return gov_crud.verify_work_order_inspection(
         db, wo_id, payload,
         inspector_id=current_user.id,
-        inspector_role=current_user.role
+        inspector_role=current_user.role,
+        idempotency_key=key,
+        request_digest=digest,
+        expected_report_version=expected,
     )
 
 
@@ -2323,6 +2332,8 @@ def get_work_order_inspections(
 def request_citizen_info(
     report_id: int,
     payload: gov_schemas.ReportRequestInfo,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -2334,10 +2345,16 @@ def request_citizen_info(
     - Appends AuditLog
     """
     _assert_role(current_user, *DISPATCH_ROLES)
+    key = command_integrity.validate_key(idempotency_key)
+    expected = command_integrity.parse_version(if_match)
+    digest = command_integrity.request_hash(payload.model_dump(mode="json")) if key else None
     return gov_crud.request_citizen_information(
         db, report_id, payload,
         actor_id=current_user.id,
-        actor_role=current_user.role
+        actor_role=current_user.role,
+        idempotency_key=key,
+        request_digest=digest,
+        expected_report_version=expected,
     )
 
 

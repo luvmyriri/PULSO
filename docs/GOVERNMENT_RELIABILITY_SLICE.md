@@ -5,7 +5,7 @@
 ## Contract
 
 - Reports have a positive `version`, exposed on `ReportResponse`. ORM report updates increment it.
-- `POST /api/gov/reports/{id}/approve-for-work` and report-sourced `POST /api/gov/work-orders` accept `If-Match: <report version>` and `Idempotency-Key: <8–128 safe characters>`. During the legacy-client transition these headers are optional. New government approval and dispatch UI requests send them.
+- `POST /api/gov/reports/{id}/approve-for-work`, report-sourced `POST /api/gov/work-orders`, `PATCH /api/reports/{id}/reject`, `PATCH /api/reports/{id}/status` (verification), `POST /api/gov/reports/{id}/request-info`, `POST /api/gov/work-orders/{wo_id}/verify` (inspection), and resident `POST /api/reports/{id}/confirm` accept `If-Match: <report version>` and `Idempotency-Key: <8–128 safe characters>`. During the legacy-client transition these headers are optional.
 - A new key with a stale version returns HTTP 409 and the current version. The client must refresh and review the decision again. A reused key with a different request body returns 409.
 - A matching replay returns the original approval result or the existing work order. A command receipt, civic state, timeline, audit, and outbox event commit together. The report row lock serializes competing report decisions.
 - Each report status change in these paths writes one `resident_in_app_notification` outbox event using the timeline ID as its event key. The worker inserts a notification with a unique outbox reference and marks the event delivered in one transaction. A failed or interrupted transaction can be retried without a duplicate notification.

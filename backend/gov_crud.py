@@ -2649,10 +2649,25 @@ def verify_work_order_inspection(
     data: gov_schemas.WorkOrderVerifyRequest,
     inspector_id: int,
     inspector_role: str,
+    idempotency_key: Optional[str] = None,
+    request_digest: Optional[str] = None,
+    expected_report_version: Optional[int] = None,
 ) -> Dict[str, Any]:
     wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).with_for_update().first()
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
+
+    if wo.report_id:
+        receipt = command_integrity.find_receipt(
+            db, actor_id=inspector_id, operation="work_order_verify_inspection",
+            report_id=wo.report_id, key=idempotency_key, digest=request_digest,
+        )
+        if receipt:
+            return receipt.result_json
+        if expected_report_version is not None:
+            rep = db.query(models.Report).filter(models.Report.id == wo.report_id).first()
+            if rep:
+                command_integrity.check_version(rep.version, expected_report_version)
 
     if wo.status != "completed_pending_review":
         raise HTTPException(status_code=409, detail="Work order must await independent completion review")
@@ -2728,7 +2743,7 @@ def verify_work_order_inspection(
     db.refresh(wo)
     db.refresh(inspection)
 
-    return {
+    res = {
         "work_order": enrich_work_order(wo, db),
         "inspection": {
             "id": inspection.id,
@@ -2736,11 +2751,19 @@ def verify_work_order_inspection(
             "inspector_id": inspection.inspector_id,
             "inspector_name": _name(db, inspection.inspector_id),
             "passed": inspection.passed,
-            "inspection_date": inspection.inspection_date,
+            "inspection_date": inspection.inspection_date.isoformat() if hasattr(inspection.inspection_date, "isoformat") else str(inspection.inspection_date),
             "notes": inspection.notes,
             "checklist_results": inspection.checklist_results,
         }
     }
+    if idempotency_key and wo.report_id:
+        command_integrity.record_receipt(
+            db, actor_id=inspector_id, operation="work_order_verify_inspection",
+            report_id=wo.report_id, key=idempotency_key, digest=request_digest,
+            resource_id=wo.id, result_json=res,
+        )
+        db.commit()
+    return res
 
 
 # =============================================================================
@@ -2753,10 +2776,22 @@ def request_citizen_information(
     data: gov_schemas.ReportRequestInfo,
     actor_id: int,
     actor_role: str,
+    idempotency_key: Optional[str] = None,
+    request_digest: Optional[str] = None,
+    expected_report_version: Optional[int] = None,
 ) -> Dict[str, Any]:
     report = db.query(models.Report).filter(models.Report.id == report_id).with_for_update().first()
     if not report:
         raise HTTPException(status_code=404, detail="Citizen report not found")
+
+    receipt = command_integrity.find_receipt(
+        db, actor_id=actor_id, operation="report_request_info",
+        report_id=report_id, key=idempotency_key, digest=request_digest,
+    )
+    if receipt:
+        return receipt.result_json
+
+    command_integrity.check_version(report.version, expected_report_version)
 
     if report.status not in ("pending", "received", "unverified", "unvalidated", "under_review", "validated", "pending_approval"):
         raise HTTPException(
@@ -2812,8 +2847,7 @@ def request_citizen_information(
 
     db.commit()
     db.refresh(report)
-
-    return {
+    res = {
         "status": "success",
         "report_id": report.id,
         "ticket_id": report.ticket_id,
@@ -2821,6 +2855,14 @@ def request_citizen_information(
         "timeline_id": timeline_entry.id,
         "message": "Information request recorded on the report timeline."
     }
+    if idempotency_key:
+        command_integrity.record_receipt(
+            db, actor_id=actor_id, operation="report_request_info",
+            report_id=report.id, key=idempotency_key, digest=request_digest,
+            resource_id=report.id, result_json=res,
+        )
+        db.commit()
+    return res
 
 
 # =============================================================================

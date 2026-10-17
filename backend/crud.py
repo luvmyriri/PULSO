@@ -542,7 +542,8 @@ def confirm_report_resolution(
     report_id: int, 
     resident_id: int, 
     rating: int, 
-    note: str = None
+    note: str = None,
+    expected_version: Optional[int] = None,
 ) -> Optional[models.Report]:
     """
     Allow a resident to confirm a report as resolved and provide feedback.
@@ -565,6 +566,9 @@ def confirm_report_resolution(
         if report.satisfaction_rating == rating and report.citizen_feedback_note == note:
             return report
         raise HTTPException(status_code=409, detail="Resolution has already been confirmed with different feedback")
+    if expected_version is not None:
+        import command_integrity
+        command_integrity.check_version(report.version, expected_version)
     if report.status != "resolved":
         raise HTTPException(status_code=409, detail="Only a resolved report can be confirmed")
 
