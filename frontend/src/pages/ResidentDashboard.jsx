@@ -2897,7 +2897,7 @@ const ProfileView = ({
                                             value={passwords.current}
                                             onChange={(e) => setPasswords(prev => ({ ...prev, current: e.target.value }))}
                                             placeholder="Enter current password"
-                                            className="w-full px-3.5 py-2.5 pr-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            className="w-full px-3.5 py-2.5 pr-11 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                         />
                                         <button
                                             type="button"
@@ -2919,8 +2919,8 @@ const ProfileView = ({
                                             type={showPass.new ? 'text' : 'password'}
                                             value={passwords.new}
                                             onChange={(e) => setPasswords(prev => ({ ...prev, new: e.target.value }))}
-                                            placeholder="At least 8 characters with numbers & symbols"
-                                            className="w-full px-3.5 py-2.5 pr-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            placeholder="At least 8 characters"
+                                            className="w-full px-3.5 py-2.5 pr-11 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                         />
                                         <button
                                             type="button"
@@ -2931,6 +2931,13 @@ const ProfileView = ({
                                             {showPass.new ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                     </div>
+
+                                    {/* Upfront helper requirement: visible when empty so user sees full requirement without relying on placeholder */}
+                                    {!passwords.new && (
+                                        <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5 font-medium">
+                                            At least 8 characters with numbers &amp; symbols
+                                        </p>
+                                    )}
 
                                     {/* Password Strength Meter */}
                                     {passwords.new && (
@@ -2959,7 +2966,7 @@ const ProfileView = ({
                                             value={passwords.confirm}
                                             onChange={(e) => setPasswords(prev => ({ ...prev, confirm: e.target.value }))}
                                             placeholder="Re-type new password"
-                                            className="w-full px-3.5 py-2.5 pr-10 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            className="w-full px-3.5 py-2.5 pr-11 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                         />
                                         <button
                                             type="button"
@@ -4104,7 +4111,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                                     type={showPass.current ? "text" : "password"}
                                     value={passwords.current}
                                     onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
-                                    className="w-full bg-transparent pl-12 pr-12 py-3.5 text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                                    className="w-full bg-transparent pl-12 pr-12 py-3.5 text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100"
                                     placeholder="Enter your existing password"
                                     required
                                 />
@@ -4142,7 +4149,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                                         type={showPass.new ? "text" : "password"}
                                         value={passwords.new}
                                         onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
-                                        className="w-full bg-transparent pl-12 pr-12 py-3.5 text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                                        className="w-full bg-transparent pl-12 pr-12 py-3.5 text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100"
                                         placeholder="Create new password"
                                         required
                                     />
@@ -4178,7 +4185,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                                         type={showPass.confirm ? "text" : "password"}
                                         value={passwords.confirm}
                                         onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                                        className="w-full bg-transparent pl-12 pr-12 py-3.5 text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                                        className="w-full bg-transparent pl-12 pr-12 py-3.5 text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100"
                                         placeholder="Repeat new password"
                                         required
                                     />

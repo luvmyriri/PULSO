@@ -897,7 +897,7 @@ export default function Login() {
                                                                         handleLogin(e);
                                                                     }
                                                                 }}
-                                                                className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-10 py-3 transition-all"
+                                                                className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-10 py-3 transition-all"
                                                                 placeholder="Enter password"
                                                                 required
                                                                 autoComplete="current-password"
@@ -1349,7 +1349,7 @@ export default function Login() {
                                                                     type={showNewPassword ? "text" : "password"}
                                                                     value={newPassword}
                                                                     onChange={(e) => setNewPassword(e.target.value)}
-                                                                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]"
+                                                                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 text-xs sm:text-sm rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]"
                                                                     placeholder="••••••••"
                                                                     required
                                                                 />
@@ -1375,7 +1375,7 @@ export default function Login() {
                                                                     type={showConfirmNewPassword ? "text" : "password"}
                                                                     value={confirmNewPassword}
                                                                     onChange={(e) => setConfirmNewPassword(e.target.value)}
-                                                                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]"
+                                                                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 text-xs sm:text-sm rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]"
                                                                     placeholder="••••••••"
                                                                     required
                                                                 />

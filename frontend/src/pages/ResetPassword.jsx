@@ -195,7 +195,7 @@ export default function ResetPassword() {
                                                         type={showPassword ? "text" : "password"}
                                                         value={password}
                                                         onChange={(e) => setPassword(e.target.value)}
-                                                        className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white dark:focus:bg-slate-950 block pl-12 pr-12 p-5 transition-all shadow-sm"
+                                                        className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white dark:focus:bg-slate-950 block pl-12 pr-12 p-5 transition-all shadow-sm"
                                                         placeholder="••••••••"
                                                         required
                                                     />
@@ -213,7 +213,7 @@ export default function ResetPassword() {
                                                         type={showPassword ? "text" : "password"}
                                                         value={confirmPassword}
                                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                                        className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white dark:focus:bg-slate-950 block pl-12 p-5 transition-all shadow-sm"
+                                                        className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 text-sm rounded-2xl focus:outline-none focus:border-orange-500/50 focus:bg-white dark:focus:bg-slate-950 block pl-12 p-5 transition-all shadow-sm"
                                                         placeholder="••••••••"
                                                         required
                                                     />

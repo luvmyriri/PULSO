@@ -309,16 +309,209 @@ export default function NearbyIssuesMapModal({
     const pinRef = useRef(null);
     const cardRef = useRef(null);
     const mapModalContainerRef = useRef(null);
+    const mapInstanceRef = useRef(null);
+
+    // Camera save and restore state (Ref to prevent re-renders)
+    const savedCameraRef = useRef(null);
+    const userInteractedWhilePopupOpenRef = useRef(false);
+    const isProgrammaticMoveRef = useRef(false);
+    const isPopupOpenRef = useRef(false);
+    const [highlightedPinId, setHighlightedPinId] = useState(null);
+
+    useEffect(() => {
+        isPopupOpenRef.current = isPopupOpen;
+    }, [isPopupOpen]);
+
+    // PROBLEM 2 & 4: Track manual user dragging and zooming while popup is open; clean up on unmount
+    useEffect(() => {
+        const activeMap = mapInstanceRef.current || map;
+        if (!activeMap || !window.google?.maps) return;
+
+        const dragListener = activeMap.addListener('dragstart', () => {
+            if (isPopupOpenRef.current) {
+                userInteractedWhilePopupOpenRef.current = true;
+            }
+        });
+
+        const zoomListener = activeMap.addListener('zoom_changed', () => {
+            if (isPopupOpenRef.current && !isProgrammaticMoveRef.current) {
+                userInteractedWhilePopupOpenRef.current = true;
+            }
+        });
+
+        return () => {
+            if (window.google?.maps?.event) {
+                window.google.maps.event.removeListener(dragListener);
+                window.google.maps.event.removeListener(zoomListener);
+            }
+        };
+    }, [map]);
+
+    const restoreCameraView = useCallback((snapOverride, closedHazard, options = {}) => {
+        const activeMap = mapInstanceRef.current || map;
+        if (!activeMap || !window.google?.maps) return;
+
+        const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+        const currentSnap = snapOverride || panelSnap;
+        const skipAnimation = options.skipAnimation || false;
+        const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const shouldAnimate = !skipAnimation && !prefersReducedMotion;
+
+        // PROBLEM 2: If resident moved or zoomed map by hand while popup was open, keep their view
+        if (userInteractedWhilePopupOpenRef.current) {
+            userInteractedWhilePopupOpenRef.current = false;
+            savedCameraRef.current = null;
+            return;
+        }
+
+        const saved = savedCameraRef.current;
+        let didRestore = false;
+
+        // PROBLEM 4: Validate saved zoom & center against bounds and NaNs
+        if (saved && typeof saved.zoom === 'number' && !isNaN(saved.zoom) && saved.center && !isNaN(saved.center.lat) && !isNaN(saved.center.lng)) {
+            const clampedZoom = Math.max(10, Math.min(18, saved.zoom));
+            const currentW = mapModalContainerRef.current?.clientWidth || window.innerWidth;
+            const currentH = mapModalContainerRef.current?.clientHeight || window.innerHeight;
+            const sizeChanged = Math.abs(currentW - (saved.containerWidth || currentW)) > 80 ||
+                                Math.abs(currentH - (saved.containerHeight || currentH)) > 80;
+
+            if (sizeChanged && saved.bounds) {
+                const restoredBounds = new window.google.maps.LatLngBounds(
+                    new window.google.maps.LatLng(saved.bounds.southWest.lat, saved.bounds.southWest.lng),
+                    new window.google.maps.LatLng(saved.bounds.northEast.lat, saved.bounds.northEast.lng)
+                );
+                activeMap.fitBounds(restoredBounds);
+            } else {
+                if (shouldAnimate) {
+                    activeMap.panTo(saved.center);
+                    activeMap.setZoom(clampedZoom);
+                } else {
+                    activeMap.setCenter(saved.center);
+                    activeMap.setZoom(clampedZoom);
+                }
+            }
+            didRestore = true;
+            savedCameraRef.current = null;
+        } else {
+            // Default view when there is no saved camera: fit whole Caloocan boundary or sector (matches Screenshot 2)
+            if (activeSector === 'north') {
+                const northCenter = NORTH_CALOOCAN_CENTROID || { lat: 14.7566, lng: 121.0450 };
+                const latOffset = (!isDesktop && currentSnap === 'half') ? -0.016 : 0;
+                const targetCenter = { lat: northCenter.lat + latOffset, lng: northCenter.lng };
+                if (shouldAnimate) {
+                    activeMap.panTo(targetCenter);
+                    activeMap.setZoom(12);
+                } else {
+                    activeMap.setCenter(targetCenter);
+                    activeMap.setZoom(12);
+                }
+            } else if (activeSector === 'south') {
+                const southCenter = SOUTH_CALOOCAN_CENTROID || { lat: 14.6500, lng: 120.9850 };
+                const latOffset = (!isDesktop && currentSnap === 'half') ? -0.018 : 0;
+                const targetCenter = { lat: southCenter.lat + latOffset, lng: southCenter.lng };
+                if (shouldAnimate) {
+                    activeMap.panTo(targetCenter);
+                    activeMap.setZoom(13);
+                } else {
+                    activeMap.setCenter(targetCenter);
+                    activeMap.setZoom(13);
+                }
+            } else {
+                if (COMBINED_CALOOCAN_BOUNDS?.southWest && COMBINED_CALOOCAN_BOUNDS?.northEast) {
+                    const bounds = new window.google.maps.LatLngBounds(
+                        new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
+                        new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
+                    );
+                    const containerH = mapModalContainerRef.current?.clientHeight || window.innerHeight || 700;
+                    const maxAllowedBottom = Math.max(40, Math.floor(containerH * 0.45));
+                    const bottomPadding = (!isDesktop && currentSnap === 'half')
+                        ? Math.min(maxAllowedBottom, Math.round(containerH * 0.42))
+                        : 50;
+                    const padding = isDesktop
+                        ? { top: 50, right: 50, bottom: 50, left: 50 }
+                        : { top: 60, right: 30, bottom: bottomPadding, left: 30 };
+                    try {
+                        activeMap.fitBounds(bounds, padding);
+                    } catch (_) {
+                        activeMap.panTo(COMBINED_CALOOCAN_BOUNDS.center);
+                        activeMap.setZoom(11.5);
+                    }
+                } else {
+                    const fallback = reportLocation?.lat ? reportLocation : (NORTH_CALOOCAN_CENTROID || CALOOCAN_CENTER);
+                    activeMap.panTo(fallback);
+                    activeMap.setZoom(12);
+                }
+            }
+            didRestore = true;
+        }
+
+        if (didRestore) {
+            setAriaAnnouncement('Map restored');
+        }
+
+        // PROBLEM 3: Keep the closed pin highlighted and ensure it stays visible
+        // If pin would end up behind the panel or off screen, nudge with panBy without changing zoom
+        if (closedHazard?.lat != null && closedHazard?.lng != null) {
+            setTimeout(() => {
+                const m = mapInstanceRef.current || map;
+                if (!m) return;
+                const proj = m.getProjection();
+                const bounds = m.getBounds();
+                if (proj && bounds && window.google?.maps?.Point && window.google?.maps?.LatLng) {
+                    const containerW = mapModalContainerRef.current?.clientWidth || window.innerWidth;
+                    const containerH = mapModalContainerRef.current?.clientHeight || window.innerHeight;
+                    const currentZ = m.getZoom() || 12;
+                    const scale = Math.pow(2, currentZ);
+                    const centerPoint = proj.fromLatLngToPoint(m.getCenter());
+                    const pinPoint = proj.fromLatLngToPoint(new window.google.maps.LatLng(closedHazard.lat, closedHazard.lng));
+
+                    if (centerPoint && pinPoint) {
+                        const pixelX = (pinPoint.x - centerPoint.x) * scale + (containerW / 2);
+                        const pixelY = (pinPoint.y - centerPoint.y) * scale + (containerH / 2);
+
+                        const panelBottomH = (!isDesktop && currentSnap === 'half') ? containerH * 0.5 : 80;
+                        const safeTop = 80;
+                        const safeBottom = containerH - panelBottomH - 40;
+                        const safeLeft = 40;
+                        const safeRight = containerW - 40;
+
+                        let nudgeX = 0;
+                        let nudgeY = 0;
+
+                        if (pixelY > safeBottom) {
+                            nudgeY = pixelY - safeBottom;
+                        } else if (pixelY < safeTop) {
+                            nudgeY = pixelY - safeTop;
+                        }
+
+                        if (pixelX > safeRight) {
+                            nudgeX = pixelX - safeRight;
+                        } else if (pixelX < safeLeft) {
+                            nudgeX = pixelX - safeLeft;
+                        }
+
+                        if (nudgeX !== 0 || nudgeY !== 0) {
+                            m.panBy(nudgeX, nudgeY);
+                        }
+                    }
+                }
+                // Return focus to the pin that opened the popup
+                pinRef.current?.focus?.();
+            }, 320);
+        }
+    }, [map, activeSector, panelSnap, reportLocation]);
 
     const frameReportPin = useCallback((h) => {
-        if (!h || !map || h.lat == null || h.lng == null) return;
-        const currentZ = map.getZoom() || 11;
+        const activeMap = mapInstanceRef.current || map;
+        if (!h || !activeMap || h.lat == null || h.lng == null) return;
+        const currentZ = activeMap.getZoom() || 11;
         if (currentZ < 16) {
-            map.setZoom(16);
+            activeMap.setZoom(16);
         }
 
         const frame = () => {
-            if (!map) return;
+            const currentMap = mapInstanceRef.current || map;
+            if (!currentMap) return;
             const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
             const containerH = mapModalContainerRef.current?.clientHeight || window.innerHeight || 700;
             // Popup card height is ~380px on mobile
@@ -329,9 +522,9 @@ export default function NearbyIssuesMapModal({
             const pixelOffsetY = (containerH / 2) - targetPinY;
             const pixelOffsetX = isDesktop ? 160 : 0;
 
-            const projection = map.getProjection();
+            const projection = currentMap.getProjection();
             if (projection && window.google?.maps?.LatLng && window.google?.maps?.Point) {
-                const zoom = map.getZoom() || 16;
+                const zoom = currentMap.getZoom() || 16;
                 const scale = Math.pow(2, zoom);
                 const worldPoint = projection.fromLatLngToPoint(new window.google.maps.LatLng(h.lat, h.lng));
                 if (worldPoint) {
@@ -341,14 +534,14 @@ export default function NearbyIssuesMapModal({
                     );
                     const targetLatLng = projection.fromPointToLatLng(targetWorldPoint);
                     if (targetLatLng) {
-                        map.panTo(targetLatLng);
+                        currentMap.panTo(targetLatLng);
                         return;
                     }
                 }
             }
 
             // Fallback direct pan with latitude offset (lower latitude shifts map south, placing pin north/higher)
-            map.panTo({
+            currentMap.panTo({
                 lat: h.lat - (isDesktop ? 0 : 0.0038),
                 lng: h.lng + (isDesktop ? 0.0035 : 0)
             });
@@ -362,32 +555,52 @@ export default function NearbyIssuesMapModal({
 
     const handlePinClick = useCallback((h) => {
         if (!h) return;
-        if (!isPopupOpen) {
-            previousPanelSnapRef.current = panelSnap;
-            setIsPopupOpen(true);
-            setPanelSnap('collapsed');
-        }
-        setSelectedHazard(h);
-        frameReportPin(h);
-    }, [isPopupOpen, panelSnap, frameReportPin]);
+        const activeMap = mapInstanceRef.current || map;
 
-    // Lock map dragging when report popup is active to ensure the framed pin location stays fully visible
-    useEffect(() => {
-        if (map) {
-            map.setOptions({
-                draggable: !isPopupOpen,
-                gestureHandling: isPopupOpen ? 'none' : 'greedy'
-            });
+        // PROBLEM 1 & 2: Before moving for a pin, save current camera ONLY when no popup is open yet
+        if (!isPopupOpenRef.current && !savedCameraRef.current && activeMap && window.google?.maps) {
+            const curCenter = activeMap.getCenter();
+            const curZoom = activeMap.getZoom();
+            if (curCenter && typeof curZoom === 'number') {
+                const curBounds = activeMap.getBounds();
+                savedCameraRef.current = {
+                    center: { lat: curCenter.lat(), lng: curCenter.lng() },
+                    zoom: curZoom,
+                    bounds: curBounds ? {
+                        southWest: { lat: curBounds.getSouthWest().lat(), lng: curBounds.getSouthWest().lng() },
+                        northEast: { lat: curBounds.getNorthEast().lat(), lng: curBounds.getNorthEast().lng() }
+                    } : null,
+                    heading: typeof activeMap.getHeading === 'function' ? (activeMap.getHeading() || 0) : 0,
+                    tilt: typeof activeMap.getTilt === 'function' ? (activeMap.getTilt() || 0) : 0,
+                    containerWidth: mapModalContainerRef.current?.clientWidth || window.innerWidth,
+                    containerHeight: mapModalContainerRef.current?.clientHeight || window.innerHeight
+                };
+            }
+            previousPanelSnapRef.current = panelSnap;
         }
-    }, [map, isPopupOpen]);
+
+        userInteractedWhilePopupOpenRef.current = false;
+        isProgrammaticMoveRef.current = true;
+        setHighlightedPinId(h.id);
+        setSelectedHazard(h);
+        setIsPopupOpen(true);
+        setPanelSnap('collapsed');
+        frameReportPin(h);
+
+        setTimeout(() => {
+            isProgrammaticMoveRef.current = false;
+        }, 500);
+    }, [panelSnap, frameReportPin, map]);
 
     const handleClosePopup = useCallback(() => {
+        const hazardToClose = selectedHazard;
         setIsPopupOpen(false);
         setSelectedHazard(null);
-        if (previousPanelSnapRef.current) {
-            setPanelSnap(previousPanelSnapRef.current);
-        }
-    }, []);
+        setHighlightedPinId(null);
+        const restoredSnap = previousPanelSnapRef.current || 'half';
+        setPanelSnap(restoredSnap);
+        restoreCameraView(restoredSnap, hazardToClose);
+    }, [restoreCameraView, selectedHazard]);
 
     useEffect(() => {
         if (initialSheetPosition) {
@@ -697,34 +910,59 @@ export default function NearbyIssuesMapModal({
     // Handle Sector jump
     const handleSectorChange = (sector) => {
         setActiveSector(sector);
-        if (!map || !window.google?.maps) return;
+        const activeMap = mapInstanceRef.current || map;
+        if (!activeMap || !window.google?.maps) return;
+
+        // PROBLEM 2: If switching Area while popup is open, close popup and fit chosen area instead of restoring old view
+        if (isPopupOpenRef.current) {
+            setIsPopupOpen(false);
+            setSelectedHazard(null);
+            savedCameraRef.current = null;
+            userInteractedWhilePopupOpenRef.current = false;
+        }
 
         const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
         const containerH = mapModalContainerRef.current?.clientHeight || window.innerHeight || 700;
-        // When bottom panel is at 'half' (50%), bottom padding accounts for the panel
-        const bottomPadding = (!isDesktop && panelSnap === 'half')
-            ? Math.round(containerH * 0.5) + 20
-            : (!isDesktop && panelSnap === 'collapsed')
-                ? 90
-                : 50;
 
         if (sector === 'north') {
             const northCenter = NORTH_CALOOCAN_CENTROID || { lat: 14.7566, lng: 121.0450 };
             const latOffset = (!isDesktop && panelSnap === 'half') ? -0.016 : 0;
-            map.panTo({ lat: northCenter.lat + latOffset, lng: northCenter.lng });
-            map.setZoom(12);
+            activeMap.panTo({ lat: northCenter.lat + latOffset, lng: northCenter.lng });
+            activeMap.setZoom(12);
         } else if (sector === 'south') {
             const southCenter = SOUTH_CALOOCAN_CENTROID || { lat: 14.6500, lng: 120.9850 };
             // Shift center south so South Caloocan stays clearly visible in upper half above bottom panel
             const latOffset = (!isDesktop && panelSnap === 'half') ? -0.018 : 0;
-            map.panTo({ lat: southCenter.lat + latOffset, lng: southCenter.lng });
-            map.setZoom(13);
+            activeMap.panTo({ lat: southCenter.lat + latOffset, lng: southCenter.lng });
+            activeMap.setZoom(13);
         } else {
-            const bounds = new window.google.maps.LatLngBounds(
-                new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
-                new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
-            );
-            map.fitBounds(bounds, { top: 70, right: 30, bottom: bottomPadding, left: 30 });
+            // Sector 'all': Fit whole Caloocan boundary (North and South) with bottom sheet padding
+            if (COMBINED_CALOOCAN_BOUNDS?.southWest && COMBINED_CALOOCAN_BOUNDS?.northEast) {
+                const bounds = new window.google.maps.LatLngBounds(
+                    new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.southWest.lat, COMBINED_CALOOCAN_BOUNDS.southWest.lng),
+                    new window.google.maps.LatLng(COMBINED_CALOOCAN_BOUNDS.northEast.lat, COMBINED_CALOOCAN_BOUNDS.northEast.lng)
+                );
+                const maxAllowedBottom = Math.max(40, Math.floor(containerH * 0.45));
+                const bottomPadding = (!isDesktop && panelSnap === 'half')
+                    ? Math.min(maxAllowedBottom, Math.round(containerH * 0.42))
+                    : 50;
+                const padding = isDesktop
+                    ? { top: 50, right: 50, bottom: 50, left: 50 }
+                    : { top: 60, right: 30, bottom: bottomPadding, left: 30 };
+                try {
+                    activeMap.fitBounds(bounds, padding);
+                } catch (_) {
+                    activeMap.panTo(COMBINED_CALOOCAN_BOUNDS.center);
+                    activeMap.setZoom(11.5);
+                }
+            } else {
+                const fallbackCenter = reportLocation?.lat
+                    ? reportLocation
+                    : (NORTH_CALOOCAN_CENTROID || CALOOCAN_CENTER || { lat: 14.7566, lng: 121.0450 });
+                const latOffset = (!isDesktop && panelSnap === 'half') ? -0.015 : 0;
+                activeMap.panTo({ lat: fallbackCenter.lat + latOffset, lng: fallbackCenter.lng });
+                activeMap.setZoom(12);
+            }
         }
     };
 
@@ -810,8 +1048,8 @@ export default function NearbyIssuesMapModal({
                                 : (isDark ? DARK_CIVIC_MAP_STYLE : LIGHT_CIVIC_MAP_STYLE),
                             disableDefaultUI: true,
                             zoomControl: false,
-                            draggable: !isPopupOpen,
-                            gestureHandling: isPopupOpen ? 'none' : 'greedy',
+                            draggable: true,
+                            gestureHandling: 'greedy',
                             keyboardShortcuts: false,
                             minZoom: 10,
                             maxZoom: 18,
@@ -832,7 +1070,12 @@ export default function NearbyIssuesMapModal({
                             }
                         }}
                         onLoad={m => {
+                            mapInstanceRef.current = m;
                             setMap(m);
+                        }}
+                        onUnmount={() => {
+                            mapInstanceRef.current = null;
+                            setMap(null);
                         }}
                         onClick={(e) => {
                             if (e.latLng && setReportLocation) {
@@ -844,9 +1087,9 @@ export default function NearbyIssuesMapModal({
                             } else {
                                 if (isPopupOpen) {
                                     handleClosePopup();
+                                } else if (selectedHazard || highlightedPinId) {
                                     setSelectedHazard(null);
-                                } else if (selectedHazard) {
-                                    setSelectedHazard(null);
+                                    setHighlightedPinId(null);
                                 }
                             }
                         }}
@@ -926,7 +1169,7 @@ export default function NearbyIssuesMapModal({
                             </OverlayViewF>
                         )}
 
-                        {/* Incident Markers — unselected rendered as MarkerF, selected rendered as MapPin via OverlayViewF */}
+                        {/* Incident Markers — rendered as normal MarkerF; hidden only while popup is actively open */}
                         {!svLocation && filteredReports.map(h => {
                             const isSelected = isPopupOpen && selectedHazard?.id === h.id;
                             if (isSelected) return null;
@@ -963,7 +1206,7 @@ export default function NearbyIssuesMapModal({
                             );
                         })}
 
-                        {/* Selected Pin rendered via OverlayViewF with MapPin (3.5rem round photo, dual ring) */}
+                        {/* Selected Pin rendered via OverlayViewF with MapPin (3.5rem round photo, dual ring) ONLY while popup is open */}
                         {!svLocation && isPopupOpen && selectedHazard?.lat != null && selectedHazard?.lng != null && (
                             <OverlayViewF
                                 key={`selected-pin-${selectedHazard.id}-${streetViewSession}`}
@@ -1091,6 +1334,7 @@ export default function NearbyIssuesMapModal({
                         type="button"
                         onClick={() => {
                             if (svLocation) handleStreetViewClick(null);
+                            else if (isPopupOpen) handleClosePopup();
                             else if (onClose) onClose();
                         }}
                         aria-label="Back to dashboard"
@@ -1150,6 +1394,7 @@ export default function NearbyIssuesMapModal({
                         onClose={handleClosePopup}
                         isDark={isDark}
                         onOpenReport={(r) => {
+                            restoreCameraView(panelSnap, r, { skipAnimation: true });
                             if (onOpenReportDetail) {
                                 onOpenReportDetail(r);
                             }

@@ -161,13 +161,13 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
                                 } ${
                                     isCurrentActive
                                         ? 'bg-[#ff6b00] text-white shadow-md shadow-orange-500/25 hover:bg-[#ea5f00] hover:shadow-lg hover:shadow-orange-500/30'
-                                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 font-medium'
+                                        : 'text-black dark:text-white hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 font-bold'
                                 }`}
                             >
                                 <Icon
                                     size={18}
                                     className={`shrink-0 transition-colors ${
-                                        isCurrentActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white'
+                                        isCurrentActive ? 'text-white' : 'text-black dark:text-white group-hover:text-black dark:group-hover:text-white'
                                     }`}
                                 />
                                 {!isCollapsed && <span>{item.label}</span>}
@@ -182,14 +182,14 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
                 <button
                     type="button"
                     onClick={toggleCollapse}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-all cursor-pointer ${
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-black dark:text-white hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-all cursor-pointer ${
                         !isCollapsed ? 'justify-start' : 'justify-center'
                     }`}
                     title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
                     <ChevronLeft
                         size={18}
-                        className={`shrink-0 transition-transform duration-300 ${
+                        className={`shrink-0 text-black dark:text-white transition-transform duration-300 ${
                             isCollapsed ? 'rotate-180' : ''
                         }`}
                     />

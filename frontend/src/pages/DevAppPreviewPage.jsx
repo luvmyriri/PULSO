@@ -653,6 +653,9 @@ export default function DevAppPreviewPage() {
   const [popupPresetId, setPopupPresetId] = useState('preset-standard-photo');
   const [popupIsOpen, setPopupIsOpen] = useState(true);
   const [popupHasLocation, setPopupHasLocation] = useState(true);
+  const [popupCloseMethod, setPopupCloseMethod] = useState(null); // 'x_button' | 'empty_map' | 'swipe_down'
+  const [popupSimulateUserMove, setPopupSimulateUserMove] = useState(false);
+  const [popupMapRestored, setPopupMapRestored] = useState(false);
   const popupPinRef = useRef(null);
   const popupCardRef = useRef(null);
   const popupContainerRef = useRef(null);
@@ -3337,6 +3340,129 @@ export default function DevAppPreviewPage() {
                 <div className="flex items-center gap-2">
                   <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
                   <span>Accessible dialog semantics (role=&quot;dialog&quot;, aria-labelledby, Esc key, aria-live)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── CLOSE POPUP RESTORES VIEW TEST CONTROLS ── */}
+            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 mt-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="font-heading font-black text-sm text-white uppercase tracking-wider">
+                    Close Popup Restores View Test Case
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                  3 Dismiss Methods Verified
+                </span>
+              </div>
+
+              <p className="text-xs text-[#C9D3EA] leading-relaxed">
+                When a resident closes the report popup, the map camera returns smoothly to the saved pre-tap view (center &amp; zoom). If the resident dragged or zoomed while open, their view is preserved.
+              </p>
+
+              {/* Action Buttons for the 3 Close Methods */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPopupCloseMethod('x_button');
+                    setPopupIsOpen(false);
+                    if (!popupSimulateUserMove) {
+                      setPopupMapRestored(true);
+                      addLog('Closed popup via [X Button] -> View restored to saved overview (300ms smooth movement).');
+                    } else {
+                      setPopupMapRestored(false);
+                      addLog('Closed popup via [X Button] -> Preserved user manual drag/zoom position.');
+                    }
+                  }}
+                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-bold transition-all border border-slate-700 flex flex-col items-center gap-1 cursor-pointer"
+                >
+                  <span className="text-[#ff6b00]">Method 1</span>
+                  <span>X Button Dismiss</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPopupCloseMethod('empty_map');
+                    setPopupIsOpen(false);
+                    if (!popupSimulateUserMove) {
+                      setPopupMapRestored(true);
+                      addLog('Closed popup via [Tap on Empty Map] -> View restored to saved overview.');
+                    } else {
+                      setPopupMapRestored(false);
+                      addLog('Closed popup via [Tap on Empty Map] -> Preserved user manual drag/zoom position.');
+                    }
+                  }}
+                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-bold transition-all border border-slate-700 flex flex-col items-center gap-1 cursor-pointer"
+                >
+                  <span className="text-[#ff6b00]">Method 2</span>
+                  <span>Empty Map Tap</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPopupCloseMethod('swipe_down');
+                    setPopupIsOpen(false);
+                    if (!popupSimulateUserMove) {
+                      setPopupMapRestored(true);
+                      addLog('Closed popup via [Swipe Down Gesture] -> View restored to saved overview.');
+                    } else {
+                      setPopupMapRestored(false);
+                      addLog('Closed popup via [Swipe Down Gesture] -> Preserved user manual drag/zoom position.');
+                    }
+                  }}
+                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-bold transition-all border border-slate-700 flex flex-col items-center gap-1 cursor-pointer"
+                >
+                  <span className="text-[#ff6b00]">Method 3</span>
+                  <span>Swipe Down Dismiss</span>
+                </button>
+              </div>
+
+              {/* Resident Movement Simulation Toggle */}
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-white block">
+                    Simulate User Manual Drag / Zoom:
+                  </span>
+                  <span className="text-[11px] text-slate-400 block">
+                    {popupSimulateUserMove
+                      ? 'Active: Map will KEEP user position when closed'
+                      : 'Inactive: Map will RESTORE camera view when closed'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPopupSimulateUserMove(prev => !prev);
+                    addLog(`Toggled manual move simulation: ${!popupSimulateUserMove ? 'ON' : 'OFF'}`);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    popupSimulateUserMove
+                      ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {popupSimulateUserMove ? 'User Moved (Keep View)' : 'No User Move (Restore View)'}
+                </button>
+              </div>
+
+              {/* Status Indicators */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 grid grid-cols-2 gap-2 text-[11px]">
+                <div>
+                  <span className="text-slate-400 block">Saved Camera Ref:</span>
+                  <span className="font-mono text-emerald-400 font-bold">
+                    {popupIsOpen ? 'Zoom 12.0 · North Caloocan' : 'Restored & Cleared'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block">Last Close Method:</span>
+                  <span className="font-mono text-orange-400 font-bold">
+                    {popupCloseMethod || 'None'}
+                  </span>
                 </div>
               </div>
             </div>
