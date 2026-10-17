@@ -37,6 +37,7 @@ import auth
 import utils.security
 from database import Base
 from migrate_guest_reporting import run_migration
+from tests.postgis_support import reset_rows
 
 
 TOKEN_REGEX = re.compile(r"^TRK-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$")
@@ -49,18 +50,12 @@ TOKEN_128_REGEX = re.compile(r"^TRK-[0-9A-F]{8}-[0-9A-F]{8}-[0-9A-F]{8}-[0-9A-F]
 class TestReportModelEvolution(unittest.TestCase):
 
     def setUp(self):
-        self.engine = create_engine(
-            "sqlite:///:memory:",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool
-        )
-        Base.metadata.create_all(bind=self.engine)
+        self.engine = reset_rows()
         Session = sessionmaker(bind=self.engine)
         self.db = Session()
 
     def tearDown(self):
         self.db.close()
-        Base.metadata.drop_all(bind=self.engine)
 
     def test_guest_report_instantiation(self):
         """M1-MOD-01: Verify guest report can be instantiated with nullable resident_id and guest defaults."""
@@ -385,12 +380,7 @@ class TestSecurityAndTokenCryptography(unittest.TestCase):
 class TestOptionalAuthenticationDependency(unittest.TestCase):
 
     def setUp(self):
-        self.engine = create_engine(
-            "sqlite:///:memory:",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool
-        )
-        Base.metadata.create_all(bind=self.engine)
+        self.engine = reset_rows()
         Session = sessionmaker(bind=self.engine)
         self.db = Session()
 
@@ -423,7 +413,6 @@ class TestOptionalAuthenticationDependency(unittest.TestCase):
 
     def tearDown(self):
         self.db.close()
-        Base.metadata.drop_all(bind=self.engine)
 
     def _create_jwt(self, email: str, expired: bool = False) -> str:
         delta = timedelta(hours=-1) if expired else timedelta(hours=1)

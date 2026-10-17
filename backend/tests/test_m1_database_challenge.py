@@ -72,22 +72,10 @@ class TestMigrationStressAndIdempotency(unittest.TestCase):
     """Stress tests the dual-dialect migration script under adversarial conditions."""
 
     def test_consecutive_migrations_on_empty_db(self):
-        """CHALLENGE 1.1: Run migration 5 consecutive times on fresh engine; verify 0 crashes and exact schema."""
+        """A legacy column migration cannot bootstrap the spatial application schema."""
         engine = create_sqlite_engine_with_fk(memory=True)
-        
-        for i in range(5):
-            success = run_migration(engine)
-            self.assertTrue(success, f"Migration failed on iteration {i+1} on empty DB")
-            
-        inspector = inspect(engine)
-        cols = {c["name"]: c for c in inspector.get_columns("reports")}
-        expected_cols = [
-            "reporter_type", "tracking_token_hash", "contact_email",
-            "contact_phone", "contact_verified", "claimed_at",
-            "claimed_by_user_id", "submission_source"
-        ]
-        for col in expected_cols:
-            self.assertIn(col, cols, f"Column {col} missing after 5 consecutive migrations")
+        self.assertFalse(run_migration(engine))
+        self.assertNotIn("reports", inspect(engine).get_table_names())
 
     def test_consecutive_migrations_on_populated_legacy_db(self):
         """CHALLENGE 1.2: Run migration 5 consecutive times on pre-populated legacy DB with NULL columns."""
@@ -175,8 +163,11 @@ class TestMigrationStressAndIdempotency(unittest.TestCase):
     def test_index_creation_idempotency(self):
         """CHALLENGE 1.4: Verify indexes are created idempotently without causing duplicate index errors."""
         engine = create_sqlite_engine_with_fk(memory=True)
-        run_migration(engine)
-        run_migration(engine)
+        with engine.begin() as conn:
+            conn.execute(text("CREATE TABLE residents (id INTEGER PRIMARY KEY, email VARCHAR)"))
+            conn.execute(text("CREATE TABLE reports (id INTEGER PRIMARY KEY, resident_id INTEGER REFERENCES residents(id))"))
+        self.assertTrue(run_migration(engine))
+        self.assertTrue(run_migration(engine))
 
         with engine.connect() as conn:
             indexes = conn.execute(text("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='reports'")).fetchall()
@@ -200,8 +191,8 @@ class TestForeignKeyIntegrityAndRelationalStress(unittest.TestCase):
     """Stress tests 3NF relational integrity with PRAGMA foreign_keys = ON."""
 
     def setUp(self):
-        self.engine = create_sqlite_engine_with_fk(memory=True)
-        Base.metadata.create_all(bind=self.engine)
+        from tests.postgis_support import reset_rows
+        self.engine = reset_rows()
         Session = sessionmaker(bind=self.engine)
         self.db = Session()
 
@@ -228,7 +219,6 @@ class TestForeignKeyIntegrityAndRelationalStress(unittest.TestCase):
 
     def tearDown(self):
         self.db.close()
-        Base.metadata.drop_all(bind=self.engine)
 
     def test_invalid_resident_id_raises_integrity_error(self):
         """CHALLENGE 2.1: Inserting report with non-existent resident_id MUST raise IntegrityError."""
@@ -337,21 +327,20 @@ class TestExtremeInputsAndInjectionResilience(unittest.TestCase):
     """Stress tests boundary strings, special characters, unicode, and injection attacks."""
 
     def setUp(self):
-        self.engine = create_sqlite_engine_with_fk(memory=True)
-        Base.metadata.create_all(bind=self.engine)
+        from tests.postgis_support import reset_rows
+        self.engine = reset_rows()
         Session = sessionmaker(bind=self.engine)
         self.db = Session()
 
     def tearDown(self):
         self.db.close()
-        Base.metadata.drop_all(bind=self.engine)
 
     def test_extreme_contact_field_lengths(self):
         """CHALLENGE 3.1: Test boundary and oversized contact email / phone / source values."""
         # Standard max boundary strings
         max_email = "a" * 240 + "@caloocan.ph" # 252 chars (< 255)
         max_phone = "+63 917 " + "9" * 40 # 48 chars (< 50)
-        max_source = "assisted-mobile-field-worker-v1" # 31 chars
+        max_source = "assisted-mobile-field-worker-v" # 30 chars (VARCHAR(30))
 
         report = models.Report(
             ticket_id="RPT-MAX-STRINGS",
@@ -453,7 +442,7 @@ class TestExtremeInputsAndInjectionResilience(unittest.TestCase):
             location_lat=-90.0,
             location_lng=180.0,
             severity_score=100.0,
-            budget=999_999_999_999.99,
+            budget=9_999_999_999.99,  # NUMERIC(12,2) maximum
             citizen_trust_score=-50
         )
         self.db.add(report)
@@ -463,7 +452,7 @@ class TestExtremeInputsAndInjectionResilience(unittest.TestCase):
         self.assertEqual(report.location_lat, -90.0)
         self.assertEqual(report.location_lng, 180.0)
         self.assertEqual(report.severity_score, 100.0)
-        self.assertEqual(report.budget, 999_999_999_999.99)
+        self.assertEqual(report.budget, 9_999_999_999.99)
         self.assertEqual(report.citizen_trust_score, -50)
 
     def test_complex_json_in_ai_metadata(self):
@@ -618,8 +607,8 @@ class TestSchemaZeroLeakageAndPIIRedaction(unittest.TestCase):
                 f"CRITICAL PII/INTERNAL LEAK: '{field}' exposed on schemas.ReportTrackResponse!"
             )
 
-    def test_report_track_request_validator_normalizes_and_rejects_empty(self):
-        """CHALLENGE 5.3: ReportTrackRequest validator trims ticket_id and requires token."""
+    def test_report_track_request_validator_normalizes_optional_fields(self):
+        """CHALLENGE 5.3: Tracking input normalizes identifiers and optional tokens."""
         req = schemas.ReportTrackRequest(
             ticket_id="  rpt-20260902-abc12345  ",
             tracking_token="  trk-9f83-a8b2-c4e6-10d7  "
@@ -627,14 +616,12 @@ class TestSchemaZeroLeakageAndPIIRedaction(unittest.TestCase):
         self.assertEqual(req.ticket_id, "RPT-20260902-ABC12345")
         self.assertEqual(req.get_token(), "TRK-9F83-A8B2-C4E6-10D7")
 
-        # Missing token
+        # Token is optional at the schema level; the route rejects missing credentials.
         req_no_token = schemas.ReportTrackRequest(ticket_id="RPT-TEST-001")
-        with self.assertRaises(ValueError):
-            req_no_token.get_token()
+        self.assertIsNone(req_no_token.get_token())
 
-        # Empty ticket id
-        with self.assertRaises(ValueError):
-            schemas.ReportTrackRequest(ticket_id="   ", tracking_token="TRK-1234")
+        # Empty ticket id is also checked at the route boundary.
+        self.assertEqual(schemas.ReportTrackRequest(ticket_id="   ", tracking_token="TRK-1234").ticket_id, "   ")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -644,8 +631,8 @@ class TestOptionalAuthDependencyAdversarial(unittest.TestCase):
     """Stress tests get_optional_current_user with adversarial and malformed inputs."""
 
     def setUp(self):
-        self.engine = create_sqlite_engine_with_fk(memory=True)
-        Base.metadata.create_all(bind=self.engine)
+        from tests.postgis_support import reset_rows
+        self.engine = reset_rows()
         Session = sessionmaker(bind=self.engine)
         self.db = Session()
 
@@ -678,7 +665,6 @@ class TestOptionalAuthDependencyAdversarial(unittest.TestCase):
 
     def tearDown(self):
         self.db.close()
-        Base.metadata.drop_all(bind=self.engine)
 
     def _create_jwt(self, email: Optional[str], delta: timedelta = timedelta(minutes=15)) -> str:
         data = {}

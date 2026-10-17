@@ -51,14 +51,10 @@ import predictive_router                # Predictive Maintenance Engine
 import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
 import pulseai_router                    # PULSEAI Persistent Chat & History Engine
-from database import engine, get_db
+from database import get_db
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter
-
-# Create ALL tables — citizen-side + government-side
-models.Base.metadata.create_all(bind=engine)
-gov_models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="pulso-backend",
@@ -1808,6 +1804,15 @@ async def create_new_report(
     report_submission_limiter.check(request)
 
     # 1. Payload validation
+    text_fields = (
+        category, description, location_string, location_barangay,
+        contact_email, contact_phone, submission_source,
+    )
+    if any("\x00" in value for value in text_fields if value is not None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Text fields cannot contain null bytes.",
+        )
     clean_desc = (description or "").strip()
     if len(clean_desc) < 10:
         raise HTTPException(

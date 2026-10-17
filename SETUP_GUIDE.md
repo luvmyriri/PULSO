@@ -36,17 +36,18 @@ Ensure you have the following installed on your system:
    ```
 
 5. **Configure Environment Variables**:
-   - Copy `.env` from a teammate or use the template provided in the `backend/` folder.
-   - Path: `backend/.env`
+   - Copy `backend/.env.example` to `backend/.env.local` and fill in local values. Keep that file untracked.
+   - Set `DATABASE_URL` in the terminal to the URL of your own blank PostGIS database. The bootstrap command requires an explicit URL and refuses to run without one.
 
-6. **Database Migration**:
-   - Ensure PostgreSQL is running.
-   - Create a database named `pulso_db`.
-   - Run migrations:
+6. **Bootstrap the database**:
+   - Ensure PostgreSQL with PostGIS is running. Use a blank database; the bootstrap refuses a database with application objects.
+   - From the repository root, run the command for your shell:
 
      ```bash
-     alembic upgrade head
+     bash scripts/bootstrap_db.sh
      ```
+
+     On Windows PowerShell, run `./scripts/bootstrap_db.ps1 -Python python` instead. The script loads the schema snapshot, stamps its baseline revision, and applies the remaining Alembic migrations. Do not run `alembic upgrade head` against an empty database.
 
 7. **Run the Backend**:
 

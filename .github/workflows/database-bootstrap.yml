@@ -1,0 +1,91 @@
+name: Database bootstrap
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgis:
+        image: postgis/postgis:18-3.6
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: pulso_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pulso_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/pulso_ci
+      PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Block secrets in feature commits
+        run: |
+          git rev-parse --verify origin/main >/dev/null
+          docker run --rm --network none \
+            -v "$PWD:/workspace:ro" -w /workspace \
+            ghcr.io/gitleaks/gitleaks:v8.30.0 \
+            git --log-opts="origin/main..HEAD" --redact
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend requirements
+        run: python -m pip install -r backend/requirements.txt
+      - name: Bootstrap blank database
+        run: bash scripts/bootstrap_db.sh
+      - name: Confirm Alembic head
+        working-directory: backend
+        run: |
+          python -m alembic -c alembic.ini current
+          python ../scripts/db_schema.py assert-revision e4b7c9d2f610
+      - name: Compare normalized schema inventory
+        run: |
+          python scripts/db_schema.py inventory --output "$RUNNER_TEMP/head-inventory.json"
+          python - "$RUNNER_TEMP/head-inventory.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          expected = json.loads(Path("backend/schema/head_e4b7c9d2f610.inventory.json").read_text())
+          actual = json.loads(Path(sys.argv[1]).read_text())
+          assert actual == expected, "Normalized schema inventory differs from the checked-in manifest"
+          print("Normalized schema inventory: PASS")
+          PY
+      - name: Report Alembic model drift
+        continue-on-error: true
+        working-directory: backend
+        run: |
+          set +e
+          python -m alembic -c alembic.ini check > "$RUNNER_TEMP/alembic-check.log" 2>&1
+          status=$?
+          set -e
+          count=$(grep -c 'INFO  \[alembic.autogenerate.compare\] Detected ' "$RUNNER_TEMP/alembic-check.log" || true)
+          echo "Alembic drift count: $count"
+          if [ "$status" -ne 0 ] && [ "$count" -eq 0 ]; then
+            echo "Alembic check failed without a parsed drift count."
+          fi
+          exit "$status"
+      - name: Run backend tests against PostGIS
+        working-directory: backend
+        env:
+          PULSO_TEST_DATABASE: '1'
+          PULSO_ENFORCE_KNOWN: '1'
+          PULSO_XPASS_FILE: ${{ runner.temp }}/pulso-known-xpass.txt
+        run: |
+          python -m pip install pytest==8.4.2
+          python -m pytest tests -q --disable-warnings
+      - name: Fail if a known failure starts passing
+        if: always()
+        run: python scripts/check_known_failures.py --xpass-file "$RUNNER_TEMP/pulso-known-xpass.txt"

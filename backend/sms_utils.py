@@ -8,8 +8,9 @@ from dataclasses import dataclass
 import requests
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env.local"), override=True)
+_ENV_DIR = os.path.dirname(__file__)
+load_dotenv(os.path.join(_ENV_DIR, ".env.local"))
+load_dotenv(os.path.join(_ENV_DIR, ".env"))
 
 _LOG = logging.getLogger(__name__)
 _SEMAPHORE_BASE_URL = "https://api.semaphore.co/api/v4"

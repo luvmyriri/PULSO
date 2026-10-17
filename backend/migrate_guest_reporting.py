@@ -51,16 +51,8 @@ def run_migration(engine_or_url: Optional[Union[Engine, str]] = None) -> bool:
         # 1. Verify reports table exists
         existing_tables = inspector.get_table_names()
         if "reports" not in existing_tables:
-            logger.warning("Table 'reports' does not exist. Initializing full schema on target engine...")
-            try:
-                from database import Base
-                import models
-                import gov_models
-                Base.metadata.create_all(bind=engine)
-                inspector = inspect(conn)
-            except Exception as e:
-                logger.error(f"Failed to initialize schema: {e}")
-                return False
+            logger.warning("Table 'reports' does not exist. Bootstrap the database before this legacy migration.")
+            return False
 
         existing_cols = {c["name"]: c for c in inspector.get_columns("reports")}
         logger.info(f"Inspected 'reports' table: {len(existing_cols)} existing columns found.")

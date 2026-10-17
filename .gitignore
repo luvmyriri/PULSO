@@ -4,6 +4,7 @@
 .env
 *.env
 backend/.env.local
+backend/google-credentials.json
 
 # Python Caches
 __pycache__/
@@ -38,6 +39,7 @@ frontend/public/apk/
 # Logs and transient text files
 *.log
 *.txt
+!tests/known_failures.txt
 backend/logs/
 
 # Uploads

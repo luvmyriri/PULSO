@@ -1,0 +1,4 @@
+backend/.env -diff
+frontend/.env -diff
+backend/google-credentials.json -diff
+backend/logs/ocr_scans/*.json -diff
