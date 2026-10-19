@@ -266,11 +266,13 @@ export default function PulseAIChatWindow({
 
         try {
             let convId = activeConversationId;
+            const contextStr = isStaff ? 'Government staff workspace session' : 'Resident portal session';
 
             // Create conversation session if needed
             if (!convId && token) {
                 const createRes = await apiFetch('/api/pulseai/conversations', {
                     method: 'POST',
+                    timeout: 15000,
                     body: JSON.stringify({ title: textToSend.slice(0, 40) })
                 });
                 if (createRes.ok && createRes.data?.id) {
@@ -282,9 +284,10 @@ export default function PulseAIChatWindow({
             if (convId && token) {
                 const postRes = await apiFetch(`/api/pulseai/conversations/${convId}/messages`, {
                     method: 'POST',
+                    timeout: 25000,
                     body: JSON.stringify({
                         query: textToSend,
-                        context: isStaff ? 'Government staff workspace session' : 'Resident portal session'
+                        context: contextStr
                     })
                 });
 
@@ -294,6 +297,25 @@ export default function PulseAIChatWindow({
                         text: postRes.data.response || "I could not load that information right now. You can check the Reports section for details."
                     }]);
                     fetchConversations();
+                    return;
+                }
+            }
+
+            // Stateless fallback so AI responds even if conversation persistence fails
+            if (token) {
+                const askRes = await apiFetch('/api/pulseai/ask', {
+                    method: 'POST',
+                    timeout: 25000,
+                    body: JSON.stringify({
+                        query: textToSend,
+                        context: contextStr
+                    })
+                });
+                if (askRes.ok && askRes.data?.response) {
+                    setMessages(prev => [...prev, {
+                        role: 'assistant',
+                        text: askRes.data.response
+                    }]);
                     return;
                 }
             }

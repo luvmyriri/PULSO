@@ -809,38 +809,68 @@ def get_ai_assistant_response(
             return "I couldn't load that right now. You can open Reports to check."
         try:
             import models
+            import gov_models
             from sqlalchemy import or_
             query = db.query(models.Report)
             s_lower = (status_or_scope or "").lower()
+
             if "unassigned" in s_lower:
-                reports = query.filter(
-                    models.Report.status.in_(['unverified', 'pending_approval', 'verified', 'pending']),
-                    or_(models.Report.assigned_to == None, models.Report.assigned_to == "")
-                ).order_by(models.Report.created_at.desc()).limit(6).all()
+                assigned_report_ids = [
+                    row[0] for row in db.query(gov_models.WorkOrder.report_id)
+                    .filter(
+                        gov_models.WorkOrder.report_id.isnot(None),
+                        gov_models.WorkOrder.status.notin_(['cancelled', 'rejected'])
+                    ).all()
+                ]
+                q_unassigned = query.filter(
+                    models.Report.status.in_(['pending', 'unverified', 'pending_approval', 'verified', 'for_verification'])
+                )
+                if assigned_report_ids:
+                    q_unassigned = q_unassigned.filter(~models.Report.id.in_(assigned_report_ids))
+                reports = q_unassigned.order_by(models.Report.created_at.desc()).limit(6).all()
                 title_label = "Unassigned citizen reports requiring dispatch:"
-            elif "verification" in s_lower or "needs_verification" in s_lower or "unverified" in s_lower:
-                reports = query.filter(models.Report.status == 'unverified').order_by(models.Report.created_at.desc()).limit(6).all()
-                title_label = "Reports awaiting administrative verification:"
-            elif "priority" in s_lower or "critical" in s_lower or "today" in s_lower:
+            elif "verification" in s_lower or "needs_verification" in s_lower or "unverified" in s_lower or "awaiting" in s_lower:
                 reports = query.filter(
-                    or_(models.Report.ai_urgency == 'Critical', models.Report.priority == 'critical')
+                    models.Report.status.in_(['pending', 'unverified', 'pending_approval', 'for_verification'])
                 ).order_by(models.Report.created_at.desc()).limit(6).all()
-                title_label = "Today's high and critical priority reports:"
+                title_label = "Reports awaiting administrative verification:"
+            elif "priority" in s_lower or "critical" in s_lower or "today" in s_lower or "high" in s_lower:
+                reports = query.filter(
+                    or_(
+                        models.Report.ai_urgency.ilike('%critical%'),
+                        models.Report.ai_urgency.ilike('%high%'),
+                        models.Report.severity_score >= 7.0
+                    ),
+                    models.Report.status.notin_(['resolved', 'rejected'])
+                ).order_by(models.Report.severity_score.desc(), models.Report.created_at.desc()).limit(6).all()
+                if not reports:
+                    reports = query.filter(
+                        models.Report.status.notin_(['resolved', 'rejected'])
+                    ).order_by(models.Report.severity_score.desc(), models.Report.created_at.desc()).limit(6).all()
+                title_label = "Current high and critical priority reports:"
             else:
                 reports = query.order_by(models.Report.created_at.desc()).limit(6).all()
-                title_label = "Recent incoming reports in Caloocan Engineering theater:"
+                title_label = "Recent incoming citizen reports:"
 
             if not reports:
-                return f"No reports matching '{status_or_scope or 'current query'}' were found in the queue."
+                msg = f"No reports matching **{status_or_scope or 'current filter'}** were found in the active queue."
+                invoked_tools.append({"tool": "get_staff_reports_overview", "data": msg})
+                return msg
 
-            lines = [title_label]
+            lines = [title_label, ""]
             for r in reports:
                 ticket_str = r.ticket_id or f"PUL-2026-{r.id:04d}"
                 loc = r.location_barangay or r.location_string or "North Caloocan"
                 cat = r.ai_category or r.category or "Infrastructure"
-                urg = r.ai_urgency or r.priority or "Normal"
-                lines.append(f"- Ticket **#{ticket_str}** | **{cat}** | Status: **{r.status}** | Priority: **{urg}** | Location: {loc}")
-            lines.append("\nNote: Suggestions are informational. Please confirm any status or assignment changes directly in the Reports docket.")
+                urg = r.ai_urgency or "Normal"
+                desc_snippet = (r.ai_summary or r.description or "").strip()
+                if len(desc_snippet) > 90:
+                    desc_snippet = desc_snippet[:87] + "..."
+                lines.append(
+                    f"- **#{ticket_str}** — **{cat}** ({loc}) | Status: **{r.status}** | Urgency: **{urg}**"
+                    + (f"\n  Summary: {desc_snippet}" if desc_snippet else "")
+                )
+            lines.append("\nYou can open any ticket in the **Command Center** or **Reports** workspace to verify, dispatch a crew, or update status.")
             full_res = "\n".join(lines)
             invoked_tools.append({"tool": "get_staff_reports_overview", "data": full_res[:500]})
             return full_res
@@ -854,30 +884,38 @@ def get_ai_assistant_response(
         if not db:
             return "I couldn't load that right now. You can open Work Orders to check."
         try:
-            import models
-            from sqlalchemy import or_
-            query = db.query(models.WorkOrder)
+            import gov_models
+            query = db.query(gov_models.WorkOrder)
             s_lower = (status_or_scope or "").lower()
-            if "overdue" in s_lower or "late" in s_lower:
-                wos = query.filter(models.WorkOrder.status.in_(['assigned', 'in_progress'])).order_by(models.WorkOrder.created_at.asc()).limit(5).all()
-                title_label = "Active work orders requiring scheduling review:"
+            if "overdue" in s_lower or "late" in s_lower or "sla" in s_lower:
+                wos = query.filter(
+                    gov_models.WorkOrder.status.in_(['open', 'assigned', 'in_progress', 'rework_required', 'blocked'])
+                ).order_by(gov_models.WorkOrder.created_at.asc()).limit(6).all()
+                title_label = "Active work orders requiring SLA and scheduling review:"
             else:
-                wos = query.order_by(models.WorkOrder.created_at.desc()).limit(5).all()
+                wos = query.order_by(gov_models.WorkOrder.created_at.desc()).limit(6).all()
                 title_label = "Current engineering work orders:"
 
             if not wos:
-                return "There are no overdue or active work orders flagged in your current division queue."
+                msg = "There are no overdue or active work orders flagged in the current engineering queue."
+                invoked_tools.append({"tool": "get_staff_work_orders_overview", "data": msg})
+                return msg
 
-            lines = [title_label]
+            lines = [title_label, ""]
             for wo in wos:
-                wo_id = getattr(wo, "wo_number", None) or getattr(wo, "tracking_number", None) or f"WO-2026-{wo.id:03d}"
-                lines.append(f"- Order **#{wo_id}** | **{wo.title or 'Field Maintenance'}** | Status: **{wo.status}** | Priority: **{wo.priority or 'Normal'}**")
-            lines.append("\nPlease review team dispatch and verify progress in the Operations workspace.")
+                wo_id = getattr(wo, "wo_number", None) or f"WO-2026-{wo.id:03d}"
+                prio = (wo.priority or "normal").upper()
+                lines.append(
+                    f"- **#{wo_id}** — **{wo.title or 'Field Maintenance'}** | Status: **{wo.status}** | Priority: **{prio}**"
+                )
+            lines.append("\nPlease review crew dispatch and verify completion milestones in the **Field Operations** workspace.")
             full_res = "\n".join(lines)
             invoked_tools.append({"tool": "get_staff_work_orders_overview", "data": full_res[:500]})
             return full_res
         except Exception as err:
-            return f"I couldn't load that right now. You can open Work Orders to check. ({err})"
+            err_msg = f"I couldn't load that right now. You can open Work Orders to check. ({err})"
+            invoked_tools.append({"tool": "get_staff_work_orders_overview", "data": err_msg})
+            return err_msg
 
     # ── Grounded Knowledge: Filing a report in PULSO ───────────────────────────
     REPORTING_GUIDE = (
@@ -894,11 +932,11 @@ def get_ai_assistant_response(
         ql = q.lower()
         if any(w in ql for w in ["unassigned", "unassigned report", "unassigned reports"]):
             return get_staff_reports_overview("unassigned")
-        if any(w in ql for w in ["overdue", "overdue work", "overdue work order", "overdue work orders"]):
+        if any(w in ql for w in ["overdue", "work order", "work orders", "sla"]):
             return get_staff_work_orders_overview("overdue")
-        if any(w in ql for w in ["needs verification", "unverified", "awaiting verification"]):
+        if any(w in ql for w in ["needs verification", "unverified", "awaiting verification", "verification"]):
             return get_staff_reports_overview("needs_verification")
-        if any(w in ql for w in ["priority", "priorities", "today's priorities", "critical reports"]):
+        if any(w in ql for w in ["priority", "priorities", "today's priorities", "critical", "urgent"]):
             return get_staff_reports_overview("today_priorities")
         if any(w in ql for w in ["hotline", "emergency", "police", "pnp", "fire", "bfp", "drrmo", "contact number"]):
             return get_city_hotlines()
@@ -910,6 +948,8 @@ def get_ai_assistant_response(
             return get_active_advisories()
         if any(w in ql for w in ["how to file", "how to report", "file a report", "submit a report"]):
             return REPORTING_GUIDE
+        if "staff" in (context or "").lower() or "government" in (context or "").lower():
+            return get_staff_reports_overview("recent")
         return (
             "I couldn't load that right now. You can open Reports to check. "
             "For urgent emergencies or infrastructure hazards, please contact the **Caloocan City Action Center** at **(02) 8288-8811** "
@@ -917,7 +957,6 @@ def get_ai_assistant_response(
         )
 
     if not _SDK_READY:
-
         fallback_res = _deterministic_fallback(query)
         return {
             "response": _clean_response(fallback_res),
@@ -930,14 +969,16 @@ You assist citizens and LGU staff with infrastructure management, hazard reporti
 
 STRICT OPERATIONAL & TONE RULES:
 1. NO EMOJIS: Do not use emojis in any response. Maintain a professional, helpful tone appropriate for an official city government service.
-2. MARKDOWN STRUCTURE: Always structure responses with clean paragraph breaks (double newlines). Use markdown bold (**text**) for all key terms: hotline numbers, ticket IDs, report statuses (**pending**, **in_progress**, **resolved**), department names, and important notices. Use bullet points (- ) or numbered lists (1. ) for readability.
+2. MARKDOWN STRUCTURE: Always structure responses with clean paragraph breaks (double newlines). Use markdown bold (**text**) for all key terms: hotline numbers, ticket IDs, work order IDs, report statuses (**pending**, **in_progress**, **resolved**), department names, and important notices. Use bullet points (- ) or numbered lists (1. ) for readability.
 3. GROUNDING IN REAL DATA (MANDATORY TOOL USE):
-   - When asked about the user's reports or report status: You MUST call `get_my_reports` to fetch their real database records. Present the actual ticket IDs, categories, and statuses. Never invent a status or ticket ID.
-   - When asked about city hotlines or emergency contacts: You MUST call `get_city_hotlines`. Present the official Caloocan City emergency numbers exactly as retrieved. Never fabricate hotline numbers.
+   - When asked about unassigned reports, reports awaiting verification, or critical/priority reports by staff: You MUST call `get_staff_reports_overview` with `status_or_scope` set to `"unassigned"`, `"needs_verification"`, or `"today_priorities"`. Present the exact ticket IDs, categories, locations, and statuses returned by the tool.
+   - When asked about work orders, overdue work orders, or SLA alerts: You MUST call `get_staff_work_orders_overview` with `status_or_scope="overdue"`. Present the exact work order numbers, titles, statuses, and priorities returned by the tool.
+   - When asked about a resident's own reports or report status: You MUST call `get_my_reports` to fetch their real database records.
+   - When asked about city hotlines or emergency contacts: You MUST call `get_city_hotlines`.
    - When asked about active advisories, roadworks, or city notices: You MUST call `get_active_advisories`.
-   - When asked about evacuation routes: You MUST call `get_evacuation_routes`. Plainly state that mapped digital evacuation route data is not yet available, and instruct them to contact Caloocan DRRMO at (02) 8397-6212 or NDRRMC at 911.
-   - When asked how to file a report: Describe the 5-step PULSO workflow (Tap **Report Issue**, upload evidence photo for AI scan, pin location on North Caloocan map, review & submit, receive unique **Ticket ID** to track under **My Reports**).
-4. HONEST FALLBACK: If requested data is genuinely not available or a tool returns no records, state this plainly (e.g., "I don't have that information right now — you can check the Updates tab or call the relevant hotline.") rather than guessing.
+   - When asked about evacuation routes: You MUST call `get_evacuation_routes`.
+   - When asked how to file a report: Describe the 5-step PULSO workflow.
+4. HONEST FALLBACK: If requested data is genuinely not available or a tool returns no records, state this plainly rather than guessing.
 
 System Context: {context or "General citizen inquiry"}
 User Query: {query}

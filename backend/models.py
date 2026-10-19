@@ -429,18 +429,17 @@ class NewsItem(Base):
 
 class ChatConversation(Base):
     """
-    PULSEAI Resident Chat Conversation Session.
-    Maintains persistent conversation history per resident account.
+    PULSEAI Chat Conversation Session.
+    Maintains persistent conversation history per resident or official account.
     """
     __tablename__ = "chat_conversations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("residents.id"), nullable=False, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
     title = Column(String(255), nullable=False, default="New Conversation")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    resident = relationship("Resident", backref="chat_conversations")
     messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan", order_by="ChatMessage.created_at.asc()")
 
 
