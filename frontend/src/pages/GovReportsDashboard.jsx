@@ -19,6 +19,7 @@ import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovUserDropdown from '../components/GovUserDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import SearchInput from '../components/SearchInput';
+import TablePagination from '../components/TablePagination';
 import './gov-reports-header.css';
 import Swal from 'sweetalert2';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
@@ -997,60 +998,15 @@ export default function GovReportsDashboard() {
                         </div>
 
                         {/* Pagination Footer */}
-                        <div className="h-14 shrink-0 border-t border-slate-200 dark:border-slate-800 px-5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                            <div>
-                                Showing {filteredReports.length ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredReports.length)} of {filteredReports.length} reports
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                {/* Page Buttons (Circular shape) */}
-                                <div className="flex items-center gap-1.5">
-                                    <button
-                                        type="button"
-                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed transition-all text-slate-500 dark:text-slate-400"
-                                        title="Previous page"
-                                    >
-                                        <ChevronLeft size={15} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="w-7 h-7 flex items-center justify-center font-bold text-xs bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-[#ff6b00] rounded-full shadow-xs cursor-pointer"
-                                    >
-                                        {currentPage}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setCurrentPage(p => Math.min(pageCount, p + 1))}
-                                        disabled={currentPage >= pageCount}
-                                        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed transition-all text-slate-500 dark:text-slate-400"
-                                        title="Next page"
-                                    >
-                                        <ChevronRight size={15} />
-                                    </button>
-                                </div>
-
-                                {/* Page Size Selector */}
-                                <OrangeSelect
-                                    value={pageSize}
-                                    onChange={(val) => {
-                                        setPageSize(Number(val));
-                                        setCurrentPage(1);
-                                    }}
-                                    size="sm"
-                                    minWidth="105px"
-                                    searchable={false}
-                                    dropUp={true}
-                                    align="right"
-                                    options={[
-                                        { value: 10, label: '10 / page' },
-                                        { value: 20, label: '20 / page' },
-                                        { value: 50, label: '50 / page' }
-                                    ]}
-                                />
-                            </div>
-                        </div>
+                        {filteredReports.length > 0 && (
+                            <TablePagination
+                                page={currentPage}
+                                pageSize={pageSize}
+                                total={filteredReports.length}
+                                itemLabel="reports"
+                                onPageChange={setCurrentPage}
+                            />
+                        )}
                     </div>
 
                     {/* ── RIGHT: DETAIL PANEL (Simultaneous Aperture Reveal) ───────────────────── */}
@@ -1349,8 +1305,8 @@ export default function GovReportsDashboard() {
                             aria-modal="true"
                             aria-labelledby="wo-modal-title"
                         >
-                            {/* Top Accent Gradient Strip */}
-                            <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
+                            {/* Top Accent Strip */}
+                            <div className="h-1.5 w-full bg-orange-500 shrink-0" />
 
                             {/* Modal Header */}
                             <div className="px-6 py-4.5 sm:px-7 sm:py-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40 shrink-0">

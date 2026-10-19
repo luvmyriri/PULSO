@@ -3584,11 +3584,6 @@ export default function AdministrationWorkspacePage({ workspace = 'administratio
                                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                                                     By: <strong>{log.actor}</strong> ({log.actor_role})
                                                 </div>
-                                                {log.details && (
-                                                    <pre className="mt-1 p-2 rounded bg-slate-50 dark:bg-slate-800 text-[10.5px] font-mono-data text-slate-600 dark:text-slate-300 overflow-x-auto">
-                                                        {log.details}
-                                                    </pre>
-                                                )}
                                             </div>
                                         ))
                                     )}

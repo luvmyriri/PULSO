@@ -14,6 +14,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
+import TablePagination from '../components/TablePagination';
 
 export default function DocumentRegistryPage({ workspace }) {
     const location = useLocation();
@@ -492,31 +493,15 @@ export default function DocumentRegistryPage({ workspace }) {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
-                )}
-
-                {/* Pagination */}
-                {pagination.total > 0 && (
-                    <div className="flex items-center justify-between mt-4 text-sm">
-                        <div className="text-slate-500">
-                            Showing {pagination.offset + 1} - {Math.min(pagination.offset + pagination.limit, pagination.total)} of {pagination.total}
-                        </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setPagination(prev => ({ ...prev, offset: Math.max(0, prev.offset - prev.limit) }))}
-                                disabled={pagination.offset === 0}
-                                className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg disabled:opacity-50"
-                            >
-                                Previous
-                            </button>
-                            <button
-                                onClick={() => setPagination(prev => ({ ...prev, offset: prev.offset + prev.limit }))}
-                                disabled={pagination.offset + pagination.limit >= pagination.total}
-                                className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg disabled:opacity-50"
-                            >
-                                Next
-                            </button>
-                        </div>
+                        {pagination.total > 0 && (
+                            <TablePagination
+                                page={Math.floor(pagination.offset / pagination.limit) + 1}
+                                pageSize={pagination.limit}
+                                total={pagination.total}
+                                itemLabel="documents"
+                                onPageChange={(newPage) => setPagination(prev => ({ ...prev, offset: (newPage - 1) * prev.limit }))}
+                            />
+                        )}
                     </div>
                 )}
             </div>

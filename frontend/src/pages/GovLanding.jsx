@@ -10,7 +10,6 @@ import {
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
 import LegalModal from '../components/LegalModal';
-import OfficialBanner from '../components/landing/OfficialBanner';
 import { setAuthSession, clearAuthSession } from '../utils/authSession';
 
 import { API_BASE_URL } from '../utils/apiBase';
@@ -131,11 +130,6 @@ export default function GovLanding() {
     return (
         <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden">
 
-            {/* ── Official Government Banner (GOVPH standard) ───────────── */}
-            <div className="relative z-30 w-full">
-                <OfficialBanner />
-            </div>
-
             {/* ── Top Header: Branding & Navigation ───────────── */}
             <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
                 {/* Branding: Official City Engineering Department Lockup + Gov Portal Tag */}
@@ -208,12 +202,6 @@ export default function GovLanding() {
                     {/* Left Column: Hero & System Context (60% / 7 cols) */}
                     <div className="lg:col-span-7 flex flex-col items-start text-left w-full">
 
-                        {/* Category Tag Pill */}
-                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
-                            <Activity size={14} className="text-[#ff6b00] shrink-0" />
-                            <span>Unified Command Center • Caloocan City</span>
-                        </div>
-
                         {/* Main Display Heading */}
                         <h1 className="font-heading font-black text-3xl sm:text-5xl lg:text-[52px] text-slate-900 dark:text-white uppercase leading-[1.12] mb-4 tracking-tight">
                             THE PULSE OF <br className="hidden sm:inline" />
@@ -224,40 +212,6 @@ export default function GovLanding() {
                         <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-300 font-normal leading-relaxed mb-6 max-w-xl">
                             Official engineering management and public service operations platform for LGU personnel. Authorized access only.
                         </p>
-
-                        {/* Feature Cards Grid (Mirrored Clean Style) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 w-full max-w-xl text-left">
-                            <div className="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-                                <div className="w-9 h-9 bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] rounded-lg flex items-center justify-center mb-2.5 border border-orange-200 dark:border-orange-800/50">
-                                    <ShieldCheck size={18} />
-                                </div>
-                                <h3 className="font-heading font-bold text-xs text-slate-900 dark:text-white uppercase tracking-wide mb-1">Secure Access</h3>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
-                                    Encrypted government access under Data Privacy Act (RA 10173).
-                                </p>
-                            </div>
-
-                            <div className="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-                                <div className="w-9 h-9 bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] rounded-lg flex items-center justify-center mb-2.5 border border-orange-200 dark:border-orange-800/50">
-                                    <Activity size={18} />
-                                </div>
-                                <h3 className="font-heading font-bold text-xs text-slate-900 dark:text-white uppercase tracking-wide mb-1">Live Dispatch</h3>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
-                                    Direct work order integration with LGU engineering crews.
-                                </p>
-                            </div>
-
-                            <div className="bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-                                <div className="w-9 h-9 bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] rounded-lg flex items-center justify-center mb-2.5 border border-orange-200 dark:border-orange-800/50">
-                                    <Users size={18} />
-                                </div>
-                                <h3 className="font-heading font-bold text-xs text-slate-900 dark:text-white uppercase tracking-wide mb-1">Personnel Hub</h3>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
-                                    Manage field teams, track assignments, and monitor progress.
-                                </p>
-                            </div>
-                        </div>
-
                     </div>
 
                     {/* Right Column: Structured Auth Container (40% / 5 cols) */}

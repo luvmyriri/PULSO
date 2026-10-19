@@ -51,6 +51,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
       }
 
       const mapEl = document.getElementById('map-preview');
+      const mapContentEl = document.getElementById('map-content');
       const howEl = document.getElementById('how-it-works');
       const updatesEl = document.getElementById('city-updates');
       const hotEl = document.getElementById('hotlines');
@@ -65,7 +66,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
         current = 'hotlines';
       } else if (howEl && howEl.getBoundingClientRect().top <= 240) {
         current = 'how-it-works';
-      } else if (mapEl && mapEl.getBoundingClientRect().top <= 240) {
+      } else if ((mapContentEl && mapContentEl.getBoundingClientRect().top <= 240) || (mapEl && mapEl.getBoundingClientRect().top <= 240)) {
         current = 'map';
       } else if (updatesEl && updatesEl.getBoundingClientRect().top <= 240) {
         current = 'updates';
@@ -140,9 +141,11 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
 
   const scrollTo = (id) => {
     setMobileMenuOpen(false);
-    const element = document.getElementById(id);
+    // Prioritize the interactive map content anchor so that the map and controls are immediately framed in full view
+    const targetId = (id === 'map-preview' || id === 'map') ? (document.getElementById('map-content') ? 'map-content' : 'map-preview') : id;
+    const element = document.getElementById(targetId) || document.getElementById(id);
     if (element) {
-      const offset = 73;
+      const offset = 76;
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = element.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;
@@ -152,7 +155,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
         behavior: 'smooth'
       });
     } else {
-      window.location.href = `/#${id}`;
+      window.location.href = `/#${targetId}`;
     }
   };
 
@@ -190,7 +193,11 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
         setMobileMenuOpen(false); 
         setActiveSection('map');
         if (onSelectTab) onSelectTab('map'); 
-        scrollTo('map-preview'); 
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          window.location.href = '/#map-content';
+        } else {
+          scrollTo('map-content'); 
+        }
       } 
     },
     { 

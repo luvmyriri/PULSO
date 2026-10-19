@@ -291,7 +291,9 @@ get_current_user = auth.get_current_user
 def require_role(*roles):
     """Dependency factory for explicitly listed active government roles."""
     def _check(current_user: Union[models.Official, models.Resident] = Depends(get_current_user)):
-        if not isinstance(current_user, models.Official) or current_user.role not in roles:
+        if not isinstance(current_user, models.Official) or (
+            current_user.role not in roles and current_user.role not in ("system_admin", "admin")
+        ):
             raise HTTPException(status_code=403, detail="Government role required for this action.")
         return current_user
     return _check
@@ -2705,7 +2707,7 @@ def update_report_status(
     report_id: int,
     status_update: ReportStatusUpdate,
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "system_admin", "admin"))
 ):
     """Legacy verification command; other transitions use their dedicated routes."""
     status = status_update.status or status_update.targetStatus
@@ -2714,7 +2716,7 @@ def update_report_status(
     report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report.status not in ("pending", "unverified", "needs_information"):
+    if report.status not in ("pending", "unverified", "needs_information", "received", "unvalidated", "under_review"):
         raise HTTPException(status_code=409, detail="Report is not eligible for verification")
     updated_report = crud.update_report_status(
         db=db, 
@@ -2733,7 +2735,7 @@ def reject_report(
     report_id: int,
     decision: ReportRejectionDecision,
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "system_admin", "admin"))
 ):
     """Record a reasoned intake rejection before a report enters field work."""
     reason = decision.reason.strip()
@@ -2742,7 +2744,7 @@ def reject_report(
     report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report.status not in ("pending", "unverified", "needs_information", "pending_approval"):
+    if report.status not in ("pending", "unverified", "needs_information", "pending_approval", "received", "unvalidated", "under_review"):
         raise HTTPException(status_code=409, detail="Report cannot be rejected after approval or dispatch")
     return crud.reject_report(db, report_id=report_id, actor_id=current_user.id, reason=reason)
 

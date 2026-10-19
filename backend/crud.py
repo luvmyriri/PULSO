@@ -633,7 +633,7 @@ def cancel_report(db: Session, report_id: int, actor: models.Resident | models.O
     if report is None:
         return None
 
-    is_staff = isinstance(actor, models.Official) and actor.role in ("dispatcher", "manager")
+    is_staff = isinstance(actor, models.Official) and actor.role in ("dispatcher", "manager", "system_admin", "admin")
     is_owner = isinstance(actor, models.Resident) and (
         report.claimed_by_user_id == actor.id or
         (report.claimed_by_user_id is None and report.resident_id == actor.id)

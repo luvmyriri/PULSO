@@ -1007,14 +1007,14 @@ export default function GovAnalyticsPage({ workspace }) {
                                     />
                                 </div>
                                 <select value={reportStatusFilter} onChange={e => setReportStatusFilter(e.target.value)}
-                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-black'}`}>
                                     <option value="">All Statuses</option>
                                     {['pending','validated','dispatched','approved_internal','in_progress','resolved'].map(s => (
                                         <option key={s} value={s}>{s.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
                                     ))}
                                 </select>
                                 <select value={reportCategoryFilter} onChange={e => setReportCategoryFilter(e.target.value)}
-                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-black'}`}>
                                     <option value="">All Categories</option>
                                     {[
                                         { value: 'roads_bridges', label: 'Roads & Bridges' },

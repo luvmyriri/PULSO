@@ -799,11 +799,9 @@ const DispatcherDashboard = () => {
         window.open(url, '_blank');
     };
 
+    // Keep pulseRadius static to avoid 25fps full-component re-renders that cause map pins to glitch
     useEffect(() => {
-        const interval = setInterval(() => {
-            setPulseRadius(prev => (prev + 1) % 40); // Pulse scale from 0 to 40
-        }, 40);
-        return () => clearInterval(interval);
+        setPulseRadius(18);
     }, []);
 
     // (Duplicate panorama effect removed — consolidated into the one above)
@@ -1338,223 +1336,282 @@ const DispatcherDashboard = () => {
         ]
     }), []);
 
+    // Unified Map Status Legend Theme (shared by Map Pin Outlines & Incident Feed Card Outlines)
+    // Matches the 5 Map Status Legend items: Pending Review (Amber), Dispatched (Orange), Resolved (Emerald), Rejected (Rose), Cancelled (Slate)
+    const getLegendStatusTheme = useCallback((rawStatus) => {
+        const s = (rawStatus || 'pending').toString().toLowerCase().trim();
+        if (['resolved', 'completed', 'fixed', 'closed'].includes(s)) {
+            return {
+                tone: 'emerald',
+                borderColor: '#10b981',
+                glowColor: 'rgba(16, 185, 129, 0.35)',
+                cardSelected: 'bg-emerald-500/5 dark:bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/25 shadow-sm',
+                cardUnselected: 'border-emerald-500/45 dark:border-emerald-500/40 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-500/5 dark:hover:bg-emerald-950/20'
+            };
+        }
+        if (s === 'rejected') {
+            return {
+                tone: 'rose',
+                borderColor: '#f43f5e',
+                glowColor: 'rgba(244, 63, 94, 0.35)',
+                cardSelected: 'bg-rose-500/5 dark:bg-rose-950/30 border-rose-500 ring-1 ring-rose-500/25 shadow-sm',
+                cardUnselected: 'border-rose-500/45 dark:border-rose-500/40 hover:border-rose-500 dark:hover:border-rose-500 hover:bg-rose-500/5 dark:hover:bg-rose-950/20'
+            };
+        }
+        if (['cancelled', 'canceled'].includes(s)) {
+            return {
+                tone: 'slate',
+                borderColor: '#94a3b8',
+                glowColor: 'rgba(148, 163, 184, 0.35)',
+                cardSelected: 'bg-slate-500/5 dark:bg-slate-800/40 border-slate-400 dark:border-slate-500 ring-1 ring-slate-400/25 shadow-sm',
+                cardUnselected: 'border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-slate-500/5 dark:hover:bg-slate-800/20'
+            };
+        }
+        if (['dispatched', 'in_progress', 'in progress', 'ongoing', 'approved_internal', 'assigned'].includes(s)) {
+            return {
+                tone: 'orange',
+                borderColor: '#f97316',
+                glowColor: 'rgba(249, 115, 22, 0.35)',
+                cardSelected: 'bg-orange-500/5 dark:bg-orange-950/30 border-orange-500 ring-1 ring-orange-500/25 shadow-sm',
+                cardUnselected: 'border-orange-500/45 dark:border-orange-500/40 hover:border-orange-500 dark:hover:border-orange-500 hover:bg-orange-500/5 dark:hover:bg-orange-950/20'
+            };
+        }
+        // Default: Pending Review (pending, unverified, received, pending_approval, verified)
+        return {
+            tone: 'amber',
+            borderColor: '#f59e0b',
+            glowColor: 'rgba(245, 158, 11, 0.35)',
+            cardSelected: 'bg-amber-500/5 dark:bg-amber-950/30 border-amber-500 ring-1 ring-amber-500/25 shadow-sm',
+            cardUnselected: 'border-amber-500/45 dark:border-amber-500/40 hover:border-amber-500 dark:hover:border-amber-500 hover:bg-amber-500/5 dark:hover:bg-amber-950/20'
+        };
+    }, []);
+
+    const missingPinKeysCount = React.useMemo(() => {
+        if (!filteredReports || filteredReports.length === 0) return 0;
+        let missing = 0;
+        for (const r of filteredReports) {
+            const rawImg = r?.image_url || r?.photo_url || r?.image;
+            if (!rawImg) continue;
+            const statusTone = getLegendStatusTheme(r.status).tone;
+            const normKey = `v2-${r.id}-${statusTone}-norm`;
+            const selKey = `v2-${r.id}-${statusTone}-sel`;
+            if (!photoPinIcons[normKey] || !photoPinIcons[selKey]) {
+                missing++;
+            }
+        }
+        return missing;
+    }, [filteredReports, photoPinIcons, getLegendStatusTheme]);
+
     // Generate high-performance Canvas Image Pins for Native Google Maps MarkerF
-    // (Size-optimized 80x80 thumbnails, Viewport-aware lazy loading, Zero glitching, 60fps)
+    // (Size-optimized 80x80 thumbnails, zero glitching, 60fps)
     useEffect(() => {
-        if (!filteredReports || filteredReports.length === 0) return;
+        if (!filteredReports || filteredReports.length === 0 || missingPinKeysCount === 0) return;
 
-        let isMounted = true;
-        let batchTimer = null;
-        const pendingBatch = {};
+        const drawPinDataUrl = (loadedImg, report, isSelected) => {
+            try {
+                const size = isSelected ? 46 : 36;
+                const pointerH = isSelected ? 8 : 7;
+                const totalW = size + 6;
+                const totalH = size + pointerH + 2;
 
-        const flushBatch = () => {
-            if (!isMounted || Object.keys(pendingBatch).length === 0) return;
-            setPhotoPinIcons(prev => ({ ...prev, ...pendingBatch }));
+                const canvas = document.createElement('canvas');
+                canvas.width = totalW;
+                canvas.height = totalH;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return null;
+
+                const cx = totalW / 2;
+                const cy = size / 2 + 1;
+                const radius = (size - 4) / 2;
+
+                const { borderColor, glowColor } = getLegendStatusTheme(report.status);
+
+                // Pointer Arrow
+                ctx.beginPath();
+                ctx.moveTo(cx - 5, cy + radius - 2);
+                ctx.lineTo(cx + 5, cy + radius - 2);
+                ctx.lineTo(cx, cy + radius + pointerH);
+                ctx.closePath();
+                ctx.fillStyle = borderColor;
+                ctx.fill();
+
+                // Outer Glow if Selected
+                if (isSelected) {
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
+                    ctx.fillStyle = glowColor;
+                    ctx.fill();
+                }
+
+                // Outer Border Ring (2px thin border per spec)
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+                ctx.fillStyle = borderColor;
+                ctx.fill();
+
+                // Inner background
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#0c1424';
+                ctx.fill();
+
+                // Circular photo clip
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+                ctx.clip();
+
+                const imgW = loadedImg.naturalWidth || loadedImg.width || 80;
+                const imgH = loadedImg.naturalHeight || loadedImg.height || 80;
+                const aspect = imgW / imgH;
+                let dw, dh, dx, dy;
+                if (aspect > 1) {
+                    dh = (radius - 0.5) * 2;
+                    dw = dh * aspect;
+                    dx = cx - dw / 2;
+                    dy = cy - radius + 0.5;
+                } else {
+                    dw = (radius - 0.5) * 2;
+                    dh = dw / aspect;
+                    dx = cx - radius + 0.5;
+                    dy = cy - dh / 2;
+                }
+                ctx.drawImage(loadedImg, dx, dy, dw, dh);
+                ctx.restore();
+
+                // White inner accent ring
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.0;
+                ctx.stroke();
+
+                return canvas.toDataURL('image/png');
+            } catch (err) {
+                return null;
+            }
         };
 
-        // Lazy-load: prioritize reports currently in visible bounds
-        const reportsToLoad = currentBounds
-            ? filteredReports.filter(r => r.location_lat && r.location_lng && currentBounds.contains({ lat: r.location_lat, lng: r.location_lng }))
-            : filteredReports.slice(0, 50);
+        const syncFromCache = {};
+        let hasSyncFromCache = false;
 
-        reportsToLoad.forEach(report => {
+        filteredReports.forEach(report => {
             const rawImg = report.image_url || report.photo_url || report.image;
             if (!rawImg) return;
 
+            const statusTone = getLegendStatusTheme(report.status).tone;
+
             [false, true].forEach(isSelected => {
-                const cacheKey = `${report.id}-${isSelected ? 'sel' : 'norm'}`;
-                if (pinIconCache.current.has(cacheKey)) return;
+                const cacheKey = `v2-${report.id}-${statusTone}-${isSelected ? 'sel' : 'norm'}`;
+                if (pinIconCache.current.has(cacheKey)) {
+                    const cachedUrl = pinIconCache.current.get(cacheKey);
+                    if (cachedUrl && !photoPinIcons[cacheKey]) {
+                        syncFromCache[cacheKey] = cachedUrl;
+                        hasSyncFromCache = true;
+                    }
+                    return;
+                }
 
                 let thumbUrl = rawImg;
                 if (!rawImg.startsWith('http') && !rawImg.startsWith('data:')) {
                     const cleanPath = rawImg.startsWith('/') ? rawImg : `/${rawImg}`;
-                    // Use backend 80x80 optimized thumbnail endpoint for 10x faster load and low memory
                     thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
                 }
 
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    try {
-                        const size = isSelected ? 46 : 36;
-                        const pointerH = isSelected ? 8 : 7;
-                        const totalW = size + 6;
-                        const totalH = size + pointerH + 2;
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = totalW;
-                        canvas.height = totalH;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) return;
-
-                        const cx = totalW / 2;
-                        const cy = size / 2 + 1;
-                        const radius = (size - 4) / 2;
-
-                        let borderColor = '#ff6b00';
-                        if (report.status === 'resolved') borderColor = '#22c55e';
-                        else if (report.status === 'pending' || report.status === 'unverified') {
-                            borderColor = report.ai_urgency === 'CRITICAL' ? '#ef4444' : '#ff6b00';
-                        } else if (report.status === 'rejected') {
-                            borderColor = '#64748b';
-                        } else if (report.status === 'cancelled') {
-                            borderColor = '#0f172a';
-                        }
-
-                        // Pointer Arrow
-                        ctx.beginPath();
-                        ctx.moveTo(cx - 5, cy + radius - 2);
-                        ctx.lineTo(cx + 5, cy + radius - 2);
-                        ctx.lineTo(cx, cy + radius + pointerH);
-                        ctx.closePath();
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Outer Glow if Selected
-                        if (isSelected) {
-                            ctx.beginPath();
-                            ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
-                            ctx.fillStyle = 'rgba(255, 107, 0, 0.35)';
-                            ctx.fill();
-                        }
-
-                        // Outer Border Ring (2px thin border per spec)
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Inner background
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                        ctx.fillStyle = '#0c1424';
-                        ctx.fill();
-
-                        // Circular photo clip
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.clip();
-
-                        const aspect = img.width / img.height;
-                        let dw, dh, dx, dy;
-                        if (aspect > 1) {
-                            dh = (radius - 0.5) * 2;
-                            dw = dh * aspect;
-                            dx = cx - dw / 2;
-                            dy = cy - radius + 0.5;
-                        } else {
-                            dw = (radius - 0.5) * 2;
-                            dh = dw / aspect;
-                            dx = cx - radius + 0.5;
-                            dy = cy - dh / 2;
-                        }
-                        ctx.drawImage(img, dx, dy, dw, dh);
-                        ctx.restore();
-
-                        // White inner accent ring
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1.0;
-                        ctx.stroke();
-
-                        const dataUrl = canvas.toDataURL('image/png');
+                const commitLoadedImage = (loadedImg) => {
+                    const dataUrl = drawPinDataUrl(loadedImg, report, isSelected);
+                    if (dataUrl) {
                         pinIconCache.current.set(cacheKey, dataUrl);
-                        pendingBatch[cacheKey] = dataUrl;
-
-                        if (batchTimer) clearTimeout(batchTimer);
-                        batchTimer = setTimeout(flushBatch, 100);
-                    } catch (err) {
-                        // Canvas tainted or fallback
+                        setPhotoPinIcons(prev => (prev[cacheKey] === dataUrl ? prev : { ...prev, [cacheKey]: dataUrl }));
                     }
                 };
+
+                const img = new Image();
+                if (thumbUrl.startsWith('http')) {
+                    img.crossOrigin = 'anonymous';
+                }
+                img.onload = () => commitLoadedImage(img);
                 img.onerror = () => {
-                    // If thumbnail endpoint had an issue, try fallback to original
                     if (thumbUrl.includes('/api/thumbnails')) {
+                        const fallbackUrl = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
                         const fallbackImg = new Image();
-                        fallbackImg.crossOrigin = 'anonymous';
-                        fallbackImg.onload = img.onload;
-                        fallbackImg.onerror = () => {
-                            // Safely handle missing fallback image; marker will use SVG pin
-                        };
-                        fallbackImg.src = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
+                        if (fallbackUrl.startsWith('http')) {
+                            fallbackImg.crossOrigin = 'anonymous';
+                        }
+                        fallbackImg.onload = () => commitLoadedImage(fallbackImg);
+                        fallbackImg.src = fallbackUrl;
                     }
                 };
                 img.src = thumbUrl;
             });
         });
 
-        return () => {
-            isMounted = false;
-            if (batchTimer) clearTimeout(batchTimer);
-        };
-    }, [filteredReports, currentBounds, API_BASE_URL]);
+        if (hasSyncFromCache) {
+            setPhotoPinIcons(prev => ({ ...prev, ...syncFromCache }));
+        }
+    }, [filteredReports, API_BASE_URL, missingPinKeysCount, getLegendStatusTheme]);
 
-    // Adaptive Clustering Calculation: Clusters nearby reports into count badges at low zoom levels
+    // Always display individual photo incident pins on the map (no number cluster badges)
     const { individualMarkers, clusterMarkers } = React.useMemo(() => {
         if (!filteredReports || filteredReports.length === 0) {
             return { individualMarkers: [], clusterMarkers: [] };
         }
 
-        // Viewport filtering
-        const visibleReports = currentBounds
-            ? filteredReports.filter(r => r.location_lat && r.location_lng && currentBounds.contains({ lat: r.location_lat, lng: r.location_lng }))
-            : filteredReports.filter(r => r.location_lat && r.location_lng);
-
-        // When zoomed in past threshold (zoom >= 14) and under marker cap (<= 80), show all photo markers
-        if (currentZoom >= 14 && visibleReports.length <= 80) {
-            return { individualMarkers: visibleReports, clusterMarkers: [] };
+        // Deduplicate by report.id and ensure numeric coordinates
+        const seenIds = new Set();
+        const validReports = [];
+        for (const r of filteredReports) {
+            if (!r || seenIds.has(r.id)) continue;
+            const lat = Number(r.location_lat);
+            const lng = Number(r.location_lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+            seenIds.add(r.id);
+            validReports.push({ ...r, location_lat: lat, location_lng: lng });
         }
 
-        // Dynamic grid degree threshold based on zoom level (~45 screen pixels)
-        const gridDegree = 45 * 360 / (256 * Math.pow(2, Math.max(1, currentZoom)));
-        const grid = new Map();
+        // Only offset pins that share the exact same coordinate so they don't stack on top of each other
+        const spreadCoincidentMarkers = (markers) => {
+            const overlapDeg = 0.00025;
+            const spreadRadiusDeg = 0.00038;
+            const buckets = new Map();
 
-        visibleReports.forEach(report => {
-            const cellX = Math.floor(report.location_lng / gridDegree);
-            const cellY = Math.floor(report.location_lat / gridDegree);
-            const key = `${cellX}_${cellY}`;
-            if (!grid.has(key)) grid.set(key, []);
-            grid.get(key).push(report);
-        });
+            markers.forEach(m => {
+                const bx = Math.round(m.location_lng / overlapDeg);
+                const by = Math.round(m.location_lat / overlapDeg);
+                const bKey = `${bx}_${by}`;
+                if (!buckets.has(bKey)) buckets.set(bKey, []);
+                buckets.get(bKey).push(m);
+            });
 
-        const individualMarkers = [];
-        const clusterMarkers = [];
+            const result = [];
+            buckets.forEach(group => {
+                if (group.length === 1) {
+                    const m = group[0];
+                    result.push({
+                        ...m,
+                        _displayPosition: { lat: m.location_lat, lng: m.location_lng }
+                    });
+                } else {
+                    const sorted = [...group].sort((a, b) => Number(a.id) - Number(b.id));
+                    const centerLat = sorted.reduce((acc, item) => acc + item.location_lat, 0) / sorted.length;
+                    const centerLng = sorted.reduce((acc, item) => acc + item.location_lng, 0) / sorted.length;
+                    sorted.forEach((m, i) => {
+                        const angle = (2 * Math.PI * i) / sorted.length;
+                        result.push({
+                            ...m,
+                            _displayPosition: {
+                                lat: centerLat + Math.sin(angle) * spreadRadiusDeg,
+                                lng: centerLng + Math.cos(angle) * spreadRadiusDeg
+                            }
+                        });
+                    });
+                }
+            });
+            return result;
+        };
 
-        grid.forEach((cellReports, cellKey) => {
-            if (cellReports.length === 1 && currentZoom >= 13) {
-                individualMarkers.push(cellReports[0]);
-            } else {
-                let sumLat = 0, sumLng = 0;
-                let hasCritical = false, hasPending = false, hasActive = false;
-
-                cellReports.forEach(r => {
-                    sumLat += r.location_lat;
-                    sumLng += r.location_lng;
-                    if (r.ai_urgency === 'CRITICAL') hasCritical = true;
-                    else if (r.status === 'pending' || r.status === 'unverified') hasPending = true;
-                    else if (r.status === 'dispatched' || r.status === 'approved_internal') hasActive = true;
-                });
-
-                let clusterColor = '#22c55e'; // resolved default
-                if (hasActive) clusterColor = '#ff6b00';
-                if (hasPending) clusterColor = '#ff6b00';
-                if (hasCritical) clusterColor = '#ef4444';
-
-                clusterMarkers.push({
-                    id: `cluster-${cellKey}`,
-                    count: cellReports.length,
-                    lat: sumLat / cellReports.length,
-                    lng: sumLng / cellReports.length,
-                    statusColor: clusterColor,
-                    reports: cellReports
-                });
-            }
-        });
-
-        return { individualMarkers, clusterMarkers };
-    }, [filteredReports, currentZoom, currentBounds]);
+        return { individualMarkers: spreadCoincidentMarkers(validReports), clusterMarkers: [] };
+    }, [filteredReports]);
 
     // Supported canvas overlay replaces Google's retired visualization layer.
     useEffect(() => {
@@ -1580,31 +1637,19 @@ const DispatcherDashboard = () => {
         if (!category) return 'slate';
         const cat = category.toLowerCase();
         if (cat.includes('water') || cat.includes('flood') || cat.includes('drain')) return 'blue';
-        if (cat.includes('electric') || cat.includes('wire') || cat.includes('light') || cat.includes('power')) return 'red';
+        if (cat.includes('electric') || cat.includes('wire') || cat.includes('light') || cat.includes('power') || cat.includes('safety') || cat.includes('hazard') || cat.includes('security')) return 'red';
         if (cat.includes('road') || cat.includes('pothole') || cat.includes('bridge') || cat.includes('infrastructure')) return 'orange';
         if (cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public')) return 'green';
         if (cat.includes('other')) return 'purple';
         return 'slate';
     };
 
-    // Beautiful Dynamic SVG Pin Generator
+    // Beautiful Dynamic SVG Pin Generator (matches Map Status Legend colors)
     const getMarkerSVG = (category, status, isSelected = false) => {
-        let color = '#f97316'; // Default Active
+        const { borderColor: color } = getLegendStatusTheme(status);
         const cat = (category || '').toLowerCase();
-        const isPublicFacility = cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public');
+        const isPublicFacility = !cat.includes('safety') && !cat.includes('hazard') && (cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public'));
         const isOthers = cat.includes('other');
-
-        if (status === 'resolved') color = '#22c55e';
-        else if (status === 'pending' || status === 'unverified') color = '#ef4444';
-        else if (status === 'rejected') color = '#64748b';
-        else if (status === 'cancelled') color = '#0f172a';
-        
-        // Overwrite color for Public Facilities or Others if selected or themed
-        if (isPublicFacility) {
-            color = isSelected ? '#16a34a' : (status === 'resolved' ? '#22c55e' : '#22c55e'); // Using green for all public facilities per request
-        } else if (isOthers && status !== 'resolved' && status !== 'rejected') {
-            color = isSelected ? '#7c3aed' : '#8b5cf6';
-        }
         
         let svgIcon = ''; 
         
@@ -2017,23 +2062,12 @@ const DispatcherDashboard = () => {
                                         const tacticalBrgyDigits = (tacticalContext?.barangay || '').toString().replace(/\D/g, '');
                                         const isTacticalMatch = tacticalContext && tacticalBrgyDigits && reportBrgyDigits === tacticalBrgyDigits;
                                         const isSelected = selectedReport?.id === report.id;
+                                        const legendTheme = getLegendStatusTheme(report.status);
                                         const selectionClass = isSelected 
-                                            ? ({
-                                                orange: 'bg-primary/5 dark:bg-orange-950/30 border-primary ring-1 ring-primary/20 shadow-sm',
-                                                blue: 'bg-secondary/5 dark:bg-blue-950/30 border-secondary ring-1 ring-secondary/20 shadow-sm',
-                                                green: 'bg-secondary/5 dark:bg-green-950/30 border-secondary ring-1 ring-secondary/20 shadow-sm',
-                                                red: 'bg-red-500/5 dark:bg-red-950/30 border-red-500/50 ring-1 ring-red-500/20 shadow-sm',
-                                                slate: 'bg-neutral-bg dark:bg-slate-800/40 border-neutral-border ring-1 ring-neutral-border/20 shadow-sm'
-                                            }[color] || 'bg-neutral-bg dark:bg-slate-800 border-primary/50')
+                                            ? legendTheme.cardSelected
                                             : isTacticalMatch
                                             ? 'bg-yellow-500/5 border-yellow-500/50 ring-1 ring-yellow-500/30 shadow-sm shadow-yellow-500/10'
-                                            : `bg-white dark:bg-slate-950/50 border-neutral-border dark:border-slate-800/50 shadow-sm transition-all duration-200 ${
-                                                color === 'green' ? 'hover:border-secondary dark:hover:border-green-500/30 hover:bg-secondary-light/30 dark:hover:bg-green-900/5' :
-                                                color === 'blue' ? 'hover:border-secondary dark:hover:border-blue-500/30 hover:bg-secondary-light/30 dark:hover:bg-blue-900/5' :
-                                                color === 'orange' ? 'hover:border-primary dark:hover:border-orange-700 hover:bg-primary-light/30 dark:hover:bg-orange-900/5' :
-                                                color === 'red' ? 'hover:border-red-400/50 dark:hover:border-red-700 hover:bg-red-50/30 dark:hover:bg-red-900/5' :
-                                                'hover:border-primary-hover dark:hover:border-slate-700'
-                                            }`;
+                                            : `bg-white dark:bg-slate-950/50 ${legendTheme.cardUnselected} shadow-sm transition-all duration-200`;
 
                                         return (
                                         <button 
@@ -2101,26 +2135,33 @@ const DispatcherDashboard = () => {
                                             </div>
 
                                             {/* Location line with District badge */}
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 mb-2.5 truncate font-medium">
-                                                <span className="flex items-center gap-1 truncate text-[11px]">
-                                                    <MapPin size={11} className="text-slate-400 shrink-0"/> 
-                                                    <span className="truncate">{report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}</span>
-                                                </span>
-                                                {(() => {
-                                                    if (!report.location_lat || !report.location_lng) return null;
-                                                    const dist = getCaloocanDistrict(report.location_lat, report.location_lng);
-                                                    if (dist === 'north') {
-                                                        return <span className="shrink-0 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">North</span>;
-                                                    }
-                                                    if (dist === 'south') {
-                                                        return <span className="shrink-0 text-[9px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">South</span>;
-                                                    }
-                                                    return (
-                                                        <span className="shrink-0 text-[9px] font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30" title="Coordinates are outside Caloocan boundaries">
-                                                            ⚠️ Outside
-                                                        </span>
-                                                    );
-                                                })()}
+                                            <div className="mb-2.5">
+                                                <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 truncate font-medium">
+                                                    <span className="flex items-center gap-1 truncate text-[11px]">
+                                                        <MapPin size={11} className="text-slate-400 shrink-0"/> 
+                                                        <span className="truncate">{report.location_string || `${Number(report.location_lat)?.toFixed(5)}, ${Number(report.location_lng)?.toFixed(5)}`}</span>
+                                                    </span>
+                                                    {(() => {
+                                                        if (!report.location_lat || !report.location_lng) return null;
+                                                        const dist = getCaloocanDistrict(report.location_lat, report.location_lng);
+                                                        if (dist === 'north') {
+                                                            return <span className="shrink-0 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">North</span>;
+                                                        }
+                                                        if (dist === 'south') {
+                                                            return <span className="shrink-0 text-[9px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">South</span>;
+                                                        }
+                                                        return (
+                                                            <span className="shrink-0 text-[9px] font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30" title="Coordinates are outside Caloocan boundaries">
+                                                                ⚠️ Outside
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </div>
+                                                {report.location_lat != null && report.location_lng != null && (
+                                                    <div className="pl-4 mt-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">
+                                                        Lat: {Number(report.location_lat).toFixed(5)}, Lng: {Number(report.location_lng).toFixed(5)}
+                                                    </div>
+                                                )}
                                             </div>
                                             
                                             {/* Footer line: Priority/Urgency Badge with Icon + Separated Actions */}
@@ -2287,8 +2328,9 @@ const DispatcherDashboard = () => {
                             {/* Render Report Photo-Pins (with size-optimized thumbnails, status borders & fallback) */}
                             {individualMarkers.map(report => {
                                 const isSelected = selectedReport?.id === report.id;
-                                const cacheKey = `${report.id}-${isSelected ? 'sel' : 'norm'}`;
-                                const customIconUrl = photoPinIcons[cacheKey];
+                                const statusTone = getLegendStatusTheme(report.status).tone;
+                                const cacheKey = `v2-${report.id}-${statusTone}-${isSelected ? 'sel' : 'norm'}`;
+                                const customIconUrl = photoPinIcons[cacheKey] || pinIconCache.current.get(cacheKey);
 
                                 const size = isSelected ? 46 : 36;
                                 const pointerH = isSelected ? 8 : 7;
@@ -2306,23 +2348,24 @@ const DispatcherDashboard = () => {
                                     );
 
                                 const ariaTitle = `Report ${formatTicketId(report.ticket_id, report.id)}, ${report.category || report.ai_category || 'Incident'}, ${(report.status || 'PENDING').toUpperCase()} — click to view details`;
+                                const pinPosition = report._displayPosition || { lat: Number(report.location_lat), lng: Number(report.location_lng) };
 
                                 return (
                                     <MarkerF
                                         key={`map-pin-${report.id}`}
-                                        position={{ lat: report.location_lat, lng: report.location_lng }}
-                                        zIndex={isSelected ? 500 : 150}
+                                        position={pinPosition}
+                                        zIndex={isSelected ? 1000 : (150 + (Number(report.id) % 300))}
                                         title={ariaTitle}
                                         onClick={() => {
                                             setSelectedReport(report);
                                             setSelectedMarker(report);
-                                            if (map) map.panTo({ lat: report.location_lat, lng: report.location_lng });
+                                            if (map) map.panTo(pinPosition);
                                         }}
                                         onDblClick={() => {
                                             handleStreetViewClick({ lat: report.location_lat, lng: report.location_lng });
                                         }}
                                         options={{
-                                            optimized: true,
+                                            optimized: false,
                                             clickable: true
                                         }}
                                         icon={iconConfig}
@@ -2336,7 +2379,7 @@ const DispatcherDashboard = () => {
                                     <MarkerF
                                         key={`sv-pin-${report.id}`}
                                         map={panorama} 
-                                        position={{ lat: report.location_lat, lng: report.location_lng }}
+                                        position={{ lat: Number(report.location_lat), lng: Number(report.location_lng) }}
                                         onClick={() => {
                                             setSelectedReport(report);
                                             setSelectedMarker(report); 
@@ -2357,8 +2400,8 @@ const DispatcherDashboard = () => {
                             {/* TOP-LEVEL TACTICAL CARD: Dynamic anchoring to Map or SV */}
                             {(() => {
                                 if (!selectedMarker) return null;
-                                const rawLat = selectedMarker.location_lat ?? selectedMarker.lat ?? selectedMarker.latitude;
-                                const rawLng = selectedMarker.location_lng ?? selectedMarker.lng ?? selectedMarker.longitude;
+                                const rawLat = selectedMarker._displayPosition?.lat ?? selectedMarker.location_lat ?? selectedMarker.lat ?? selectedMarker.latitude;
+                                const rawLng = selectedMarker._displayPosition?.lng ?? selectedMarker.location_lng ?? selectedMarker.lng ?? selectedMarker.longitude;
                                 const markerLat = typeof rawLat === 'function' ? rawLat() : parseFloat(rawLat);
                                 const markerLng = typeof rawLng === 'function' ? rawLng() : parseFloat(rawLng);
 
@@ -2503,13 +2546,13 @@ const DispatcherDashboard = () => {
                                                         disabled={directionsLoading}
                                                         onPointerDown={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
                                                         onClick={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
-                                                        className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-orange-600 dark:bg-slate-800 dark:hover:bg-orange-600 text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer mb-2.5 disabled:opacity-50"
+                                                        className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200/90 dark:bg-slate-800 dark:hover:bg-orange-600 dark:text-white dark:border-slate-700 text-xs font-bold shadow-2xs flex items-center justify-center gap-2 transition-all cursor-pointer mb-2.5 disabled:opacity-50"
                                                     >
                                                         {directionsLoading ? (
-                                                            <div className="animate-spin w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"></div>
+                                                            <div className="animate-spin w-3.5 h-3.5 border-2 border-slate-400/30 border-t-orange-500 dark:border-white/30 dark:border-t-white rounded-full"></div>
                                                         ) : (
                                                             <>
-                                                                <Navigation size={13} className="text-orange-400" />
+                                                                <Navigation size={13} className="text-orange-500 dark:text-orange-400" />
                                                                 <span>Plan Team Route</span>
                                                             </>
                                                         )}
@@ -3309,7 +3352,7 @@ const DispatcherDashboard = () => {
                                 className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden max-w-lg w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]"
                             >
                                 {/* Top Accent Gradient Strip */}
-                                <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
+                                <div className="h-1.5 w-full bg-orange-500 shrink-0" />
 
                                 {/* Modal Header */}
                                 <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
@@ -3661,19 +3704,12 @@ const DispatcherDashboard = () => {
                             className="relative w-full max-w-5xl xl:max-w-6xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]"
                         >
                             {/* Top Accent Gradient Strip */}
-                            <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
+                            <div className="h-1.5 w-full bg-orange-500 shrink-0" />
 
                             {/* Modal Header */}
                             <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
                                 <div className="flex items-center justify-between gap-3 mb-2.5">
                                     <div className="flex items-center gap-2.5 flex-wrap">
-                                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-[11px] font-bold text-orange-600 dark:text-orange-400">
-                                            <span className="relative flex h-2 w-2">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-                                            </span>
-                                            <span>PULSO DISPATCH LIFECYCLE AUDIT</span>
-                                        </div>
                                         {(() => {
                                             const raw = (selectedReport.status || '').toLowerCase();
                                             const isResolved = ['resolved', 'completed', 'fixed', 'closed'].some(k => raw.includes(k));
@@ -3916,8 +3952,7 @@ const DispatcherDashboard = () => {
 
                                                         {/* Meta Pill pinned at bottom */}
                                                         <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
-                                                            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800/80 text-[10px] font-mono-data font-medium text-slate-600 dark:text-slate-300 max-w-full">
-                                                                <Sparkles size={11} className="text-orange-500 shrink-0" />
+                                                            <div className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800/80 text-[10px] font-mono-data font-medium text-slate-600 dark:text-slate-300 max-w-full">
                                                                 <span className="truncate">{m.meta}</span>
                                                             </div>
                                                         </div>

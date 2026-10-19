@@ -13,9 +13,10 @@ export default function QuickActionsSection({ onOpenTrackModal }) {
   const [quickTicket, setQuickTicket] = useState('');
 
   const scrollToSection = (id) => {
-    const element = document.getElementById(id);
+    const targetId = (id === 'map-preview' || id === 'map') ? (document.getElementById('map-content') ? 'map-content' : 'map-preview') : id;
+    const element = document.getElementById(targetId) || document.getElementById(id);
     if (element) {
-      const offset = 80;
+      const offset = 76;
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = element.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;

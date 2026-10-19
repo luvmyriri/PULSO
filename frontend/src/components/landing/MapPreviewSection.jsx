@@ -47,7 +47,7 @@ import { API_BASE_URL } from '../../utils/apiBase';
 const CALOOCAN_CENTER = { lat: 14.7104, lng: 121.0298 };
 
 // Caloocan geographical restriction bounding box allowing both North and South Caloocan to be freely panned and centered
-export const CALOOCAN_RESTRICTION_BOUNDS = {
+const CALOOCAN_RESTRICTION_BOUNDS = {
   north: 14.840,
   south: 14.580,
   west: 120.910,
@@ -684,24 +684,27 @@ export default function MapPreviewSection() {
     <section
       id="map-preview"
       aria-label="Civic Utility Map Preview"
-      className="min-h-[calc(100vh-73px)] py-8 sm:py-12 bg-white dark:bg-[#070a12] border-b border-slate-200 dark:border-slate-800 transition-colors flex flex-col justify-center scroll-mt-[73px]"
+      className="min-h-[calc(100vh-73px)] pt-5 pb-8 sm:pt-6 sm:pb-12 bg-white dark:bg-[#070a12] border-b border-slate-200 dark:border-slate-800 transition-colors flex flex-col justify-center scroll-mt-[73px]"
     >
       <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6 sm:mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-3 sm:mb-4">
           <div className="max-w-2xl text-left">
             <h2 className="font-heading font-extrabold text-2xl sm:text-3xl md:text-4xl text-slate-900 dark:text-white">
               Live utility repairs across Caloocan
             </h2>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1.5">
+            <p
+              id="map-content"
+              className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1.5 scroll-mt-[76px]"
+            >
               Authoritative civic map displaying verified municipal reports, active roadworks, and density concentration across all 188 Caloocan barangays directly from the database.
             </p>
           </div>
         </div>
 
         {/* Filter & View Mode Controls Bar */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mb-6">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mb-3.5 sm:mb-4">
           
           {/* Left: Category Filters + View Mode Switcher */}
           <div className="flex flex-wrap items-center gap-2">

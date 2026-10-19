@@ -47,85 +47,83 @@ export default function TablePagination({
 
     return (
         <div
-            className={`min-h-14 shrink-0 border-t border-slate-200 dark:border-slate-800 px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 ${className}`}
+            className={`min-h-14 shrink-0 border-t border-slate-200 dark:border-slate-800 px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-black dark:text-white bg-white dark:bg-slate-900 ${className}`}
         >
-            {/* Count text on the left in soft gray, Inter 14px */}
-            <div aria-live="polite" className="font-normal text-slate-500 dark:text-slate-400 text-sm">
-                Showing <span className="font-medium text-slate-700 dark:text-slate-200">{startItem}</span> to{' '}
-                <span className="font-medium text-slate-700 dark:text-slate-200">{endItem}</span> of{' '}
-                <span className="font-medium text-slate-700 dark:text-slate-200">{total}</span> {itemLabel}
+            {/* Count text on the left */}
+            <div aria-live="polite" className="font-normal text-black dark:text-white text-sm">
+                Showing <span className="font-medium text-black dark:text-white">{startItem}</span> to{' '}
+                <span className="font-medium text-black dark:text-white">{endItem}</span> of{' '}
+                <span className="font-medium text-black dark:text-white">{total}</span> {itemLabel}
             </div>
 
-            {/* Pagination Controls on the right (hidden when total <= pageSize) */}
-            {total > pageSize && (
-                <nav
-                    className="flex items-center gap-1.5"
-                    aria-label={`${itemLabel} pagination`}
+            {/* Pagination Controls on the right */}
+            <nav
+                className="flex items-center gap-1.5"
+                aria-label={`${itemLabel} pagination`}
+            >
+                {/* Previous Button */}
+                <button
+                    type="button"
+                    onClick={() => onPageChange && onPageChange(Math.max(1, safePage - 1))}
+                    disabled={safePage <= 1}
+                    aria-disabled={safePage <= 1 ? 'true' : 'false'}
+                    className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-black dark:text-white cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="Previous page"
                 >
-                    {/* Previous Button */}
-                    <button
-                        type="button"
-                        onClick={() => onPageChange && onPageChange(Math.max(1, safePage - 1))}
-                        disabled={safePage <= 1}
-                        aria-disabled={safePage <= 1 ? 'true' : 'false'}
-                        className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-slate-600 dark:text-slate-300 cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
-                        aria-label="Previous page"
-                    >
-                        Previous
-                    </button>
+                    Previous
+                </button>
 
-                    {/* Narrow Mobile Indicator (<640px) */}
-                    <span className="sm:hidden text-xs font-medium text-slate-500 dark:text-slate-400 px-2 select-none">
-                        Page {safePage} of {totalPages}
-                    </span>
+                {/* Narrow Mobile Indicator (<640px) */}
+                <span className="sm:hidden text-xs font-medium text-black dark:text-white px-2 select-none">
+                    Page {safePage} of {totalPages}
+                </span>
 
-                    {/* Page Numbers (640px+) */}
-                    <div className="hidden sm:flex items-center gap-1">
-                        {getPageNumbers().map((p, idx) => {
-                            if (p === '...') {
-                                return (
-                                    <span
-                                        key={`ellipsis-${idx}`}
-                                        className="w-8 text-center text-slate-400 select-none font-bold"
-                                        aria-hidden="true"
-                                    >
-                                        &hellip;
-                                    </span>
-                                );
-                            }
-                            const isActive = p === safePage;
+                {/* Page Numbers (640px+) */}
+                <div className="hidden sm:flex items-center gap-1">
+                    {getPageNumbers().map((p, idx) => {
+                        if (p === '...') {
                             return (
-                                <button
-                                    key={`page-${p}`}
-                                    type="button"
-                                    onClick={() => onPageChange && onPageChange(p)}
-                                    aria-current={isActive ? 'page' : undefined}
-                                    aria-label={`Go to page ${p}`}
-                                    className={`min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-xs rounded-xl transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
-                                        isActive
-                                            ? 'bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border-2 border-[#ff6b00] shadow-xs'
-                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
-                                    }`}
+                                <span
+                                    key={`ellipsis-${idx}`}
+                                    className="w-8 text-center text-black dark:text-white select-none font-bold"
+                                    aria-hidden="true"
                                 >
-                                    {p}
-                                </button>
+                                    &hellip;
+                                </span>
                             );
-                        })}
-                    </div>
+                        }
+                        const isActive = p === safePage;
+                        return (
+                            <button
+                                key={`page-${p}`}
+                                type="button"
+                                onClick={() => onPageChange && onPageChange(p)}
+                                aria-current={isActive ? 'page' : undefined}
+                                aria-label={`Go to page ${p}`}
+                                className={`min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-xs rounded-xl transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                                    isActive
+                                        ? 'bg-orange-50 dark:bg-orange-950/50 text-black dark:text-white border-2 border-[#ff6b00] shadow-xs'
+                                        : 'text-black dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+                                }`}
+                            >
+                                {p}
+                            </button>
+                        );
+                    })}
+                </div>
 
-                    {/* Next Button */}
-                    <button
-                        type="button"
-                        onClick={() => onPageChange && onPageChange(Math.min(totalPages, safePage + 1))}
-                        disabled={safePage >= totalPages}
-                        aria-disabled={safePage >= totalPages ? 'true' : 'false'}
-                        className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-slate-600 dark:text-slate-300 cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
-                        aria-label="Next page"
-                    >
-                        Next
-                    </button>
-                </nav>
-            )}
+                {/* Next Button */}
+                <button
+                    type="button"
+                    onClick={() => onPageChange && onPageChange(Math.min(totalPages, safePage + 1))}
+                    disabled={safePage >= totalPages}
+                    aria-disabled={safePage >= totalPages ? 'true' : 'false'}
+                    className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-black dark:text-white cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                    aria-label="Next page"
+                >
+                    Next
+                </button>
+            </nav>
         </div>
     );
 }
