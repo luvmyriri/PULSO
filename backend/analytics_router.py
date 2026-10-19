@@ -303,15 +303,17 @@ def get_analytics_reports(
         if hasattr(r, "reporter") and r.reporter:
             reporter_name = getattr(r.reporter, "full_name", None) or "Anonymous"
 
+        canonical_ticket_id = r.ticket_id or f"PUL-2026-{r.id:04d}"
         result.append({
             "id": r.id,
-            "report_id": f"RPT-{r.id:05d}",
+            "ticket_id": canonical_ticket_id,
+            "report_id": canonical_ticket_id,
             "category": r.ai_category or r.category or "infrastructure",
             "description": r.description or "",
             "status": r.status,
             "urgency": r.ai_urgency or "Medium",
             "full_location": full_location,
-            "location_barangay": r.location_barangay or "Barangay Unknown",
+            "location_barangay": analytics_service._resolve_barangay(r),
             "location_lat": r.location_lat,
             "location_lng": r.location_lng,
             "image_url": r.image_url or None,

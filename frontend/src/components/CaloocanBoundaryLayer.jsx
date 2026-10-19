@@ -212,37 +212,6 @@ export default function CaloocanBoundaryLayer({
                 onMouseOver={() => interactive && setHoveredSector('south')}
                 onMouseOut={() => interactive && setHoveredSector(null)}
             />
-
-            {/* ── 4. Sector Centroid Labels (Matching Command Center Pills) ── */}
-            {showLabels && northLabelIcon && (
-                <MarkerF
-                    key="caloocan-label-north"
-                    position={NORTH_CALOOCAN_CENTROID}
-                    zIndex={120}
-                    options={{
-                        clickable: Boolean(interactive && onSectorClick),
-                        optimized: true,
-                        opacity: activeSector === 'south' ? 0.45 : 1.0
-                    }}
-                    icon={northLabelIcon}
-                    onClick={handleNorthClick}
-                />
-            )}
-
-            {showLabels && southLabelIcon && (
-                <MarkerF
-                    key="caloocan-label-south"
-                    position={SOUTH_CALOOCAN_CENTROID}
-                    zIndex={120}
-                    options={{
-                        clickable: Boolean(interactive && onSectorClick),
-                        optimized: true,
-                        opacity: activeSector === 'north' ? 0.45 : 1.0
-                    }}
-                    icon={southLabelIcon}
-                    onClick={handleSouthClick}
-                />
-            )}
         </>
     );
 }

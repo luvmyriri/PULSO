@@ -356,6 +356,23 @@ def append_message_and_respond(
     if not query_text:
         raise HTTPException(status_code=400, detail="Query message cannot be empty.")
 
+    # 0. Fetch recent conversation history for follow-up context awareness
+    recent_msgs = (
+        db.query(models.ChatMessage)
+        .filter(models.ChatMessage.conversation_id == conv.id)
+        .order_by(models.ChatMessage.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    history_lines = []
+    for m in reversed(recent_msgs):
+        role_label = "User" if m.role == "user" else "PULSEAI"
+        snippet = (m.content or "").strip()
+        if len(snippet) > 600:
+            snippet = snippet[:600] + "..."
+        history_lines.append(f"{role_label}: {snippet}")
+    history_block = ("\nRecent Conversation History:\n" + "\n".join(history_lines)) if history_lines else ""
+
     # 1. Save user message
     user_msg = models.ChatMessage(
         conversation_id=conv.id,
@@ -370,7 +387,7 @@ def append_message_and_respond(
 
     # 3. Call AI Assistant with full grounding & tool audit
     actor_label = f"Staff ({getattr(current_user, 'role', 'official')})" if is_staff else "Resident"
-    user_ctx = f"{actor_label}: {current_user.full_name} (Barangay: {getattr(current_user, 'barangay', 'North Caloocan')}). {req.context or ''}"
+    user_ctx = f"{actor_label}: {current_user.full_name} (Barangay: {getattr(current_user, 'barangay', 'North Caloocan')}). {req.context or ''}{history_block}"
     ai_result = gemini_service.get_ai_assistant_response(
         query=query_text,
         context=user_ctx,
