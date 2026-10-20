@@ -302,25 +302,36 @@ def send_emergency_sms(phone_number: str, title: str, message: str) -> SmsSendRe
     return SmsSendResult(False)
 
 
-def _portal_url() -> str:
-    return os.getenv("PULSO_PUBLIC_URL", "https://pulso-caloocan.gov.ph").strip().rstrip("/")
+def _portal_domain() -> str:
+    raw = os.getenv("PULSO_PUBLIC_URL", "pulso-caloocan.gov.ph").strip()
+    raw = re.sub(r"^https?://", "", raw).rstrip("/")
+    return raw or "pulso-caloocan.gov.ph"
 
 
-def _sender_header() -> str:
-    return os.getenv("PULSO_SENDER_HEADER", "PULSO | Caloocan City Engineering Division").strip()
+def _sanitize_gsm7(text: str) -> str:
+    """Keep SMS strictly within 7-bit GSM-7 ASCII so 160-char single-segment delivery never degrades to 70-char UCS-2."""
+    replacements = {
+        "—": "-",
+        "–": "-",
+        "•": "-",
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+    }
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+    return text
 
 
 def send_login_otp_sms(phone_number: str, otp_code: str, ref_id: str | None = None) -> SmsSendResult:
     """Send a caller-generated code using the configured SMS provider."""
     ref_suffix = f" Ref: {ref_id}." if ref_id else ""
     if _provider() == "textbee":
-        header = _sender_header()
-        portal = _portal_url()
-        message = (
-            f"[{header}]\n\n"
-            f"PULSO Caloocan: Your sign-in code is {otp_code}.\n"
-            f"Valid for 10 minutes. Do not share it with anyone.{ref_suffix}\n\n"
-            f"Portal: {portal}"
+        message = _sanitize_gsm7(
+            f"[PULSO Caloocan Engineering]\n"
+            f"PULSO Caloocan: Your sign-in code is {otp_code}. "
+            f"Valid for 10 minutes. Do not share it.{ref_suffix}"
         )
         return _send_textbee_sms(phone_number, message)
     if _provider() == "philsms":
@@ -343,50 +354,37 @@ def send_templated_sms(
     barangay: str = "175",
     category: str = "Roads & Bridges",
     status: str = "Validated",
-    eta_days: str = "2-5 working days (LightGBM P50-P90)",
+    eta_days: str = "2-5 days",
     wo_number: str = "WO-2026-0104",
     asset_id: str = "CAL-DR-002",
-    asset_name: str = "Camarin Drainage Culvert",
+    asset_name: str = "Camarin Drainage",
     priority: str = "HIGH",
 ) -> SmsSendResult:
-    """Send a governed PULSO Caloocan templated SMS notification with official header and portal links."""
-    header = _sender_header()
-    portal = _portal_url()
+    """
+    Send a governed PULSO Caloocan templated SMS notification.
+    Uses compact GSM-7 ASCII (<160 chars) and protocol-free domain references
+    to avoid Philippine telco (Smart/Globe) URL-filtering and UCS-2 multipart drops.
+    """
+    domain = _portal_domain()
 
     if template_name == "report_status_update":
         msg = (
-            f"[{header}]\n\n"
-            f"CIVIC RECORD STATUS UPDATE\n"
-            f"- Ticket ID: {ticket_id}\n"
-            f"- Category: {category} (Brgy. {barangay})\n"
-            f"- Current Status: {status.upper()}\n"
-            f"- Est. Turnaround: {eta_days}\n\n"
-            f"View engineering docket & field photos:\n"
-            f"{portal}/track?ticket={ticket_id}\n\n"
-            f"Caloocan Action Center: (02) 8288-8811"
+            f"[PULSO Caloocan Engineering]\n"
+            f"Ticket {ticket_id} (Brgy {barangay}, {category})\n"
+            f"Status: {status.upper()} (Est: {eta_days})\n"
+            f"Track: {domain} | (02)8288-8811"
         )
     elif template_name == "predictive_work_order":
         msg = (
-            f"[{header}]\n\n"
-            f"PREEMPTIVE MAINTENANCE DISPATCH\n"
-            f"- Work Order: {wo_number}\n"
-            f"- Target Asset: {asset_name} ({asset_id})\n"
-            f"- Location: Brgy. {barangay} | Priority: {priority.upper()}\n"
-            f"- Turnaround Forecast: {eta_days}\n\n"
-            f"Open Staff Operations Workspace:\n"
-            f"{portal}/gov/predictive"
+            f"[PULSO Caloocan Engineering]\n"
+            f"Preemptive WO {wo_number}: {asset_name} ({asset_id}, Brgy {barangay})\n"
+            f"Priority: {priority.upper()} | Est: {eta_days}\n"
+            f"Portal: {domain}"
         )
     else:
         msg = (
-            f"[{header}]\n\n"
-            f"OFFICIAL REPORT RECEIPT\n"
-            f"- Ticket ID: {ticket_id}\n"
-            f"- Category: {category}\n"
-            f"- Location: Brgy. {barangay}, North Caloocan\n"
-            f"- Status: QUEUED FOR ENGINEERING TRIAGE\n"
-            f"- Est. Turnaround: {eta_days}\n\n"
-            f"Track live status & field evidence:\n"
-            f"{portal}/track?ticket={ticket_id}\n\n"
-            f"Caloocan Action Center: (02) 8288-8811"
+            f"[PULSO Caloocan Engineering]\n"
+            f"Receipt: Ticket {ticket_id} (Brgy {barangay}, {category}) is QUEUED for review.\n"
+            f"Est: {eta_days} | Track: {domain}"
         )
-    return send_plain_sms(phone_number, msg)
+    return send_plain_sms(phone_number, _sanitize_gsm7(msg))
