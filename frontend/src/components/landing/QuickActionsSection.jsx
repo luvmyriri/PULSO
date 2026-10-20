@@ -13,9 +13,10 @@ export default function QuickActionsSection({ onOpenTrackModal }) {
   const [quickTicket, setQuickTicket] = useState('');
 
   const scrollToSection = (id) => {
-    const element = document.getElementById(id);
+    const targetId = (id === 'map-preview' || id === 'map') ? (document.getElementById('map-content') ? 'map-content' : 'map-preview') : id;
+    const element = document.getElementById(targetId) || document.getElementById(id);
     if (element) {
-      const offset = 80;
+      const offset = 76;
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = element.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;
@@ -162,7 +163,7 @@ export default function QuickActionsSection({ onOpenTrackModal }) {
                 <div className="w-12 h-12 rounded-xl bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center transition-transform group-hover:scale-105">
                   <PhoneCall size={24} />
                 </div>
-                <span className="text-[10px] font-mono-data font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300">
+                <span className="text-[10px] font-mono-data font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white shadow-2xs">
                   24/7 Hotlines
                 </span>
               </div>

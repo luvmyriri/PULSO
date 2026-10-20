@@ -43,6 +43,12 @@ class _MapScreenState extends State<MapScreen> {
   // Selected marker info-window data
   Map<String, dynamic>? _selectedReport;
 
+  // Saved camera state for restoring view on popup close
+  CameraPosition? _savedCamera;
+  CameraPosition? _currentCamera;
+  bool _userInteractedWhilePopupOpen = false;
+  bool _isProgrammaticMove = false;
+
   late final LocationService _locationService;
 
   // Dark map style matching the dispatcher dashboard
@@ -198,11 +204,57 @@ class _MapScreenState extends State<MapScreen> {
         markerId: MarkerId('r_${r['id']}'),
         position: LatLng(lat, lng),
         icon: _markerIcon(status),
-        onTap: () => setState(() => _selectedReport = r),
+        onTap: () {
+          if (_selectedReport == null && _currentCamera != null) {
+            _savedCamera = _currentCamera;
+          }
+          _userInteractedWhilePopupOpen = false;
+          _isProgrammaticMove = true;
+          setState(() => _selectedReport = r);
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16),
+          ).then((_) {
+            _isProgrammaticMove = false;
+          });
+        },
       ));
     }
 
     return markers;
+  }
+
+  void _closeReportPopup() {
+    if (_selectedReport == null) return;
+    setState(() => _selectedReport = null);
+
+    if (_userInteractedWhilePopupOpen) {
+      _userInteractedWhilePopupOpen = false;
+      _savedCamera = null;
+      return;
+    }
+
+    if (_savedCamera != null) {
+      _isProgrammaticMove = true;
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(_savedCamera!),
+      ).then((_) {
+        _isProgrammaticMove = false;
+      });
+      _savedCamera = null;
+    } else {
+      _isProgrammaticMove = true;
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          _userPosition != null
+              ? LatLng(_userPosition!.latitude, _userPosition!.longitude)
+              : _caloocanCenter,
+          13.0,
+        ),
+      ).then((_) {
+        _isProgrammaticMove = false;
+      });
+    }
+    _userInteractedWhilePopupOpen = false;
   }
 
   String _normalizeStatus(String s) {
@@ -231,12 +283,18 @@ class _MapScreenState extends State<MapScreen> {
               _mapController = ctrl;
               ctrl.setMapStyle(_mapStyle);
             },
+            onCameraMove: (pos) => _currentCamera = pos,
+            onCameraMoveStarted: () {
+              if (_selectedReport != null && !_isProgrammaticMove) {
+                _userInteractedWhilePopupOpen = true;
+              }
+            },
             markers: _markers,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
-            onTap: (_) => setState(() => _selectedReport = null),
+            onTap: (_) => _closeReportPopup(),
           ),
 
           // ── Top header bar ───────────────────────────────────────────────
@@ -359,7 +417,7 @@ class _MapScreenState extends State<MapScreen> {
               right: 16,
               child: _ReportPopup(
                 report: _selectedReport!,
-                onClose: () => setState(() => _selectedReport = null),
+                onClose: _closeReportPopup,
               ).animate().fadeIn().slideY(begin: 0.4),
             ),
 

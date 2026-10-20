@@ -8,8 +8,8 @@ import Branding from '../components/Branding';
 import { getAuthToken } from '../utils/authSession';
 
 import { useInteractionHarden } from '../hooks/useInteractionHarden';
-import { API_BASE_URL } from '../utils/apiBase';
 import PulseAIMarkdown from '../components/PulseAIMarkdown';
+import PulseAIChatWindow from '../components/PulseAIChatWindow';
 
 export default function DashboardOverlay({ onNavigate }) {
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -27,13 +27,8 @@ export default function DashboardOverlay({ onNavigate }) {
     const [gettingLocation, setGettingLocation] = useState(false);
     const [description, setDescription] = useState('');
 
-    // AI Omni-Assistant State
+    // PULSEAI Assistant State
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-    const [aiQuery, setAiQuery] = useState('');
-    const [aiMessages, setAiMessages] = useState([
-        { role: 'assistant', text: "Hello! I am **PULSEAI**, the official assistant for Caloocan City services. How may I assist you today?" }
-    ]);
-    const [isAILoading, setIsAILoading] = useState(false);
     
     // Interaction Hardening
     const { throttleAction, isCooldown, isProcessing: aiProcessing } = useInteractionHarden();
@@ -202,43 +197,7 @@ export default function DashboardOverlay({ onNavigate }) {
             } finally {
                 setIsSubmitting(false);
             }
-        }, 5000); // 5s throttle
-    };
 
-
-    const handleAIChat = async (e) => {
-        e.preventDefault();
-        if (!aiQuery.trim() || isAILoading || isCooldown) return;
-        
-        await throttleAction(async () => {
-            const currentQuery = aiQuery;
-            const userMsg = { role: 'user', text: currentQuery };
-            setAiMessages(prev => [...prev, userMsg]);
-            setAiQuery('');
-            setIsAILoading(true);
-
-            try {
-                const token = getAuthToken() || localStorage.getItem('pulso_token');
-                const resp = await fetch(`${API_BASE_URL}/api/ai/assistant`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ 
-                        query: currentQuery,
-                        context: "Resident Dashboard. Main reporting screen."
-                    })
-                });
-                const data = await resp.json();
-                setAiMessages(prev => [...prev, { role: 'assistant', text: data.response || data.error || "No response received." }]);
-            } catch (err) {
-                setAiMessages(prev => [...prev, { role: 'assistant', text: "Service temporarily unavailable." }]);
-            } finally {
-                setIsAILoading(false);
-            }
-        }, 4000); // 4s throttle between messages
-    };
 
     return (
         <motion.div
@@ -480,78 +439,25 @@ export default function DashboardOverlay({ onNavigate }) {
                 </section>
 
             </div>
-            {/* AI Assistant Floating Interface */}
-            <div className="fixed bottom-24 right-6 z-[60] flex flex-col items-end gap-3 sm:bottom-24 sm:right-8">
-                <AnimatePresence>
-                    {isAIChatOpen && (
-                        <motion.div 
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="w-[calc(100vw-32px)] sm:w-[350px] h-[450px] bg-white shadow-2xl rounded-3xl border border-slate-100 overflow-hidden flex flex-col mb-4"
-                        >
-                            <div className="p-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                    <Brain size={20} />
-                                    <span className="font-bold text-sm">PULSEAI</span>
-                                </div>
-                                <button onClick={() => setIsAIChatOpen(false)}><X size={18} /></button>
-                            </div>
-                            
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {aiMessages.map((msg, i) => (
-                                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[85%] p-3 rounded-2xl text-[12px] font-medium leading-relaxed ${
-                                            msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-700'
-                                        }`}>
-                                            {msg.role === 'assistant' ? (
-                                                <PulseAIMarkdown content={msg.text} />
-                                            ) : (
-                                                <p className="whitespace-pre-wrap">{msg.text}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                                {isAILoading && (
-                                    <div className="flex justify-center p-2">
-                                        <Loader2 className="animate-spin text-orange-500" size={16} />
-                                    </div>
-                                )}
-                            </div>
+            {/* Shared PULSEAI Assistant */}
+            <PulseAIChatWindow 
+                isOpen={isAIChatOpen} 
+                onClose={() => setIsAIChatOpen(false)} 
+                role="resident" 
+            />
 
-                            <form onSubmit={handleAIChat} className="p-3 border-t border-slate-100 flex gap-2 bg-slate-50 relative">
-                                {isCooldown && (
-                                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center text-[10px] font-bold text-orange-600 animate-pulse">
-                                        Cooldown active...
-                                    </div>
-                                )}
-                                <input 
-                                    type="text" 
-                                    value={aiQuery}
-                                    onChange={(e) => setAiQuery(e.target.value)}
-                                    placeholder={isCooldown ? "Please wait..." : "Ask about Caloocan services..."}
-                                    disabled={isCooldown || isAILoading}
-                                    className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-medium outline-none focus:ring-1 focus:ring-orange-500 disabled:bg-slate-50"
-                                />
-                                <button 
-                                    type="submit" 
-                                    disabled={isCooldown || isAILoading || !aiQuery.trim()}
-                                    className="p-2 bg-orange-500 text-white rounded-xl shadow-sm hover:bg-orange-600 transition-colors disabled:bg-slate-300"
-                                >
-                                    {isAILoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                                </button>
-                            </form>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                <button 
-                    onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-orange-500 shadow-xl flex items-center justify-center text-white hover:bg-orange-600 transition-all hover:scale-110 active:scale-95 group"
-                >
-                    <Brain size={28} className="group-hover:animate-pulse" />
-                </button>
-            </div>
+            {/* Launcher button */}
+            {!isAIChatOpen && (
+                <div className="fixed bottom-24 right-6 z-[60] flex flex-col items-end gap-3 sm:bottom-24 sm:right-8">
+                    <button 
+                        onClick={() => setIsAIChatOpen(true)}
+                        aria-label="Open PULSEAI Assistant"
+                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-[#e65100] to-[#f97316] shadow-xl flex items-center justify-center text-white hover:brightness-110 transition-all hover:scale-105 active:scale-95 group focus:outline-none focus:ring-4 focus:ring-orange-500/30"
+                    >
+                        <Brain size={28} className="group-hover:animate-pulse" />
+                    </button>
+                </div>
+            )}
             {/* Notification Modal */}
             {notification && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">

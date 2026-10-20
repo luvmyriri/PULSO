@@ -307,7 +307,7 @@ export default function GovernmentUserManagementPage({ workspace }) {
                                                 capabilities: template ? template.capabilities : {}
                                             });
                                         }}
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white"
                                     >
                                         <option value="">Blank Role</option>
                                         {templates.map(t => (
@@ -371,7 +371,7 @@ export default function GovernmentUserManagementPage({ workspace }) {
                                 <select
                                     value={filters.account_type}
                                     onChange={(e) => handleFilterChange('account_type', e.target.value)}
-                                    className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white"
                                 >
                                     <option value="government">Government Accounts</option>
                                     <option value="resident">Resident Accounts</option>
@@ -379,7 +379,7 @@ export default function GovernmentUserManagementPage({ workspace }) {
                                 <select
                                     value={filters.status}
                                     onChange={(e) => handleFilterChange('status', e.target.value)}
-                                    className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white"
                                 >
                                     <option value="">All Status</option>
                                     <option value="active">Active</option>
@@ -436,7 +436,7 @@ export default function GovernmentUserManagementPage({ workspace }) {
                                             <select
                                                 value={user.role}
                                                 onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                                                className="bg-slate-100 dark:bg-slate-800 border-0 rounded-lg px-2 py-1 text-xs font-medium outline-none"
+                                                className="bg-slate-100 dark:bg-slate-800 border-0 rounded-lg px-2 py-1 text-xs font-medium outline-none cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white"
                                             >
                                                 {GOV_ROLES.map(r => (
                                                     <option key={r.value} value={r.value}>{r.label}</option>

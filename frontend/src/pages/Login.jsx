@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     User, Shield, Eye, EyeOff, ChevronRight,
     Activity, Mail, ArrowLeft, CheckCircle, Lock,
-    ShieldCheck, MapPinned, Clock, Clipboard, HardHat, Check, AlertCircle, Home, UserX
+    MapPinned, Clock, Clipboard, HardHat, Check, AlertCircle, Home, UserX
 } from 'lucide-react';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -14,6 +14,8 @@ import LegalModal from '../components/LegalModal';
 import PendingVerificationModal from '../components/PendingVerificationModal';
 import { setAuthSession } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
+import { isInstalledApp } from '../utils/appContext';
+import PulsoBottomScrim from '../components/mobile/PulsoBottomScrim';
 import '../index.css';
 
 /**
@@ -182,6 +184,8 @@ export default function Login() {
 
         return () => observer.disconnect();
     }, [theme]);
+
+    const isApp = isInstalledApp();
 
     // Reset reCAPTCHA verification on theme change to prevent submitting an invalidated token
     const prevThemeStateRef = useRef(isDark);
@@ -703,8 +707,34 @@ export default function Login() {
     };
 
     return (
-        <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden">
-
+        <div
+            style={isApp ? {
+                backgroundColor: isDark ? '#080D19' : '#EAF2FF',
+                transition: 'background-color 150ms ease, color 150ms ease'
+            } : undefined}
+            className={`relative min-h-screen min-h-[100dvh] w-full text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden ${
+                isApp
+                    ? ''
+                    : 'bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12]'
+            }`}
+        >
+            {/* Installed Mobile App City Scene Background */}
+            {isApp && (
+                <>
+                    <div
+                        className="absolute inset-0 w-full max-w-[480px] mx-auto pointer-events-none select-none z-0"
+                        style={{
+                            backgroundImage: isDark ? 'url(/pulso-bg-dark.svg)' : 'url(/pulso-bg-light.svg)',
+                            backgroundSize: '100% auto',
+                            backgroundPosition: 'center bottom',
+                            backgroundRepeat: 'no-repeat',
+                            transition: 'background-image 150ms ease'
+                        }}
+                        aria-hidden="true"
+                    />
+                    <PulsoBottomScrim isDark={isDark} />
+                </>
+            )}
 
             {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
             <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
@@ -731,26 +761,28 @@ export default function Login() {
                 </div>
             </header>
 
-            {/* ── Background Seal Watermark (Desktop only, hidden on mobile) ───── */}
-            <div
-                className="hidden lg:flex absolute inset-0 overflow-hidden pointer-events-none select-none z-0 items-center justify-end"
-                aria-hidden="true"
-            >
-                <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
-                    <div className="absolute inset-0 rounded-full border-2 border-orange-500/30 dark:border-white/20 animate-pulse" style={{ animationDuration: '6s' }} />
-                    <div className="absolute inset-[-18px] sm:inset-[-24px] rounded-full border border-dashed border-[#ff6b00]/40 dark:border-[#ff6b00]/30" />
-                    <div className="absolute inset-[-36px] sm:inset-[-50px] rounded-full border border-slate-400/25 dark:border-white/10" />
+            {/* ── Background Seal Watermark (Desktop website only, hidden in installed app and mobile) ───── */}
+            {!isApp && (
+                <div
+                    className="hidden lg:flex absolute inset-0 overflow-hidden pointer-events-none select-none z-0 items-center justify-end"
+                    aria-hidden="true"
+                >
+                    <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
+                        <div className="absolute inset-0 rounded-full border-2 border-orange-500/30 dark:border-white/20 animate-pulse" style={{ animationDuration: '6s' }} />
+                        <div className="absolute inset-[-18px] sm:inset-[-24px] rounded-full border border-dashed border-[#ff6b00]/40 dark:border-[#ff6b00]/30" />
+                        <div className="absolute inset-[-36px] sm:inset-[-50px] rounded-full border border-slate-400/25 dark:border-white/10" />
 
-                    <img
-                        src="/engineering-logo.jpg"
-                        alt="Official Caloocan City Seal Watermark"
-                        className="w-full h-full object-contain rounded-full drop-shadow-sm dark:brightness-105"
-                        loading="eager"
-                    />
+                        <img
+                            src="/engineering-logo.jpg"
+                            alt="Official Caloocan City Seal Watermark"
+                            className="w-full h-full object-contain rounded-full drop-shadow-sm dark:brightness-105"
+                            loading="eager"
+                        />
 
-                    <div className="absolute inset-0 rounded-full bg-radial from-transparent via-transparent to-white/40 dark:to-[#070a12]/50 pointer-events-none" />
+                        <div className="absolute inset-0 rounded-full bg-radial from-transparent via-transparent to-white/40 dark:to-[#070a12]/50 pointer-events-none" />
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ── Main Content Grid (60/40 Ratio in max-w-7xl on Desktop, Hero hidden on Mobile) ───────────── */}
             <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-6 lg:py-12 flex-1 flex items-center justify-center">
@@ -758,12 +790,6 @@ export default function Login() {
                     
                     {/* Left Column: Hero & System Context (60% / 7 cols) — Hidden on mobile/tablet (< lg), visible on desktop */}
                     <div className="hidden lg:flex lg:col-span-7 flex-col items-start text-left w-full">
-                        
-                        {/* Category Tag Pill */}
-                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-orange-200 dark:border-orange-800/60 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
-                            <ShieldCheck size={14} className="text-[#ff6b00] shrink-0" />
-                            <span>Citizen Access Portal • Caloocan City</span>
-                        </div>
                         
                         {/* Main Display Heading */}
                         <h1 className="font-heading font-black text-3xl sm:text-5xl lg:text-[52px] text-slate-900 dark:text-white uppercase leading-[1.12] mb-4 tracking-tight">
@@ -871,7 +897,7 @@ export default function Login() {
                                                                         handleLogin(e);
                                                                     }
                                                                 }}
-                                                                className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-10 py-3 transition-all"
+                                                                className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-10 py-3 transition-all"
                                                                 placeholder="Enter password"
                                                                 required
                                                                 autoComplete="current-password"
@@ -1323,7 +1349,7 @@ export default function Login() {
                                                                     type={showNewPassword ? "text" : "password"}
                                                                     value={newPassword}
                                                                     onChange={(e) => setNewPassword(e.target.value)}
-                                                                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]"
+                                                                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 text-xs sm:text-sm rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]"
                                                                     placeholder="••••••••"
                                                                     required
                                                                 />
@@ -1349,7 +1375,7 @@ export default function Login() {
                                                                     type={showConfirmNewPassword ? "text" : "password"}
                                                                     value={confirmNewPassword}
                                                                     onChange={(e) => setConfirmNewPassword(e.target.value)}
-                                                                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]"
+                                                                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 text-xs sm:text-sm rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#ff6b00]"
                                                                     placeholder="••••••••"
                                                                     required
                                                                 />

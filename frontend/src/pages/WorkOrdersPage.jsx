@@ -34,6 +34,7 @@ import GovBlockerModal from '../components/modals/GovBlockerModal';
 import AssignWorkOrderModal from '../components/modals/AssignWorkOrderModal';
 import WorkOrderCompletionModal from '../components/modals/WorkOrderCompletionModal';
 import WorkOrderEvidence from '../components/WorkOrderEvidence';
+import SearchInput from '../components/SearchInput';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import './work-orders.css';
@@ -338,16 +339,14 @@ export default function WorkOrdersPage({ workspace }) {
                     {/* Left Column: Orders Queue */}
                     <div className="citizen-reports-queue flex-1 min-w-0" style={{ height: 'auto', padding: 0 }}>
                         {/* Search & Filter Header */}
-                        <div className="relative mb-3.5 max-w-md">
-                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                <Search size={14} />
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Search by order ID, title, barangay, or assigned team..."
+                        <div className="mb-3.5">
+                            <SearchInput
                                 value={searchQuery}
-                                onChange={(e) => updateParam('search', e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ff6b00] transition-all shadow-xs"
+                                onChange={(val) => updateParam('search', val)}
+                                placeholder="Search order ID, title, barangay or team"
+                                ariaLabel="Search order ID, title, barangay or team"
+                                onClear={() => updateParam('search', '')}
+                                className="w-full sm:w-[320px] md:w-[360px]"
                             />
                         </div>
 

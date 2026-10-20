@@ -18,6 +18,9 @@ import OrangeSelect from '../components/OrangeSelect';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovUserDropdown from '../components/GovUserDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
+import SearchInput from '../components/SearchInput';
+import TablePagination from '../components/TablePagination';
+import './gov-reports-header.css';
 import Swal from 'sweetalert2';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import { getCaloocanDistrict } from '../data/caloocanBoundaries';
@@ -565,118 +568,130 @@ export default function GovReportsDashboard() {
             ══════════════════════════════════════════════════════════════════════ */}
             <div ref={mainContentRef} className="flex-1 flex flex-col h-full overflow-hidden">
 
-                {/* ─────────────────────────────────────────────────────────────
-                    2. TOP BAR & UNIFIED WORKFLOW CONTROLS
-                ────────────────────────────────────────────────────────────── */}
-                <header className="min-h-[80px] py-3.5 sm:py-4 px-3 sm:px-4 lg:px-6 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between relative z-50 gap-3 flex-nowrap">
-                    {/* Left: Breadcrumbs + Title + Persistent Role Subtitle */}
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <button
-                            ref={mobileNavTriggerRef}
-                            type="button"
-                            className="lg:hidden inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-xs hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#2563EB] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                            aria-label="Open government navigation"
-                            aria-expanded={isMobileNavOpen}
-                            aria-controls="gov-mobile-navigation"
-                            onClick={() => setIsMobileNavOpen(true)}
-                        >
-                            <Menu size={20} />
-                        </button>
-                        <div className="min-w-0 pt-1 pb-0.5">
-                            <GovBreadcrumb category="Citizen Services" current="Citizen Reports Docket" />
-                            <div className="flex items-center gap-2 mt-0.5">
-                                <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-snug whitespace-nowrap">
-                                    Citizen reports
-                                </h1>
+                {/* ═════════════════════════════════════════════════════════════
+                    2. TWO-TIER ADMIN HEADER
+                    Tier 1: Global App Bar (Search, Notifications, Theme, User)
+                    Tier 2: Page Header (Breadcrumb, Title, Subtitle, Actions)
+                ══════════════════════════════════════════════════════════════ */}
+                <header className="sticky top-0 z-50 shrink-0 bg-white dark:bg-[#090e1a] border-b border-slate-200 dark:border-slate-800/80 shadow-xs gov-admin-header-container">
+                    {/* ── TIER 1: PAGE IDENTITY & GLOBAL TOOLS ── */}
+                    <div className="gov-tier1-bar py-2.5 sm:py-3 px-3 sm:px-4 lg:px-6 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between gap-3 relative z-20">
+                        {/* Left: Mobile Nav Hamburger + Breadcrumbs + Title + Plain Subtitle */}
+                        <div className="gov-tier2-title-block min-w-0 flex-1 flex items-start gap-2.5 sm:gap-3">
+                            <button
+                                ref={mobileNavTriggerRef}
+                                type="button"
+                                className="lg:hidden mt-0.5 inline-flex h-10 w-10 min-w-[40px] min-h-[40px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-xs hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 cursor-pointer"
+                                aria-label="Open government navigation"
+                                aria-expanded={isMobileNavOpen}
+                                aria-controls="gov-mobile-navigation"
+                                onClick={() => setIsMobileNavOpen(true)}
+                            >
+                                <Menu size={18} />
+                            </button>
+                            <div className="min-w-0 flex-1">
+                                <GovBreadcrumb
+                                    category="Citizen Services"
+                                    categoryLink="/gov/reports"
+                                    current="Citizen Reports"
+                                />
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <h1 className="gov-tier2-title font-heading font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight leading-snug whitespace-nowrap">
+                                        Citizen reports
+                                    </h1>
+                                </div>
+                                <p className="gov-tier2-subtitle text-xs mt-0.5 line-clamp-2 max-w-xl font-normal leading-relaxed">
+                                    Review, verify and assign incoming reports.
+                                </p>
                             </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden xl:block mt-0.5 truncate max-w-lg">
-                                Administrative Triage — Review citizen submissions, verify evidence, inspect audit trails, and manage compliance.
-                            </p>
+                        </div>
+
+                        {/* Right: Global Tools Cluster (Notifications, Theme, User Profile) */}
+                        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                            {/* Notification Bell with solid background badge */}
+                            <GovNotificationDropdown />
+
+                            {/* Theme Toggle: single icon on narrow, 3-option pill on xl+ */}
+                            <ThemeToggle responsiveBreakpoint="xl" />
+
+                            {/* User Avatar + Role Dropdown */}
+                            <GovUserDropdown currentUser={currentUser} />
                         </div>
                     </div>
 
-                    {/* Right: Workflow View Switcher + Controls & User cluster */}
-                    <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 ml-auto">
-                        {/* Segmented View Switcher: Map View ↔ Table View */}
-                        <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    {/* ── TIER 2: SEARCH & PAGE ACTIONS TOOLBAR ── */}
+                    <div className="gov-tier2-header py-2 sm:py-2.5 px-3 sm:px-4 lg:px-6 flex flex-col md:flex-row md:items-center justify-between gap-3 relative z-10">
+                        {/* Left: Global Search Bar */}
+                        <div className="gov-tier1-search relative w-full md:w-auto">
+                            <SearchInput
+                                ref={searchInputRef}
+                                value={searchQuery}
+                                onChange={setSearchQuery}
+                                placeholder="Search ticket, citizen or category"
+                                ariaLabel="Search ticket, citizen or category"
+                                onClear={() => setSearchQuery('')}
+                                className="w-full sm:w-[320px] md:w-[360px]"
+                            />
+                        </div>
+
+                        {/* Right: Page Actions (Map/Table Toggle, All Districts, Sync) */}
+                        <div className="gov-tier2-actions flex flex-wrap items-center gap-2 sm:gap-2.5">
+                            {/* Segmented View Switcher: Map View ↔ Table View */}
+                            <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const param = selectedReport?.id ? `?reportId=${selectedReport.id}` : '';
+                                        navigate(`/dispatcher${param}`);
+                                    }}
+                                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                    title="Switch to Tactical GIS Map View (Field Dispatch & Routing)"
+                                    aria-label="Switch to Tactical GIS Map View"
+                                >
+                                    <MapIcon size={14} />
+                                    <span className="hidden sm:inline">Map View</span>
+                                </button>
+                                <div
+                                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-xs border border-slate-200/60 dark:border-slate-600"
+                                    aria-current="page"
+                                    title="Table View (Current)"
+                                >
+                                    <FileText size={14} />
+                                    <span className="hidden sm:inline">Table View</span>
+                                </div>
+                            </div>
+
+                            {/* District Filter Dropdown */}
+                            <div className="relative" title={`District Filter: ${districtFilter}`}>
+                                <OrangeSelect
+                                    value={districtFilter}
+                                    onChange={setDistrictFilter}
+                                    size="sm"
+                                    minWidth="125px"
+                                    icon={MapPin}
+                                    searchable={false}
+                                    placeholder="All Districts"
+                                    options={[
+                                        { value: 'All Districts', label: 'All Districts' },
+                                        { value: 'North Caloocan', label: 'North Caloocan' },
+                                        { value: 'South Caloocan', label: 'South Caloocan' }
+                                    ]}
+                                />
+                            </div>
+
+                            {/* On-demand Live Sync Button */}
                             <button
                                 type="button"
-                                onClick={() => {
-                                    const param = selectedReport?.id ? `?reportId=${selectedReport.id}` : '';
-                                    navigate(`/dispatcher${param}`);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer"
-                                title="Switch to Tactical GIS Map View (Field Dispatch & Routing)"
-                                aria-label="Switch to Tactical GIS Map View for Field Dispatch"
+                                onClick={fetchLiveReports}
+                                disabled={isSyncing}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-300 dark:hover:border-orange-500/40 transition-all cursor-pointer disabled:opacity-50 min-h-[36px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                title={lastSynced ? `Last synced at ${lastSynced}` : "Sync with live citizen database"}
+                                aria-label={isSyncing ? "Syncing live reports" : "Sync live citizen database"}
                             >
-                                <MapIcon size={14} />
-                                <span className="hidden sm:inline">Map View</span>
+                                <RefreshCw size={13} className={isSyncing ? "animate-spin text-[#ff6b00]" : "text-slate-400"} />
+                                <span className="hidden sm:inline">{isSyncing ? "Syncing..." : "Sync"}</span>
                             </button>
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-xs border border-slate-200/60 dark:border-slate-600">
-                                <FileText size={14} />
-                                <span className="hidden sm:inline">Table View</span>
-                            </div>
                         </div>
-
-
-                        {/* District Filter Dropdown */}
-                        <div className="relative hidden sm:block">
-                            <OrangeSelect
-                                value={districtFilter}
-                                onChange={setDistrictFilter}
-                                size="sm"
-                                minWidth="140px"
-                                icon={MapPin}
-                                searchable={false}
-                                placeholder="All Districts"
-                                options={[
-                                    { value: 'All Districts', label: 'All Districts' },
-                                    { value: 'North Caloocan', label: 'North Caloocan' },
-                                    { value: 'South Caloocan', label: 'South Caloocan' }
-                                ]}
-                            />
-                        </div>
-
-                        {/* On-demand Live Sync Button */}
-                        <button
-                            type="button"
-                            onClick={fetchLiveReports}
-                            disabled={isSyncing}
-                            className="hidden md:flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-300 dark:hover:border-orange-500/40 transition-all cursor-pointer disabled:opacity-50"
-                            title={lastSynced ? `Last synced at ${lastSynced}` : "Sync with live citizen database"}
-                        >
-                            <RefreshCw size={13} className={isSyncing ? "animate-spin text-[#ff6b00]" : "text-slate-400"} />
-                            <span className="hidden lg:inline">{isSyncing ? "Syncing..." : "Sync"}</span>
-                        </button>
-
-                        {/* Search Input with '/' shortcut */}
-                        <div className="relative hidden md:block w-56 lg:w-64">
-                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                <Search size={14} />
-                            </div>
-                            <input
-                                ref={searchInputRef}
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search reports"
-                                className="w-full pl-9 pr-8 py-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ff6b00] transition-all"
-                            />
-                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                <kbd className="px-1.5 py-0.5 text-[10px] font-mono-data font-semibold text-slate-400 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded">
-                                    /
-                                </kbd>
-                            </div>
-                        </div>
-
-                        {/* Notification Bell */}
-                        <GovNotificationDropdown />
-
-                        {/* Theme Toggle */}
-                        <ThemeToggle className="hidden sm:flex" />
-
-                        {/* User Avatar + Role Dropdown */}
-                        <GovUserDropdown currentUser={currentUser} />
                     </div>
                 </header>
 
@@ -983,60 +998,15 @@ export default function GovReportsDashboard() {
                         </div>
 
                         {/* Pagination Footer */}
-                        <div className="h-14 shrink-0 border-t border-slate-200 dark:border-slate-800 px-5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                            <div>
-                                Showing {filteredReports.length ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredReports.length)} of {filteredReports.length} reports
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                {/* Page Buttons (Circular shape) */}
-                                <div className="flex items-center gap-1.5">
-                                    <button
-                                        type="button"
-                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed transition-all text-slate-500 dark:text-slate-400"
-                                        title="Previous page"
-                                    >
-                                        <ChevronLeft size={15} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="w-7 h-7 flex items-center justify-center font-bold text-xs bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] border border-[#ff6b00] rounded-full shadow-xs cursor-pointer"
-                                    >
-                                        {currentPage}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setCurrentPage(p => Math.min(pageCount, p + 1))}
-                                        disabled={currentPage >= pageCount}
-                                        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed transition-all text-slate-500 dark:text-slate-400"
-                                        title="Next page"
-                                    >
-                                        <ChevronRight size={15} />
-                                    </button>
-                                </div>
-
-                                {/* Page Size Selector */}
-                                <OrangeSelect
-                                    value={pageSize}
-                                    onChange={(val) => {
-                                        setPageSize(Number(val));
-                                        setCurrentPage(1);
-                                    }}
-                                    size="sm"
-                                    minWidth="105px"
-                                    searchable={false}
-                                    dropUp={true}
-                                    align="right"
-                                    options={[
-                                        { value: 10, label: '10 / page' },
-                                        { value: 20, label: '20 / page' },
-                                        { value: 50, label: '50 / page' }
-                                    ]}
-                                />
-                            </div>
-                        </div>
+                        {filteredReports.length > 0 && (
+                            <TablePagination
+                                page={currentPage}
+                                pageSize={pageSize}
+                                total={filteredReports.length}
+                                itemLabel="reports"
+                                onPageChange={setCurrentPage}
+                            />
+                        )}
                     </div>
 
                     {/* ── RIGHT: DETAIL PANEL (Simultaneous Aperture Reveal) ───────────────────── */}
@@ -1335,8 +1305,8 @@ export default function GovReportsDashboard() {
                             aria-modal="true"
                             aria-labelledby="wo-modal-title"
                         >
-                            {/* Top Accent Gradient Strip */}
-                            <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
+                            {/* Top Accent Strip */}
+                            <div className="h-1.5 w-full bg-orange-500 shrink-0" />
 
                             {/* Modal Header */}
                             <div className="px-6 py-4.5 sm:px-7 sm:py-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40 shrink-0">

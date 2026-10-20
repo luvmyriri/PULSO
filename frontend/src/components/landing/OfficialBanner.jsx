@@ -46,7 +46,7 @@ export default function OfficialBanner() {
       aria-label="Philippine Government Official Header"
       className="w-full bg-slate-100 dark:bg-[#050811] text-slate-700 dark:text-slate-300 text-[10px] sm:text-xs border-b border-slate-200 dark:border-slate-800 transition-colors"
     >
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         
         {/* Left: Official Government Affiliation */}
         <div className="flex items-center gap-2 flex-wrap">

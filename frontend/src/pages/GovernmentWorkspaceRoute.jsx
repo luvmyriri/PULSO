@@ -38,7 +38,9 @@ const VIEW_COMPONENTS = {
         staff: AdministrationWorkspacePage,
         residents: AdministrationWorkspacePage,
         settings: AdministrationWorkspacePage,
+        'automated-ai': AdministrationWorkspacePage,
         agents: AdministrationWorkspacePage,
+        'ai-tools': AdministrationWorkspacePage,
     },
 };
 
@@ -47,12 +49,17 @@ export default function GovernmentWorkspaceRoute({ workspace }) {
     const currentUser = readGovernmentUser();
     const definition = GOVERNMENT_WORKSPACES[workspace];
     const availableViews = getAvailableWorkspaceViews(workspace, currentUser);
-    const requestedView = new URLSearchParams(location.search).get('view');
+    const searchParams = new URLSearchParams(location.search);
+    const rawRequested = searchParams.get('view') || searchParams.get('tab');
+    const requestedView = (rawRequested === 'agents' || rawRequested === 'ai-tools') ? 'automated-ai' : rawRequested;
     const activeView = availableViews.find((view) => view.key === requestedView) || availableViews[0];
 
     if (!definition || !activeView) return <Navigate to="/gov/my-dashboard" replace />;
     if (requestedView !== activeView.key) {
-        return <Navigate to={`${definition.path}?view=${activeView.key}`} replace />;
+        const nextParams = new URLSearchParams(location.search);
+        nextParams.set('view', activeView.key);
+        nextParams.set('tab', activeView.key);
+        return <Navigate to={`${definition.path}?${nextParams.toString()}`} replace />;
     }
 
     const ActiveComponent = VIEW_COMPONENTS[workspace]?.[activeView.key];

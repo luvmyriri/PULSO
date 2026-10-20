@@ -20,9 +20,11 @@ from sqlalchemy.engine import make_url
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT = ROOT / "backend" / "schema" / "baseline_c455ca49f6d5.sql"
 BASELINE_INVENTORY = ROOT / "backend" / "schema" / "baseline_c455ca49f6d5.inventory.json"
-HEAD_INVENTORY = ROOT / "backend" / "schema" / "head_e4b7c9d2f610.inventory.json"
+HEAD_INVENTORY = ROOT / "backend" / "schema" / "head_f3a6d8c1b250.inventory.json"
+PREVIOUS_INVENTORY = ROOT / "backend" / "schema" / "head_e4b7c9d2f610.inventory.json"
 BASELINE_REVISION = "c455ca49f6d5"
-HEAD_REVISION = "e4b7c9d2f610"
+HEAD_REVISION = "f3a6d8c1b250"
+PREVIOUS_REVISION = "e4b7c9d2f610"
 
 
 def connection_kwargs(database: str | None = None) -> dict:
@@ -293,6 +295,9 @@ def command_check_existing() -> None:
     if revision == HEAD_REVISION:
         expected = load_inventory(HEAD_INVENTORY)
         state = "head"
+    elif revision == PREVIOUS_REVISION:
+        expected = load_inventory(PREVIOUS_INVENTORY)
+        state = "previous"
     elif revision in {None, BASELINE_REVISION}:
         expected = load_inventory(BASELINE_INVENTORY)
         state = "baseline"

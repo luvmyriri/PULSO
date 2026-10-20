@@ -8,6 +8,7 @@ Model: Configurable Vertex AI model and serving region
 """
 
 import os
+import re
 import json
 import base64
 import time
@@ -475,7 +476,7 @@ Severity Guidelines:
    b) NON-INFRASTRUCTURE CONTENT: If the image shows food, animals, random objects, memes, indoor rooms, screenshots, or any content clearly unrelated to city public works and infrastructure, set:
       - "is_infrastructure": false
       - "is_inappropriate": true  
-      - "rejection_reason": "We couldn't clearly see a city infrastructure issue in this photo. Please take a photo showing the actual problem (such as a pothole, broken streetlight, or drainage hazard)."
+      - "rejection_reason": "We couldn't clearly see a city infrastructure issue in this photo. Please take a photo showing the actual problem."
       - "category": "Inappropriate Content"
    c) VALID INFRASTRUCTURE images:
       - "is_infrastructure": true
@@ -803,6 +804,323 @@ def get_ai_assistant_response(
         invoked_tools.append({"tool": "get_evacuation_routes", "data": res[:500]})
         return res
 
+    def get_staff_reports_overview(status_or_scope: Optional[str] = None) -> str:
+        """Retrieve real administrative citizen reports for government staff triage, including unassigned, pending verification, and today's priority cases."""
+        if not db:
+            return "I couldn't load that right now. You can open Reports to check."
+        try:
+            import models
+            import gov_models
+            from sqlalchemy import or_
+            query = db.query(models.Report)
+            s_lower = (status_or_scope or "").lower()
+
+            if "unassigned" in s_lower:
+                assigned_report_ids = [
+                    row[0] for row in db.query(gov_models.WorkOrder.report_id)
+                    .filter(
+                        gov_models.WorkOrder.report_id.isnot(None),
+                        gov_models.WorkOrder.status.notin_(['cancelled', 'rejected'])
+                    ).all()
+                ]
+                q_unassigned = query.filter(
+                    models.Report.status.in_(['pending', 'unverified', 'pending_approval', 'verified', 'for_verification'])
+                )
+                if assigned_report_ids:
+                    q_unassigned = q_unassigned.filter(~models.Report.id.in_(assigned_report_ids))
+                reports = q_unassigned.order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Unassigned citizen reports requiring dispatch:"
+            elif "verification" in s_lower or "needs_verification" in s_lower or "unverified" in s_lower or "awaiting" in s_lower:
+                reports = query.filter(
+                    models.Report.status.in_(['pending', 'unverified', 'pending_approval', 'for_verification'])
+                ).order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Reports awaiting administrative verification:"
+            elif "priority" in s_lower or "critical" in s_lower or "today" in s_lower or "high" in s_lower:
+                reports = query.filter(
+                    or_(
+                        models.Report.ai_urgency.ilike('%critical%'),
+                        models.Report.ai_urgency.ilike('%high%'),
+                        models.Report.severity_score >= 7.0
+                    ),
+                    models.Report.status.notin_(['resolved', 'rejected'])
+                ).order_by(models.Report.severity_score.desc(), models.Report.created_at.desc()).limit(6).all()
+                if not reports:
+                    reports = query.filter(
+                        models.Report.status.notin_(['resolved', 'rejected'])
+                    ).order_by(models.Report.severity_score.desc(), models.Report.created_at.desc()).limit(6).all()
+                title_label = "Current high and critical priority reports:"
+            else:
+                reports = query.order_by(models.Report.created_at.desc()).limit(6).all()
+                title_label = "Recent incoming citizen reports:"
+
+            if not reports:
+                msg = f"No reports matching **{status_or_scope or 'current filter'}** were found in the active queue."
+                invoked_tools.append({"tool": "get_staff_reports_overview", "data": msg})
+                return msg
+
+            lines = [title_label, ""]
+            for r in reports:
+                ticket_str = r.ticket_id or f"PUL-2026-{r.id:04d}"
+                loc = r.location_barangay or r.location_string or "North Caloocan"
+                cat = r.ai_category or r.category or "Infrastructure"
+                urg = r.ai_urgency or "Normal"
+                desc_snippet = (r.ai_summary or r.description or "").strip()
+                if len(desc_snippet) > 90:
+                    desc_snippet = desc_snippet[:87] + "..."
+                lines.append(
+                    f"- **#{ticket_str}** — **{cat}** ({loc}) | Status: **{r.status}** | Urgency: **{urg}**"
+                    + (f"\n  Summary: {desc_snippet}" if desc_snippet else "")
+                )
+            lines.append("\nYou can open any ticket in the **Command Center** or **Reports** workspace to verify, dispatch a crew, or update status.")
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_staff_reports_overview", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"I couldn't load that right now. You can open Reports to check. ({err})"
+            invoked_tools.append({"tool": "get_staff_reports_overview", "data": err_msg})
+            return err_msg
+
+    def get_staff_work_orders_overview(status_or_scope: Optional[str] = None) -> str:
+        """Retrieve real government work orders from the PULSO engineering operations system."""
+        if not db:
+            return "I couldn't load that right now. You can open Work Orders to check."
+        try:
+            import gov_models
+            query = db.query(gov_models.WorkOrder)
+            s_lower = (status_or_scope or "").lower()
+            if "overdue" in s_lower or "late" in s_lower or "sla" in s_lower:
+                wos = query.filter(
+                    gov_models.WorkOrder.status.in_(['open', 'assigned', 'in_progress', 'rework_required', 'blocked'])
+                ).order_by(gov_models.WorkOrder.created_at.asc()).limit(6).all()
+                title_label = "Active work orders requiring SLA and scheduling review:"
+            else:
+                wos = query.order_by(gov_models.WorkOrder.created_at.desc()).limit(6).all()
+                title_label = "Current engineering work orders:"
+
+            if not wos:
+                msg = "There are no overdue or active work orders flagged in the current engineering queue."
+                invoked_tools.append({"tool": "get_staff_work_orders_overview", "data": msg})
+                return msg
+
+            lines = [title_label, ""]
+            for wo in wos:
+                wo_id = getattr(wo, "wo_number", None) or f"WO-2026-{wo.id:03d}"
+                prio = (wo.priority or "normal").upper()
+                lines.append(
+                    f"- **#{wo_id}** — **{wo.title or 'Field Maintenance'}** | Status: **{wo.status}** | Priority: **{prio}**"
+                )
+            lines.append("\nPlease review crew dispatch and verify completion milestones in the **Field Operations** workspace.")
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "get_staff_work_orders_overview", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"I couldn't load that right now. You can open Work Orders to check. ({err})"
+            invoked_tools.append({"tool": "get_staff_work_orders_overview", "data": err_msg})
+            return err_msg
+
+    def predict_maintenance_and_resolution_plan(target_ticket_or_category: Optional[str] = None) -> str:
+        """Predict repair duration, recommended engineering actions, and post-resolution preventive maintenance schedule for a citizen report, ticket ID, or infrastructure category (e.g., Roads & Bridges, Water & Drainage, Street Lighting)."""
+        try:
+            import models
+            import gov_models
+            from sqlalchemy import or_
+
+            combined_text = f"{target_ticket_or_category or ''} {query or ''} {context or ''}"
+            ticket_matches = re.findall(r"(PUL-\d{4}-\d+)", combined_text, flags=re.IGNORECASE)
+
+            matched_report = None
+            if db and ticket_matches:
+                # Use the most recently mentioned ticket ID in the query/conversation
+                target_tid = ticket_matches[-1].upper()
+                matched_report = (
+                    db.query(models.Report)
+                    .filter(models.Report.ticket_id.ilike(target_tid))
+                    .first()
+                )
+
+            if db and not matched_report:
+                # Try matching the top active high/critical report if user asks a follow-up
+                matched_report = (
+                    db.query(models.Report)
+                    .filter(
+                        or_(
+                            models.Report.ai_urgency.ilike('%critical%'),
+                            models.Report.ai_urgency.ilike('%high%'),
+                            models.Report.severity_score >= 7.0
+                        ),
+                        models.Report.status.notin_(['resolved', 'rejected'])
+                    )
+                    .order_by(models.Report.severity_score.desc(), models.Report.created_at.desc())
+                    .first()
+                )
+
+            # Determine category, urgency, and issue specifics
+            cat_text = (
+                (matched_report.ai_category or matched_report.category or "")
+                if matched_report else ""
+            ) + " " + combined_text
+            cat_lower = cat_text.lower()
+            desc_lower = (
+                f"{matched_report.ai_summary or ''} {matched_report.description or ''}".lower()
+                if matched_report else combined_text.lower()
+            )
+
+            # Check historical work orders for grounding
+            completed_count = 0
+            avg_days_note = ""
+            if db:
+                try:
+                    completed_wos = (
+                        db.query(gov_models.WorkOrder)
+                        .filter(
+                            gov_models.WorkOrder.completed_date.isnot(None),
+                            gov_models.WorkOrder.created_at.isnot(None)
+                        )
+                        .limit(20)
+                        .all()
+                    )
+                    durations = []
+                    for w in completed_wos:
+                        delta = (w.completed_date - w.created_at).total_seconds() / 86400.0
+                        if 0.1 <= delta <= 90:
+                            durations.append(delta)
+                    if durations:
+                        completed_count = len(durations)
+                        avg_d = sum(durations) / len(durations)
+                        avg_days_note = f" (Historical LGU benchmark across {completed_count} completed work orders: **{avg_d:.1f} days** average turnaround)"
+                except Exception:
+                    pass
+
+            is_collapse_or_severe = any(
+                k in desc_lower for k in ["collapse", "collapsed", "sinkhole", "erosion", "submerged", "washed out", "structural", "major"]
+            )
+            is_road_bridge = any(k in cat_lower for k in ["road", "bridge", "pothole", "asphalt", "pavement"])
+            is_drainage = any(k in cat_lower for k in ["drainage", "water", "flood", "canal", "culvert", "sewer"])
+            is_lighting = any(k in cat_lower for k in ["light", "street lighting", "lamp", "electrical", "post"])
+
+            if is_road_bridge and (is_collapse_or_severe or is_drainage):
+                scope_label = "Roads & Bridges / Water & Drainage Structural Rehabilitation"
+                stabilization_time = "4 to 12 hours"
+                repair_duration = "7 to 14 working days"
+                minor_comparison = "1 to 3 working days for standard pothole/asphalt patching; 3 to 5 days for localized drainage declogging"
+                curing_qa_time = "2 to 3 days (concrete curing, compaction & load inspection)"
+                service_lifespan = "8 to 12 years (reinforced concrete / slope & riprap protection) or 4 to 6 years (heavy-duty asphalt overlay)"
+                preventive_cycle = (
+                    "- **30-Day Post-Resolution Inspection**: Verify sub-base settlement, road shoulder stability, and water runoff flow.\n"
+                    "- **Every 6 Months (Pre- & Post-Rainy Season)**: Mandatory drainage de-silting, culvert clearing, and embankment erosion check.\n"
+                    "- **Every 12 Months (Annual Asset Audit)**: Structural condition scoring and pavement surface inspection in the PULSO Asset Registry."
+                )
+                action_steps = (
+                    "1. **Immediate Site Stabilization (First 4-12 Hours)**: Deploy safety barricades, traffic warning signage, and cordon off the collapsed road edge adjacent to the waterway to prevent vehicle hazards.\n"
+                    "2. **Engineering Triage & Work Order Dispatch (Day 1)**: Approve the report in the **Command Center** and dispatch a **Civil/Structural Engineer**, **Heavy Equipment Road Crew**, and **Drainage Team**.\n"
+                    "3. **Slope, Drainage & Sub-Base Reconstruction (Days 2-10)**: Excavate unstable saturated soil, install riprap or reinforced retaining wall protection along the water edge, restore drainage culvert flow, and compact aggregate sub-base.\n"
+                    "4. **Pavement Resurfacing & Curing (Days 11-14)**: Pour Portland Cement Concrete Pavement (PCCP) or hot-mix asphalt overlay, allow proper curing, and complete final quality assurance inspection before marking **resolved**."
+                )
+            elif is_road_bridge:
+                scope_label = "Roads & Bridges Maintenance and Surface Rehabilitation"
+                stabilization_time = "2 to 6 hours"
+                repair_duration = "1 to 3 working days (minor/moderate pothole or surface crack) or 7 to 14 working days (major road section rehabilitation)"
+                minor_comparison = "1 to 2 days for cold/hot-mix asphalt patching"
+                curing_qa_time = "1 day (compaction and surface level verification)"
+                service_lifespan = "3 to 5 years for asphalt patching/overlay; 10 to 15 years for concrete reblocking"
+                preventive_cycle = (
+                    "- **30-Day Post-Repair Check**: Inspect patch bonding and edge sealing under traffic load.\n"
+                    "- **Every 6 Months**: Routine pavement distress survey and roadside drainage clearing to prevent water infiltration.\n"
+                    "- **Every 12-18 Months**: Preventive crack sealing and surface wear audit."
+                )
+                action_steps = (
+                    "1. **Site Verification & Traffic Control (2-6 Hours)**: Verify defect dimensions and place safety cones around the damaged road lane.\n"
+                    "2. **Crew Dispatch (Day 1)**: Assign the **Road Maintenance Crew** via a PULSO Work Order.\n"
+                    "3. **Surface Preparation & Repair (Days 1-3)**: Saw-cut damaged edges, clear standing water/debris, compact base course, and apply hot-mix asphalt or concrete patch.\n"
+                    "4. **Final Compaction & Closure**: Verify level surface, upload completion photo evidence, and mark the ticket **resolved**."
+                )
+            elif is_drainage:
+                scope_label = "Water & Drainage Infrastructure Maintenance"
+                stabilization_time = "2 to 6 hours"
+                repair_duration = "2 to 5 working days (declogging & desilting) or 7 to 10 working days (culvert/line replacement)"
+                minor_comparison = "1 to 2 days for localized inlet clearing"
+                curing_qa_time = "1 day (hydraulic flow verification)"
+                service_lifespan = "5 to 10 years for structural culvert repairs"
+                preventive_cycle = (
+                    "- **30-Day Flow Check**: Confirm zero silt accumulation after rainfall.\n"
+                    "- **Every 3 to 6 Months**: Scheduled pre-monsoon declogging and solid waste trap maintenance.\n"
+                    "- **Annual Drainage Audit**: Full line capacity inspection before typhoon season."
+                )
+                action_steps = (
+                    "1. **Hazard Isolation (2-6 Hours)**: Secure open manholes or flooded road sections.\n"
+                    "2. **Dispatch Drainage Crew (Day 1)**: Assign vacuum/declogging equipment and masonry crew.\n"
+                    "3. **Desilting & Structural Repair (Days 2-5)**: Remove silt/debris blockage, repair damaged concrete drainage covers or culvert walls, and test water flow."
+                )
+            elif is_lighting:
+                scope_label = "Street Lighting & Electrical Maintenance"
+                stabilization_time = "1 to 4 hours"
+                repair_duration = "4 to 24 hours (1 working day) for luminaire/wiring repair, or 2 to 4 days if pole replacement is required"
+                minor_comparison = "Under 24 hours for LED fixture or photo-sensor replacement"
+                curing_qa_time = "2 hours (electrical load & night illumination test)"
+                service_lifespan = "5 to 7 years (LED luminaire rated life: 50,000 operational hours)"
+                preventive_cycle = (
+                    "- **30-Day Illumination Check**: Verify timer/photocell operation and circuit stability.\n"
+                    "- **Every 6 Months**: Inspect pole grounding, bracket corrosion, and overhead cable clearance.\n"
+                    "- **Every 24 Months**: Preventive driver and surge protection check."
+                )
+                action_steps = (
+                    "1. **Electrical Safety Check (1-4 Hours)**: Isolate faulty circuit or broken fixture lens.\n"
+                    "2. **Dispatch Electrical Team (Day 1)**: Assign bucket truck and licensed LGU electrician.\n"
+                    "3. **Fixture Replacement & Testing (Day 1)**: Replace damaged LED luminaire/ballast, seal weatherproof housing, and verify illumination."
+                )
+            else:
+                scope_label = "Public Infrastructure Maintenance & Rehabilitation"
+                stabilization_time = "4 to 8 hours"
+                repair_duration = "3 to 7 working days (depending on structural scope and material curing)"
+                minor_comparison = "1 to 3 days for minor surface/facility repairs"
+                curing_qa_time = "1 day (engineering quality inspection)"
+                service_lifespan = "5 to 10 years with routine preventive upkeep"
+                preventive_cycle = (
+                    "- **30-Day Post-Resolution Check**: Verify repair integrity under normal public use.\n"
+                    "- **Every 6 Months**: Routine preventive maintenance and safety inspection.\n"
+                    "- **Every 12 Months**: Annual Digital Twin asset condition assessment."
+                )
+                action_steps = (
+                    "1. **Triage & Site Inspection (4-8 Hours)**: Verify field evidence and secure the affected area.\n"
+                    "2. **Work Order Dispatch (Day 1)**: Assign the appropriate District Engineering Crew.\n"
+                    "3. **Repair Execution & QA (Days 2-7)**: Complete structural/surface restoration, upload post-repair photo evidence, and close the work order."
+                )
+
+            lines = [f"Predictive Engineering & Maintenance Forecast — **{scope_label}**:", ""]
+            if matched_report:
+                tid = matched_report.ticket_id or f"PUL-2026-{matched_report.id:04d}"
+                loc = matched_report.location_barangay or matched_report.location_string or "North Caloocan"
+                urg = matched_report.ai_urgency or "High"
+                summary_str = (matched_report.ai_summary or matched_report.description or "").strip()
+                lines.append(
+                    f"**Reference Ticket**: **#{tid}** | **Category**: **{matched_report.ai_category or matched_report.category}** | **Urgency**: **{urg}** | **Location**: {loc}"
+                )
+                if summary_str:
+                    lines.append(f"**Observed Condition**: {summary_str}")
+                lines.append("")
+
+            lines.extend([
+                "**1. Recommended Engineering Action Plan (What You Can Do Now)**",
+                action_steps,
+                "",
+                f"**2. Predicted Repair & Resolution Duration (How Long It Takes to Resolve)**{avg_days_note}",
+                f"- **Emergency Site Stabilization & Triage**: **{stabilization_time}**",
+                f"- **Estimated Active Repair Duration**: **{repair_duration}** ({minor_comparison})",
+                f"- **Quality Assurance & Curing Gate**: **{curing_qa_time}**",
+                "",
+                "**3. Post-Resolution Predictive Maintenance Schedule (After the Problem Is Resolved)**",
+                f"- **Predicted Service Lifespan of Repair**: **{service_lifespan}**",
+                preventive_cycle,
+            ])
+
+            full_res = "\n".join(lines)
+            invoked_tools.append({"tool": "predict_maintenance_and_resolution_plan", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"Unable to compute predictive maintenance estimate right now: {err}"
+            invoked_tools.append({"tool": "predict_maintenance_and_resolution_plan", "data": err_msg})
+            return err_msg
+
     # ── Grounded Knowledge: Filing a report in PULSO ───────────────────────────
     REPORTING_GUIDE = (
         "To file an infrastructure report in PULSO, follow these steps:\n\n"
@@ -816,6 +1134,20 @@ def get_ai_assistant_response(
     # ── Deterministic Keyword Fallback Handler ─────────────────────────────────
     def _deterministic_fallback(q: str) -> str:
         ql = q.lower()
+        if any(w in ql for w in [
+            "predict", "predictive", "duration", "how long", "long it takes",
+            "maintenance", "what can i do", "how to fix", "how to resolve",
+            "when i resolved", "when resolved", "repair time", "timeline", "estimate"
+        ]):
+            return predict_maintenance_and_resolution_plan(q)
+        if any(w in ql for w in ["unassigned", "unassigned report", "unassigned reports"]):
+            return get_staff_reports_overview("unassigned")
+        if any(w in ql for w in ["overdue", "work order", "work orders", "sla"]):
+            return get_staff_work_orders_overview("overdue")
+        if any(w in ql for w in ["needs verification", "unverified", "awaiting verification", "verification"]):
+            return get_staff_reports_overview("needs_verification")
+        if any(w in ql for w in ["priority", "priorities", "today's priorities", "critical", "urgent"]):
+            return get_staff_reports_overview("today_priorities")
         if any(w in ql for w in ["hotline", "emergency", "police", "pnp", "fire", "bfp", "drrmo", "contact number"]):
             return get_city_hotlines()
         if any(w in ql for w in ["my report", "report status", "ticket status", "track report", "check report", "my ticket"]):
@@ -826,8 +1158,10 @@ def get_ai_assistant_response(
             return get_active_advisories()
         if any(w in ql for w in ["how to file", "how to report", "file a report", "submit a report"]):
             return REPORTING_GUIDE
+        if "staff" in (context or "").lower() or "government" in (context or "").lower():
+            return get_staff_reports_overview("recent")
         return (
-            "PULSO AI is currently operating in offline mode. "
+            "I couldn't load that right now. You can open Reports to check. "
             "For urgent emergencies or infrastructure hazards, please contact the **Caloocan City Action Center** at **(02) 8288-8811** "
             "or **Caloocan DRRMO** at **(02) 8397-6212**."
         )
@@ -841,38 +1175,55 @@ def get_ai_assistant_response(
         }
 
     prompt = f"""You are PULSO AI, the official intelligent assistant for the Caloocan City Engineering Office (PULSO System).
-You assist citizens and LGU staff with infrastructure management, hazard reporting, and city operations.
+You assist citizens and LGU staff with infrastructure management, hazard reporting, predictive maintenance planning, and city operations.
 
 STRICT OPERATIONAL & TONE RULES:
 1. NO EMOJIS: Do not use emojis in any response. Maintain a professional, helpful tone appropriate for an official city government service.
-2. MARKDOWN STRUCTURE: Always structure responses with clean paragraph breaks (double newlines). Use markdown bold (**text**) for all key terms: hotline numbers, ticket IDs, report statuses (**pending**, **in_progress**, **resolved**), department names, and important notices. Use bullet points (- ) or numbered lists (1. ) for readability.
+2. MARKDOWN STRUCTURE: Always structure responses with clean paragraph breaks (double newlines). Use markdown bold (**text**) for all key terms: hotline numbers, ticket IDs, work order IDs, durations/timelines, report statuses (**pending**, **in_progress**, **resolved**), department names, and important notices. Use bullet points (- ) or numbered lists (1. ) for readability.
 3. GROUNDING IN REAL DATA (MANDATORY TOOL USE):
-   - When asked about the user's reports or report status: You MUST call `get_my_reports` to fetch their real database records. Present the actual ticket IDs, categories, and statuses. Never invent a status or ticket ID.
-   - When asked about city hotlines or emergency contacts: You MUST call `get_city_hotlines`. Present the official Caloocan City emergency numbers exactly as retrieved. Never fabricate hotline numbers.
+   - When asked what to do for a report, how long repair or maintenance takes, or to predict maintenance duration/schedule (before or after resolution): You MUST call `predict_maintenance_and_resolution_plan` and present the complete engineering action plan, predicted repair duration (hours/days), and post-resolution preventive maintenance cycle (30-day check, 6-month cycle, and expected service lifespan in years). NEVER say you cannot predict maintenance durations or timelines.
+   - When asked about unassigned reports, reports awaiting verification, or critical/priority reports by staff: You MUST call `get_staff_reports_overview` with `status_or_scope` set to `"unassigned"`, `"needs_verification"`, or `"today_priorities"`. Present the exact ticket IDs, categories, locations, and statuses returned by the tool.
+   - When asked about work orders, overdue work orders, or SLA alerts: You MUST call `get_staff_work_orders_overview` with `status_or_scope="overdue"`. Present the exact work order numbers, titles, statuses, and priorities returned by the tool.
+   - When asked about a resident's own reports or report status: You MUST call `get_my_reports` to fetch their real database records.
+   - When asked about city hotlines or emergency contacts: You MUST call `get_city_hotlines`.
    - When asked about active advisories, roadworks, or city notices: You MUST call `get_active_advisories`.
-   - When asked about evacuation routes: You MUST call `get_evacuation_routes`. Plainly state that mapped digital evacuation route data is not yet available, and instruct them to contact Caloocan DRRMO at (02) 8397-6212 or NDRRMC at 911.
-   - When asked how to file a report: Describe the 5-step PULSO workflow (Tap **Report Issue**, upload evidence photo for AI scan, pin location on North Caloocan map, review & submit, receive unique **Ticket ID** to track under **My Reports**).
-4. HONEST FALLBACK: If requested data is genuinely not available or a tool returns no records, state this plainly (e.g., "I don't have that information right now — you can check the Updates tab or call the relevant hotline.") rather than guessing.
+   - When asked about evacuation routes: You MUST call `get_evacuation_routes`.
+   - When asked how to file a report: Describe the 5-step PULSO workflow.
+4. FOLLOW-UP CONTEXT: Use the `Recent Conversation History` in `System Context` to resolve pronouns like "this", "that", or "it" to the specific Ticket ID (e.g., **#PUL-2026-8714**) or infrastructure category discussed in prior messages.
 
 System Context: {context or "General citizen inquiry"}
 User Query: {query}
 """
 
-    tools = [get_my_reports, get_city_hotlines, get_active_advisories, get_evacuation_routes]
+    tools = [
+        get_my_reports,
+        get_city_hotlines,
+        get_active_advisories,
+        get_evacuation_routes,
+        get_staff_reports_overview,
+        get_staff_work_orders_overview,
+        predict_maintenance_and_resolution_plan
+    ]
     user_id = str(getattr(user, "id", "citizen"))
 
     try:
         raw = _generate_with_tools(prompt, tools=tools, user_id=user_id)
         if raw:
-            return {
-                "response": _clean_response(raw),
-                "tool_name": invoked_tools[0]["tool"] if invoked_tools else None,
-                "tool_data": invoked_tools[0]["data"] if invoked_tools else None
-            }
+            raw_lower = raw.lower()
+            refusal_phrases = [
+                "cannot predict", "can't predict", "do not have the functionality",
+                "unable to predict", "cannot forecast", "not able to predict"
+            ]
+            if not any(p in raw_lower for p in refusal_phrases):
+                return {
+                    "response": _clean_response(raw),
+                    "tool_name": invoked_tools[0]["tool"] if invoked_tools else None,
+                    "tool_data": invoked_tools[0]["data"] if invoked_tools else None
+                }
     except Exception as e:
         print(f"[AI] Assistant tool-calling error: {e}")
 
-    # Fallback if API fails or is rate limited
+    # Fallback if API fails, is rate limited, or declines predictive estimation
     fallback_res = _deterministic_fallback(query)
     return {
         "response": _clean_response(fallback_res),

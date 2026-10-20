@@ -3,19 +3,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUp } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
+import { isInstalledApp } from '../utils/appContext';
+
 export default function ScrollToTop() {
     const [isVisible, setIsVisible] = useState(false);
     const location = useLocation();
 
-    // Hide on resident dashboard, government portals, and authentication pages
+    // Hide on resident dashboard, government portals, auth pages, tutorial, dev preview, and installed app
     const isHidden = 
+        isInstalledApp() ||
         location.pathname.startsWith('/dashboard') ||
         location.pathname.startsWith('/gov') ||
         location.pathname.startsWith('/management') ||
         location.pathname.startsWith('/dispatcher') ||
         location.pathname.startsWith('/login') ||
         location.pathname.startsWith('/register') ||
-        location.pathname.startsWith('/reset-password');
+        location.pathname.startsWith('/reset-password') ||
+        location.pathname.startsWith('/tutorial') ||
+        location.pathname.startsWith('/dev');
 
     useEffect(() => {
         const toggleVisibility = () => {

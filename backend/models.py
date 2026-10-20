@@ -7,11 +7,26 @@ from datetime import datetime
 import random
 import uuid
 import re
+from geoalchemy2 import Geometry
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Geographic Lookup Tables (3NF Normalisation)
+# Geographic Lookup Tables (3NF Normalisation & PostGIS Spatial Core)
 # ─────────────────────────────────────────────────────────────────────────────
+
+class CityBoundary(Base):
+    """
+    Authoritative boundary polygons for North and South Caloocan.
+    Stored as two separate non-contiguous MultiPolygons.
+    """
+    __tablename__ = "city_boundaries"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    name       = Column(String(64), unique=True, nullable=False) # 'North Caloocan' | 'South Caloocan'
+    sector     = Column(String(32), nullable=False)              # 'North' | 'South'
+    geom       = Column(Geometry(geometry_type="MULTIPOLYGON", srid=4326), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 
 class District(Base):
     """
@@ -37,11 +52,15 @@ class Barangay(Base):
     """
     __tablename__ = "barangays"
 
-    id          = Column(Integer,      primary_key=True, index=True)
-    name        = Column(String(150),  unique=True, nullable=False)   # "Barangay 172" / "Camarin"
-    district_id = Column(Integer,      ForeignKey("districts.id"), nullable=False, index=True)
-    zip_code    = Column(String(10),   nullable=True)
-    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+    id           = Column(Integer,      primary_key=True, index=True)
+    name         = Column(String(150),  unique=True, nullable=False)   # "Barangay 172" / "Camarin"
+    district_id  = Column(Integer,      ForeignKey("districts.id"), nullable=False, index=True)
+    sector       = Column(String(32),   nullable=True, index=True)    # 'North' | 'South'
+    brgy_num     = Column(Integer,      nullable=True, index=True)
+    display_name = Column(String(100),  nullable=True)
+    geom         = Column(Geometry(geometry_type="MULTIPOLYGON", srid=4326), nullable=True)
+    zip_code     = Column(String(10),   nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
     district    = relationship("District", back_populates="barangays")
 
@@ -87,7 +106,20 @@ class Resident(Base):
     auth_provider = Column(String, nullable=True, default="local")
     
     is_active = Column(Boolean, default=True)
+    status = Column(String, default="active", nullable=True)  # "active", "inactive", "pending", "suspended", "deactivated"
+    status_reason = Column(String, nullable=True)
+    status_changed_by = Column(String, nullable=True)
+    status_changed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # ID Verification Columns
+    id_verification_status = Column(String, default="N/A", nullable=True)  # "Verified", "Pending review", "Rejected", "N/A"
+    id_rejection_reason = Column(String, nullable=True)
+    id_verified_at = Column(DateTime(timezone=True), nullable=True)
+
+    avatar_url = Column(String, nullable=True)
+    preferences = Column(JSON, nullable=True, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     @property
     def role(self):
@@ -95,7 +127,7 @@ class Resident(Base):
         
     @property
     def is_suspended(self):
-        return False
+        return not self.is_active or self.status == "suspended"
 
     @property
     def barangay(self):
@@ -161,8 +193,9 @@ class Official(Base):
     suspension_reason = Column(String, nullable=True)
     suspended_at = Column(DateTime(timezone=True), nullable=True)
     suspended_by = Column(Integer, ForeignKey("officials.id"), nullable=True)
-    
+    avatar_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     role = Column(String, default="staff", index=True)  # Denormalized for query performance & compatibility
 
@@ -248,6 +281,11 @@ class Report(Base):
     location_lat = Column(Float, nullable=True)
     location_lng = Column(Float, nullable=True)
     location_string = Column(String, nullable=True)
+    # PostGIS Spatial Core
+    location = Column(Geometry(geometry_type="POINT", srid=4326), nullable=True)
+    accuracy_m = Column(Float, default=0.0)
+    plus_code = Column(String(32), nullable=True)
+    sector = Column(String(32), nullable=True, index=True) # 'North' | 'South'
     status = Column(String, default="pending", index=True)
     image_url = Column(String, nullable=True)
     resolution_image_url = Column(String, nullable=True)
@@ -391,18 +429,18 @@ class NewsItem(Base):
 
 class ChatConversation(Base):
     """
-    PULSEAI Resident Chat Conversation Session.
-    Maintains persistent conversation history per resident account.
+    PULSEAI Chat Conversation Session.
+    Maintains persistent conversation history per resident or official account.
     """
     __tablename__ = "chat_conversations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("residents.id"), nullable=False, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    owner_type = Column(String(16), nullable=False, default="resident", server_default="resident")
     title = Column(String(255), nullable=False, default="New Conversation")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    resident = relationship("Resident", backref="chat_conversations")
     messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan", order_by="ChatMessage.created_at.asc()")
 
 
@@ -417,11 +455,53 @@ class ChatMessage(Base):
     conversation_id = Column(Integer, ForeignKey("chat_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(String(20), nullable=False)  # 'user' | 'assistant'
     content = Column(Text, nullable=False)
-    tool_name = Column(String(100), nullable=True)  # Tool called during grounding (e.g. get_my_reports)
-    tool_data = Column(Text, nullable=True)  # Reference snippet of retrieved data for audit/debugging
+    tool_name = Column(String(100), nullable=True)
+    tool_data = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     conversation = relationship("ChatConversation", back_populates="messages")
+
+
+class SystemSetting(Base):
+    """
+    Persisted system-wide configurations, policies, SLAs, and retention standards.
+    Supports versioning and tamper-evident history.
+    """
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, index=True, nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    value = Column(JSON, nullable=False)
+    policy_source = Column(String(255), nullable=True)
+    category = Column(String(50), default="general")
+    version = Column(Integer, default=1)
+    updated_by_id = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    updated_by = relationship("Official", foreign_keys=[updated_by_id])
+    history = relationship("SystemSettingHistory", back_populates="setting", cascade="all, delete-orphan", order_by="SystemSettingHistory.created_at.desc()")
+
+
+class SystemSettingHistory(Base):
+    """
+    Immutable audit history of all changes to system settings.
+    Requires mandatory reason and captures actor identity.
+    """
+    __tablename__ = "system_setting_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    setting_id = Column(Integer, ForeignKey("system_settings.id", ondelete="CASCADE"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+    old_value = Column(JSON, nullable=True)
+    new_value = Column(JSON, nullable=False)
+    reason = Column(Text, nullable=False)
+    changed_by_id = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    setting = relationship("SystemSetting", back_populates="history")
+    changed_by = relationship("Official", foreign_keys=[changed_by_id])
 
 
 # Import gov_models at the end to resolve circular dependency for relationships

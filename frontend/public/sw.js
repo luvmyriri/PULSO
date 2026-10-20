@@ -1,14 +1,20 @@
-const CACHE_NAME = 'pulso-pwa-v3';
+const CACHE_NAME = 'pulso-pwa-v4';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/fonts/inter-latin-variable.woff2',
+  '/fonts/inter-latin-ext-variable.woff2',
   '/icon-192x192.png',
   '/icon-maskable-192.png',
   '/icon-512x512.png',
   '/icon-maskable-512.png',
   '/city-engineering-logo.png',
-  '/apple-touch-icon.png'
+  '/apple-touch-icon.png',
+  '/pulso-bg-dark.svg',
+  '/pulso-bg-light.svg',
+  '/flags/ph.svg',
+  '/flags/us.svg'
 ];
 
 self.addEventListener('install', (event) => {

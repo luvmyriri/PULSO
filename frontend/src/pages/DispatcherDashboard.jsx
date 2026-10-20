@@ -54,9 +54,13 @@ import GovSidebar from '../components/GovSidebar';
 import OrangeSelect from '../components/OrangeSelect';
 import ThemeToggle from '../components/ThemeToggle';
 import { useTheme } from '../contexts/ThemeContext';
-import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
+import GovUserDropdown from '../components/GovUserDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
+import PulseAIChatWindow from '../components/PulseAIChatWindow';
+import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
+import { getCityHallMarkerSvg } from '../config/boundaryStyle';
+import SearchInput from '../components/SearchInput';
 import Swal from 'sweetalert2';
 import { CANONICAL_STATUS_LIST, getStatusDescriptor, formatTicketId } from '../utils/reportWorkflow';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
@@ -566,15 +570,8 @@ const DispatcherDashboard = () => {
         return CALOOCAN_ALL_BARANGAYS_OPTIONS;
     }, [selectedArea]);
 
-    // AI Omni-Assistant State
+    // PULSEAI Assistant State
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-    const [aiQuery, setAiQuery] = useState('');
-    const [aiMessages, setAiMessages] = useState([
-        { role: 'assistant', text: `Greetings, Dispatcher ${currentUser?.full_name || ''}. I am your Engineering Co-pilot. How can I assist with triage today?` }
-    ]);
-    const [isAILoading, setIsAILoading] = useState(false);
-    const [isAIMaximized, setIsAIMaximized] = useState(false);
-    const aiChatEndRef = useRef(null);
 
     useEffect(() => {
         if (!token || !currentUser) {
@@ -646,61 +643,7 @@ const DispatcherDashboard = () => {
         }
     };
 
-    const handleAIChat = async (e) => {
-        e.preventDefault();
-        if (!aiQuery.trim() || isAILoading) return;
 
-        const userMsg = { role: 'user', text: aiQuery };
-        setAiMessages(prev => [...prev, userMsg]);
-        const capturedQuery = aiQuery;
-        setAiQuery('');
-        setIsAILoading(true);
-
-        try {
-            // If query is location-related, fetch live report data
-            let reportContext = '';
-            let reportsForMap = [];
-            const isLocationQuery = LOCATION_KEYWORDS.test(capturedQuery);
-
-            if (isLocationQuery) {
-                try {
-                    const rResp = await fetch(`${API_BASE_URL}/api/reports?limit=30&t=${Date.now()}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (rResp.ok) {
-                        reportsForMap = await rResp.json();
-                        reportContext = `\n\nLive Report Data (${reportsForMap.length} active reports):\n` +
-                            reportsForMap.map((r, i) =>
-                                `${i + 1}. ${formatTicketId(r.ticket_id, r.id)} — ${r.ai_category || r.category || 'Uncategorized'} — ${r.location_string || `Lat:${r.location_lat?.toFixed(4)}, Lng:${r.location_lng?.toFixed(4)}`} — Status: ${r.status}`
-                            ).join('\n');
-                    }
-                } catch { /* silently skip if reports unavailable */ }
-            }
-
-            const resp = await fetch(`${API_BASE_URL}/api/ai/assistant`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    query: capturedQuery,
-                    context: `Dispatcher View. Mode: ${dashboardMode}. Selection: ${selectedReport?.category || 'None'}.${reportContext}`
-                })
-            });
-            const data = await resp.json();
-            setAiMessages(prev => [...prev, {
-                role: 'assistant',
-                text: data.response,
-                mapData: reportsForMap.length > 0 ? reportsForMap : undefined
-            }]);
-        } catch (err) {
-            setAiMessages(prev => [...prev, { role: 'assistant', text: 'Error connecting to PULSO Brain.' }]);
-        } finally {
-            setIsAILoading(false);
-            setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-        }
-    };
 
     // Sync Street View with State — single consolidated effect
     useEffect(() => {
@@ -856,11 +799,9 @@ const DispatcherDashboard = () => {
         window.open(url, '_blank');
     };
 
+    // Keep pulseRadius static to avoid 25fps full-component re-renders that cause map pins to glitch
     useEffect(() => {
-        const interval = setInterval(() => {
-            setPulseRadius(prev => (prev + 1) % 40); // Pulse scale from 0 to 40
-        }, 40);
-        return () => clearInterval(interval);
+        setPulseRadius(18);
     }, []);
 
     // (Duplicate panorama effect removed — consolidated into the one above)
@@ -1395,219 +1336,282 @@ const DispatcherDashboard = () => {
         ]
     }), []);
 
+    // Unified Map Status Legend Theme (shared by Map Pin Outlines & Incident Feed Card Outlines)
+    // Matches the 5 Map Status Legend items: Pending Review (Amber), Dispatched (Orange), Resolved (Emerald), Rejected (Rose), Cancelled (Slate)
+    const getLegendStatusTheme = useCallback((rawStatus) => {
+        const s = (rawStatus || 'pending').toString().toLowerCase().trim();
+        if (['resolved', 'completed', 'fixed', 'closed'].includes(s)) {
+            return {
+                tone: 'emerald',
+                borderColor: '#10b981',
+                glowColor: 'rgba(16, 185, 129, 0.35)',
+                cardSelected: 'bg-emerald-500/5 dark:bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/25 shadow-sm',
+                cardUnselected: 'border-emerald-500/45 dark:border-emerald-500/40 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-500/5 dark:hover:bg-emerald-950/20'
+            };
+        }
+        if (s === 'rejected') {
+            return {
+                tone: 'rose',
+                borderColor: '#f43f5e',
+                glowColor: 'rgba(244, 63, 94, 0.35)',
+                cardSelected: 'bg-rose-500/5 dark:bg-rose-950/30 border-rose-500 ring-1 ring-rose-500/25 shadow-sm',
+                cardUnselected: 'border-rose-500/45 dark:border-rose-500/40 hover:border-rose-500 dark:hover:border-rose-500 hover:bg-rose-500/5 dark:hover:bg-rose-950/20'
+            };
+        }
+        if (['cancelled', 'canceled'].includes(s)) {
+            return {
+                tone: 'slate',
+                borderColor: '#94a3b8',
+                glowColor: 'rgba(148, 163, 184, 0.35)',
+                cardSelected: 'bg-slate-500/5 dark:bg-slate-800/40 border-slate-400 dark:border-slate-500 ring-1 ring-slate-400/25 shadow-sm',
+                cardUnselected: 'border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-slate-500/5 dark:hover:bg-slate-800/20'
+            };
+        }
+        if (['dispatched', 'in_progress', 'in progress', 'ongoing', 'approved_internal', 'assigned'].includes(s)) {
+            return {
+                tone: 'orange',
+                borderColor: '#f97316',
+                glowColor: 'rgba(249, 115, 22, 0.35)',
+                cardSelected: 'bg-orange-500/5 dark:bg-orange-950/30 border-orange-500 ring-1 ring-orange-500/25 shadow-sm',
+                cardUnselected: 'border-orange-500/45 dark:border-orange-500/40 hover:border-orange-500 dark:hover:border-orange-500 hover:bg-orange-500/5 dark:hover:bg-orange-950/20'
+            };
+        }
+        // Default: Pending Review (pending, unverified, received, pending_approval, verified)
+        return {
+            tone: 'amber',
+            borderColor: '#f59e0b',
+            glowColor: 'rgba(245, 158, 11, 0.35)',
+            cardSelected: 'bg-amber-500/5 dark:bg-amber-950/30 border-amber-500 ring-1 ring-amber-500/25 shadow-sm',
+            cardUnselected: 'border-amber-500/45 dark:border-amber-500/40 hover:border-amber-500 dark:hover:border-amber-500 hover:bg-amber-500/5 dark:hover:bg-amber-950/20'
+        };
+    }, []);
+
+    const missingPinKeysCount = React.useMemo(() => {
+        if (!filteredReports || filteredReports.length === 0) return 0;
+        let missing = 0;
+        for (const r of filteredReports) {
+            const rawImg = r?.image_url || r?.photo_url || r?.image;
+            if (!rawImg) continue;
+            const statusTone = getLegendStatusTheme(r.status).tone;
+            const normKey = `v2-${r.id}-${statusTone}-norm`;
+            const selKey = `v2-${r.id}-${statusTone}-sel`;
+            if (!photoPinIcons[normKey] || !photoPinIcons[selKey]) {
+                missing++;
+            }
+        }
+        return missing;
+    }, [filteredReports, photoPinIcons, getLegendStatusTheme]);
+
     // Generate high-performance Canvas Image Pins for Native Google Maps MarkerF
-    // (Size-optimized 80x80 thumbnails, Viewport-aware lazy loading, Zero glitching, 60fps)
+    // (Size-optimized 80x80 thumbnails, zero glitching, 60fps)
     useEffect(() => {
-        if (!filteredReports || filteredReports.length === 0) return;
+        if (!filteredReports || filteredReports.length === 0 || missingPinKeysCount === 0) return;
 
-        let isMounted = true;
-        let batchTimer = null;
-        const pendingBatch = {};
+        const drawPinDataUrl = (loadedImg, report, isSelected) => {
+            try {
+                const size = isSelected ? 46 : 36;
+                const pointerH = isSelected ? 8 : 7;
+                const totalW = size + 6;
+                const totalH = size + pointerH + 2;
 
-        const flushBatch = () => {
-            if (!isMounted || Object.keys(pendingBatch).length === 0) return;
-            setPhotoPinIcons(prev => ({ ...prev, ...pendingBatch }));
+                const canvas = document.createElement('canvas');
+                canvas.width = totalW;
+                canvas.height = totalH;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return null;
+
+                const cx = totalW / 2;
+                const cy = size / 2 + 1;
+                const radius = (size - 4) / 2;
+
+                const { borderColor, glowColor } = getLegendStatusTheme(report.status);
+
+                // Pointer Arrow
+                ctx.beginPath();
+                ctx.moveTo(cx - 5, cy + radius - 2);
+                ctx.lineTo(cx + 5, cy + radius - 2);
+                ctx.lineTo(cx, cy + radius + pointerH);
+                ctx.closePath();
+                ctx.fillStyle = borderColor;
+                ctx.fill();
+
+                // Outer Glow if Selected
+                if (isSelected) {
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
+                    ctx.fillStyle = glowColor;
+                    ctx.fill();
+                }
+
+                // Outer Border Ring (2px thin border per spec)
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+                ctx.fillStyle = borderColor;
+                ctx.fill();
+
+                // Inner background
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#0c1424';
+                ctx.fill();
+
+                // Circular photo clip
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+                ctx.clip();
+
+                const imgW = loadedImg.naturalWidth || loadedImg.width || 80;
+                const imgH = loadedImg.naturalHeight || loadedImg.height || 80;
+                const aspect = imgW / imgH;
+                let dw, dh, dx, dy;
+                if (aspect > 1) {
+                    dh = (radius - 0.5) * 2;
+                    dw = dh * aspect;
+                    dx = cx - dw / 2;
+                    dy = cy - radius + 0.5;
+                } else {
+                    dw = (radius - 0.5) * 2;
+                    dh = dw / aspect;
+                    dx = cx - radius + 0.5;
+                    dy = cy - dh / 2;
+                }
+                ctx.drawImage(loadedImg, dx, dy, dw, dh);
+                ctx.restore();
+
+                // White inner accent ring
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.0;
+                ctx.stroke();
+
+                return canvas.toDataURL('image/png');
+            } catch (err) {
+                return null;
+            }
         };
 
-        // Lazy-load: prioritize reports currently in visible bounds
-        const reportsToLoad = currentBounds
-            ? filteredReports.filter(r => r.location_lat && r.location_lng && currentBounds.contains({ lat: r.location_lat, lng: r.location_lng }))
-            : filteredReports.slice(0, 50);
+        const syncFromCache = {};
+        let hasSyncFromCache = false;
 
-        reportsToLoad.forEach(report => {
+        filteredReports.forEach(report => {
             const rawImg = report.image_url || report.photo_url || report.image;
             if (!rawImg) return;
 
+            const statusTone = getLegendStatusTheme(report.status).tone;
+
             [false, true].forEach(isSelected => {
-                const cacheKey = `${report.id}-${isSelected ? 'sel' : 'norm'}`;
-                if (pinIconCache.current.has(cacheKey)) return;
+                const cacheKey = `v2-${report.id}-${statusTone}-${isSelected ? 'sel' : 'norm'}`;
+                if (pinIconCache.current.has(cacheKey)) {
+                    const cachedUrl = pinIconCache.current.get(cacheKey);
+                    if (cachedUrl && !photoPinIcons[cacheKey]) {
+                        syncFromCache[cacheKey] = cachedUrl;
+                        hasSyncFromCache = true;
+                    }
+                    return;
+                }
 
                 let thumbUrl = rawImg;
                 if (!rawImg.startsWith('http') && !rawImg.startsWith('data:')) {
                     const cleanPath = rawImg.startsWith('/') ? rawImg : `/${rawImg}`;
-                    // Use backend 80x80 optimized thumbnail endpoint for 10x faster load and low memory
                     thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
                 }
 
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    try {
-                        const size = isSelected ? 46 : 36;
-                        const pointerH = isSelected ? 8 : 7;
-                        const totalW = size + 6;
-                        const totalH = size + pointerH + 2;
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = totalW;
-                        canvas.height = totalH;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) return;
-
-                        const cx = totalW / 2;
-                        const cy = size / 2 + 1;
-                        const radius = (size - 4) / 2;
-
-                        let borderColor = '#ff6b00';
-                        if (report.status === 'resolved') borderColor = '#22c55e';
-                        else if (report.status === 'pending' || report.status === 'unverified') {
-                            borderColor = report.ai_urgency === 'CRITICAL' ? '#ef4444' : '#ff6b00';
-                        } else if (report.status === 'rejected') {
-                            borderColor = '#64748b';
-                        } else if (report.status === 'cancelled') {
-                            borderColor = '#0f172a';
-                        }
-
-                        // Pointer Arrow
-                        ctx.beginPath();
-                        ctx.moveTo(cx - 5, cy + radius - 2);
-                        ctx.lineTo(cx + 5, cy + radius - 2);
-                        ctx.lineTo(cx, cy + radius + pointerH);
-                        ctx.closePath();
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Outer Glow if Selected
-                        if (isSelected) {
-                            ctx.beginPath();
-                            ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
-                            ctx.fillStyle = 'rgba(255, 107, 0, 0.35)';
-                            ctx.fill();
-                        }
-
-                        // Outer Border Ring (2px thin border per spec)
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Inner background
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                        ctx.fillStyle = '#0c1424';
-                        ctx.fill();
-
-                        // Circular photo clip
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.clip();
-
-                        const aspect = img.width / img.height;
-                        let dw, dh, dx, dy;
-                        if (aspect > 1) {
-                            dh = (radius - 0.5) * 2;
-                            dw = dh * aspect;
-                            dx = cx - dw / 2;
-                            dy = cy - radius + 0.5;
-                        } else {
-                            dw = (radius - 0.5) * 2;
-                            dh = dw / aspect;
-                            dx = cx - radius + 0.5;
-                            dy = cy - dh / 2;
-                        }
-                        ctx.drawImage(img, dx, dy, dw, dh);
-                        ctx.restore();
-
-                        // White inner accent ring
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1.0;
-                        ctx.stroke();
-
-                        const dataUrl = canvas.toDataURL('image/png');
+                const commitLoadedImage = (loadedImg) => {
+                    const dataUrl = drawPinDataUrl(loadedImg, report, isSelected);
+                    if (dataUrl) {
                         pinIconCache.current.set(cacheKey, dataUrl);
-                        pendingBatch[cacheKey] = dataUrl;
-
-                        if (batchTimer) clearTimeout(batchTimer);
-                        batchTimer = setTimeout(flushBatch, 100);
-                    } catch (err) {
-                        // Canvas tainted or fallback
+                        setPhotoPinIcons(prev => (prev[cacheKey] === dataUrl ? prev : { ...prev, [cacheKey]: dataUrl }));
                     }
                 };
+
+                const img = new Image();
+                if (thumbUrl.startsWith('http')) {
+                    img.crossOrigin = 'anonymous';
+                }
+                img.onload = () => commitLoadedImage(img);
                 img.onerror = () => {
-                    // If thumbnail endpoint had an issue, try fallback to original
                     if (thumbUrl.includes('/api/thumbnails')) {
+                        const fallbackUrl = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
                         const fallbackImg = new Image();
-                        fallbackImg.crossOrigin = 'anonymous';
-                        fallbackImg.src = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
+                        if (fallbackUrl.startsWith('http')) {
+                            fallbackImg.crossOrigin = 'anonymous';
+                        }
+                        fallbackImg.onload = () => commitLoadedImage(fallbackImg);
+                        fallbackImg.src = fallbackUrl;
                     }
                 };
                 img.src = thumbUrl;
             });
         });
 
-        return () => {
-            isMounted = false;
-            if (batchTimer) clearTimeout(batchTimer);
-        };
-    }, [filteredReports, currentBounds, API_BASE_URL]);
+        if (hasSyncFromCache) {
+            setPhotoPinIcons(prev => ({ ...prev, ...syncFromCache }));
+        }
+    }, [filteredReports, API_BASE_URL, missingPinKeysCount, getLegendStatusTheme]);
 
-    // Adaptive Clustering Calculation: Clusters nearby reports into count badges at low zoom levels
+    // Always display individual photo incident pins on the map (no number cluster badges)
     const { individualMarkers, clusterMarkers } = React.useMemo(() => {
         if (!filteredReports || filteredReports.length === 0) {
             return { individualMarkers: [], clusterMarkers: [] };
         }
 
-        // Viewport filtering
-        const visibleReports = currentBounds
-            ? filteredReports.filter(r => r.location_lat && r.location_lng && currentBounds.contains({ lat: r.location_lat, lng: r.location_lng }))
-            : filteredReports.filter(r => r.location_lat && r.location_lng);
-
-        // When zoomed in past threshold (zoom >= 14) and under marker cap (<= 80), show all photo markers
-        if (currentZoom >= 14 && visibleReports.length <= 80) {
-            return { individualMarkers: visibleReports, clusterMarkers: [] };
+        // Deduplicate by report.id and ensure numeric coordinates
+        const seenIds = new Set();
+        const validReports = [];
+        for (const r of filteredReports) {
+            if (!r || seenIds.has(r.id)) continue;
+            const lat = Number(r.location_lat);
+            const lng = Number(r.location_lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+            seenIds.add(r.id);
+            validReports.push({ ...r, location_lat: lat, location_lng: lng });
         }
 
-        // Dynamic grid degree threshold based on zoom level (~45 screen pixels)
-        const gridDegree = 45 * 360 / (256 * Math.pow(2, Math.max(1, currentZoom)));
-        const grid = new Map();
+        // Only offset pins that share the exact same coordinate so they don't stack on top of each other
+        const spreadCoincidentMarkers = (markers) => {
+            const overlapDeg = 0.00025;
+            const spreadRadiusDeg = 0.00038;
+            const buckets = new Map();
 
-        visibleReports.forEach(report => {
-            const cellX = Math.floor(report.location_lng / gridDegree);
-            const cellY = Math.floor(report.location_lat / gridDegree);
-            const key = `${cellX}_${cellY}`;
-            if (!grid.has(key)) grid.set(key, []);
-            grid.get(key).push(report);
-        });
+            markers.forEach(m => {
+                const bx = Math.round(m.location_lng / overlapDeg);
+                const by = Math.round(m.location_lat / overlapDeg);
+                const bKey = `${bx}_${by}`;
+                if (!buckets.has(bKey)) buckets.set(bKey, []);
+                buckets.get(bKey).push(m);
+            });
 
-        const individualMarkers = [];
-        const clusterMarkers = [];
+            const result = [];
+            buckets.forEach(group => {
+                if (group.length === 1) {
+                    const m = group[0];
+                    result.push({
+                        ...m,
+                        _displayPosition: { lat: m.location_lat, lng: m.location_lng }
+                    });
+                } else {
+                    const sorted = [...group].sort((a, b) => Number(a.id) - Number(b.id));
+                    const centerLat = sorted.reduce((acc, item) => acc + item.location_lat, 0) / sorted.length;
+                    const centerLng = sorted.reduce((acc, item) => acc + item.location_lng, 0) / sorted.length;
+                    sorted.forEach((m, i) => {
+                        const angle = (2 * Math.PI * i) / sorted.length;
+                        result.push({
+                            ...m,
+                            _displayPosition: {
+                                lat: centerLat + Math.sin(angle) * spreadRadiusDeg,
+                                lng: centerLng + Math.cos(angle) * spreadRadiusDeg
+                            }
+                        });
+                    });
+                }
+            });
+            return result;
+        };
 
-        grid.forEach((cellReports, cellKey) => {
-            if (cellReports.length === 1 && currentZoom >= 13) {
-                individualMarkers.push(cellReports[0]);
-            } else {
-                let sumLat = 0, sumLng = 0;
-                let hasCritical = false, hasPending = false, hasActive = false;
-
-                cellReports.forEach(r => {
-                    sumLat += r.location_lat;
-                    sumLng += r.location_lng;
-                    if (r.ai_urgency === 'CRITICAL') hasCritical = true;
-                    else if (r.status === 'pending' || r.status === 'unverified') hasPending = true;
-                    else if (r.status === 'dispatched' || r.status === 'approved_internal') hasActive = true;
-                });
-
-                let clusterColor = '#22c55e'; // resolved default
-                if (hasActive) clusterColor = '#ff6b00';
-                if (hasPending) clusterColor = '#ff6b00';
-                if (hasCritical) clusterColor = '#ef4444';
-
-                clusterMarkers.push({
-                    id: `cluster-${cellKey}`,
-                    count: cellReports.length,
-                    lat: sumLat / cellReports.length,
-                    lng: sumLng / cellReports.length,
-                    statusColor: clusterColor,
-                    reports: cellReports
-                });
-            }
-        });
-
-        return { individualMarkers, clusterMarkers };
-    }, [filteredReports, currentZoom, currentBounds]);
+        return { individualMarkers: spreadCoincidentMarkers(validReports), clusterMarkers: [] };
+    }, [filteredReports]);
 
     // Supported canvas overlay replaces Google's retired visualization layer.
     useEffect(() => {
@@ -1633,31 +1637,19 @@ const DispatcherDashboard = () => {
         if (!category) return 'slate';
         const cat = category.toLowerCase();
         if (cat.includes('water') || cat.includes('flood') || cat.includes('drain')) return 'blue';
-        if (cat.includes('electric') || cat.includes('wire') || cat.includes('light') || cat.includes('power')) return 'red';
+        if (cat.includes('electric') || cat.includes('wire') || cat.includes('light') || cat.includes('power') || cat.includes('safety') || cat.includes('hazard') || cat.includes('security')) return 'red';
         if (cat.includes('road') || cat.includes('pothole') || cat.includes('bridge') || cat.includes('infrastructure')) return 'orange';
         if (cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public')) return 'green';
         if (cat.includes('other')) return 'purple';
         return 'slate';
     };
 
-    // Beautiful Dynamic SVG Pin Generator
+    // Beautiful Dynamic SVG Pin Generator (matches Map Status Legend colors)
     const getMarkerSVG = (category, status, isSelected = false) => {
-        let color = '#f97316'; // Default Active
+        const { borderColor: color } = getLegendStatusTheme(status);
         const cat = (category || '').toLowerCase();
-        const isPublicFacility = cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public');
+        const isPublicFacility = !cat.includes('safety') && !cat.includes('hazard') && (cat.includes('facility') || cat.includes('facilities') || cat.includes('building') || cat.includes('park') || cat.includes('public'));
         const isOthers = cat.includes('other');
-
-        if (status === 'resolved') color = '#22c55e';
-        else if (status === 'pending' || status === 'unverified') color = '#ef4444';
-        else if (status === 'rejected') color = '#64748b';
-        else if (status === 'cancelled') color = '#0f172a';
-        
-        // Overwrite color for Public Facilities or Others if selected or themed
-        if (isPublicFacility) {
-            color = isSelected ? '#16a34a' : (status === 'resolved' ? '#22c55e' : '#22c55e'); // Using green for all public facilities per request
-        } else if (isOthers && status !== 'resolved' && status !== 'rejected') {
-            color = isSelected ? '#7c3aed' : '#8b5cf6';
-        }
         
         let svgIcon = ''; 
         
@@ -1810,19 +1802,19 @@ const DispatcherDashboard = () => {
                             </button>
                         </div>
 
-                        {/* PULSO Omni-Assistant AI Copilot in Header */}
+                        {/* PULSEAI Staff Assistant in Header */}
                         <button
                             onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all shadow-sm ${
                                 isAIChatOpen
-                                    ? 'bg-blue-600 text-white shadow-blue-500/25 ring-2 ring-blue-400'
-                                    : 'bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800'
+                                    ? 'bg-[#f05a00] text-white shadow-orange-500/25 ring-2 ring-[#f05a00]'
+                                    : 'bg-orange-50 dark:bg-orange-950/50 text-[#f05a00] dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 border border-orange-200 dark:border-orange-800/60'
                             }`}
-                            title={isAIChatOpen ? "Close AI Copilot" : "Open PULSO Omni-Assistant (AI Copilot)"}
-                            aria-label="Toggle PULSO Omni-Assistant AI Copilot"
+                            title={isAIChatOpen ? "Close PULSEAI" : "Open PULSEAI (Staff Assistant)"}
+                            aria-label="Toggle PULSEAI Staff Assistant"
                         >
                             <Brain size={14} className={isAIChatOpen ? 'animate-pulse' : ''} />
-                            <span className="hidden md:inline">AI Copilot</span>
+                            <span className="hidden md:inline font-heading">PULSEAI</span>
                             <span className="flex h-2 w-2 relative">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -1866,25 +1858,14 @@ const DispatcherDashboard = () => {
                                     </span>
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <div className="relative">
-                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-muted dark:text-slate-400 pointer-events-none" />
-                                        <input 
-                                            type="text" 
-                                            placeholder="Search by issue, location, category, or report ID..." 
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-neutral-bg dark:bg-slate-950 border border-neutral-border dark:border-slate-800 rounded-lg pl-9 pr-8 py-2 text-xs text-neutral-text dark:text-white placeholder-neutral-muted focus:outline-none focus:border-primary transition-colors" 
-                                        />
-                                        {searchQuery && (
-                                            <button 
-                                                onClick={() => setSearchQuery('')}
-                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5"
-                                                aria-label="Clear search query"
-                                            >
-                                                <X size={13} />
-                                            </button>
-                                        )}
-                                    </div>
+                                    <SearchInput
+                                        value={searchQuery}
+                                        onChange={setSearchQuery}
+                                        placeholder="Search ticket, citizen or category"
+                                        ariaLabel="Search by issue, location, category, or report ID"
+                                        onClear={() => setSearchQuery('')}
+                                        className="w-full"
+                                    />
                                     <div className="flex flex-col gap-2">
                                         {/* Area / Sector Filter (North vs South Caloocan) */}
                                         <OrangeSelect
@@ -2081,23 +2062,12 @@ const DispatcherDashboard = () => {
                                         const tacticalBrgyDigits = (tacticalContext?.barangay || '').toString().replace(/\D/g, '');
                                         const isTacticalMatch = tacticalContext && tacticalBrgyDigits && reportBrgyDigits === tacticalBrgyDigits;
                                         const isSelected = selectedReport?.id === report.id;
+                                        const legendTheme = getLegendStatusTheme(report.status);
                                         const selectionClass = isSelected 
-                                            ? ({
-                                                orange: 'bg-primary/5 dark:bg-orange-950/30 border-primary ring-1 ring-primary/20 shadow-sm',
-                                                blue: 'bg-secondary/5 dark:bg-blue-950/30 border-secondary ring-1 ring-secondary/20 shadow-sm',
-                                                green: 'bg-secondary/5 dark:bg-green-950/30 border-secondary ring-1 ring-secondary/20 shadow-sm',
-                                                red: 'bg-red-500/5 dark:bg-red-950/30 border-red-500/50 ring-1 ring-red-500/20 shadow-sm',
-                                                slate: 'bg-neutral-bg dark:bg-slate-800/40 border-neutral-border ring-1 ring-neutral-border/20 shadow-sm'
-                                            }[color] || 'bg-neutral-bg dark:bg-slate-800 border-primary/50')
+                                            ? legendTheme.cardSelected
                                             : isTacticalMatch
                                             ? 'bg-yellow-500/5 border-yellow-500/50 ring-1 ring-yellow-500/30 shadow-sm shadow-yellow-500/10'
-                                            : `bg-white dark:bg-slate-950/50 border-neutral-border dark:border-slate-800/50 shadow-sm transition-all duration-200 ${
-                                                color === 'green' ? 'hover:border-secondary dark:hover:border-green-500/30 hover:bg-secondary-light/30 dark:hover:bg-green-900/5' :
-                                                color === 'blue' ? 'hover:border-secondary dark:hover:border-blue-500/30 hover:bg-secondary-light/30 dark:hover:bg-blue-900/5' :
-                                                color === 'orange' ? 'hover:border-primary dark:hover:border-orange-700 hover:bg-primary-light/30 dark:hover:bg-orange-900/5' :
-                                                color === 'red' ? 'hover:border-red-400/50 dark:hover:border-red-700 hover:bg-red-50/30 dark:hover:bg-red-900/5' :
-                                                'hover:border-primary-hover dark:hover:border-slate-700'
-                                            }`;
+                                            : `bg-white dark:bg-slate-950/50 ${legendTheme.cardUnselected} shadow-sm transition-all duration-200`;
 
                                         return (
                                         <button 
@@ -2165,26 +2135,33 @@ const DispatcherDashboard = () => {
                                             </div>
 
                                             {/* Location line with District badge */}
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 mb-2.5 truncate font-medium">
-                                                <span className="flex items-center gap-1 truncate text-[11px]">
-                                                    <MapPin size={11} className="text-slate-400 shrink-0"/> 
-                                                    <span className="truncate">{report.location_string || `${report.location_lat?.toFixed(4)}, ${report.location_lng?.toFixed(4)}`}</span>
-                                                </span>
-                                                {(() => {
-                                                    if (!report.location_lat || !report.location_lng) return null;
-                                                    const dist = getCaloocanDistrict(report.location_lat, report.location_lng);
-                                                    if (dist === 'north') {
-                                                        return <span className="shrink-0 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">North</span>;
-                                                    }
-                                                    if (dist === 'south') {
-                                                        return <span className="shrink-0 text-[9px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">South</span>;
-                                                    }
-                                                    return (
-                                                        <span className="shrink-0 text-[9px] font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30" title="Coordinates are outside Caloocan boundaries">
-                                                            ⚠️ Outside
-                                                        </span>
-                                                    );
-                                                })()}
+                                            <div className="mb-2.5">
+                                                <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between gap-1 truncate font-medium">
+                                                    <span className="flex items-center gap-1 truncate text-[11px]">
+                                                        <MapPin size={11} className="text-slate-400 shrink-0"/> 
+                                                        <span className="truncate">{report.location_string || `${Number(report.location_lat)?.toFixed(5)}, ${Number(report.location_lng)?.toFixed(5)}`}</span>
+                                                    </span>
+                                                    {(() => {
+                                                        if (!report.location_lat || !report.location_lng) return null;
+                                                        const dist = getCaloocanDistrict(report.location_lat, report.location_lng);
+                                                        if (dist === 'north') {
+                                                            return <span className="shrink-0 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">North</span>;
+                                                        }
+                                                        if (dist === 'south') {
+                                                            return <span className="shrink-0 text-[9px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">South</span>;
+                                                        }
+                                                        return (
+                                                            <span className="shrink-0 text-[9px] font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30" title="Coordinates are outside Caloocan boundaries">
+                                                                ⚠️ Outside
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </div>
+                                                {report.location_lat != null && report.location_lng != null && (
+                                                    <div className="pl-4 mt-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">
+                                                        Lat: {Number(report.location_lat).toFixed(5)}, Lng: {Number(report.location_lng).toFixed(5)}
+                                                    </div>
+                                                )}
                                             </div>
                                             
                                             {/* Footer line: Priority/Urgency Badge with Icon + Separated Actions */}
@@ -2270,16 +2247,16 @@ const DispatcherDashboard = () => {
                         {isRightSidebarOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                     </button>
 
-                    {/* PULSO Omni-Assistant AI Brain Button on Map Canvas (Always positioned on map, never blocking triage cards) */}
+                    {/* PULSEAI Staff Assistant Button on Map Canvas */}
                     <button
                         onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                         className={`absolute top-4 right-16 z-40 shadow-xl border p-2.5 rounded-full transition-all flex items-center justify-center pointer-events-auto group ${
                             isAIChatOpen
-                                ? 'bg-blue-600 border-blue-500 text-white ring-2 ring-blue-400'
-                                : 'bg-white dark:bg-slate-900 border-neutral-border text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50'
+                                ? 'bg-[#f05a00] border-[#ea580c] text-white ring-2 ring-[#f05a00]'
+                                : 'bg-white dark:bg-slate-900 border-neutral-border text-[#f05a00] dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/50'
                         }`}
-                        title={isAIChatOpen ? "Close AI Assistant" : "Open PULSO Omni-Assistant (AI Copilot)"}
-                        aria-label="Toggle PULSO Omni-Assistant AI Copilot"
+                        title={isAIChatOpen ? "Close PULSEAI" : "Open PULSEAI (Staff Assistant)"}
+                        aria-label="Toggle PULSEAI Staff Assistant"
                     >
                         <Brain size={18} className={isAIChatOpen ? 'animate-pulse' : 'group-hover:scale-110 transition-transform'} />
                     </button>
@@ -2351,8 +2328,9 @@ const DispatcherDashboard = () => {
                             {/* Render Report Photo-Pins (with size-optimized thumbnails, status borders & fallback) */}
                             {individualMarkers.map(report => {
                                 const isSelected = selectedReport?.id === report.id;
-                                const cacheKey = `${report.id}-${isSelected ? 'sel' : 'norm'}`;
-                                const customIconUrl = photoPinIcons[cacheKey];
+                                const statusTone = getLegendStatusTheme(report.status).tone;
+                                const cacheKey = `v2-${report.id}-${statusTone}-${isSelected ? 'sel' : 'norm'}`;
+                                const customIconUrl = photoPinIcons[cacheKey] || pinIconCache.current.get(cacheKey);
 
                                 const size = isSelected ? 46 : 36;
                                 const pointerH = isSelected ? 8 : 7;
@@ -2370,23 +2348,24 @@ const DispatcherDashboard = () => {
                                     );
 
                                 const ariaTitle = `Report ${formatTicketId(report.ticket_id, report.id)}, ${report.category || report.ai_category || 'Incident'}, ${(report.status || 'PENDING').toUpperCase()} — click to view details`;
+                                const pinPosition = report._displayPosition || { lat: Number(report.location_lat), lng: Number(report.location_lng) };
 
                                 return (
                                     <MarkerF
                                         key={`map-pin-${report.id}`}
-                                        position={{ lat: report.location_lat, lng: report.location_lng }}
-                                        zIndex={isSelected ? 500 : 150}
+                                        position={pinPosition}
+                                        zIndex={isSelected ? 1000 : (150 + (Number(report.id) % 300))}
                                         title={ariaTitle}
                                         onClick={() => {
                                             setSelectedReport(report);
                                             setSelectedMarker(report);
-                                            if (map) map.panTo({ lat: report.location_lat, lng: report.location_lng });
+                                            if (map) map.panTo(pinPosition);
                                         }}
                                         onDblClick={() => {
                                             handleStreetViewClick({ lat: report.location_lat, lng: report.location_lng });
                                         }}
                                         options={{
-                                            optimized: true,
+                                            optimized: false,
                                             clickable: true
                                         }}
                                         icon={iconConfig}
@@ -2400,7 +2379,7 @@ const DispatcherDashboard = () => {
                                     <MarkerF
                                         key={`sv-pin-${report.id}`}
                                         map={panorama} 
-                                        position={{ lat: report.location_lat, lng: report.location_lng }}
+                                        position={{ lat: Number(report.location_lat), lng: Number(report.location_lng) }}
                                         onClick={() => {
                                             setSelectedReport(report);
                                             setSelectedMarker(report); 
@@ -2421,8 +2400,8 @@ const DispatcherDashboard = () => {
                             {/* TOP-LEVEL TACTICAL CARD: Dynamic anchoring to Map or SV */}
                             {(() => {
                                 if (!selectedMarker) return null;
-                                const rawLat = selectedMarker.location_lat ?? selectedMarker.lat ?? selectedMarker.latitude;
-                                const rawLng = selectedMarker.location_lng ?? selectedMarker.lng ?? selectedMarker.longitude;
+                                const rawLat = selectedMarker._displayPosition?.lat ?? selectedMarker.location_lat ?? selectedMarker.lat ?? selectedMarker.latitude;
+                                const rawLng = selectedMarker._displayPosition?.lng ?? selectedMarker.location_lng ?? selectedMarker.lng ?? selectedMarker.longitude;
                                 const markerLat = typeof rawLat === 'function' ? rawLat() : parseFloat(rawLat);
                                 const markerLng = typeof rawLng === 'function' ? rawLng() : parseFloat(rawLng);
 
@@ -2567,13 +2546,13 @@ const DispatcherDashboard = () => {
                                                         disabled={directionsLoading}
                                                         onPointerDown={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
                                                         onClick={(e) => { e.stopPropagation(); handleGetDirections(selectedMarker); }}
-                                                        className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-orange-600 dark:bg-slate-800 dark:hover:bg-orange-600 text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer mb-2.5 disabled:opacity-50"
+                                                        className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200/90 dark:bg-slate-800 dark:hover:bg-orange-600 dark:text-white dark:border-slate-700 text-xs font-bold shadow-2xs flex items-center justify-center gap-2 transition-all cursor-pointer mb-2.5 disabled:opacity-50"
                                                     >
                                                         {directionsLoading ? (
-                                                            <div className="animate-spin w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"></div>
+                                                            <div className="animate-spin w-3.5 h-3.5 border-2 border-slate-400/30 border-t-orange-500 dark:border-white/30 dark:border-t-white rounded-full"></div>
                                                         ) : (
                                                             <>
-                                                                <Navigation size={13} className="text-orange-400" />
+                                                                <Navigation size={13} className="text-orange-500 dark:text-orange-400" />
                                                                 <span>Plan Team Route</span>
                                                             </>
                                                         )}
@@ -2615,106 +2594,13 @@ const DispatcherDashboard = () => {
                         })()}
 
 
-                            {/* User Position Marker */}
-                            {/* ═══════════════════════════════════════════════════════════════════
-                                AUTHORITATIVE BARANGAY JURISDICTION BOUNDARIES (ALL 188 BARANGAYS)
-                            ══════════════════════════════════════════════════════════════════════ */}
-                            {borderData?.features?.map((feature, i) => {
-                                const props = feature.properties || {};
-                                const sector = props.sector || 'Caloocan';
-                                const isNorth = sector === 'North';
-
-                                const polygonOptions = {
-                                    strokeColor: isNorth ? '#f97316' : '#ff6b00',
-                                    strokeOpacity: 1.0,
-                                    strokeWeight: 2.2,
-                                    fillColor: isNorth ? '#f97316' : '#ff6b00',
-                                    fillOpacity: isNorth
-                                        ? (isDarkMode ? 0.10 : 0.06)
-                                        : (isDarkMode ? 0.08 : 0.05),
-                                    clickable: false,
-                                    zIndex: isNorth ? 2 : 1,
-                                };
-
-                                const paths = feature.geometry.type === 'MultiPolygon'
-                                    ? feature.geometry.coordinates.map(poly => poly[0].map(c => ({ lng: c[0], lat: c[1] })))
-                                    : [feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))];
-
-                                return paths.map((path, pi) => (
-                                    <PolygonF
-                                        key={`caloocan-brgy-border-${i}-${pi}`}
-                                        paths={path}
-                                        options={polygonOptions}
-                                    />
-                                ));
-                            })}
-
-                            {/* Fallback boundary outlines if borderData has no features */}
-                            {(!borderData?.features || borderData.features.length === 0) && (
-                                <>
-                                    <PolygonF
-                                        paths={NORTH_CALOOCAN_PATH}
-                                        options={{
-                                            fillColor: "#ff6b00",
-                                            fillOpacity: 0.08,
-                                            strokeColor: "#ff6b00",
-                                            strokeOpacity: 0.85,
-                                            strokeWeight: 2.5,
-                                            clickable: false,
-                                        }}
-                                    />
-                                    <PolygonF
-                                        paths={SOUTH_CALOOCAN_PATH}
-                                        options={{
-                                            fillColor: "#ff6b00",
-                                            fillOpacity: 0.08,
-                                            strokeColor: "#ff6b00",
-                                            strokeOpacity: 0.85,
-                                            strokeWeight: 2.5,
-                                            clickable: false,
-                                        }}
-                                    />
-                                </>
-                            )}
-
-                            {/* North Caloocan District Centroid Label */}
-                            <MarkerF
-                                position={NORTH_CALOOCAN_CENTROID}
-                                zIndex={110}
-                                options={{
-                                    clickable: false,
-                                    optimized: true
-                                }}
-                                icon={window.google && window.google.maps ? {
-                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="134" height="32" viewBox="0 0 134 32">
-                                            <rect x="2" y="2" width="130" height="28" rx="8" fill="#0c1424" fill-opacity="0.92" stroke="#ff6b00" stroke-width="1.5" />
-                                            <circle cx="16" cy="16" r="4" fill="#ff6b00" />
-                                            <text x="70" y="20" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.3">NORTH CALOOCAN</text>
-                                        </svg>
-                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                    anchor: new window.google.maps.Point(67, 16)
-                                } : undefined}
-                            />
-
-                            {/* South Caloocan District Centroid Label */}
-                            <MarkerF
-                                position={SOUTH_CALOOCAN_CENTROID}
-                                zIndex={110}
-                                options={{
-                                    clickable: false,
-                                    optimized: true
-                                }}
-                                icon={window.google && window.google.maps ? {
-                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="134" height="32" viewBox="0 0 134 32">
-                                            <rect x="2" y="2" width="130" height="28" rx="8" fill="#0c1424" fill-opacity="0.92" stroke="#ff6b00" stroke-width="1.5" />
-                                            <circle cx="16" cy="16" r="4" fill="#ff6b00" />
-                                            <text x="70" y="20" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.3">SOUTH CALOOCAN</text>
-                                        </svg>
-                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                    anchor: new window.google.maps.Point(67, 16)
-                                } : undefined}
+                            {/* Authoritative Shared Dual-Sector Caloocan Boundary Layer */}
+                            <CaloocanBoundaryLayer
+                                activeSector={selectedArea}
+                                onSectorClick={(sector) => setSelectedArea(sector)}
+                                isDarkMode={isDarkMode}
+                                showBarangays={true}
+                                showLabels={false}
                             />
 
                             {/* South Caloocan City Hall HQ Pin */}
@@ -2729,39 +2615,21 @@ const DispatcherDashboard = () => {
                                     setSelectedMarker({
                                         id: 'hq-south',
                                         isHQ: true,
-                                        title: 'Caloocan City Hall (South Main)',
+                                        title: 'Caloocan City Hall - South',
                                         location_lat: CALOOCAN_CITY_HALL_SOUTH_LOC.lat,
                                         location_lng: CALOOCAN_CITY_HALL_SOUTH_LOC.lng,
                                         description: 'South Caloocan Executive & Municipal Hall (8th Ave / Grace Park)'
                                     });
                                 }}
                                 icon={window.google && window.google.maps ? {
-                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 60" width="50" height="60">
-                                            <defs>
-                                                <linearGradient id="hqSouthGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                    <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
-                                                    <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
-                                                </linearGradient>
-                                                <filter id="shadowSouth" x="-20%" y="-20%" width="140%" height="140%">
-                                                    <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
-                                                    <feOffset dx="0" dy="2" result="offsetblur" />
-                                                    <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
-                                                    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-                                                </filter>
-                                            </defs>
-                                            <path d="M25 58c0 0 22-20 22-33a22 22 0 0 0-44 0c0 13 22 33 22 33z" fill="url(#hqSouthGrad)" stroke="#ff6b00" stroke-width="2.5" filter="url(#shadowSouth)" />
-                                            <g transform="translate(13, 10) scale(1.1)" fill="#ff6b00">
-                                                <path d="M18 20v-8l-1.5-1.5V6L15 4l-1.5 2v4.5L12 12l-1.5-1.5V6L9 4 7.5 6v4.5L6 12v8h12zM11 16h2v4h-2v-4z"/>
-                                            </g>
-                                        </svg>
-                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                    scaledSize: new window.google.maps.Size(42, 50),
-                                    anchor: new window.google.maps.Point(21, 50)
+                                    url: getCityHallMarkerSvg({ sector: 'south', isDarkMode }),
+                                    scaledSize: new window.google.maps.Size(38, 38),
+                                    anchor: new window.google.maps.Point(19, 19)
                                 } : undefined}
+                                title="Caloocan City Hall - South"
                             />
 
-                            {/* Caloocan City Hall North Pin — Styled as requested (Castle Icon) */}
+                            {/* Caloocan City Hall North Marker */}
                             <MarkerF 
                                 position={CALOOCAN_CITY_HALL_NORTH_LOC}
                                 zIndex={300}
@@ -2770,30 +2638,11 @@ const DispatcherDashboard = () => {
                                     clickable: true
                                 }}
                                 icon={window.google && window.google.maps ? {
-                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 60" width="50" height="60">
-                                            <defs>
-                                                <linearGradient id="hqGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                    <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
-                                                    <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
-                                                </linearGradient>
-                                                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                                                    <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
-                                                    <feOffset dx="0" dy="2" result="offsetblur" />
-                                                    <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
-                                                    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-                                                </filter>
-                                            </defs>
-                                            <path d="M25 58c0 0 22-20 22-33a22 22 0 0 0-44 0c0 13 22 33 22 33z" fill="url(#hqGrad)" stroke="#f97316" stroke-width="2.5" filter="url(#shadow)" />
-                                            <g transform="translate(13, 10) scale(1.1)" fill="#f97316">
-                                                <path d="M18 20v-8l-1.5-1.5V6L15 4l-1.5 2v4.5L12 12l-1.5-1.5V6L9 4 7.5 6v4.5L6 12v8h12zM11 16h2v4h-2v-4z"/>
-                                            </g>
-                                        </svg>
-                                    `.trim().replace(/\n/g, '').replace(/\s+/g, ' '))}`,
-                                    scaledSize: new window.google.maps.Size(50, 60),
-                                    anchor: new window.google.maps.Point(25, 60)
+                                    url: getCityHallMarkerSvg({ sector: 'north', isDarkMode }),
+                                    scaledSize: new window.google.maps.Size(38, 38),
+                                    anchor: new window.google.maps.Point(19, 19)
                                 } : undefined}
-                                title="LGU Command Center (HQ)"
+                                title="Caloocan City Hall - North"
                                 onClick={() => {
                                     // Trigger specialized HQ Tactical Card instead of just zooming
                                     setSelectedMarker({
@@ -3503,7 +3352,7 @@ const DispatcherDashboard = () => {
                                 className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden max-w-lg w-full border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]"
                             >
                                 {/* Top Accent Gradient Strip */}
-                                <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
+                                <div className="h-1.5 w-full bg-orange-500 shrink-0" />
 
                                 {/* Modal Header */}
                                 <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
@@ -3767,194 +3616,13 @@ const DispatcherDashboard = () => {
 
                 </main>
 
-                {/* PULSO Omni-Assistant Chat Window (Triggered from Top Header and Map Canvas toolbar) */}
-                <AnimatePresence>
-                    {isAIChatOpen && (
-                        <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
-                            {/* Backdrop (maximized only) */}
-                            {isAIMaximized && (
-                                <motion.div
-                                    key="backdrop"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[99]"
-                                    onClick={() => setIsAIMaximized(false)}
-                                />
-                            )}
-
-                            <motion.div
-                                key="chat"
-                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-                                className={`bg-slate-900 shadow-2xl border border-slate-700 overflow-hidden flex flex-col transition-all duration-300 ${
-                                    isAIMaximized
-                                        ? 'fixed inset-6 md:inset-12 lg:inset-20 z-[100] rounded-3xl'
-                                        : 'w-[380px] h-[520px] rounded-2xl relative z-[100]'
-                                }`}
-                            >
-                                {/* Header */}
-                                <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shrink-0">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-blue-800 flex items-center justify-center animate-pulse">
-                                            <Brain size={18} className="text-white" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-white text-sm">PULSO Omni-Assistant</h4>
-                                            <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Engineering Co-pilot</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        {/* Maximize / Minimize toggle */}
-                                        <button
-                                            onClick={() => setIsAIMaximized(prev => !prev)}
-                                            title={isAIMaximized ? 'Minimize' : 'Maximize'}
-                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                                        >
-                                            {isAIMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                                        </button>
-                                        {/* Close */}
-                                        <button
-                                            onClick={() => { setIsAIChatOpen(false); setIsAIMaximized(false); }}
-                                            title="Close"
-                                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Messages */}
-                                <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
-                                    {aiMessages.map((msg, i) => (
-                                        <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                            {/* Text bubble */}
-                                            <div className={`${
-                                                isAIMaximized ? 'max-w-[70%]' : 'max-w-[90%]'
-                                            } p-3 rounded-2xl text-xs font-medium leading-relaxed ${
-                                                msg.role === 'user' ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700'
-                                            }`}>
-                                                {msg.text}
-                                            </div>
-
-                                            {/* Map Result Card — shown only for assistant messages with location data */}
-                                            {msg.role === 'assistant' && msg.mapData && msg.mapData.length > 0 && isLoaded && (
-                                                <div className={`w-full ${isAIMaximized ? 'max-w-[85%]' : 'max-w-full'} rounded-2xl border border-slate-700 overflow-hidden bg-slate-800/80`}>
-                                                    {/* Map label */}
-                                                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/60 border-b border-slate-700">
-                                                        <MapIcon size={13} className="text-orange-400" />
-                                                        <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest">Live Report Locations</span>
-                                                        <span className="ml-auto text-[10px] text-slate-400 font-semibold">{msg.mapData.length} pins</span>
-                                                    </div>
-
-                                                    {/* Embedded mini Google Map */}
-                                                    <div className="w-full h-44 relative">
-                                                        <GoogleMap
-                                                            mapContainerStyle={{ width: '100%', height: '100%' }}
-                                                            center={CALOOCAN_CENTER}
-                                                            zoom={13}
-                                                            options={{
-                                                                disableDefaultUI: true,
-                                                                styles: isDarkMode ? [
-                                                                    { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-                                                                    { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-                                                                    { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
-                                                                    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-                                                                    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0c1626' }] },
-                                                                ] : [
-                                                                    { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
-                                                                    { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
-                                                                    { elementType: 'labels.text.stroke', stylers: [{ color: '#f8fafc' }] },
-                                                                    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-                                                                    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
-                                                                ]
-                                                            }}
-                                                        >
-                                                            {msg.mapData.map(r => r.location_lat && r.location_lng && (
-                                                                <MarkerF
-                                                                    key={r.id}
-                                                                    position={{ lat: r.location_lat, lng: r.location_lng }}
-                                                                    title={`${formatTicketId(r.ticket_id, r.id)}: ${r.ai_category || r.category}`}
-                                                                    icon={window.google?.maps ? {
-                                                                        path: window.google.maps.SymbolPath.CIRCLE,
-                                                                        fillColor: r.status === 'resolved' ? '#22c55e' : r.ai_urgency === 'Critical' ? '#ef4444' : '#f97316',
-                                                                        fillOpacity: 1,
-                                                                        scale: 7,
-                                                                        strokeColor: 'white',
-                                                                        strokeWeight: 2,
-                                                                    } : undefined}
-                                                                />
-                                                            ))}
-                                                        </GoogleMap>
-                                                    </div>
-
-                                                    {/* Report list — scrollable */}
-                                                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-700/50 scrollbar-thin scrollbar-thumb-slate-700">
-                                                        {msg.mapData.map((r, idx) => (
-                                                            <button
-                                                                key={r.id}
-                                                                onClick={() => map?.panTo({ lat: r.location_lat, lng: r.location_lng })}
-                                                                className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-slate-700/50 transition-colors text-left group"
-                                                            >
-                                                                {/* Index badge */}
-                                                                <span className="shrink-0 w-5 h-5 rounded-full bg-slate-700 text-[10px] font-bold text-slate-300 flex items-center justify-center mt-0.5">{idx + 1}</span>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                                        <span className="text-[11px] font-bold text-white truncate">{r.ai_category || r.category || 'Uncategorized'}</span>
-                                                                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
-                                                                            r.status === 'resolved' ? 'bg-green-500/15 text-green-400' :
-                                                                            r.ai_urgency === 'Critical' ? 'bg-red-500/15 text-red-400' :
-                                                                            'bg-orange-500/15 text-orange-400'
-                                                                        }`}>{r.status}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1 mt-0.5">
-                                                                        <MapPin size={9} className="text-slate-500 shrink-0" />
-                                                                        <span className="text-[10px] text-slate-400 truncate">
-                                                                            {r.location_string || `${r.location_lat?.toFixed(4)}°N, ${r.location_lng?.toFixed(4)}°E`}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                                <span className="text-[9px] font-mono text-slate-600 group-hover:text-orange-400 transition-colors shrink-0">{formatTicketId(r.ticket_id, r.id)}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {isAILoading && (
-                                        <div className="flex justify-start">
-                                            <div className="bg-slate-800 p-3 rounded-2xl flex gap-1">
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div ref={aiChatEndRef} />
-                                </div>
-
-                                {/* Input */}
-                                <form onSubmit={handleAIChat} className="p-4 bg-slate-800 border-t border-slate-700 shrink-0">
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={aiQuery}
-                                            onChange={(e) => setAiQuery(e.target.value)}
-                                            placeholder="Ask PULSO Brain..."
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-blue-600 outline-none"
-                                        />
-                                        <button type="submit" disabled={isAILoading} className="absolute right-2 top-[7px] text-blue-400 hover:text-blue-300 disabled:opacity-40">
-                                            <Search size={16} />
-                                        </button>
-                                    </div>
-                                </form>
-                            </motion.div>
-                        </div>
-                    )}
-                </AnimatePresence>
+                {/* ── Unified PULSEAI Assistant Window (Staff Role) ── */}
+                <PulseAIChatWindow
+                    isOpen={isAIChatOpen}
+                    onClose={() => setIsAIChatOpen(false)}
+                    role="staff"
+                    currentUser={currentUser}
+                />
             </div>
             {/* ── Image Zoom Overlay ── */}
             <AnimatePresence>
@@ -3964,7 +3632,7 @@ const DispatcherDashboard = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setZoomedImage(null)}
-                        className="fixed inset-0 z-[1000] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 sm:p-12 cursor-zoom-out"
+                        className="fixed inset-0 z-[1000] bg-white/60 dark:bg-black/60 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-12 cursor-zoom-out"
                     >
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }}
@@ -3976,13 +3644,14 @@ const DispatcherDashboard = () => {
                             <img 
                                 src={zoomedImage} 
                                 alt="Inspection" 
-                                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-white/10"
+                                className="max-w-full max-h-[85vh] sm:max-h-full object-contain rounded-2xl shadow-2xl border border-slate-200/50 dark:border-white/15"
                             />
                             <button 
                                 onClick={() => setZoomedImage(null)}
-                                className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full backdrop-blur-md transition-colors border border-white/20"
+                                className="absolute top-[max(1rem,env(safe-area-inset-top,0px))] right-4 bg-slate-900/80 hover:bg-slate-900 dark:bg-black/70 dark:hover:bg-black/90 text-white p-3 rounded-full backdrop-blur-md transition-colors border border-white/20 shadow-xl cursor-pointer"
+                                aria-label="Close photo preview"
                             >
-                                <X size={24} />
+                                <X size={22} />
                             </button>
                         </motion.div>
                     </motion.div>
@@ -4035,19 +3704,12 @@ const DispatcherDashboard = () => {
                             className="relative w-full max-w-5xl xl:max-w-6xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]"
                         >
                             {/* Top Accent Gradient Strip */}
-                            <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 shrink-0" />
+                            <div className="h-1.5 w-full bg-orange-500 shrink-0" />
 
                             {/* Modal Header */}
                             <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
                                 <div className="flex items-center justify-between gap-3 mb-2.5">
                                     <div className="flex items-center gap-2.5 flex-wrap">
-                                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-[11px] font-bold text-orange-600 dark:text-orange-400">
-                                            <span className="relative flex h-2 w-2">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-                                            </span>
-                                            <span>PULSO DISPATCH LIFECYCLE AUDIT</span>
-                                        </div>
                                         {(() => {
                                             const raw = (selectedReport.status || '').toLowerCase();
                                             const isResolved = ['resolved', 'completed', 'fixed', 'closed'].some(k => raw.includes(k));
@@ -4290,8 +3952,7 @@ const DispatcherDashboard = () => {
 
                                                         {/* Meta Pill pinned at bottom */}
                                                         <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
-                                                            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800/80 text-[10px] font-mono-data font-medium text-slate-600 dark:text-slate-300 max-w-full">
-                                                                <Sparkles size={11} className="text-orange-500 shrink-0" />
+                                                            <div className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800/80 text-[10px] font-mono-data font-medium text-slate-600 dark:text-slate-300 max-w-full">
                                                                 <span className="truncate">{m.meta}</span>
                                                             </div>
                                                         </div>

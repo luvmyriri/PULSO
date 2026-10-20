@@ -86,60 +86,159 @@ def _match_cost_key(category: str) -> str:
     return "default"
 
 
+_BOUNDARY_FEATURES_CACHE = None
+
+
+def _lookup_barangay_by_coords(lat: Optional[float], lng: Optional[float]) -> Optional[str]:
+    """Point-in-polygon lookup against Caloocan's 188 barangay boundaries."""
+    if lat is None or lng is None:
+        return None
+    global _BOUNDARY_FEATURES_CACHE
+    try:
+        if _BOUNDARY_FEATURES_CACHE is None:
+            import os
+            candidates = [
+                os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "data", "caloocan_simplified_boundary.json"),
+                os.path.join(os.path.dirname(__file__), "data", "caloocan_simplified_boundary.json"),
+            ]
+            for path in candidates:
+                if os.path.exists(path):
+                    with open(path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        _BOUNDARY_FEATURES_CACHE = data.get("features", [])
+                    break
+            if _BOUNDARY_FEATURES_CACHE is None:
+                _BOUNDARY_FEATURES_CACHE = []
+
+        x, y = float(lng), float(lat)
+
+        def _point_in_ring(px: float, py: float, ring: list) -> bool:
+            inside = False
+            n = len(ring)
+            if n < 3:
+                return False
+            j = n - 1
+            for i in range(n):
+                xi, yi = ring[i][0], ring[i][1]
+                xj, yj = ring[j][0], ring[j][1]
+                if ((yi > py) != (yj > py)) and (px < (xj - xi) * (py - yi) / ((yj - yi) or 1e-12) + xi):
+                    inside = not inside
+                j = i
+            return inside
+
+        for feat in _BOUNDARY_FEATURES_CACHE:
+            brgy_num = feat.get("properties", {}).get("brgy_num")
+            if not brgy_num:
+                continue
+            geom = feat.get("geometry", {})
+            gtype = geom.get("type")
+            coords = geom.get("coordinates", [])
+            if gtype == "Polygon" and coords:
+                if _point_in_ring(x, y, coords[0]):
+                    return str(brgy_num)
+            elif gtype == "MultiPolygon" and coords:
+                for poly in coords:
+                    if poly and _point_in_ring(x, y, poly[0]):
+                        return str(brgy_num)
+    except Exception:
+        pass
+    return None
+
+
+NAMED_BARANGAY_TO_NUMBER: Dict[str, str] = {
+    "bagong silang": "176",
+    "camarin": "175",
+    "vicas": "175",
+    "bagumbong": "171",
+    "deparo": "168",
+    "llano": "167",
+    "calicanto": "167",
+    "caybiga": "166",
+    "barugo": "169",
+    "talipapa": "164",
+}
+
+
+def _extract_brgy_number(text_val: Optional[str]) -> Optional[str]:
+    """Extract a valid Caloocan barangay number (1–188) from a string."""
+    if not text_val:
+        return None
+    s = str(text_val).strip()
+    # Direct digits like "171"
+    if s.isdigit():
+        num = int(s)
+        if 1 <= num <= 188:
+            return str(num)
+    # Match "Barangay 171" or "Brgy. 171" or "Brgy 171"
+    m = re.search(r"(?:brgy|barangay)\.?\s*(\d{1,3})\b", s, flags=re.IGNORECASE)
+    if m:
+        num = int(m.group(1))
+        if 1 <= num <= 188:
+            return str(num)
+    return None
+
+
 def _resolve_barangay(report: models.Report) -> str:
     """
-    Authoritative barangay resolution:
-    1. Prefer reporter's user profile (barangay).
-    2. Fall back to regex extraction from location string.
-    3. Final fallback to placeholder on report itself.
+    Authoritative barangay number resolution (returns numeric string '1'–'188' when possible):
+    1. Report's own location_barangay field (e.g., '171' or 'Barangay 171').
+    2. Explicit 'Barangay <number>' / 'Brgy <number>' in report.location_string.
+    3. Point-in-polygon lookup using report.location_lat & report.location_lng.
+    4. Known Caloocan area name to Barangay number mapping in location_string / location_barangay.
+    5. Reporter profile fallback.
     """
-    # 1. Authoritative: User Profile (barangay_id -> barangay lookup or address fallback)
+    # 1. Report's location_barangay field
+    num = _extract_brgy_number(getattr(report, "location_barangay", None))
+    if num:
+        return num
+
+    # 2. Explicit Barangay number in report.location_string
+    loc_str = getattr(report, "location_string", None) or ""
+    num = _extract_brgy_number(loc_str)
+    if num:
+        return num
+
+    # 3. Point-in-polygon coordinate lookup against Caloocan's 188 barangays
+    coord_brgy = _lookup_barangay_by_coords(
+        getattr(report, "location_lat", None),
+        getattr(report, "location_lng", None),
+    )
+    if coord_brgy:
+        return coord_brgy
+
+    # 4. Named Caloocan area fallback on report location fields
+    combined_loc = f"{getattr(report, 'location_barangay', '') or ''} {loc_str}".lower()
+    for name, brgy_no in NAMED_BARANGAY_TO_NUMBER.items():
+        if name in combined_loc:
+            return brgy_no
+
+    # 5. Reporter profile fallback
     try:
         if hasattr(report, "reporter") and report.reporter is not None:
             reporter = report.reporter
-            # Check for barangay relationship first
             if hasattr(reporter, "barangay_ref") and reporter.barangay_ref is not None:
-                return str(reporter.barangay_ref.name)
-            # Check for barangay_id
-            if hasattr(reporter, "barangay_id") and reporter.barangay_id is not None:
-                if hasattr(reporter, "barangay_ref") and reporter.barangay_ref:
-                    return str(reporter.barangay_ref.name)
-                return f"Barangay ID {reporter.barangay_id}"
-            # Check for address which may contain barangay
+                ref_name = str(reporter.barangay_ref.name)
+                ref_num = _extract_brgy_number(ref_name)
+                return ref_num or ref_name
             if hasattr(reporter, "address") and reporter.address:
-                loc = str(reporter.address).lower()
-                NORTH_BRGYS = ["bagong silang", "camarin", "vicas", "bagumbong", "deparo", "llano", "calicanto", "caybiga", "barugo", "talipapa"]
-                for b in NORTH_BRGYS:
-                    if b in loc:
-                        return b.title()
+                addr = str(reporter.address)
+                addr_num = _extract_brgy_number(addr)
+                if addr_num:
+                    return addr_num
+                addr_lower = addr.lower()
+                for name, brgy_no in NAMED_BARANGAY_TO_NUMBER.items():
+                    if name in addr_lower:
+                        return brgy_no
     except Exception:
-        pass  # Skip user profile if any error
-    
-    # 2. Location String Regex Fallback
-    loc = (report.location_string or "").lower()
-    # List of known North Caloocan barangays for quick matching
-    NORTH_BRGYS = [
-        "bagong silang", "camarin", "vicas", "bagumbong", "deparo", 
-        "llano", "calicanto", "caybiga", "barugo", "talipapa"
-    ]
-    for b in NORTH_BRGYS:
-        if b in loc:
-            return b.title()
-            
-    # Attempt to extract "Brgy. XXX" or "Barangay XXX"
-    import re
-    match = re.search(r"(?:brgy|barangay)\.?\s*([a-zA-Z0-9\s]+)", loc)
-    if match:
-        return match.group(1).strip().title()
+        pass
 
-    # 3. Final Fallback: Report field or Placeholder
-    if report.location_barangay:
-        return str(report.location_barangay).strip().title()
-    
-    # If we have "Caloocan" in location string but no barangay, mark as Unspecified Caloocan
-    if "caloocan" in (report.location_string or "").lower():
+    if getattr(report, "location_barangay", None):
+        cleaned = re.sub(r"^(?:brgy|barangay)\.?\s*", "", str(report.location_barangay).strip(), flags=re.IGNORECASE)
+        return cleaned.strip().title()
+
+    if "caloocan" in loc_str.lower():
         return "Caloocan (Unspecified)"
-        
+
     return "Unknown District"
 
 
@@ -224,6 +323,11 @@ def _classify_threat(severity_score: float, recurrence_score: float,
     return "MONITORING"
 
 
+# DBSCAN spatial clustering defaults
+DEFAULT_DBSCAN_EPS_METERS: float = 100.0  # 100 meters
+DEFAULT_DBSCAN_MIN_POINTS: int = 3        # At least 3 reports
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Core: Spatial Clustering
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,11 +336,13 @@ def get_infrastructure_clusters(
     db: Session,
     category_filter: Optional[str] = None,
     days_back: int = 90,
-    min_samples: int = 3,
-    radius_meters: float = 200.0,
+    min_samples: int = DEFAULT_DBSCAN_MIN_POINTS,
+    radius_meters: float = DEFAULT_DBSCAN_EPS_METERS,
 ) -> List[Dict[str, Any]]:
     """
     DBSCAN clustering of georeferenced citizen reports.
+    Uses PostGIS ST_ClusterDBSCAN (EPSG:32651, units: meters) when available,
+    falling back to scikit-learn DBSCAN (Haversine metric).
 
     Returns a list of infrastructure stress zone clusters, each with:
       - centroid, radius, report_ids, threat_level, severity_score,
@@ -245,45 +351,99 @@ def get_infrastructure_clusters(
     since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_back)
 
     q = db.query(models.Report).options(joinedload(models.Report.reporter)).filter(
-        models.Report.location_lat.isnot(None),
-        models.Report.location_lng.isnot(None),
         models.Report.created_at >= since,
         models.Report.status.notin_(["rejected", "spam"]),
     )
     if category_filter:
         q = q.filter(models.Report.category.ilike(f"%{category_filter}%"))
 
-    reports = q.all()
-    
-    # Apply strict jurisdictional filter (North Caloocan: 165-188)
-    reports = [r for r in reports if _is_in_jurisdiction(_resolve_barangay(r))]
-    
-    if len(reports) < min_samples:
+    raw_reports = q.all()
+    logger.info(f"DBSCAN: Loaded {len(raw_reports)} total reports within last {days_back} days (filter={category_filter})")
+
+    # Filter reports with valid geographic coordinates (drop null, NaN, and out-of-range coordinates)
+    valid_reports = []
+    for r in raw_reports:
+        lat = r.location_lat
+        lng = r.location_lng
+        if lat is None or lng is None:
+            continue
+        try:
+            lat_f = float(lat)
+            lng_f = float(lng)
+            if math.isnan(lat_f) or math.isnan(lng_f) or math.isinf(lat_f) or math.isinf(lng_f):
+                continue
+            if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lng_f <= 180.0):
+                continue
+            valid_reports.append(r)
+        except (ValueError, TypeError):
+            continue
+
+    logger.info(f"DBSCAN: {len(valid_reports)}/{len(raw_reports)} reports have valid geographic coordinates")
+
+    # Apply jurisdictional filter
+    valid_reports = [r for r in valid_reports if _is_in_jurisdiction(_resolve_barangay(r))]
+
+    if len(valid_reports) < min_samples:
+        logger.info(f"DBSCAN: Insufficient valid points ({len(valid_reports)} < min_samples {min_samples}). Returning 0 clusters.")
         return []
 
-    coords = np.array([[r.location_lat, r.location_lng] for r in reports])
-    # Convert radius from meters to radians for haversine DBSCAN
-    eps_rad = radius_meters / 6_371_000
-    db_model = DBSCAN(eps=eps_rad, min_samples=min_samples, algorithm="ball_tree", metric="haversine")
-    labels = db_model.fit_predict(np.radians(coords))
-
-    # Build cluster groups
+    # Build cluster groups using PostGIS ST_ClusterDBSCAN or Scikit-learn fallback
     label_map: Dict[int, List[models.Report]] = defaultdict(list)
-    for report, label in zip(reports, labels):
-        if label >= 0:   # -1 = noise/outlier
-            label_map[label].append(report)
+    used_postgis = False
+
+    try:
+        from sqlalchemy import text
+        valid_ids = [r.id for r in valid_reports]
+        postgis_sql = text("""
+            SELECT r.id,
+                   ST_ClusterDBSCAN(
+                       ST_Transform(COALESCE(r.location, ST_SetSRID(ST_MakePoint(r.location_lng, r.location_lat), 4326)), 32651),
+                       eps := :eps,
+                       minpoints := :min_points
+                   ) OVER () AS cluster_label
+            FROM reports r
+            WHERE r.id = ANY(:report_ids)
+        """)
+        rows = db.execute(postgis_sql, {
+            "eps": float(radius_meters),
+            "min_points": int(min_samples),
+            "report_ids": valid_ids
+        }).fetchall()
+
+        id_to_report = {r.id: r for r in valid_reports}
+        for row in rows:
+            rep_id = row[0]
+            c_label = row[1]
+            if c_label is not None and c_label >= 0 and rep_id in id_to_report:
+                label_map[int(c_label)].append(id_to_report[rep_id])
+        used_postgis = True
+        logger.info(f"DBSCAN: PostGIS ST_ClusterDBSCAN identified {len(label_map)} clusters")
+    except Exception as e:
+        logger.warning(f"PostGIS ST_ClusterDBSCAN failed or unavailable ({e}); falling back to scikit-learn DBSCAN")
+        label_map.clear()
+
+    if not used_postgis:
+        coords = np.array([[float(r.location_lat), float(r.location_lng)] for r in valid_reports])
+        # Convert radius from meters to radians for Haversine DBSCAN
+        eps_rad = float(radius_meters) / 6_371_000.0
+        db_model = DBSCAN(eps=eps_rad, min_samples=int(min_samples), algorithm="ball_tree", metric="haversine")
+        labels = db_model.fit_predict(np.radians(coords))
+        for report, label in zip(valid_reports, labels):
+            if label >= 0:
+                label_map[int(label)].append(report)
+        logger.info(f"DBSCAN: scikit-learn Haversine identified {len(label_map)} clusters")
 
     clusters = []
     for label, group in label_map.items():
-        lats = [r.location_lat for r in group]
-        lngs = [r.location_lng for r in group]
+        lats = [float(r.location_lat) for r in group]
+        lngs = [float(r.location_lng) for r in group]
         centroid_lat = float(np.mean(lats))
         centroid_lng = float(np.mean(lngs))
 
         # Cluster radius = max distance from centroid to any member
-        radii = [_haversine_meters(centroid_lat, centroid_lng, r.location_lat, r.location_lng)
+        radii = [_haversine_meters(centroid_lat, centroid_lng, float(r.location_lat), float(r.location_lng))
                  for r in group]
-        cluster_radius = max(max(radii), radius_meters / 4)  # minimum visible radius
+        cluster_radius = max(max(radii), radius_meters / 4.0) if radii else radius_meters
 
         # Severity score — weighted AI urgency sum
         severity_score = 0.0
@@ -673,8 +833,8 @@ def get_recurrence_events(db: Session, days_window: int = 90) -> List[Dict]:
             )
             if dist <= RECURRENCE_RADIUS and new_r.category == res_r.category:
                 recurrence_events.append({
-                    "new_report_id":      new_r.id,
-                    "prior_report_id":    res_r.id,
+                    "new_report_id":      new_r.ticket_id or f"PUL-2026-{new_r.id:04d}",
+                    "prior_report_id":    res_r.ticket_id or f"PUL-2026-{res_r.id:04d}",
                     "category":           new_r.category,
                     "location_string":    new_r.location_string or res_r.location_string,
                     "lat":                new_r.location_lat,

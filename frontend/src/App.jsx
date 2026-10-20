@@ -12,6 +12,8 @@ import ReportWizardPage from './pages/ReportWizardPage';
 import ReportSuccessPage from './pages/ReportSuccessPage';
 import PublicTrackPage  from './pages/PublicTrackPage';
 import ResidentDashboard from './pages/ResidentDashboard';
+import MobileAppTutorial from './components/mobile/MobileAppTutorial';
+import DevAppPreviewPage from './pages/DevAppPreviewPage';
 import GovDivisionPage   from './pages/GovDivisionPage';
 import PositionDashboard from './pages/PositionDashboard';
 import OboInspectionsPage from './pages/OboInspectionsPage';
@@ -19,6 +21,7 @@ import DispatcherDashboard from './pages/DispatcherDashboard';
 import GovProjectsPage   from './pages/GovProjectsPage';
 import GovAnalyticsPage  from './pages/GovAnalyticsPage';
 import GovReportsDashboard from './pages/GovReportsDashboard';
+import GovBiDashboard      from './pages/GovBiDashboard';
 import GovTodayPage        from './pages/GovTodayPage';
 import CitizenReportsPage  from './pages/CitizenReportsPage';
 import GovReportDetailPage from './pages/GovReportDetailPage';
@@ -79,6 +82,7 @@ function App() {
                         {/* ── PUBLIC RESIDENT ROUTES ─────────────────────────── */}
                         <Route path="/"               element={<ResidentSurface><Landing /></ResidentSurface>} />
                         <Route path="/resident-home"  element={<ResidentSurface><Landing /></ResidentSurface>} />
+                        <Route path="/tutorial"       element={<ResidentSurface><MobileAppTutorial replayMode={true} /></ResidentSurface>} />
                         <Route path="/report"         element={<ResidentSurface><ReportWizardPage /></ResidentSurface>} />
                         <Route path="/report/success" element={<ResidentSurface><ReportSuccessPage /></ResidentSurface>} />
                         <Route path="/track"          element={<ResidentSurface><PublicTrackPage /></ResidentSurface>} />
@@ -86,6 +90,9 @@ function App() {
                         <Route path="/register"       element={<ResidentSurface><Register /></ResidentSurface>} />
                         <Route path="/reset-password" element={<ResidentSurface><ResetPassword /></ResidentSurface>} />
                         <Route path="/gov"            element={<GovLanding />} />
+
+                        {/* ── TEST-ONLY APP PREVIEW ─────────────────────────── */}
+                        <Route path="/dev/app-preview" element={<DevAppPreviewPage />} />
 
                         {/* ── RESIDENT PORTAL ────────────────────────────────── */}
                         {/* Residents ONLY portal access */}
@@ -95,10 +102,10 @@ function App() {
 
                         {/* ── GOVERNMENT — UNIVERSAL LANDING (First navbar menu) ── */}
                         <Route path="/gov/dashboard" element={
-                            <GovOnly><Navigate to="/gov/today" replace /></GovOnly>
+                            <GovOnly><GovBiDashboard /></GovOnly>
                         } />
                         <Route path="/gov/my-dashboard" element={
-                            <GovOnly><Navigate to="/gov/today" replace /></GovOnly>
+                            <GovOnly><GovBiDashboard /></GovOnly>
                         } />
                         <Route path="/gov/today" element={
                             <GovOnly><GovTodayPage /></GovOnly>
@@ -265,7 +272,7 @@ function App() {
 
                         {/* System Settings — admin + exec only */}
                         <Route path="/gov/settings" element={
-                            <AdminOnly><Navigate to="/gov/administration?view=staff" replace /></AdminOnly>
+                            <AdminOnly><Navigate to="/gov/administration?view=settings&tab=settings" replace /></AdminOnly>
                         } />
 
                         {/* Analytics Intelligence BI Engine — government staff & dispatchers */}

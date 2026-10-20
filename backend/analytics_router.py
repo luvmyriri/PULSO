@@ -102,12 +102,38 @@ def analytics_summary(
 # Spatial Clusters (Infrastructure Stress Zones)
 # ─────────────────────────────────────────────────────────────────────────────
 
+@router.get("/stress-zones")
+def list_stress_zones(
+    category: Optional[str] = Query(None, description="Filter by infrastructure category"),
+    days_back: int = Query(90, ge=7, le=365, description="Lookback window in days"),
+    min_points: int = Query(analytics_service.DEFAULT_DBSCAN_MIN_POINTS, ge=2, le=20, description="Minimum reports to form a cluster"),
+    eps: float = Query(analytics_service.DEFAULT_DBSCAN_EPS_METERS, ge=10, le=2000, description="Clustering radius in meters"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Run DBSCAN spatial clustering on active reports to detect stress zones.
+    Powered by PostgreSQL PostGIS ST_ClusterDBSCAN (units: meters).
+    """
+    _assert_permission(current_user, db, "analytics", "view")
+    clusters = analytics_service.get_infrastructure_clusters(
+        db,
+        category_filter=category,
+        days_back=days_back,
+        min_samples=min_points,
+        radius_meters=eps,
+    )
+    return {"clusters": clusters, "count": len(clusters), "eps": eps, "min_points": min_points}
+
+
 @router.get("/clusters")
 def list_clusters(
     category: Optional[str] = Query(None, description="Filter by infrastructure category"),
     days_back: int = Query(90, ge=7, le=365, description="Lookback window in days"),
-    min_reports: int = Query(3, ge=2, le=20, description="Minimum reports to form a cluster"),
-    radius_m: float = Query(200.0, ge=50, le=1000, description="Clustering radius in meters"),
+    min_reports: Optional[int] = Query(None, ge=2, le=20, description="Minimum reports to form a cluster"),
+    radius_m: Optional[float] = Query(None, ge=10, le=2000, description="Clustering radius in meters"),
+    min_points: Optional[int] = Query(None, ge=2, le=20, description="Alias for min_reports"),
+    eps: Optional[float] = Query(None, ge=10, le=2000, description="Alias for radius_m"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -117,14 +143,16 @@ def list_clusters(
     estimated costs, and barangay mapping.
     """
     _assert_permission(current_user, db, "analytics", "view")
+    effective_min_points = min_points or min_reports or analytics_service.DEFAULT_DBSCAN_MIN_POINTS
+    effective_eps = eps or radius_m or analytics_service.DEFAULT_DBSCAN_EPS_METERS
     clusters = analytics_service.get_infrastructure_clusters(
         db,
         category_filter=category,
         days_back=days_back,
-        min_samples=min_reports,
-        radius_meters=radius_m,
+        min_samples=effective_min_points,
+        radius_meters=effective_eps,
     )
-    return {"clusters": clusters, "count": len(clusters)}
+    return {"clusters": clusters, "count": len(clusters), "eps": effective_eps, "min_points": effective_min_points}
 
 
 @router.get("/clusters/{cluster_id}")
@@ -275,15 +303,17 @@ def get_analytics_reports(
         if hasattr(r, "reporter") and r.reporter:
             reporter_name = getattr(r.reporter, "full_name", None) or "Anonymous"
 
+        canonical_ticket_id = r.ticket_id or f"PUL-2026-{r.id:04d}"
         result.append({
             "id": r.id,
-            "report_id": f"RPT-{r.id:05d}",
+            "ticket_id": canonical_ticket_id,
+            "report_id": canonical_ticket_id,
             "category": r.ai_category or r.category or "infrastructure",
             "description": r.description or "",
             "status": r.status,
             "urgency": r.ai_urgency or "Medium",
             "full_location": full_location,
-            "location_barangay": r.location_barangay or "Barangay Unknown",
+            "location_barangay": analytics_service._resolve_barangay(r),
             "location_lat": r.location_lat,
             "location_lng": r.location_lng,
             "image_url": r.image_url or None,

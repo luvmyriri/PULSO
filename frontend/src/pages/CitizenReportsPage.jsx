@@ -23,6 +23,7 @@ import {
 import GovSidebar from '../components/GovSidebar';
 import GovernmentWorkspaceTabs from '../components/GovernmentWorkspaceTabs';
 import ThemeToggle from '../components/ThemeToggle';
+import SearchInput from '../components/SearchInput';
 import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
@@ -390,16 +391,14 @@ export default function CitizenReportsPage({ workspace }) {
                         </div>
 
                         <div className="citizen-reports-filters">
-                            <label className="citizen-reports-search">
-                                <Search size={16} aria-hidden="true" />
-                                <span className="sr-only">Search reports</span>
-                                <input
-                                    type="search"
-                                    value={search}
-                                    onChange={(event) => updateParam('search', event.target.value)}
-                                    placeholder="Search ticket, issue, or location"
-                                />
-                            </label>
+                            <SearchInput
+                                value={search}
+                                onChange={(val) => updateParam('search', val)}
+                                placeholder="Search ticket, citizen or category"
+                                ariaLabel="Search ticket, citizen or category"
+                                onClear={() => updateParam('search', '')}
+                                className="w-full"
+                            />
                             <label>
                                 <span className="sr-only">Filter by status</span>
                                 <select value={status} onChange={(event) => updateParam('status', event.target.value)}>

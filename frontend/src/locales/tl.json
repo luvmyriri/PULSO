@@ -697,7 +697,13 @@
         "resAddress": "Tirahan / Address",
         "connectivity": "Koneksyon sa Pakikipag-ugnayan",
         "secureEmail": "Ligtas na Email",
-        "mobileNumber": "Numero ng Mobile"
+        "mobileNumber": "Numero ng Mobile",
+        "darkMode": "Dark mode",
+        "lightMode": "Light mode",
+        "darkModeOn": "Naka-on ang Dark mode",
+        "lightModeOn": "Naka-on ang Light mode",
+        "darkModeEnabled": "Naka-enable ang Dark mode",
+        "lightModeEnabled": "Naka-enable ang Light mode"
       },
       "settings": {
         "portal": "Portal ng Seguridad",
@@ -773,8 +779,13 @@
         "s1_desc": "May pananagutan ang mga residente sa katumpakan ng kanilang mga ulat. Ang pagsusumite ng maling ulat ay maaaring magresulta sa limitasyon o suspensyon ng account."
       },
       "topNav": {
-        "searchPlaceholder": "Maghanap sa PULSO...",
-        "recentSearches": "Mga Nakaraang Paghahanap"
+        "greeting": "Kumusta, {{name}}",
+        "headline": "Ang iyong lungsod, ang iyong mga ulat",
+        "searchPlaceholder": "Maghanap sa PULSO",
+        "searchCompactPlaceholder": "Maghanap",
+        "recentSearches": "Mga Nakaraang Paghahanap",
+        "notifications": "Mga Abiso",
+        "notificationsUnread": "Mga Abiso, {{count}} ang hindi pa nababasa"
       }
     },
     "knowledge": {

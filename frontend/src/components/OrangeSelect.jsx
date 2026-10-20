@@ -121,25 +121,27 @@ const OrangeSelect = ({
                 key={opt.value}
                 type="button"
                 onClick={() => { onChange(opt.value); setOpen(false); }}
-                className={`w-full flex items-center justify-between px-3.5 py-2 text-xs text-left transition-all duration-150 cursor-pointer ${
+                className={`group/opt w-full flex items-center justify-between px-3.5 py-2 text-xs text-left transition-all duration-150 cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${
                     isSelected
-                        ? 'bg-orange-50 dark:bg-orange-500/15 text-[#ff6b00]'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-orange-50/70 dark:hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-300'
+                        ? 'bg-orange-50 dark:bg-orange-500/15 hover:bg-orange-100/80 dark:hover:bg-orange-500/25'
+                        : 'hover:bg-orange-50/70 dark:hover:bg-orange-500/15'
                 }`}
             >
                 <div className="flex flex-col min-w-0 pr-3">
-                    <span className={`leading-snug ${isSelected ? 'font-bold text-[#ff6b00]' : 'font-semibold text-slate-900 dark:text-white'}`}>
+                    <span className={`leading-snug transition-colors duration-150 text-black dark:text-white group-hover/opt:text-black dark:group-hover/opt:text-white ${
+                        isSelected ? 'font-bold' : 'font-semibold'
+                    }`}>
                         {opt.label}
                     </span>
                     {opt.description && (
-                        <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400 leading-normal mt-0.5 whitespace-normal">
+                        <span className="text-[10px] font-normal text-black/75 dark:text-white/75 leading-normal mt-0.5 whitespace-normal group-hover/opt:text-black dark:group-hover/opt:text-white transition-colors duration-150">
                             {opt.description}
                         </span>
                     )}
                 </div>
                 {isSelected && (
                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="shrink-0 ml-auto pl-2">
-                        <Check size={14} className="text-[#ff6b00]" strokeWidth={2.5} />
+                        <Check size={14} className="text-black dark:text-white group-hover/opt:text-black dark:group-hover/opt:text-white transition-colors duration-150" strokeWidth={2.5} />
                     </motion.div>
                 )}
             </button>
@@ -152,31 +154,38 @@ const OrangeSelect = ({
             <button
                 type="button"
                 onClick={() => setOpen(p => !p)}
-                className={`w-full flex items-center justify-between gap-2 transition-all duration-200 cursor-pointer ${
+                className={`group w-full flex items-center justify-between gap-2 transition-all duration-200 cursor-pointer hover:text-black dark:hover:text-white ${
                     size === 'sm'
                         ? `px-3 py-1.5 rounded-lg text-xs font-semibold border ${
                             open
-                                ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] text-[#ff6b00] shadow-xs ring-2 ring-orange-500/20'
+                                ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] text-black dark:text-white hover:text-black dark:hover:text-white shadow-xs ring-2 ring-orange-500/20'
                                 : isActiveFilter
-                                    ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] text-[#ff6b00]'
-                                    : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-orange-400/60'
+                                    ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] text-black dark:text-white hover:text-black dark:hover:text-white'
+                                    : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-black dark:text-white hover:border-orange-400/60 hover:text-black dark:hover:text-white'
                         }`
                         : `px-3.5 py-2.5 rounded-xl text-sm font-semibold border ${
                             open
-                                ? 'bg-orange-50/50 dark:bg-orange-950/30 border-[#ff6b00] text-slate-900 dark:text-slate-100 shadow-lg shadow-orange-500/10 ring-2 ring-orange-500/20'
-                                : 'bg-white dark:bg-[#090e1a] border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 hover:border-orange-400/60 shadow-xs'
+                                ? 'bg-orange-50/50 dark:bg-orange-950/30 border-[#ff6b00] text-black dark:text-white hover:text-black dark:hover:text-white shadow-lg shadow-orange-500/10 ring-2 ring-orange-500/20'
+                                : 'bg-white dark:bg-[#090e1a] border-slate-200 dark:border-slate-800 text-black dark:text-white hover:border-orange-400/60 hover:text-black dark:hover:text-white shadow-xs'
                         }`
                 }`}
             >
                 <div className="flex items-center gap-2 truncate">
-                    {Icon && <Icon size={size === 'sm' ? 12 : 15} className={open || isActiveFilter ? 'text-[#ff6b00]' : 'text-slate-400'} />}
-                    <span className="truncate">{selected ? selected.label : placeholder}</span>
+                    {Icon && (
+                        <Icon
+                            size={size === 'sm' ? 12 : 15}
+                            className={`transition-colors duration-150 ${open || isActiveFilter ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400'} group-hover:text-black dark:group-hover:text-white`}
+                        />
+                    )}
+                    <span className="truncate text-black dark:text-white group-hover:text-black dark:group-hover:text-white transition-colors duration-150">
+                        {selected ? selected.label : placeholder}
+                    </span>
                 </div>
                 <ChevronDown
                     size={size === 'sm' ? 12 : 15}
-                    className={`shrink-0 transition-transform duration-200 ${
-                        open ? 'rotate-180 text-[#ff6b00]' : (isActiveFilter ? 'text-[#ff6b00]' : 'text-slate-400')
-                    }`}
+                    className={`shrink-0 transition-all duration-200 ${
+                        open ? 'rotate-180 text-black dark:text-white' : (isActiveFilter ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400')
+                    } group-hover:text-black dark:group-hover:text-white`}
                 />
             </button>
 
@@ -221,7 +230,7 @@ const OrangeSelect = ({
                                     className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
                                         activeGroup === 'All'
                                             ? 'bg-orange-500 text-white shadow-xs'
-                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-black dark:hover:text-white'
                                     }`}
                                 >
                                     All ({options.filter(o => o.value !== 'All' && o.value !== 'All Barangays').length || options.length})
@@ -238,7 +247,7 @@ const OrangeSelect = ({
                                             className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
                                                 isSelectedGroup
                                                     ? 'bg-orange-500 text-white shadow-xs'
-                                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+                                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-black dark:hover:text-white'
                                             }`}
                                         >
                                             <span>{shortLabel}</span>

@@ -27,6 +27,17 @@ from auth import get_current_user
 
 router = APIRouter(prefix="/api/pulseai", tags=["PulseAI"])
 
+def _is_staff_user(user: Any) -> bool:
+    return isinstance(user, models.Official)
+
+
+def _chat_owner_type(user: Any) -> str:
+    return "official" if _is_staff_user(user) else "resident"
+
+
+def _owns_conversation(conversation: models.ChatConversation, user: Any) -> bool:
+    return conversation.user_id == user.id and conversation.owner_type == _chat_owner_type(user)
+
 
 # ── Pydantic Request / Response Schemas ────────────────────────────────────────
 
@@ -42,20 +53,49 @@ class SendMessageRequest(BaseModel):
 # ── Helper: Generate clean title from resident query ───────────────────────────
 
 def _generate_auto_title(query: str) -> str:
-    """Generate a clean, readable conversation title from the first resident query."""
+    """Generate a clean, readable conversation title from the first query."""
     clean = re.sub(r'[\r\n\t]+', ' ', query).strip()
-    # Remove leading question formatting if present
     clean = re.sub(r'^(hi|hello|hey|good\s+(morning|afternoon|evening)|ask pulseai:?)\s*,?\s*', '', clean, flags=re.IGNORECASE).strip()
     if not clean:
         clean = query.strip()
     if len(clean) > 42:
-        # Find nearest word break
         truncated = clean[:42]
         last_space = truncated.rfind(' ')
         if last_space > 20:
             truncated = truncated[:last_space]
         return f"{truncated}..."
     return clean[:45]
+
+
+# ── 0. Stateless Direct Ask Endpoint (Fallback & Quick Query) ──────────────────
+
+@router.post("/ask")
+def ask_pulseai_stateless(
+    req: SendMessageRequest,
+    db: Session = Depends(get_db),
+    current_user: Union[models.Resident, models.Official] = Depends(get_current_user)
+):
+    """Stateless PULSEAI endpoint that returns a grounded AI response even without a conversation session."""
+    query_text = (req.query or "").strip()
+    if not query_text:
+        raise HTTPException(status_code=400, detail="Query message cannot be empty.")
+
+    is_staff = _is_staff_user(current_user)
+    actor_label = f"Staff ({getattr(current_user, 'role', 'official')})" if is_staff else "Resident"
+    user_ctx = f"{actor_label}: {current_user.full_name} (Barangay: {getattr(current_user, 'barangay', 'North Caloocan')}). {req.context or ''}"
+
+    ai_result = gemini_service.get_ai_assistant_response(
+        query=query_text,
+        context=user_ctx,
+        user=current_user,
+        db=db
+    )
+    response_text = ai_result.get("response") or "I could not process your request at this time."
+    return {
+        "response": response_text,
+        "tool_name": ai_result.get("tool_name"),
+        "tool_data": ai_result.get("tool_data")
+    }
 
 
 # ── 1. List Conversations ─────────────────────────────────────────────────────
@@ -67,14 +107,13 @@ def list_conversations(
     current_user: Union[models.Resident, models.Official] = Depends(get_current_user)
 ):
     """
-    List past conversations for the authenticated resident account, most recent first.
+    List past conversations for the authenticated account, most recent first.
     Returns id, title, timestamps, message count, and last message preview.
     """
-    user_id = current_user.id
-
     convs = (
         db.query(models.ChatConversation)
-        .filter(models.ChatConversation.user_id == user_id)
+        .filter(models.ChatConversation.user_id == current_user.id,
+                models.ChatConversation.owner_type == _chat_owner_type(current_user))
         .order_by(desc(models.ChatConversation.updated_at))
         .limit(limit)
         .all()
@@ -96,7 +135,6 @@ def list_conversations(
 
         preview = ""
         if last_msg:
-            # Clean markdown formatting from snippet preview
             clean_text = re.sub(r'[\*\_#`]', '', last_msg.content).strip()
             preview = clean_text[:80] + ("..." if len(clean_text) > 80 else "")
 
@@ -127,11 +165,9 @@ def list_conversations_by_param(
     try:
         target_uid = int(user_id_param)
     except ValueError:
-        # Not an integer ID, return standard list for current user
         return list_conversations(limit=limit, db=db, current_user=current_user)
 
-    is_staff = hasattr(current_user, 'role') and current_user.role in ['admin', 'city_engineer', 'dispatcher']
-    if current_user.id != target_uid and not is_staff:
+    if current_user.id != target_uid:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. You can only view chat conversations belonging to your own account."
@@ -139,7 +175,8 @@ def list_conversations_by_param(
 
     convs = (
         db.query(models.ChatConversation)
-        .filter(models.ChatConversation.user_id == target_uid)
+        .filter(models.ChatConversation.user_id == target_uid,
+                models.ChatConversation.owner_type == _chat_owner_type(current_user))
         .order_by(desc(models.ChatConversation.updated_at))
         .limit(limit)
         .all()
@@ -185,11 +222,12 @@ def create_conversation(
     current_user: Union[models.Resident, models.Official] = Depends(get_current_user)
 ):
     """
-    Start a fresh PULSEAI conversation session for the resident.
+    Start a fresh PULSEAI conversation session for the resident or official.
     """
     title = (req.title or "").strip() or "New Conversation"
     conv = models.ChatConversation(
         user_id=current_user.id,
+        owner_type=_chat_owner_type(current_user),
         title=title
     )
     db.add(conv)
@@ -223,15 +261,13 @@ def get_conversation_messages(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
-    is_staff = hasattr(current_user, 'role') and current_user.role in ['admin', 'city_engineer', 'dispatcher']
-    if conv.user_id != current_user.id and not is_staff:
+    if not _owns_conversation(conv, current_user):
         raise HTTPException(status_code=403, detail="You do not have permission to view this conversation.")
 
     query = db.query(models.ChatMessage).filter(models.ChatMessage.conversation_id == conversation_id)
     if before_id:
         query = query.filter(models.ChatMessage.id < before_id)
 
-    # Order asc for reading flow
     messages = query.order_by(models.ChatMessage.created_at.asc()).limit(limit).all()
 
     return {
@@ -265,7 +301,7 @@ def append_message_and_respond(
     current_user: Union[models.Resident, models.Official] = Depends(get_current_user)
 ):
     """
-    Appends a resident's message to an existing conversation, invokes PULSEAI
+    Appends a message to an existing conversation, invokes PULSEAI
     with database tool-grounding, stores both user and assistant messages,
     and auto-titles the conversation if it still carries the default name.
     """
@@ -273,15 +309,31 @@ def append_message_and_respond(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
-    is_staff = hasattr(current_user, 'role') and current_user.role in ['admin', 'city_engineer', 'dispatcher']
-    if conv.user_id != current_user.id and not is_staff:
+    if not _owns_conversation(conv, current_user):
         raise HTTPException(status_code=403, detail="You do not have permission to post to this conversation.")
 
     query_text = (req.query or "").strip()
     if not query_text:
         raise HTTPException(status_code=400, detail="Query message cannot be empty.")
 
-    # 1. Save resident user message
+    # 0. Fetch recent conversation history for follow-up context awareness
+    recent_msgs = (
+        db.query(models.ChatMessage)
+        .filter(models.ChatMessage.conversation_id == conv.id)
+        .order_by(models.ChatMessage.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    history_lines = []
+    for m in reversed(recent_msgs):
+        role_label = "User" if m.role == "user" else "PULSEAI"
+        snippet = (m.content or "").strip()
+        if len(snippet) > 600:
+            snippet = snippet[:600] + "..."
+        history_lines.append(f"{role_label}: {snippet}")
+    history_block = ("\nRecent Conversation History:\n" + "\n".join(history_lines)) if history_lines else ""
+
+    # 1. Save user message
     user_msg = models.ChatMessage(
         conversation_id=conv.id,
         role="user",
@@ -294,7 +346,9 @@ def append_message_and_respond(
         conv.title = _generate_auto_title(query_text)
 
     # 3. Call AI Assistant with full grounding & tool audit
-    user_ctx = f"Resident: {current_user.full_name} (Barangay: {getattr(current_user, 'barangay', 'North Caloocan')}). {req.context or ''}"
+    is_staff = _is_staff_user(current_user)
+    actor_label = f"Staff ({getattr(current_user, 'role', 'official')})" if is_staff else "Resident"
+    user_ctx = f"{actor_label}: {current_user.full_name} (Barangay: {getattr(current_user, 'barangay', 'North Caloocan')}). {req.context or ''}{history_block}"
     ai_result = gemini_service.get_ai_assistant_response(
         query=query_text,
         context=user_ctx,
@@ -356,14 +410,13 @@ def delete_conversation(
 ):
     """
     Deletes an individual conversation and all its messages.
-    Enforces resident ownership (RA 10173 Right to Erasure).
+    Enforces account ownership (RA 10173 Right to Erasure).
     """
     conv = db.query(models.ChatConversation).filter(models.ChatConversation.id == conversation_id).first()
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
-    is_staff = hasattr(current_user, 'role') and current_user.role in ['admin', 'city_engineer', 'dispatcher']
-    if conv.user_id != current_user.id and not is_staff:
+    if not _owns_conversation(conv, current_user):
         raise HTTPException(status_code=403, detail="You do not have permission to delete this conversation.")
 
     db.delete(conv)
@@ -380,10 +433,13 @@ def clear_all_conversations(
     current_user: Union[models.Resident, models.Official] = Depends(get_current_user)
 ):
     """
-    Wipes all chat conversations and messages for the authenticated resident.
+    Wipes all chat conversations and messages for the authenticated user.
     Provides complete user control over conversational data history.
     """
-    count = db.query(models.ChatConversation).filter(models.ChatConversation.user_id == current_user.id).delete()
+    count = db.query(models.ChatConversation).filter(
+        models.ChatConversation.user_id == current_user.id,
+        models.ChatConversation.owner_type == _chat_owner_type(current_user),
+    ).delete(synchronize_session=False)
     db.commit()
 
     return {"message": "All conversations deleted successfully.", "deleted_count": count}

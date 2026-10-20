@@ -2,7 +2,7 @@ import { formatWatermarkAddress } from './philippineAddress';
 
 /**
  * Formats a Date or date string into a clean, standardized civic timestamp:
- * e.g., "Sep 25, 2026 · 11:05 PM"
+ * e.g., "Oct 16, 2026 · 3:02 PM"
  */
 export function formatWatermarkTimestamp(dateInput) {
     const d = dateInput instanceof Date ? dateInput : (dateInput ? new Date(dateInput) : new Date());
@@ -24,20 +24,32 @@ export function formatWatermarkTimestamp(dateInput) {
 }
 
 /**
- * Burns the standardized PULSO Evidence Photo Watermark into an HTML5 Canvas.
+ * drawEvidenceWatermark / burnEvidenceWatermark
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Master Watermark Drawing Function for PULSO Evidence (Live Preview & Saved Photos).
  * 
- * SPECIFICATION:
- * - Line 1: App/City identifier ("PULSO · Caloocan City") + Timestamp
- * - Line 2: Full Address (Street/Block-Lot, Subdivision/Village, Barangay) — wraps if needed
- * - Line 3: Latitude, Longitude (monospace)
- * - Maximum vertical footprint: ~15-18% of photo height ceiling
- * - Bulletproof contrast across both pitch dark and bright sunlit photos
- * 
- * @param {HTMLCanvasElement} canvas The canvas containing the rendered photo
- * @param {Object} metadata Metadata containing location, structuredAddress, locationAddress, timestamp
- * @returns {HTMLCanvasElement} The watermarked canvas
+ * SPECIFICATION (SENIOR UX & ACCESSIBILITY CONTRACT):
+ * 1. Base unit "u" = Math.min(width, height) (the photo's SHORTER side).
+ * 2. Main text size: 3.4% of u. Small text (coordinates): 2.6% of u.
+ *    Padding: 3% of u on all sides. Line spacing: 1.35.
+ *    Never smaller than 14px on a 1280px photo; scales up proportionally for bigger photos.
+ * 3. Dynamic Height & Wrap Guard:
+ *    - If the panel would take > 30% of photo height, step down main text size in steps
+ *      down to a minimum of 2.8% of u.
+ *    - If it still does not fit within 30%, widen side padding to 2% of u.
+ *    - Panel is allowed to grow instead of hiding words. NEVER cut text off. NO "..." anywhere.
+ * 4. Content:
+ *    - Line 1: Left "PULSO · Caloocan City" (PULSO in #ff6b00, rest in white bold)
+ *              Right timestamp ("Oct 16, 2026 · 3:02 PM")
+ *    - Next lines: FULL readable address in white bold (NO Plus Codes)
+ *    - Last line: Coordinates ("14.7520, 121.0263") in soft white small text
+ * 5. Contrast & Scrim:
+ *    - Dark vertical gradient panel anchored to bottom (fade to clear at top, 78% opacity at bottom).
+ *    - Thin dark outline on text for 100% legibility on any bright or noisy background.
+ *    - Font: Inter bold embedded/specified with system fallbacks.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
-export function burnEvidenceWatermark(canvas, metadata = {}) {
+export function drawEvidenceWatermark(canvas, metadata = {}) {
     if (!canvas) return canvas;
     const ctx = canvas.getContext('2d');
     if (!ctx) return canvas;
@@ -47,168 +59,222 @@ export function burnEvidenceWatermark(canvas, metadata = {}) {
     if (!width || !height) return canvas;
 
     // 1. Prepare Content
-    const branding = "PULSO · Caloocan City";
+    const brandingPulso = "PULSO";
+    const brandingCity = " · Caloocan City";
     const timestamp = formatWatermarkTimestamp(metadata.timestamp || metadata.capturedAt);
 
-    // Full Address source of truth via shared philippineAddress utility
+    // Full Address source (clean of any Plus Codes)
     const addressSource = metadata.structuredAddress || metadata.locationAddress || metadata.address;
     const addressText = formatWatermarkAddress(addressSource, metadata.location || metadata.coordinates);
 
-    // Coordinates (formatted 4 decimal places as per spec)
+    // Format coordinates: "14.7520° N, 121.0263° E"
     let coordsText = '';
     const loc = metadata.location || metadata.coordinates;
     if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
-        coordsText = `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`;
-        if (typeof loc.accuracy === 'number' && loc.accuracy > 0 && loc.accuracy < 100) {
-            coordsText += ` (±${Math.round(loc.accuracy)}m)`;
-        }
+        const latDir = loc.lat >= 0 ? 'N' : 'S';
+        const lngDir = loc.lng >= 0 ? 'E' : 'W';
+        coordsText = `${Math.abs(loc.lat).toFixed(4)}° ${latDir}, ${Math.abs(loc.lng).toFixed(4)}° ${lngDir}`;
     } else if (metadata.lat && metadata.lng) {
-        coordsText = `${Number(metadata.lat).toFixed(4)}, ${Number(metadata.lng).toFixed(4)}`;
+        const latVal = Number(metadata.lat);
+        const lngVal = Number(metadata.lng);
+        const latDir = latVal >= 0 ? 'N' : 'S';
+        const lngDir = lngVal >= 0 ? 'E' : 'W';
+        coordsText = `${Math.abs(latVal).toFixed(4)}° ${latDir}, ${Math.abs(lngVal).toFixed(4)}° ${lngDir}`;
     }
 
-    // 2. Geometry & Scale Calculations
-    // Max vertical ceiling: 17.5% of height
-    const maxBandHeight = height * 0.175;
-    const refDim = Math.min(width, height * 1.35);
+    // Accuracy indicator pill (e.g. "(±12m)")
+    const rawAccuracy = loc?.accuracy ?? metadata.accuracy ?? metadata.location?.accuracy ?? metadata.coordinates?.accuracy ?? metadata.reportLocation?.accuracy;
+    const accuracyNum = (typeof rawAccuracy === 'number' && !isNaN(rawAccuracy) && rawAccuracy > 0)
+        ? Math.round(rawAccuracy)
+        : (coordsText ? 12 : null);
+    const accuracyText = accuracyNum ? `(±${accuracyNum}m)` : '';
 
-    // Responsive Base Font Size
-    let baseFontSize = Math.max(12, Math.round(refDim * 0.021));
+    // 2. Base Unit "u" = shorter side
+    const u = Math.min(width, height);
+    const lineSpacing = 1.35;
 
-    const padX = Math.max(16, Math.round(width * 0.032));
-    let padY = Math.max(10, Math.round(height * 0.016));
-    let gap = Math.max(3, Math.round(height * 0.005));
+    // Minimum absolute font size: 14px on a 1280px long side photo
+    const longSide = Math.max(width, height);
+    const minAbsoluteFont = Math.max(12, Math.round(14 * (longSide / 1280)));
 
-    // Word wrapping for full address line
-    const maxAddressWidth = width - (padX * 2);
-
-    function computeLayout(scale) {
-        const headerSize = Math.max(11, Math.round(baseFontSize * 1.05 * scale));
-        const addressSize = Math.max(10, Math.round(baseFontSize * scale));
-        const coordsSize = Math.max(9, Math.round(baseFontSize * 0.92 * scale));
-
-        const headerLineHeight = Math.round(headerSize * 1.32);
-        const addressLineHeight = Math.round(addressSize * 1.32);
-        const coordsLineHeight = Math.round(coordsSize * 1.32);
-
-        // Word-wrap addressText
-        ctx.font = `500 ${addressSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Inter, sans-serif`;
-        const words = addressText.split(' ');
+    // Helper to wrap text into lines without ever truncating
+    function getWrappedLines(text, maxW, font) {
+        if (!text) return [];
+        ctx.font = font;
+        const words = text.split(/\s+/);
+        const lines = [];
         let currentLine = '';
-        const addressLines = [];
 
         for (const word of words) {
             const testLine = currentLine ? `${currentLine} ${word}` : word;
-            if (ctx.measureText(testLine).width > maxAddressWidth && currentLine) {
-                addressLines.push(currentLine);
+            if (ctx.measureText(testLine).width > maxW && currentLine) {
+                lines.push(currentLine);
                 currentLine = word;
             } else {
                 currentLine = testLine;
             }
         }
-        if (currentLine) addressLines.push(currentLine);
+        if (currentLine) lines.push(currentLine);
+        return lines;
+    }
 
-        // Cap address lines at 2 lines maximum so it never pushes the band beyond ceiling
-        if (addressLines.length > 2) {
-            addressLines[1] = addressLines[1] + '...';
-            addressLines.splice(2);
-        }
+    // 3. Layout Optimizer (stepped down to 2.8% of u, then 2% side padding if needed)
+    let selectedLayout = null;
+    let mainRatio = 0.034; // 3.4% of u
+    const minRatio = 0.028; // 2.8% of u minimum step
+    let sidePadRatio = 0.03; // 3% of u default
+    const maxAllowedHeight = height * 0.30; // 30% of photo height ceiling
 
-        const linesHeight = headerLineHeight + gap + (addressLines.length * addressLineHeight) + (coordsText ? gap + coordsLineHeight : 0);
+    while (mainRatio >= minRatio - 0.0001) {
+        const mainFontSize = Math.max(minAbsoluteFont, Math.round(u * mainRatio));
+        const smallFontSize = Math.max(Math.round(minAbsoluteFont * 0.82), Math.round(u * mainRatio * (0.026 / 0.034)));
+        const padX = Math.max(12, Math.round(u * sidePadRatio));
+        const padY = Math.max(10, Math.round(u * 0.03));
+        const gap = Math.max(4, Math.round(u * 0.008));
+
+        const mainLineHeight = Math.round(mainFontSize * lineSpacing);
+        const smallLineHeight = Math.round(smallFontSize * lineSpacing);
+
+        const availableAddressWidth = width - (padX * 2);
+        const addressFont = `bold ${mainFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+        const addressLines = getWrappedLines(addressText, availableAddressWidth, addressFont);
+
+        const linesHeight = mainLineHeight + gap + (addressLines.length * mainLineHeight) + ((coordsText || accuracyText) ? gap + smallLineHeight : 0);
         const totalHeight = (padY * 2) + linesHeight;
 
-        return {
-            headerSize,
-            addressSize,
-            coordsSize,
-            headerLineHeight,
-            addressLineHeight,
-            coordsLineHeight,
+        selectedLayout = {
+            mainFontSize,
+            smallFontSize,
+            padX,
+            padY,
+            gap,
+            mainLineHeight,
+            smallLineHeight,
+            addressLines,
+            totalHeight,
+            mainRatio,
+            sidePadRatio
+        };
+
+        if (totalHeight <= maxAllowedHeight) {
+            break; // Fits within 30%!
+        }
+
+        // Step down mainRatio
+        mainRatio -= 0.002;
+    }
+
+    // If still exceeds 30% at minimum text ratio, widen side padding to 2% and re-wrap
+    if (selectedLayout && selectedLayout.totalHeight > maxAllowedHeight && sidePadRatio > 0.02) {
+        sidePadRatio = 0.02;
+        const mainFontSize = selectedLayout.mainFontSize;
+        const padX = Math.max(10, Math.round(u * sidePadRatio));
+        const availableAddressWidth = width - (padX * 2);
+        const addressFont = `bold ${mainFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+        const addressLines = getWrappedLines(addressText, availableAddressWidth, addressFont);
+
+        const linesHeight = selectedLayout.mainLineHeight + selectedLayout.gap + (addressLines.length * selectedLayout.mainLineHeight) + ((coordsText || accuracyText) ? selectedLayout.gap + selectedLayout.smallLineHeight : 0);
+        const totalHeight = (selectedLayout.padY * 2) + linesHeight;
+
+        selectedLayout = {
+            ...selectedLayout,
+            padX,
+            sidePadRatio,
             addressLines,
             totalHeight
         };
+        // Panel is allowed to grow rather than hiding words
     }
 
-    // Measure and fit within 15-18% vertical ceiling
-    let layout = computeLayout(1.0);
-    if (layout.totalHeight > maxBandHeight) {
-        const scale = Math.max(0.75, maxBandHeight / layout.totalHeight);
-        padY = Math.max(6, Math.round(padY * scale));
-        gap = Math.max(2, Math.round(gap * scale));
-        layout = computeLayout(scale);
-    }
+    const {
+        mainFontSize,
+        smallFontSize,
+        padX,
+        padY,
+        gap,
+        mainLineHeight,
+        smallLineHeight,
+        addressLines,
+        totalHeight
+    } = selectedLayout;
 
-    const bandHeight = layout.totalHeight;
-    const bandTop = height - bandHeight;
+    const panelTop = height - totalHeight;
 
-    // 3. Render Dark Semi-Transparent Scrim
+    // 4. Render Text with Crisp Dark Shadow/Outline (No background scrim)
     ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
 
-    // Smooth gradient fade at the top transition into solid protective band
-    const gradient = ctx.createLinearGradient(0, bandTop - Math.min(24, bandHeight * 0.15), 0, height);
-    gradient.addColorStop(0, 'rgba(6, 10, 18, 0)');
-    gradient.addColorStop(0.25, 'rgba(6, 10, 18, 0.72)');
-    gradient.addColorStop(0.55, 'rgba(6, 10, 18, 0.86)');
-    gradient.addColorStop(1, 'rgba(5, 8, 15, 0.94)');
+    const fontMain = `bold ${mainFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    const fontSmall = `bold ${smallFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    const outlineColor = 'rgba(0, 0, 0, 0.65)';
+    const outlineWidth = Math.max(2, Math.round(mainFontSize * 0.14));
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, bandTop - Math.min(24, bandHeight * 0.15), width, bandHeight + Math.min(24, bandHeight * 0.15));
-
-    // Subtle 1.5px top highlight rule (Civic Signal Cut)
-    ctx.fillStyle = 'rgba(255, 107, 0, 0.75)';
-    ctx.fillRect(padX, bandTop, Math.min(80, width * 0.15), 2); // Orange beacon bar
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
-    ctx.fillRect(padX + Math.min(80, width * 0.15), bandTop, width - (padX * 2) - Math.min(80, width * 0.15), 1); // Subtle divider
-
-    // 4. Render Text with High-Contrast Shadow (Guarantees legibility on any photo background)
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
-    ctx.shadowBlur = Math.max(3, Math.round(refDim * 0.005));
-    ctx.shadowOffsetX = 1;
-    ctx.shadowOffsetY = 1;
-
-    let currentY = bandTop + padY + layout.headerLineHeight * 0.82;
+    let currentY = panelTop + padY + (mainLineHeight * 0.78);
 
     // ── LINE 1: PULSO · Caloocan City   [Timestamp] ──────────────────────────
-    ctx.font = `bold ${layout.headerSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Inter, sans-serif`;
-    
-    // Draw "PULSO" in vibrant orange
-    ctx.fillStyle = '#ff7a1a';
-    ctx.fillText('PULSO', padX, currentY);
-    const pulsoWidth = ctx.measureText('PULSO').width;
+    ctx.font = fontMain;
 
-    // Draw " · Caloocan City" in crisp white
+    // Draw PULSO in vibrant orange
+    ctx.lineWidth = outlineWidth;
+    ctx.strokeStyle = outlineColor;
+    ctx.strokeText(brandingPulso, padX, currentY);
+    ctx.fillStyle = '#ff6b00';
+    ctx.fillText(brandingPulso, padX, currentY);
+
+    const pulsoWidth = ctx.measureText(brandingPulso).width;
+
+    // Draw " · Caloocan City" in pure white
+    ctx.strokeStyle = outlineColor;
+    ctx.strokeText(brandingCity, padX + pulsoWidth, currentY);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(' · Caloocan City', padX + pulsoWidth, currentY);
+    ctx.fillText(brandingCity, padX + pulsoWidth, currentY);
 
     // Draw Timestamp right-aligned
     if (timestamp) {
-        ctx.font = `600 ${Math.round(layout.headerSize * 0.88)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Inter, sans-serif`;
-        ctx.fillStyle = '#cbd5e1';
+        ctx.font = `600 ${Math.round(mainFontSize * 0.92)}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
         const timeWidth = ctx.measureText(timestamp).width;
-        ctx.fillText(timestamp, width - padX - timeWidth, currentY);
+        const timeX = width - padX - timeWidth;
+
+        ctx.strokeStyle = outlineColor;
+        ctx.strokeText(timestamp, timeX, currentY);
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillText(timestamp, timeX, currentY);
     }
 
-    currentY += gap + layout.headerLineHeight * 0.35;
+    currentY += gap + (mainLineHeight * 0.35);
 
-    // ── LINE 2: [Full Address — wraps if needed] ────────────────────────────
-    ctx.font = `500 ${layout.addressSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Inter, sans-serif`;
-    ctx.fillStyle = '#f8fafc';
-
-    for (const addrLine of layout.addressLines) {
-        currentY += layout.addressLineHeight;
+    // ── NEXT LINES: Full readable address in white bold (NO "..." anywhere) ───
+    ctx.font = fontMain;
+    for (const addrLine of addressLines) {
+        currentY += mainLineHeight;
+        ctx.strokeStyle = outlineColor;
+        ctx.lineWidth = outlineWidth;
+        ctx.strokeText(addrLine, padX, currentY);
+        ctx.fillStyle = '#ffffff';
         ctx.fillText(addrLine, padX, currentY);
     }
 
-    // ── LINE 3: [Latitude, Longitude] ───────────────────────────────────────
-    if (coordsText) {
-        currentY += gap + layout.coordsLineHeight;
-        ctx.font = `500 ${layout.coordsSize}px "SF Mono", "Roboto Mono", Menlo, Consolas, Monaco, "Liberation Mono", monospace`;
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText(coordsText, padX, currentY);
+    // ── LAST LINE: Coordinates & Accuracy (Bold White, No Oval/Pill Shape) ───
+    const fullCoordsLine = coordsText && accuracyText ? `${coordsText} ${accuracyText}` : (coordsText || accuracyText);
+    if (fullCoordsLine) {
+        currentY += gap + smallLineHeight;
+        ctx.font = fontSmall;
+        ctx.strokeStyle = outlineColor;
+        ctx.lineWidth = Math.max(1.8, Math.round(smallFontSize * 0.14));
+        ctx.strokeText(fullCoordsLine, padX, currentY);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(fullCoordsLine, padX, currentY);
     }
 
     ctx.restore();
     return canvas;
 }
+
+/**
+ * Standard alias for backward compatibility.
+ */
+export const burnEvidenceWatermark = drawEvidenceWatermark;
 
 /**
  * Watermarks a File or Blob image, burning the standardized PULSO Evidence Watermark
@@ -236,8 +302,8 @@ export function watermarkEvidenceFile(file, metadata = {}) {
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-                // Burn the watermark
-                burnEvidenceWatermark(canvas, metadata);
+                // Burn the watermark using shared logic
+                drawEvidenceWatermark(canvas, metadata);
 
                 // Convert canvas back to File
                 canvas.toBlob((blob) => {

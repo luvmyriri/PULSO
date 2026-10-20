@@ -30,6 +30,8 @@ import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import OrangeSelect from '../components/OrangeSelect';
+import SearchInput from '../components/SearchInput';
+import TablePagination from '../components/TablePagination';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import './citizen-reports.css';
@@ -464,39 +466,14 @@ export default function GovAssetsPage() {
 
                     {/* Filter Bar: Search & Condition Dropdown */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                        <div className="citizen-reports-search" style={{ flex: 1 }}>
-                            <Search size={15} />
-                            <input
-                                type="text"
-                                placeholder="Search by asset code (e.g. CAL-RD-...), name, or barangay..."
-                                value={searchQuery}
-                                onChange={(e) => updateParam('search', e.target.value)}
-                            />
-                            {searchQuery && (
-                                <button
-                                    type="button"
-                                    onClick={() => updateParam('search', '')}
-                                    style={{
-                                        position: 'absolute',
-                                        right: '10px',
-                                        top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: 'var(--gov-text-secondary)',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        padding: '4px',
-                                        borderRadius: '4px'
-                                    }}
-                                    title="Clear search"
-                                    aria-label="Clear search"
-                                >
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
+                        <SearchInput
+                            value={searchQuery}
+                            onChange={(val) => updateParam('search', val)}
+                            placeholder="Search issue, location or category"
+                            ariaLabel="Search issue, location or category"
+                            onClear={() => updateParam('search', '')}
+                            className="w-full sm:w-[320px] md:w-[360px]"
+                        />
 
                         <OrangeSelect
                             value={conditionParam}
@@ -658,131 +635,15 @@ export default function GovAssetsPage() {
                                 </div>
 
                                 {/* Table Pagination Footer */}
-                                <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400 select-none">
-                                    {/* Left: Range and Total count */}
-                                    <div className="flex items-center gap-1.5 font-mono-data">
-                                        <span>Showing</span>
-                                        <span className="font-bold text-slate-800 dark:text-slate-100">
-                                            {filteredAssets.length === 0 ? 0 : startIndex + 1}
-                                        </span>
-                                        <span>to</span>
-                                        <span className="font-bold text-slate-800 dark:text-slate-100">
-                                            {endIndex}
-                                        </span>
-                                        <span>of</span>
-                                        <span className="font-bold text-slate-800 dark:text-slate-100">
-                                            {filteredAssets.length}
-                                        </span>
-                                        <span>assets</span>
-                                    </div>
-
-                                    {/* Right: Page controls and Page Size Selector */}
-                                    <div className="flex items-center gap-3">
-                                        {/* Page navigation buttons */}
-                                        <nav className="flex items-center gap-1" aria-label="Assets pagination">
-                                            {/* Jump to first page */}
-                                            <button
-                                                type="button"
-                                                onClick={() => handlePageChange(1)}
-                                                disabled={currentPage === 1}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                                title="First page"
-                                                aria-label="First page"
-                                            >
-                                                <ChevronsLeft size={14} />
-                                            </button>
-
-                                            {/* Previous page */}
-                                            <button
-                                                type="button"
-                                                onClick={() => handlePageChange(currentPage - 1)}
-                                                disabled={currentPage === 1}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                                title="Previous page"
-                                                aria-label="Previous page"
-                                            >
-                                                <ChevronLeft size={14} />
-                                            </button>
-
-                                            {/* Page numbers */}
-                                            {getPageNumbers().map((pageItem, idx) => {
-                                                if (pageItem === '...') {
-                                                    return (
-                                                        <span
-                                                            key={`ellipsis-${idx}`}
-                                                            className="w-7 h-7 flex items-center justify-center text-slate-400 select-none font-mono-data"
-                                                        >
-                                                            …
-                                                        </span>
-                                                    );
-                                                }
-
-                                                const isActive = pageItem === currentPage;
-                                                return (
-                                                    <button
-                                                        key={`page-${pageItem}`}
-                                                        type="button"
-                                                        onClick={() => handlePageChange(pageItem)}
-                                                        className={`w-7 h-7 flex items-center justify-center font-mono-data text-xs rounded-lg transition-all ${
-                                                            isActive
-                                                                ? 'font-black bg-orange-50 dark:bg-orange-950/60 text-[#ff6b00] border border-[#ff6b00] shadow-xs cursor-default'
-                                                                : 'font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white cursor-pointer'
-                                                        }`}
-                                                        aria-current={isActive ? 'page' : undefined}
-                                                        aria-label={`Page ${pageItem}`}
-                                                    >
-                                                        {pageItem}
-                                                    </button>
-                                                );
-                                            })}
-
-                                            {/* Next page */}
-                                            <button
-                                                type="button"
-                                                onClick={() => handlePageChange(currentPage + 1)}
-                                                disabled={currentPage === totalPages}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                                title="Next page"
-                                                aria-label="Next page"
-                                            >
-                                                <ChevronRight size={14} />
-                                            </button>
-
-                                            {/* Jump to last page */}
-                                            <button
-                                                type="button"
-                                                onClick={() => handlePageChange(totalPages)}
-                                                disabled={currentPage === totalPages}
-                                                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                                title="Last page"
-                                                aria-label="Last page"
-                                            >
-                                                <ChevronsRight size={14} />
-                                            </button>
-                                        </nav>
-
-                                        {/* Page Size Selector */}
-                                        <OrangeSelect
-                                            value={pageSize}
-                                            onChange={(val) => {
-                                                const nextSize = Number(val);
-                                                setPageSize(nextSize);
-                                                setCurrentPage(1);
-                                                updateParam('page', null);
-                                            }}
-                                            size="sm"
-                                            minWidth="105px"
-                                            dropUp={true}
-                                            align="right"
-                                            searchable={false}
-                                            options={[
-                                                { value: 10, label: '10 / page' },
-                                                { value: 20, label: '20 / page' },
-                                                { value: 50, label: '50 / page' }
-                                            ]}
-                                        />
-                                    </div>
-                                </div>
+                                {filteredAssets.length > 0 && (
+                                    <TablePagination
+                                        page={currentPage}
+                                        pageSize={pageSize}
+                                        total={filteredAssets.length}
+                                        itemLabel="assets"
+                                        onPageChange={handlePageChange}
+                                    />
+                                )}
                             </div>
 
                             {/* Right Rail: Asset Profile & Registry */}

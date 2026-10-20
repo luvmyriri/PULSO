@@ -253,10 +253,13 @@ html.dark .swal2-cancel:hover,
 
 /* Civic Aperture Styled Status Icons */
 .swal2-icon {
-    width: 52px !important;
-    height: 52px !important;
+    width: 5em !important;
+    height: 5em !important;
+    line-height: 5em !important;
+    font-size: 11px !important;
     margin: 8px auto 14px !important;
-    border-width: 2.5px !important;
+    border-width: 0.23em !important;
+    box-sizing: content-box !important;
 }
 
 .swal2-icon.swal2-warning {
@@ -269,9 +272,21 @@ html.dark .swal2-cancel:hover,
     color: #ef4444 !important;
 }
 
+.swal2-icon.swal2-error [class^="swal2-x-mark-line"] {
+    background-color: #ef4444 !important;
+}
+
 .swal2-icon.swal2-success {
     border-color: #10b981 !important;
     color: #10b981 !important;
+}
+
+.swal2-icon.swal2-success [class^="swal2-success-line"] {
+    background-color: #10b981 !important;
+}
+
+.swal2-icon.swal2-success .swal2-success-ring {
+    border-color: rgba(16, 185, 129, 0.3) !important;
 }
 
 .swal2-icon.swal2-info {

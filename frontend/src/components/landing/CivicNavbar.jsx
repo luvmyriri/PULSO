@@ -5,6 +5,7 @@ import Branding from '../Branding';
 import ThemeToggle from '../ThemeToggle';
 import PwaModal from './PwaModal';
 import { getAuthToken, getAuthUser, clearAuthSession } from '../../utils/authSession';
+import { isInstalledApp } from '../../utils/appContext';
 
 /**
  * CivicNavbar
@@ -19,20 +20,70 @@ import { getAuthToken, getAuthUser, clearAuthSession } from '../../utils/authSes
  * - Accessible: aria-labels, 4.5:1+ contrast ratio, keyboard focus rings.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export default function CivicNavbar({ onOpenTrackModal, mode }) {
+export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, activeTab: propActiveTab, onSelectTab }) {
   const { t, i18n } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [pwaModalOpen, setPwaModalOpen] = useState(false);
+  const handleOpenPwa = onOpenPwaModal || (() => setPwaModalOpen(true));
+  const [activeSection, setActiveSection] = useState(propActiveTab || 'home');
+
+  // Synchronize if parent explicitly updates activeTab prop
+  useEffect(() => {
+    if (propActiveTab) {
+      setActiveSection(propActiveTab);
+    }
+  }, [propActiveTab]);
+
+  const currentActiveTab = activeSection;
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      const scrollY = window.scrollY;
+      setScrolled(scrollY > 20);
+
+      // Top fold is always 'home'
+      if (scrollY < 140) {
+        setActiveSection('home');
+        if (onSelectTab) onSelectTab('home');
+        return;
+      }
+
+      const mapEl = document.getElementById('map-preview');
+      const mapContentEl = document.getElementById('map-content');
+      const howEl = document.getElementById('how-it-works');
+      const updatesEl = document.getElementById('city-updates');
+      const hotEl = document.getElementById('hotlines');
+
+      // Check section viewport positions (strictly ordered from bottom of page to top)
+      const isAtBottom = window.innerHeight + scrollY >= document.documentElement.scrollHeight - 60;
+
+      let current = 'home';
+      if (isAtBottom && hotEl) {
+        current = 'hotlines';
+      } else if (hotEl && hotEl.getBoundingClientRect().top <= 240) {
+        current = 'hotlines';
+      } else if (howEl && howEl.getBoundingClientRect().top <= 240) {
+        current = 'how-it-works';
+      } else if ((mapContentEl && mapContentEl.getBoundingClientRect().top <= 240) || (mapEl && mapEl.getBoundingClientRect().top <= 240)) {
+        current = 'map';
+      } else if (updatesEl && updatesEl.getBoundingClientRect().top <= 240) {
+        current = 'updates';
+      } else {
+        current = 'home';
+      }
+
+      setActiveSection(current);
+      if (onSelectTab) onSelectTab(current);
     };
+
+    // Calculate immediately on initial mount
+    handleScroll();
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [onSelectTab]);
 
   // State awareness: Detect active user session from session storage
   useEffect(() => {
@@ -90,9 +141,11 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
 
   const scrollTo = (id) => {
     setMobileMenuOpen(false);
-    const element = document.getElementById(id);
+    // Prioritize the interactive map content anchor so that the map and controls are immediately framed in full view
+    const targetId = (id === 'map-preview' || id === 'map') ? (document.getElementById('map-content') ? 'map-content' : 'map-preview') : id;
+    const element = document.getElementById(targetId) || document.getElementById(id);
     if (element) {
-      const offset = 75;
+      const offset = 76;
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = element.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;
@@ -102,16 +155,71 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
         behavior: 'smooth'
       });
     } else {
-      window.location.href = `/#${id}`;
+      window.location.href = `/#${targetId}`;
     }
   };
 
   const navLinks = [
-    { label: t('landing.nav.report', 'Report Issue'), onClick: () => scrollTo('report-section') },
-    { label: t('landing.nav.track', 'Track Report'), onClick: () => { setMobileMenuOpen(false); if (onOpenTrackModal) onOpenTrackModal(); else scrollTo('quick-actions'); } },
-    { label: t('landing.nav.map', 'Live Map'), onClick: () => scrollTo('map-preview') },
-    { label: t('landing.nav.howItWorks', 'How It Works'), onClick: () => scrollTo('how-it-works') },
-    { label: t('landing.nav.hotlines', 'Hotlines'), onClick: () => scrollTo('hotlines') },
+    { 
+      id: 'home',
+      label: 'Home', 
+      onClick: () => { 
+        setMobileMenuOpen(false); 
+        setActiveSection('home');
+        if (onSelectTab) onSelectTab('home');
+        if (typeof window !== 'undefined') {
+          if (window.location.pathname !== '/') {
+            window.location.href = '/';
+          } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }
+      } 
+    },
+    { 
+      id: 'updates',
+      label: 'City Updates', 
+      onClick: () => { 
+        setMobileMenuOpen(false); 
+        setActiveSection('updates');
+        if (onSelectTab) onSelectTab('updates'); 
+        scrollTo('city-updates'); 
+      } 
+    },
+    { 
+      id: 'map',
+      label: 'Live Map', 
+      onClick: () => { 
+        setMobileMenuOpen(false); 
+        setActiveSection('map');
+        if (onSelectTab) onSelectTab('map'); 
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          window.location.href = '/#map-content';
+        } else {
+          scrollTo('map-content'); 
+        }
+      } 
+    },
+    { 
+      id: 'how-it-works',
+      label: 'How It Works', 
+      onClick: () => { 
+        setMobileMenuOpen(false); 
+        setActiveSection('how-it-works');
+        if (onSelectTab) onSelectTab('how-it-works'); 
+        scrollTo('how-it-works'); 
+      } 
+    },
+    { 
+      id: 'hotlines',
+      label: 'Hotlines', 
+      onClick: () => { 
+        setMobileMenuOpen(false); 
+        setActiveSection('hotlines');
+        if (onSelectTab) onSelectTab('hotlines'); 
+        scrollTo('hotlines'); 
+      } 
+    },
   ];
 
   return (
@@ -124,19 +232,27 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
             : 'bg-white dark:bg-[#070a12] border-b border-slate-200/90 dark:border-slate-800 py-2.5 sm:py-3.5'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 flex items-center justify-between gap-1.5 sm:gap-4">
+        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 flex items-center justify-between gap-1.5 sm:gap-4">
           
           {/* Brand Logo & Municipal Identity: City Engineering Department Logo + Stacked LGU Hierarchy */}
           <a
             href="/"
-            className="flex items-center gap-2 sm:gap-3 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl p-0.5 sm:p-1 shrink-0"
+            onClick={(e) => {
+              if (typeof window !== 'undefined' && window.location.pathname === '/') {
+                e.preventDefault();
+                setActiveSection('home');
+                if (onSelectTab) onSelectTab('home');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+            className="flex items-center gap-2 sm:gap-3 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl p-0.5 sm:p-1 shrink-0 cursor-pointer"
             aria-label="Caloocan City - City Engineering Department - Powered by PULSO Home"
           >
             {/* Official City Engineering Department Logo */}
             <img 
               src="/city-engineering-logo.png" 
-              alt="City Engineering Department Logo" 
-              className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 aspect-square object-contain drop-shadow-sm rounded-full bg-white border border-slate-200 dark:border-slate-700 shrink-0 group-hover:scale-105 transition-transform duration-200"
+              alt="Caloocan City Engineering Department Logo" 
+              className="h-9 w-9 xs:h-10 xs:w-10 sm:h-11 sm:w-11 aspect-square object-contain shrink-0 group-hover:scale-105 transition-transform duration-200 select-none"
             />
 
             <div className="flex flex-col text-left shrink-0 leading-tight">
@@ -155,21 +271,28 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
           </a>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden xl:flex items-center gap-5 xl:gap-6 text-xs xl:text-[13px] font-semibold text-slate-700 dark:text-slate-200 shrink-0">
-            {navLinks.map((item, idx) => (
-              <button
-                key={idx}
-                onClick={item.onClick}
-                className="hover:text-[#ff6b00] dark:hover:text-[#ff6b00] transition-colors py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded cursor-pointer whitespace-nowrap"
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className="hidden lg:flex items-center gap-5 xl:gap-6 text-xs xl:text-[13px] font-semibold text-slate-700 dark:text-slate-200 shrink-0">
+            {navLinks.map((item) => {
+              const isActive = currentActiveTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={item.onClick}
+                  className={`transition-colors py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? 'text-[#ff6b00] font-black'
+                      : 'hover:text-[#ff6b00] dark:hover:text-[#ff6b00]'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Desktop Controls & Persistent Auth Area */}
           <div className="hidden md:flex items-center gap-2 sm:gap-2.5 shrink-0">
-            
+
             {/* Language Toggle (EN / TL) */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 text-xs font-bold border border-slate-200/80 dark:border-slate-700">
               <button
@@ -343,29 +466,39 @@ export default function CivicNavbar({ onOpenTrackModal, mode }) {
             className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#070a12] px-4 pt-3 pb-6 space-y-3 shadow-xl"
           >
             <div className="space-y-1">
-              {navLinks.map((item, idx) => (
-                <button
-                  key={idx}
-                  onClick={item.onClick}
-                  className="w-full text-left py-2.5 px-3 rounded-xl text-sm font-bold text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
-                >
-                  {item.label}
-                </button>
-              ))}
+              {navLinks.map((item) => {
+                const isActive = currentActiveTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={item.onClick}
+                    className={`w-full text-left py-2.5 px-3 rounded-xl text-sm font-bold transition-colors cursor-pointer flex items-center justify-between ${
+                      isActive
+                        ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] font-black'
+                        : 'text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#ff6b00]" />}
+                  </button>
+                );
+              })}
 
-              <button
-                type="button"
-                onClick={() => { setMobileMenuOpen(false); setPwaModalOpen(true); }}
-                className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl text-sm font-bold bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] border border-orange-200/80 dark:border-orange-800/60 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Smartphone size={16} className="text-[#ff6b00]" />
-                  <span>Install Mobile App (PWA)</span>
-                </div>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-[#ff6b00] text-white">
-                  QR Code
-                </span>
-              </button>
+              {!isInstalledApp() && (
+                <button
+                  type="button"
+                  onClick={() => { setMobileMenuOpen(false); handleOpenPwa(); }}
+                  className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl text-sm font-bold bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] border border-orange-200/80 dark:border-orange-800/60 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Smartphone size={16} className="text-[#ff6b00]" />
+                    <span>Install Mobile App (PWA)</span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-[#ff6b00] text-white">
+                    QR Code
+                  </span>
+                </button>
+              )}
             </div>
 
             <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-2">

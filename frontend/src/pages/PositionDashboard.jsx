@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
     AlertTriangle, CheckCircle2, Clock, ChevronRight, ChevronDown,
     GitBranch, Building2, PackageCheck, ShieldCheck, BarChart2,
@@ -666,7 +667,7 @@ const PositionDashboard = () => {
 
     return (
         <div className="gov-workspace-shell">
-            <GovSidebar currentUser={currentUser} />
+            <GovSidebar currentUser={currentUser} activeTab="dashboard" />
 
             <div className="gov-workspace">
                 <GovSystemBanner autoOffline={true} />
@@ -698,7 +699,7 @@ const PositionDashboard = () => {
                         >
                             {/* Spline Background */}
                             <div className="absolute -top-10 -left-10 -right-20 -bottom-20 z-0 opacity-40 mix-blend-overlay pointer-events-none">
-                                <Spline scene={theme === 'dark' ? DARK_SCENE : LIGHT_SCENE} />
+                                <Spline scene={theme === 'dark' ? DARK_SCENE : LIGHT_SCENE} onError={(e) => console.warn('Spline background error:', e)} />
                             </div>
 
                             <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">

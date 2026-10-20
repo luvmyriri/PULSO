@@ -1,134 +1,196 @@
-import React, { useState } from 'react';
-import { ArrowRight, Search, Smartphone, QrCode } from 'lucide-react';
-import CityNewsWidget from './CityNewsWidget';
+import React, { useState, useEffect } from 'react';
+import { SquarePen, Search, ArrowRight, Smartphone, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import PwaModal from './PwaModal';
+import { isInstalledApp } from '../../utils/appContext';
+import { API_BASE_URL } from '../../utils/apiBase';
 
 /**
  * HeroSection
  * ─────────────────────────────────────────────────────────────────────────────
- * Responsive Civic Hero Section with Official Caloocan City Background Watermark:
- * - One clear sentence stating purpose.
- * - Primary CTA + Track Report actions.
- * - Mobile App PWA Banner with scannable QR Code.
- * - Authoritative Caloocan City municipal seal background watermark.
- * - Mobile-first layout with smooth stacking.
+ * Clean Civic Aperture layout mirroring user's approved design:
+ * - Scaled to match the 125% zoom density at standard 100% viewport zoom
+ * - Left: Large authoritative headline ("See a problem in your community? Report it here.")
+ *   + Plain language explanation
+ *   + Large paired CTAs: [Report a Problem ->] & [Track My Report ->]
+ *   + Official Mobile App Installation card with scannable QR Code
+ * - Right: Grand official Caloocan City seal
+ *   + Caption: "Your report helps build a safer city."
+ *   + Two-tone civic accent bar (Orange & Blue)
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export default function HeroSection({ onOpenTrackModal }) {
-  const [pwaModalOpen, setPwaModalOpen] = useState(false);
+export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
+  const [internalPwaOpen, setInternalPwaOpen] = useState(false);
+  const handleOpenPwa = onOpenPwaModal || (() => setInternalPwaOpen(true));
+
+  const [activeUrl, setActiveUrl] = useState(() => {
+    if (typeof window === 'undefined') return 'https://pulso.caloocan.gov.ph';
+    return window.location.origin;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    if (!isLocalDev) {
+      setActiveUrl(window.location.origin);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`${API_BASE_URL}/api/system/network-ip`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.ip) {
+          const port = window.location.port ? `:${window.location.port}` : '';
+          setActiveUrl(`http://${data.ip}${port}`);
+        }
+      })
+      .catch(() => {
+        setActiveUrl(window.location.origin);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   return (
     <section
-      id="report-section"
+      id="hero-section"
       aria-label="Civic Reporting Hero"
-      className="relative min-h-[calc(100vh-6.25rem)] sm:min-h-[calc(100dvh-6.25rem)] py-8 sm:py-12 lg:py-14 flex items-center bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] border-b border-slate-200 dark:border-slate-800 transition-colors overflow-hidden"
+      className="relative flex-1 flex flex-col justify-center min-h-[calc(100vh-73px)] scroll-mt-[73px] bg-white dark:bg-[#070a12] transition-colors py-3 sm:py-5 lg:py-6 overflow-hidden"
     >
-      {/* Official Caloocan City Municipal Seal Background Watermark - Positioned to frame advisories cleanly below the navbar menu */}
-      <div
-        className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0 flex items-center justify-center lg:justify-end"
-        aria-hidden="true"
-      >
-        <div className="relative w-[340px] h-[340px] xs:w-[400px] xs:h-[400px] sm:w-[490px] sm:h-[490px] lg:w-[590px] lg:h-[590px] xl:w-[620px] xl:h-[620px] lg:mr-[1.5%] opacity-[0.18] sm:opacity-[0.20] dark:opacity-[0.14] transition-all duration-500 translate-y-1.5 sm:translate-y-2 lg:translate-y-2.5 my-auto">
-          {/* Subtle concentric municipal rings */}
-          <div className="absolute inset-0 rounded-full border-2 border-orange-500/30 dark:border-white/20 animate-pulse" style={{ animationDuration: '6s' }} />
-          <div className="absolute inset-[-12px] sm:inset-[-16px] rounded-full border border-dashed border-[#ff6b00]/40 dark:border-[#ff6b00]/30" />
-          <div className="absolute inset-[-24px] sm:inset-[-30px] rounded-full border border-slate-400/25 dark:border-white/10" />
-
-          {/* Caloocan Official Seal with authentic colors */}
-          <img
-            src="/engineering-logo.jpg"
-            alt="Official Caloocan City Seal Watermark"
-            className="w-full h-full object-contain rounded-full drop-shadow-sm dark:brightness-105"
-            loading="eager"
-          />
-
-          {/* Soft edge feathering */}
-          <div className="absolute inset-0 rounded-full bg-radial from-transparent via-transparent to-white/40 dark:to-[#070a12]/50 pointer-events-none" />
-        </div>
-      </div>
-
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+      <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 xl:gap-16 items-center">
           
-          {/* Left Column: Core Civic Purpose & Actions */}
-          <div className="lg:col-span-7 flex flex-col items-start text-left w-full">
+          {/* Left Column: Heading, Subhead & Action Buttons */}
+          <div className="lg:col-span-7 xl:col-span-7 flex flex-col items-start text-left max-w-[760px]">
             
-            {/* Responsive Heading */}
-            <h1 className="font-heading font-black text-2xl sm:text-4xl md:text-5xl lg:text-[44px] tracking-tight text-slate-900 dark:text-white leading-[1.15] sm:leading-[1.12] mb-3.5 sm:mb-4">
-              Report utility hazards &amp; road damage{' '}
-              <span className="text-[#ff6b00]">
-                directly to City Engineering.
-              </span>
+            {/* Eyebrow Kicker */}
+            <span className="font-heading font-black text-xs sm:text-sm md:text-[15px] tracking-wider text-[#0284c7] uppercase mb-2 sm:mb-2.5">
+              A SAFER, CLEANER, AND STRONGER CALOOCAN
+            </span>
+
+            {/* Main Headline - Scaled to match 125% density */}
+            <h1 className="font-heading font-black text-4xl sm:text-5xl md:text-[60px] lg:text-[68px] xl:text-[76px] tracking-tight text-[#0f2347] dark:text-white leading-[1.04] mb-3 sm:mb-3.5">
+              See a problem in<br />
+              your community?<br />
+              <span className="text-[#ff6b00]">Report it here.</span>
             </h1>
 
-            {/* Plain-language explanation */}
-            <p className="text-sm sm:text-base lg:text-lg text-slate-700 dark:text-slate-300 font-normal leading-relaxed mb-5 sm:mb-6 max-w-2xl">
-              PULSO is Caloocan City&apos;s direct service portal for residents to report broken streetlights, water pipe leaks, road potholes, and clogged drainage to city maintenance crews for fast repair.
+            {/* Subhead Explanation */}
+            <p className="text-base sm:text-lg lg:text-[18px] text-slate-600 dark:text-slate-300 leading-relaxed mb-4 sm:mb-5 font-normal max-w-[620px]">
+              Report public facility damage, community infrastructure concerns, and everyday neighborhood utility issues directly to the City Engineering Department for immediate review and action.
             </p>
 
-            {/* Primary Action Button Area - Normal compact sizes */}
-            <div className="w-full max-w-[395px]">
-              <div className="flex flex-row flex-wrap items-center gap-2.5 mb-3.5">
-                <a
-                  href="/report"
-                  className="inline-flex min-h-11 items-center justify-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-xs sm:text-sm tracking-wide transition-all shadow-xs hover:shadow cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
-                >
-                  <span>Report an Issue Now</span>
-                  <ArrowRight size={15} />
-                </a>
+            {/* Primary Action Button Pair */}
+            <div className="flex flex-wrap items-center gap-3 w-full">
+              <a
+                href="/report"
+                className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-xs sm:text-sm tracking-wide shadow-sm hover:shadow transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
+              >
+                <SquarePen size={17} className="shrink-0" />
+                <span>Report a Problem</span>
+                <ArrowRight size={15} className="shrink-0" />
+              </a>
 
-                <button
-                  type="button"
-                  onClick={onOpenTrackModal}
-                  className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-xs sm:text-sm border border-slate-300 dark:border-slate-700 transition-all shadow-2xs hover:border-[#ff6b00]/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
-                >
-                  <Search size={14} className="text-slate-500 dark:text-slate-400" />
-                  <span>Track My Report</span>
-                </button>
-              </div>
-
-              {/* Mobile App PWA Banner with QR Code Trigger - Normal size, even with buttons above */}
-              <div className="w-full p-2.5 sm:p-3 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-orange-200/90 dark:border-orange-900/50 shadow-2xs hover:shadow-xs transition-all flex items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-orange-100 dark:bg-orange-950/70 text-[#ff6b00] flex items-center justify-center shrink-0 shadow-2xs">
-                    <QrCode size={16} className="text-[#ff6b00]" />
-                  </div>
-                  <div className="min-w-0 flex-1 text-left">
-                    <span className="text-xs font-heading font-black text-slate-900 dark:text-white block leading-tight">
-                      Install PULSO Mobile App
-                    </span>
-                    <p className="text-[10.5px] sm:text-[11px] text-slate-600 dark:text-slate-400 leading-tight mt-0.5 truncate">
-                      Scan QR code with camera to install.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setPwaModalOpen(true)}
-                  className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white font-bold text-xs shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
-                >
-                  <Smartphone size={13} />
-                  <span>Install app</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onOpenTrackModal}
+                className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-100 hover:text-slate-900 dark:hover:text-white font-heading font-bold text-xs sm:text-sm border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 shadow-2xs hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
+              >
+                <Search size={16} className="text-slate-600 dark:text-slate-300 shrink-0" strokeWidth={1.8} />
+                <span>Track My Report</span>
+                <ArrowRight size={15} className="text-slate-400 dark:text-slate-400 shrink-0" strokeWidth={1.8} />
+              </button>
             </div>
+
+            {/* Mobile App Installation Card with Scannable QR Code */}
+            {!isInstalledApp() && (
+              <div className="mt-4 sm:mt-5 pt-3.5 sm:pt-4 border-t border-slate-200/90 dark:border-slate-800 w-full max-w-[620px]">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-2xs hover:border-orange-300 dark:hover:border-slate-700 transition-colors">
+                  
+                  {/* Left: Scannable QR Code + Details */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <button
+                      type="button"
+                      onClick={handleOpenPwa}
+                      className="p-1.5 bg-white dark:bg-white rounded-xl border border-slate-200 shadow-2xs shrink-0 cursor-pointer hover:border-[#ff6b00] hover:scale-105 transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                      title="Click to view full installation guide"
+                      aria-label="Scan or click QR code to install PULSO Mobile App"
+                    >
+                      <QRCodeSVG
+                        value={activeUrl}
+                        size={64}
+                        level="M"
+                        includeMargin={false}
+                        imageSettings={{
+                          src: '/city-engineering-logo.png',
+                          x: undefined,
+                          y: undefined,
+                          height: 16,
+                          width: 16,
+                          excavate: true,
+                        }}
+                      />
+                    </button>
+
+                    <div className="flex flex-col text-left min-w-0">
+                      <span className="font-heading font-black text-xs sm:text-sm text-[#0f2347] dark:text-white">
+                        Install Mobile App
+                      </span>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        Scan with your phone&apos;s camera to install PULSO directly onto your home screen.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right: Install Action Button */}
+                  <button
+                    type="button"
+                    onClick={handleOpenPwa}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-[#0f2347] dark:text-white border border-slate-300 dark:border-slate-700 text-xs font-heading font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                  >
+                    <Smartphone size={14} className="text-[#ff6b00]" />
+                    <span>Install App</span>
+                  </button>
+
+                </div>
+              </div>
+            )}
 
           </div>
 
-          {/* Right Column: Caloocan City News Feed Widget */}
-          <div className="lg:col-span-5 flex flex-col items-center w-full">
-            <div className="w-full max-w-lg">
-              {/* City News Widget */}
-              <CityNewsWidget />
+          {/* Right Column: Prominent Official Caloocan Seal + Caption + Pulse Accent Bar */}
+          <div className="lg:col-span-5 xl:col-span-5 flex flex-col items-center justify-center text-center w-full">
+            <div className="flex flex-col items-center justify-center text-center">
+              
+              {/* Grand High-Resolution Caloocan Seal */}
+              <div className="relative group transition-transform duration-300 hover:scale-[1.02]">
+                <img
+                  src="/caloocan-seal-large.png"
+                  alt="Lungsod ng Caloocan Official Seal"
+                  className="w-56 h-56 sm:w-72 sm:h-72 md:w-[330px] md:h-[330px] lg:w-[390px] lg:h-[390px] xl:w-[430px] xl:h-[430px] aspect-square object-contain drop-shadow-sm select-none"
+                />
+              </div>
+
+              {/* Caption text */}
+              <p className="font-heading font-bold text-base sm:text-lg md:text-xl text-[#0b1c38] dark:text-white mt-4 sm:mt-5 tracking-tight">
+                Your report helps build a safer city.
+              </p>
+
+              {/* Two-tone accent bar: orange and blue rounded pills */}
+              <div className="flex items-center justify-center gap-2 mt-2.5" aria-hidden="true">
+                <span className="w-12 h-2 rounded-full bg-[#ff6b00]" />
+                <span className="w-12 h-2 rounded-full bg-[#0284c7]" />
+              </div>
+
             </div>
           </div>
 
         </div>
       </div>
 
-      {/* Progressive Web App QR Code Modal */}
-      <PwaModal isOpen={pwaModalOpen} onClose={() => setPwaModalOpen(false)} />
+      {/* Progressive Web App QR Code Modal Fallback */}
+      <PwaModal isOpen={internalPwaOpen} onClose={() => setInternalPwaOpen(false)} />
     </section>
   );
 }

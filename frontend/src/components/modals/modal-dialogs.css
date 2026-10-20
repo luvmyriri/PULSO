@@ -275,6 +275,16 @@ html.dark .gov-modal-textarea,
     color: #f8fafc;
 }
 
+html.light .gov-modal-select:hover,
+body:not(.dark) .gov-modal-select:hover {
+    color: #000000;
+}
+
+html.dark .gov-modal-select:hover,
+.dark .gov-modal-select:hover {
+    color: #ffffff;
+}
+
 .gov-modal-select:focus,
 .gov-modal-input:focus,
 .gov-modal-textarea:focus {

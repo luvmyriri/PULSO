@@ -29,6 +29,7 @@ import ThemeToggle from '../ThemeToggle';
 import GovSidebar from '../GovSidebar';
 import GovUserDropdown from '../GovUserDropdown';
 import GovNotificationDropdown from '../GovNotificationDropdown';
+import TablePagination from '../TablePagination';
 import { API_BASE_URL } from '../../utils/apiBase';
 
 const API_BASE = API_BASE_URL;
@@ -926,34 +927,13 @@ export default function LguProjectsView({ currentUser, token, onNavigate }) {
 
                         {/* Table Footer with Pagination */}
                         {!loading && filtered.length > 0 && (
-                            <div className="p-3 sm:px-5 sm:py-3.5 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                                <div>
-                                    Showing <span className="font-bold text-slate-800 dark:text-slate-200">{(page - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-bold text-slate-800 dark:text-slate-200">{Math.min(page * ITEMS_PER_PAGE, filtered.length)}</span> of <span className="font-bold text-slate-800 dark:text-slate-200">{filtered.length}</span> projects
-                                </div>
-                                {totalPages > 1 && (
-                                    <div className="flex items-center gap-1.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                                            disabled={page === 1}
-                                            className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 font-bold disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                        >
-                                            Prev
-                                        </button>
-                                        <span className="font-mono px-1 font-bold">
-                                            {page} / {totalPages}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                            disabled={page === totalPages}
-                                            className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 font-bold disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                        >
-                                            Next
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+                            <TablePagination
+                                page={page}
+                                pageSize={ITEMS_PER_PAGE}
+                                total={filtered.length}
+                                itemLabel="projects"
+                                onPageChange={setPage}
+                            />
                         )}
 
                     </div>

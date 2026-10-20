@@ -2360,7 +2360,7 @@ export default function Register() {
                                                             onChange={handleChange}
                                                             placeholder="At least 8 characters"
                                                             required
-                                                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-8 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
+                                                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-9 py-2 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 focus:ring-2 focus:ring-orange-500 outline-none"
                                                         />
                                                         <button
                                                             type="button"
@@ -2385,7 +2385,7 @@ export default function Register() {
                                                             onChange={handleChange}
                                                             placeholder="Repeat password"
                                                             required
-                                                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-8 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
+                                                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl pl-8 pr-9 py-2 text-slate-900 dark:text-white placeholder:text-slate-600 dark:placeholder:text-slate-300 placeholder:opacity-100 focus:ring-2 focus:ring-orange-500 outline-none"
                                                         />
                                                         <button
                                                             type="button"

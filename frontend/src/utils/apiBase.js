@@ -10,8 +10,10 @@
  */
 const envUrl = import.meta.env.VITE_API_BASE_URL;
 
-export const API_BASE_URL = envUrl
+export const API_BASE_URL = (envUrl !== undefined && envUrl !== '')
     ? envUrl
-    : `http://${window.location.hostname}:33159`;
+    : (typeof window !== 'undefined' && (window.location.port === '5173' || window.location.port === '4173')
+        ? ''
+        : `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:33159`);
 
 export default API_BASE_URL;

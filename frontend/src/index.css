@@ -1,13 +1,43 @@
 @import "tailwindcss";
 @import "./components/modals/modal-dialogs.css";
 @import "./styles/sweetalert-civic.css";
+@import "./components/search-input.css";
+
+/* ── SELF-HOSTED INTER VARIABLE FONT (Weights 400 to 700 / 100-900, Latin & Latin-Ext under 100KB, no CDN) ── */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-variable.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext-variable.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Fallback font with size-adjust to eliminate layout shift while Inter loads */
+@font-face {
+  font-family: 'Inter-fallback';
+  src: local('Arial'), local('Helvetica');
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+  size-adjust: 107%;
+}
 
 html {
   scroll-behavior: smooth;
 }
 
-/* Enforce manual dark mode toggling alongside system preferring */
-@variant dark (&:is(.dark *));
+/* Instant theme switching (no color delay or muddy intermediate rendering) */
+@variant dark (&:where(.dark, .dark *));
 
 @theme {
   --breakpoint-xs: 420px;
@@ -78,13 +108,58 @@ html {
   --color-focus: #2563eb;
   --color-focus-dark: #93c5fd;
 
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Space Grotesk", "Archivo", "Inter", sans-serif;
-  --font-heading: "Space Grotesk", sans-serif;
-  --font-mono: "JetBrains Mono", "IBM Plex Mono", "SF Mono", monospace;
+  --font-sans: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-display: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-heading: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-mono: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
 }
 
 :root {
+  /* Global Single Font Stack Token */
+  --font-sans: "Inter", "Inter-fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --font-mono: var(--font-sans);
+
+  /* Shared Typography Scale Tokens (rem units) */
+  --type-display-size: 2rem;           /* 32px mobile */
+  --type-display-desktop: 2.75rem;     /* 44px desktop */
+  --type-display-weight: 700;
+  --type-display-line-height: 1.15;
+  --type-display-tracking: -0.02em;
+
+  --type-h1-size: 1.75rem;             /* 28px mobile */
+  --type-h1-desktop: 2.25rem;          /* 36px desktop */
+  --type-h1-weight: 700;
+  --type-h1-line-height: 1.2;
+  --type-h1-tracking: -0.015em;
+
+  --type-h2-size: 1.375rem;            /* 22px mobile */
+  --type-h2-desktop: 1.75rem;          /* 28px desktop */
+  --type-h2-weight: 600;
+  --type-h2-line-height: 1.25;
+
+  --type-card-title-size: 1.125rem;    /* 18px mobile */
+  --type-card-title-desktop: 1.25rem;  /* 20px desktop */
+  --type-card-title-weight: 600;
+  --type-card-title-line-height: 1.3;
+
+  --type-body-size: 1rem;              /* 16px */
+  --type-body-weight: 400;
+  --type-body-line-height: 1.5;
+
+  --type-small-size: 0.875rem;         /* 14px (minimum resident read size) */
+  --type-small-weight: 400;
+  --type-small-line-height: 1.45;
+
+  --type-caption-size: 0.8125rem;      /* 13px */
+  --type-caption-weight: 500;
+  --type-caption-line-height: 1.35;
+
+  --type-button-size: 1rem;            /* 16px */
+  --type-button-weight: 600;
+  --type-button-line-height: 1.25;
+
   --bg: #fffbf9;
   --text: #000000;
   --surface: #ffffff;
@@ -131,6 +206,25 @@ html {
   --gov-surface-hover: #f1f5f9;
   --gov-sidebar-width: 256px;
   --gov-sidebar-rail-width: 72px;
+
+  /* Mobile Tutorial & Civic Theme Tokens (Light Mode - Morning Field Sheet) */
+  --pulso-tut-bg-base: #f8f7f5;
+  --pulso-tut-bg-glow: rgba(255, 107, 0, 0.10);
+  --pulso-tut-bg-glow-fade: rgba(255, 107, 0, 0.03);
+  --pulso-tut-heading: #0c2436;
+  --pulso-tut-body: #475569;
+  --pulso-tut-btn-bg: #ff6b00;
+  --pulso-tut-btn-text: #070a12;
+  --pulso-tut-link: #c2410c;
+  --pulso-tut-dot-inactive: #cbd5e1;
+  --pulso-tut-dot-active: #ff6b00;
+  --pulso-tut-emergency: #b91c1c;
+
+  /* Settings & Icon Tile Tokens (Light Mode - Morning Field Sheet) */
+  --icon-tile-bg: rgba(255, 107, 0, 0.12);
+  --icon-tile-fg: #D95700;
+  --icon-tile-destructive-bg: rgba(239, 68, 68, 0.10);
+  --icon-tile-destructive-fg: #DC2626;
 }
 
 .dark {
@@ -185,6 +279,25 @@ html {
   --gov-critical-soft: rgba(239, 68, 68, 0.15);
   --gov-card-bg: #0c1424;
   --gov-surface-hover: #1e293b;
+
+  /* Mobile Tutorial & Civic Theme Tokens (Dark Mode - Night Inspection) */
+  --pulso-tut-bg-base: #070a12;
+  --pulso-tut-bg-glow: rgba(255, 107, 0, 0.14);
+  --pulso-tut-bg-glow-fade: rgba(255, 107, 0, 0.04);
+  --pulso-tut-heading: #ffffff;
+  --pulso-tut-body: #cbd5e1;
+  --pulso-tut-btn-bg: #ff6b00;
+  --pulso-tut-btn-text: #ffffff;
+  --pulso-tut-link: #ff8a3d;
+  --pulso-tut-dot-inactive: #334155;
+  --pulso-tut-dot-active: #ff6b00;
+  --pulso-tut-emergency: #f87171;
+
+  /* Settings & Icon Tile Tokens (Dark Mode - Night Inspection) */
+  --icon-tile-bg: rgba(255, 107, 0, 0.15);
+  --icon-tile-fg: #FF6B00;
+  --icon-tile-destructive-bg: rgba(239, 68, 68, 0.15);
+  --icon-tile-destructive-fg: #F87171;
 }
 
 @layer base {
@@ -485,9 +598,45 @@ html {
   .gm-ui-hover-effect {
     display: none !important; /* Hide default X button to use our clean design */
   }
+
+  /* Hide Google Maps bottom terms, map data copyright strip, and keyboard shortcuts */
+  .gm-style-cc {
+    display: none !important;
+  }
+
+  button[title*="shortcuts" i],
+  button[aria-label*="shortcuts" i] {
+    display: none !important;
+  }
+
+  .gm-style a[href*="terms_maps"] {
+    display: none !important;
+  }
 }
 
 @layer utilities {
+  .themed-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .themed-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .themed-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.4);
+    border-radius: 9999px;
+  }
+  .dark .themed-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.5);
+  }
+  .themed-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  }
+  .dark .themed-scrollbar {
+    scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+  }
+
   .glass-nav {
     background-color: color-mix(in srgb, white 90%, transparent);
     backdrop-filter: blur(12px);
@@ -614,24 +763,26 @@ canvas + div {
    HIGH-CONTRAST LIGHT MODE TYPOGRAPHY (USER REQUIREMENT)
    All gray/slate text classes render as solid black in light mode across all pages.
    Dark mode (.dark) remains completely unaffected with zero regression.
-   Uses :not(:hover) so standard hover states (:hover) smoothly override.
+   Only explicit interactive elements with hover classes (like hover:text-orange-500)
+   or links/buttons with hover classes are allowed to change color on hover.
+   Plain text labels, headings, and paragraphs NEVER change color on hover.
    ========================================================================== */
 
-html:not(.dark) :not(footer):not(footer *).text-slate-300:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-slate-400:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-slate-500:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-slate-600:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-slate-700:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-gray-400:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-gray-500:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-gray-600:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-zinc-400:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-zinc-500:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-zinc-600:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-neutral-400:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-neutral-500:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-neutral-600:not(:hover),
-html:not(.dark) :not(footer):not(footer *).text-neutral-muted:not(:hover) {
+html:not(.dark) :not(footer):not(footer *).text-slate-300:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-slate-400:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-slate-500:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-slate-600:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-slate-700:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-gray-400:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-gray-500:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-gray-600:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-zinc-400:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-zinc-500:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-zinc-600:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-neutral-400:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-neutral-500:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-neutral-600:not([class*="hover:text-"]):not(a):not(button),
+html:not(.dark) :not(footer):not(footer *).text-neutral-muted:not([class*="hover:text-"]):not(a):not(button) {
   color: #000000 !important;
 }
 
@@ -656,10 +807,49 @@ html:not(.dark) .recharts-text {
   fill: #000000 !important;
 }
 
-/* Form input placeholders in light mode remain distinct from typed input */
+/* Accessible, high-contrast, fully readable input and textarea placeholders */
+input::placeholder,
+textarea::placeholder,
+input::-webkit-input-placeholder,
+textarea::-webkit-input-placeholder,
+input::-moz-placeholder,
+textarea::-moz-placeholder,
+input:-ms-input-placeholder,
+textarea:-ms-input-placeholder {
+  opacity: 1 !important;
+  color: #334155 !important; /* slate-700: 6.8:1 contrast ratio against light inputs (WCAG AA compliant) */
+}
+
 html:not(.dark) input::placeholder,
-html:not(.dark) textarea::placeholder {
-  color: #475569;
+html:not(.dark) textarea::placeholder,
+html:not(.dark) input::-webkit-input-placeholder,
+html:not(.dark) textarea::-webkit-input-placeholder,
+html:not(.dark) input::-moz-placeholder,
+html:not(.dark) textarea::-moz-placeholder,
+html:not(.dark) input:-ms-input-placeholder,
+html:not(.dark) textarea:-ms-input-placeholder,
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  opacity: 1 !important;
+  color: #334155 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder,
+.dark input::placeholder,
+.dark textarea::placeholder,
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder,
+html.dark input::-webkit-input-placeholder,
+html.dark textarea::-webkit-input-placeholder,
+.dark input::-webkit-input-placeholder,
+.dark textarea::-webkit-input-placeholder,
+html.dark input::-moz-placeholder,
+html.dark textarea::-moz-placeholder,
+.dark input::-moz-placeholder,
+.dark textarea::-moz-placeholder {
+  opacity: 1 !important;
+  color: #cbd5e1 !important; /* slate-300: 9.5:1 contrast ratio against dark inputs (WCAG AA compliant) */
 }
 
 /* Preserve crisp contrast for official municipal dark civic footer in light mode */
@@ -670,7 +860,6 @@ footer[role="contentinfo"],
   border-top: 1px solid #1e293b !important;
 }
 
-html:not(.dark) footer,
 html:not(.dark) footer[role="contentinfo"],
 html:not(.dark) .civic-footer {
   background-color: #0f172a !important;
@@ -678,48 +867,221 @@ html:not(.dark) .civic-footer {
   border-top: 1px solid #1e293b !important;
 }
 
-html:not(.dark) footer .text-slate-400:not(:hover),
-html:not(.dark) footer .text-slate-400,
-html:not(.dark) footer .text-slate-500:not(:hover),
-html:not(.dark) footer .text-slate-500,
-html:not(.dark) footer p:not(:hover),
-html:not(.dark) footer li:not(:hover) {
+html:not(.dark) footer[role="contentinfo"] .text-slate-400,
+html:not(.dark) .civic-footer .text-slate-400,
+html:not(.dark) footer[role="contentinfo"] .text-slate-500,
+html:not(.dark) .civic-footer .text-slate-500,
+html:not(.dark) footer[role="contentinfo"] p,
+html:not(.dark) .civic-footer p,
+html:not(.dark) footer[role="contentinfo"] li,
+html:not(.dark) .civic-footer li {
   color: #94a3b8 !important;
 }
 
-html:not(.dark) footer .text-slate-300:not(:hover),
-html:not(.dark) footer .text-slate-300 {
+html:not(.dark) footer[role="contentinfo"] .text-slate-300,
+html:not(.dark) .civic-footer .text-slate-300 {
   color: #cbd5e1 !important;
 }
 
-html:not(.dark) footer .text-slate-200:not(:hover),
-html:not(.dark) footer .text-slate-200,
-html:not(.dark) footer .text-white:not(:hover),
-html:not(.dark) footer .text-white,
-html:not(.dark) footer strong:not(:hover) {
+html:not(.dark) footer[role="contentinfo"] .text-slate-200,
+html:not(.dark) .civic-footer .text-slate-200,
+html:not(.dark) footer[role="contentinfo"] .text-white,
+html:not(.dark) .civic-footer .text-white,
+html:not(.dark) footer[role="contentinfo"] strong,
+html:not(.dark) .civic-footer strong {
   color: #ffffff !important;
 }
 
-html:not(.dark) footer a:not(:hover),
-html:not(.dark) footer button:not(:hover) {
+html:not(.dark) footer[role="contentinfo"] a,
+html:not(.dark) footer[role="contentinfo"] button,
+html:not(.dark) .civic-footer a,
+html:not(.dark) .civic-footer button {
   color: #94a3b8 !important;
 }
 
-html:not(.dark) footer a:hover,
-html:not(.dark) footer button:hover {
+html:not(.dark) footer[role="contentinfo"] a:hover,
+html:not(.dark) footer[role="contentinfo"] button:hover,
+html:not(.dark) .civic-footer a:hover,
+html:not(.dark) .civic-footer button:hover {
   color: #ff6b00 !important;
 }
 
-html:not(.dark) footer .border-slate-800 {
+html:not(.dark) footer[role="contentinfo"] .border-slate-800,
+html:not(.dark) .civic-footer .border-slate-800 {
   border-color: #1e293b !important;
 }
 
-html:not(.dark) footer .border-slate-700 {
+html:not(.dark) footer[role="contentinfo"] .border-slate-700,
+html:not(.dark) .civic-footer .border-slate-700 {
   border-color: #334155 !important;
 }
 
-html:not(.dark) footer .bg-slate-800\/90 {
+html:not(.dark) footer[role="contentinfo"] .bg-slate-800\/90,
+html:not(.dark) .civic-footer .bg-slate-800\/90 {
   background-color: rgba(30, 41, 59, 0.9) !important;
 }
+
+/* ── PULSO SHARED TYPOGRAPHY SCALE CLASSES ── */
+.pulso-display {
+  font-family: var(--font-sans);
+  font-size: var(--type-display-size);
+  font-weight: var(--type-display-weight);
+  line-height: var(--type-display-line-height);
+  letter-spacing: var(--type-display-tracking);
+  text-wrap: balance;
+}
+@media (min-width: 640px) {
+  .pulso-display {
+    font-size: var(--type-display-desktop);
+  }
+}
+
+.pulso-h1 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h1-size);
+  font-weight: var(--type-h1-weight);
+  line-height: var(--type-h1-line-height);
+  letter-spacing: var(--type-h1-tracking);
+  text-wrap: balance;
+}
+@media (min-width: 640px) {
+  .pulso-h1 {
+    font-size: var(--type-h1-desktop);
+  }
+}
+
+.pulso-h2 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h2-size);
+  font-weight: var(--type-h2-weight);
+  line-height: var(--type-h2-line-height);
+  text-wrap: balance;
+}
+@media (min-width: 640px) {
+  .pulso-h2 {
+    font-size: var(--type-h2-desktop);
+  }
+}
+
+.pulso-card-title {
+  font-family: var(--font-sans);
+  font-size: var(--type-card-title-size);
+  font-weight: var(--type-card-title-weight);
+  line-height: var(--type-card-title-line-height);
+}
+@media (min-width: 640px) {
+  .pulso-card-title {
+    font-size: var(--type-card-title-desktop);
+  }
+}
+
+.pulso-body {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-line-height);
+  text-wrap: pretty;
+}
+
+.pulso-small {
+  font-family: var(--font-sans);
+  font-size: var(--type-small-size);
+  font-weight: var(--type-small-weight);
+  line-height: var(--type-small-line-height);
+}
+
+.pulso-caption {
+  font-family: var(--font-sans);
+  font-size: var(--type-caption-size);
+  font-weight: var(--type-caption-weight);
+  line-height: var(--type-caption-line-height);
+  text-transform: none;
+}
+
+.pulso-btn-text {
+  font-family: var(--font-sans);
+  font-size: var(--type-button-size);
+  font-weight: var(--type-button-weight);
+  line-height: var(--type-button-line-height);
+  text-transform: none;
+}
+
+/* Tabular figures for tracking numbers and timestamps */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Ensure mobile form fields are at least 16px to prevent iOS Safari auto-zoom on focus */
+input, select, textarea {
+  font-size: 1rem;
+}
+
+/* ── PULSO MOBILE APP ONBOARDING SCENE TOKENS & UTILITIES ── */
+:root,
+[data-theme="light"] {
+  --bg-scrim-rgb: 245, 249, 255;
+  --pulso-onboarding-sky: #EAF2FF;
+  --pulso-onboarding-bg-img: url('/pulso-bg-light.svg');
+  --pulso-onboarding-scrim-base: #F5F9FF;
+  --pulso-onboarding-scrim-92: rgba(245, 249, 255, 0.92);
+  --pulso-onboarding-heading: #0B1630;
+  --pulso-onboarding-body: #334155;
+  --pulso-onboarding-link: #B83A00;
+  --pulso-onboarding-link-hover: #8F2D00;
+  --pulso-onboarding-dot-inactive: rgba(51, 65, 85, 0.40);
+  --pulso-onboarding-btn-text: #0B1630;
+  --text-heading: #0B1630;
+  --text-body: #334155;
+  --text-muted: #475569;
+  --link-accent: #B83A00;
+  --link-accent-hover: #8F2D00;
+  --icon-tile-bg: rgba(255, 107, 0, 0.12);
+  --icon-tile-fg: #D95700;
+  --icon-tile-destructive-bg: rgba(239, 68, 68, 0.10);
+  --icon-tile-destructive-fg: #DC2626;
+}
+
+html.dark,
+[data-theme="dark"] {
+  --bg-scrim-rgb: 11, 17, 32;
+  --pulso-onboarding-sky: #080D19;
+  --pulso-onboarding-bg-img: url('/pulso-bg-dark.svg');
+  --pulso-onboarding-scrim-base: #0B1120;
+  --pulso-onboarding-scrim-92: rgba(11, 17, 32, 0.92);
+  --pulso-onboarding-heading: #FFFFFF;
+  --pulso-onboarding-body: #CBD5E1;
+  --pulso-onboarding-link: #FF8A3D;
+  --pulso-onboarding-link-hover: #FFA266;
+  --pulso-onboarding-dot-inactive: rgba(255, 255, 255, 0.35);
+  --pulso-onboarding-btn-text: #0B1630;
+  --text-heading: #FFFFFF;
+  --text-body: #CBD5E1;
+  --text-muted: #B6C2DC;
+  --link-accent: #FF8A3D;
+  --link-accent-hover: #FFA266;
+  --icon-tile-bg: rgba(255, 107, 0, 0.15);
+  --icon-tile-fg: #FF6B00;
+  --icon-tile-destructive-bg: rgba(239, 68, 68, 0.15);
+  --icon-tile-destructive-fg: #F87171;
+}
+
+.pulso-onboarding-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--pulso-onboarding-sky);
+  background-image: var(--pulso-onboarding-bg-img);
+  background-size: 100% auto;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  transition: background-color 150ms ease, background-image 150ms ease, color 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulso-onboarding-container {
+    transition: none !important;
+  }
+}
+
 
 

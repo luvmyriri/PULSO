@@ -40,6 +40,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import GovUserDropdown from '../components/GovUserDropdown';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
+import SearchInput from '../components/SearchInput';
 import { API_BASE_URL } from '../utils/apiBase';
 import './projects-workspace.css';
 
@@ -761,17 +762,14 @@ export default function ProjectsWorkspacePage({ workspace = 'delivery' }) {
                                         </select>
                                     </div>
 
-                                    <div className="projects-search-box">
-                                        <Search size={14} className="projects-search-icon" />
-                                        <input
-                                            type="search"
-                                            placeholder="Search project ID, title, barangay..."
-                                            className="projects-search-input"
-                                            value={searchQuery}
-                                            onChange={(e) => updateParam('search', e.target.value)}
-                                            aria-label="Search projects"
-                                        />
-                                    </div>
+                                    <SearchInput
+                                        value={searchQuery}
+                                        onChange={(val) => updateParam('search', val)}
+                                        placeholder="Search order ID, title, barangay or team"
+                                        ariaLabel="Search project ID, title, barangay or team"
+                                        onClear={() => updateParam('search', '')}
+                                        className="w-full sm:w-[320px] md:w-[360px]"
+                                    />
 
                                     {(jurisdictionFilter !== 'all' || ownerFilter !== 'all' || riskFilter !== 'all' || searchQuery) && (
                                         <button

@@ -69,7 +69,7 @@ def clean_postgis(postgis_database):
 
 
 @pytest.fixture
-def synthetic_boundaries(postgis_database):
+def synthetic_boundaries(clean_postgis, postgis_database):
     """Fake rectangles for deterministic tests, never a civic boundary source."""
     with postgis_database.begin() as connection:
         connection.execute(text("""

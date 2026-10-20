@@ -25,7 +25,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getAuthUser } from '../utils/authSession';
 import {
-    BarChart2, TrendingUp, TrendingDown, Clock, CheckCircle2,
+    BarChart2, Clock, CheckCircle2,
     AlertTriangle, ShieldCheck, Filter, RotateCcw, Calendar,
     MapPin, Search, Bell, Download, ChevronDown, Check,
     Table, Eye, ArrowUpRight, Wrench, Shield, Users, Layers,
@@ -35,6 +35,7 @@ import GovSidebar from '../components/GovSidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovUserDropdown from '../components/GovUserDropdown';
+import SearchInput from '../components/SearchInput';
 import Swal from 'sweetalert2';
 
 // ─── Constants & Fallback Reference BI Data ──────────────────────────────────
@@ -220,15 +221,10 @@ export default function GovBiDashboard() {
 
         return {
             totalReports: total.toLocaleString(),
-            totalTrend: { val: '+12.4%', isPositive: true },
             resolutionRate: `${rate}%`,
-            rateTrend: { val: '+4.2%', isPositive: true },
             avgHours: '18.4 hrs',
-            hoursTrend: { val: '-2.1 hrs', isPositive: true }, // negative hours = faster = good (green)
             activeCases: active.toLocaleString(),
-            activeTrend: { val: '-14', isPositive: true },     // less open backlog = good (green)
             criticalCount: criticalCount.toLocaleString(),
-            criticalTrend: { val: '+3', isPositive: false }    // more critical = bad (red)
         };
     }, [barangayFilter]);
 
@@ -312,36 +308,46 @@ export default function GovBiDashboard() {
 
                 {/* ── TOP FILTER BAR (Citizen Reports Pattern) ──────────────── */}
                 <div ref={dropdownRef} className="px-6 py-3 shrink-0 bg-white/70 dark:bg-[#09101f] border-b border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 relative z-30 backdrop-blur-sm">
-                    <div className="flex flex-wrap items-center gap-2">
+                    {/* First item on the left: Standard SearchInput */}
+                    <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+                        <SearchInput
+                            value={searchQuery}
+                            onChange={setSearchQuery}
+                            placeholder="Search metrics or barangay"
+                            ariaLabel="Search metrics or barangay"
+                            onClear={() => setSearchQuery('')}
+                            className="w-full sm:w-[320px] md:w-[360px]"
+                        />
+
                         {/* 1. Date Range Picker */}
                         <div className="relative">
                             <button
                                 type="button"
                                 onClick={() => setOpenDropdown(openDropdown === 'date' ? null : 'date')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-heading font-medium transition-colors cursor-pointer ${
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-heading font-medium transition-colors cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${
                                     dateRange !== '30d'
-                                        ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] text-[#ff6b00] font-bold'
-                                        : 'bg-white dark:bg-[#0c1424] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                                        ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] font-bold'
+                                        : 'bg-white dark:bg-[#0c1424] border-slate-200 dark:border-slate-800 hover:border-slate-400'
                                 }`}
                             >
-                                <Calendar size={13} className={dateRange !== '30d' ? 'text-[#ff6b00]' : 'text-slate-400'} />
-                                <span>Period: {DATE_RANGES.find(d => d.id === dateRange)?.label}</span>
-                                <ChevronDown size={13} className="text-slate-400" />
+                                <Calendar size={13} className={dateRange !== '30d' ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400'} />
+                                <span className="text-black dark:text-white">Period: {DATE_RANGES.find(d => d.id === dateRange)?.label}</span>
+                                <ChevronDown size={13} className={dateRange !== '30d' ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400'} />
                             </button>
                             {openDropdown === 'date' && (
                                 <div className="absolute top-full left-0 mt-1.5 w-48 rounded-xl bg-white dark:bg-[#0c1424] border border-slate-200 dark:border-slate-800 shadow-xl p-1 z-30 space-y-0.5">
                                     {DATE_RANGES.map(d => (
-                                        <button
+                                         <button
                                             key={d.id}
                                             onClick={() => { setDateRange(d.id); setOpenDropdown(null); }}
-                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-heading cursor-pointer ${
+                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-heading cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${
                                                 dateRange === d.id
-                                                    ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] font-bold'
-                                                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                                    ? 'bg-orange-50 dark:bg-orange-950/40 font-bold'
+                                                    : 'hover:bg-slate-100 dark:hover:bg-slate-800/60'
                                             }`}
                                         >
-                                            <span>{d.label}</span>
-                                            {dateRange === d.id && <Check size={13} className="text-[#ff6b00]" />}
+                                            <span className="text-black dark:text-white">{d.label}</span>
+                                            {dateRange === d.id && <Check size={13} className="text-black dark:text-white" />}
                                         </button>
                                     ))}
                                 </div>
@@ -353,15 +359,15 @@ export default function GovBiDashboard() {
                             <button
                                 type="button"
                                 onClick={() => setOpenDropdown(openDropdown === 'barangay' ? null : 'barangay')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-heading font-medium transition-colors cursor-pointer ${
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-heading font-medium transition-colors cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${
                                     barangayFilter !== 'All Barangays'
-                                        ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] text-[#ff6b00] font-bold'
-                                        : 'bg-white dark:bg-[#0c1424] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                                        ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] font-bold'
+                                        : 'bg-white dark:bg-[#0c1424] border-slate-200 dark:border-slate-800 hover:border-slate-400'
                                 }`}
                             >
-                                <MapPin size={13} className={barangayFilter !== 'All Barangays' ? 'text-[#ff6b00]' : 'text-slate-400'} />
-                                <span>Barangay: {barangayFilter === 'All Barangays' ? 'All' : barangayFilter}</span>
-                                <ChevronDown size={13} className="text-slate-400" />
+                                <MapPin size={13} className={barangayFilter !== 'All Barangays' ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400'} />
+                                <span className="text-black dark:text-white">Barangay: {barangayFilter === 'All Barangays' ? 'All' : barangayFilter}</span>
+                                <ChevronDown size={13} className={barangayFilter !== 'All Barangays' ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400'} />
                             </button>
                             {openDropdown === 'barangay' && (
                                 <div className="absolute top-full left-0 mt-1.5 w-56 max-h-64 overflow-y-auto rounded-xl bg-white dark:bg-[#0c1424] border border-slate-200 dark:border-slate-800 shadow-xl p-1 z-30 space-y-0.5 custom-scrollbar">
@@ -369,14 +375,14 @@ export default function GovBiDashboard() {
                                         <button
                                             key={b}
                                             onClick={() => { setBarangayFilter(b); setOpenDropdown(null); }}
-                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-heading cursor-pointer ${
+                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-heading cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${
                                                 barangayFilter === b
-                                                    ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] font-bold'
-                                                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                                    ? 'bg-orange-50 dark:bg-orange-950/40 font-bold'
+                                                    : 'hover:bg-slate-100 dark:hover:bg-slate-800/60'
                                             }`}
                                         >
-                                            <span>{b}</span>
-                                            {barangayFilter === b && <Check size={13} className="text-[#ff6b00]" />}
+                                            <span className="text-black dark:text-white">{b}</span>
+                                            {barangayFilter === b && <Check size={13} className="text-black dark:text-white" />}
                                         </button>
                                     ))}
                                 </div>
@@ -388,15 +394,15 @@ export default function GovBiDashboard() {
                             <button
                                 type="button"
                                 onClick={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-heading font-medium transition-colors cursor-pointer ${
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-heading font-medium transition-colors cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${
                                     statusFilter !== 'All Statuses'
-                                        ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] text-[#ff6b00] font-bold'
-                                        : 'bg-white dark:bg-[#0c1424] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                                        ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] font-bold'
+                                        : 'bg-white dark:bg-[#0c1424] border-slate-200 dark:border-slate-800 hover:border-slate-400'
                                 }`}
                             >
-                                <CheckCircle2 size={13} className={statusFilter !== 'All Statuses' ? 'text-[#ff6b00]' : 'text-slate-400'} />
-                                <span>Status: {statusFilter === 'All Statuses' ? 'All' : statusFilter}</span>
-                                <ChevronDown size={13} className="text-slate-400" />
+                                <CheckCircle2 size={13} className={statusFilter !== 'All Statuses' ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400'} />
+                                <span className="text-black dark:text-white">Status: {statusFilter === 'All Statuses' ? 'All' : statusFilter}</span>
+                                <ChevronDown size={13} className={statusFilter !== 'All Statuses' ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400'} />
                             </button>
                             {openDropdown === 'status' && (
                                 <div className="absolute top-full left-0 mt-1.5 w-44 rounded-xl bg-white dark:bg-[#0c1424] border border-slate-200 dark:border-slate-800 shadow-xl p-1 z-30 space-y-0.5">
@@ -404,14 +410,14 @@ export default function GovBiDashboard() {
                                         <button
                                             key={s}
                                             onClick={() => { setStatusFilter(s); setOpenDropdown(null); }}
-                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-heading cursor-pointer ${
+                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-heading cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${
                                                 statusFilter === s
-                                                    ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] font-bold'
-                                                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                                    ? 'bg-orange-50 dark:bg-orange-950/40 font-bold'
+                                                    : 'hover:bg-slate-100 dark:hover:bg-slate-800/60'
                                             }`}
                                         >
-                                            <span>{s}</span>
-                                            {statusFilter === s && <Check size={13} className="text-[#ff6b00]" />}
+                                            <span className="text-black dark:text-white">{s}</span>
+                                            {statusFilter === s && <Check size={13} className="text-black dark:text-white" />}
                                         </button>
                                     ))}
                                 </div>
@@ -423,15 +429,15 @@ export default function GovBiDashboard() {
                             <button
                                 type="button"
                                 onClick={() => setOpenDropdown(openDropdown === 'severity' ? null : 'severity')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-heading font-medium transition-colors cursor-pointer ${
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-heading font-medium transition-colors cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${
                                     severityFilter !== 'All Severities'
-                                        ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] text-[#ff6b00] font-bold'
-                                        : 'bg-white dark:bg-[#0c1424] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                                        ? 'bg-orange-50 dark:bg-orange-950/40 border-[#ff6b00] font-bold'
+                                        : 'bg-white dark:bg-[#0c1424] border-slate-200 dark:border-slate-800 hover:border-slate-400'
                                 }`}
                             >
-                                <AlertTriangle size={13} className={severityFilter !== 'All Severities' ? 'text-[#ff6b00]' : 'text-slate-400'} />
-                                <span>Severity: {severityFilter === 'All Severities' ? 'All' : severityFilter}</span>
-                                <ChevronDown size={13} className="text-slate-400" />
+                                <AlertTriangle size={13} className={severityFilter !== 'All Severities' ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400'} />
+                                <span className="text-black dark:text-white">Severity: {severityFilter === 'All Severities' ? 'All' : severityFilter}</span>
+                                <ChevronDown size={13} className={severityFilter !== 'All Severities' ? 'text-black dark:text-white' : 'text-slate-500 dark:text-slate-400'} />
                             </button>
                             {openDropdown === 'severity' && (
                                 <div className="absolute top-full left-0 mt-1.5 w-44 rounded-xl bg-white dark:bg-[#0c1424] border border-slate-200 dark:border-slate-800 shadow-xl p-1 z-30 space-y-0.5">
@@ -439,14 +445,14 @@ export default function GovBiDashboard() {
                                         <button
                                             key={sev}
                                             onClick={() => { setSeverityFilter(sev); setOpenDropdown(null); }}
-                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-heading cursor-pointer ${
+                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-heading cursor-pointer text-black dark:text-white hover:text-black dark:hover:text-white ${
                                                 severityFilter === sev
-                                                    ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] font-bold'
-                                                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                                    ? 'bg-orange-50 dark:bg-orange-950/40 font-bold'
+                                                    : 'hover:bg-slate-100 dark:hover:bg-slate-800/60'
                                             }`}
                                         >
-                                            <span>{sev}</span>
-                                            {severityFilter === sev && <Check size={13} className="text-[#ff6b00]" />}
+                                            <span className="text-black dark:text-white">{sev}</span>
+                                            {severityFilter === sev && <Check size={13} className="text-black dark:text-white" />}
                                         </button>
                                     ))}
                                 </div>
@@ -465,18 +471,6 @@ export default function GovBiDashboard() {
                             </button>
                         )}
                     </div>
-
-                    {/* Quick Search */}
-                    <div className="relative w-full sm:w-64">
-                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            placeholder="Search metrics or barangay..."
-                            className="w-full bg-white dark:bg-[#0c1424] border border-slate-200 dark:border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-[#ff6b00] transition-colors"
-                        />
-                    </div>
                 </div>
 
                 {/* ── SCROLLABLE BI WORKSPACE ───────────────────────────────── */}
@@ -488,7 +482,7 @@ export default function GovBiDashboard() {
                     <section aria-label="Key Performance Indicators" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
 
                         {/* Card 1: Total Reports */}
-                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs transition-transform hover:-translate-y-0.5 duration-200">
+                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs">
                             <div className="flex items-center justify-between text-slate-400 mb-2">
                                 <span className="font-heading text-[11px] font-bold uppercase tracking-wider">Total Reports</span>
                                 <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center text-slate-500 dark:text-slate-300">
@@ -498,17 +492,10 @@ export default function GovBiDashboard() {
                             <div className="font-mono-data font-black text-2xl lg:text-3xl text-slate-900 dark:text-white tracking-tight">
                                 {kpis.totalReports}
                             </div>
-                            <div className="flex items-center gap-1.5 mt-2 text-xs">
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-mono-data font-bold text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">
-                                    <TrendingUp size={12} />
-                                    {kpis.totalTrend.val}
-                                </span>
-                                <span className="text-[11px] text-slate-400">vs prev. period</span>
-                            </div>
                         </div>
 
                         {/* Card 2: Resolution Rate */}
-                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs transition-transform hover:-translate-y-0.5 duration-200">
+                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs">
                             <div className="flex items-center justify-between text-slate-400 mb-2">
                                 <span className="font-heading text-[11px] font-bold uppercase tracking-wider">Resolution Rate</span>
                                 <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center text-slate-500 dark:text-slate-300">
@@ -518,17 +505,10 @@ export default function GovBiDashboard() {
                             <div className="font-mono-data font-black text-2xl lg:text-3xl text-slate-900 dark:text-white tracking-tight">
                                 {kpis.resolutionRate}
                             </div>
-                            <div className="flex items-center gap-1.5 mt-2 text-xs">
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-mono-data font-bold text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">
-                                    <TrendingUp size={12} />
-                                    {kpis.rateTrend.val}
-                                </span>
-                                <span className="text-[11px] text-slate-400">benchmark &gt; 85%</span>
-                            </div>
                         </div>
 
                         {/* Card 3: Avg Resolution Time */}
-                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs transition-transform hover:-translate-y-0.5 duration-200">
+                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs">
                             <div className="flex items-center justify-between text-slate-400 mb-2">
                                 <span className="font-heading text-[11px] font-bold uppercase tracking-wider">Avg Resolution Time</span>
                                 <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center text-slate-500 dark:text-slate-300">
@@ -538,17 +518,10 @@ export default function GovBiDashboard() {
                             <div className="font-mono-data font-black text-2xl lg:text-3xl text-slate-900 dark:text-white tracking-tight">
                                 {kpis.avgHours}
                             </div>
-                            <div className="flex items-center gap-1.5 mt-2 text-xs">
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-mono-data font-bold text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">
-                                    <TrendingDown size={12} />
-                                    {kpis.hoursTrend.val}
-                                </span>
-                                <span className="text-[11px] text-slate-400">faster response</span>
-                            </div>
                         </div>
 
                         {/* Card 4: Active Open Cases */}
-                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs transition-transform hover:-translate-y-0.5 duration-200">
+                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs">
                             <div className="flex items-center justify-between text-slate-400 mb-2">
                                 <span className="font-heading text-[11px] font-bold uppercase tracking-wider">Active Open Cases</span>
                                 <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center text-slate-500 dark:text-slate-300">
@@ -558,17 +531,10 @@ export default function GovBiDashboard() {
                             <div className="font-mono-data font-black text-2xl lg:text-3xl text-slate-900 dark:text-white tracking-tight">
                                 {kpis.activeCases}
                             </div>
-                            <div className="flex items-center gap-1.5 mt-2 text-xs">
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-mono-data font-bold text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">
-                                    <TrendingDown size={12} />
-                                    {kpis.activeTrend.val}
-                                </span>
-                                <span className="text-[11px] text-slate-400">backlog clearing</span>
-                            </div>
                         </div>
 
                         {/* Card 5: Critical / High Severity */}
-                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs transition-transform hover:-translate-y-0.5 duration-200">
+                        <div className="bg-white dark:bg-[#0c1424] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-4.5 shadow-xs">
                             <div className="flex items-center justify-between text-slate-400 mb-2">
                                 <span className="font-heading text-[11px] font-bold uppercase tracking-wider">Critical & High</span>
                                 <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center text-red-600 dark:text-red-400">
@@ -577,13 +543,6 @@ export default function GovBiDashboard() {
                             </div>
                             <div className="font-mono-data font-black text-2xl lg:text-3xl text-red-600 dark:text-red-400 tracking-tight">
                                 {kpis.criticalCount}
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-2 text-xs">
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-mono-data font-bold text-[11px] bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400">
-                                    <TrendingUp size={12} />
-                                    {kpis.criticalTrend.val}
-                                </span>
-                                <span className="text-[11px] text-slate-400">requires triage</span>
                             </div>
                         </div>
 
@@ -603,9 +562,6 @@ export default function GovBiDashboard() {
                                 <div>
                                     <h2 className="font-heading font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
                                         <span>Reports Trend Over Time</span>
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono-data font-bold bg-orange-100 dark:bg-orange-950/40 text-[#ff6b00]">
-                                            Hero Metric
-                                        </span>
                                     </h2>
                                     <p className="text-[11px] text-slate-400 mt-0.5">30-day chronological report intake vs resolutions</p>
                                 </div>
@@ -1215,9 +1171,6 @@ export default function GovBiDashboard() {
                                 <div>
                                     <h2 className="font-heading font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
                                         <span>Resolution Time by Category</span>
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono-data font-bold bg-amber-100 dark:bg-amber-950/40 text-amber-600">
-                                            SLA Analysis
-                                        </span>
                                     </h2>
                                     <p className="text-[11px] text-slate-400 mt-0.5">Mean time to resolution (hours) vs municipal benchmark</p>
                                 </div>

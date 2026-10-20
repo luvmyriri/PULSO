@@ -1,5 +1,5 @@
 import ReportDensityLayer from '../components/maps/ReportDensityLayer';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -23,6 +23,9 @@ import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovBreadcrumb from '../components/GovBreadcrumb';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
+import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
+import SearchInput from '../components/SearchInput';
+import { formatTicketId } from '../utils/reportWorkflow';
 
 const CATEGORY_LABELS = {
     'roads_bridges': 'Roads & Bridges',
@@ -84,14 +87,14 @@ const LIGHT_MAP_STYLE = [
 // ─── KPI Card ────────────────────────────────────────────────────────────────
 const KPICard = ({ label, value, sub, icon: Icon, color = 'indigo', trend }) => (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex items-start gap-4 shadow-sm">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-${color}-100 dark:bg-${color}-900/20`}>
-            <Icon size={20} className={`text-${color}-600 dark:text-${color}-400`} />
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-${color}-100 dark:bg-${color}-900/20`}>
+            <Icon size={18} className={`text-${color}-600 dark:text-${color}-400`} />
         </div>
         <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold text-black dark:text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
-            <p className="text-xl font-black text-black dark:text-white leading-tight truncate">{value ?? '—'}</p>
-            {sub && <p className="text-[10px] text-black dark:text-slate-400 mt-0.5 font-medium truncate">{sub}</p>}
+            <p className="text-[10px] font-bold text-black dark:text-slate-400 uppercase tracking-wider leading-snug mb-0.5">{label}</p>
+            <p className="text-xl font-black text-black dark:text-white leading-tight">{value ?? '—'}</p>
+            {sub && <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 font-medium leading-snug break-words">{sub}</p>}
         </div>
         {trend !== undefined && (
             <div className={`shrink-0 flex items-center gap-1 text-xs font-bold ${trend > 0 ? 'text-red-500' : trend < 0 ? 'text-green-500' : 'text-black dark:text-slate-400'}`}>
@@ -187,6 +190,9 @@ export default function GovAnalyticsPage({ workspace }) {
 
     const [summary, setSummary] = useState(null);
     const [clusters, setClusters] = useState([]);
+    const [clusteringLoading, setClusteringLoading] = useState(true);
+    const [clusteringError, setClusteringError] = useState(null);
+    const [clusterRetryTrigger, setClusterRetryTrigger] = useState(0);
     const [forecast, setForecast] = useState([]);
     const [recurrence, setRecurrence] = useState([]);
     const [heatmapData, setHeatmapData] = useState(null);
@@ -227,22 +233,22 @@ export default function GovAnalyticsPage({ workspace }) {
 
     const { isLoaded: mapsLoaded } = useGoogleMaps();
 
-    // ── Fetch All Data ──────────────────────────────────────────────────────
+    // ── Fetch General Analytics Data (KPIs, Forecast, Recurrence, Heatmap, Border) ──
     const fetchData = useCallback(async () => {
         setLoading(true);
         setFetchError(null);
         try {
-            const [summaryRes, clustersRes, forecastRes, recurrenceRes, heatmapRes, borderRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/gov/analytics/summary`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/clusters?days_back=${daysBack}${categoryFilter ? `&category=${categoryFilter}` : ''}`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/forecast`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/recurrence`, { headers }),
-                fetch(`${API_BASE_URL}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers }),
-                fetch(`${API_BASE_URL}/api/geo/caloocan-border`, { headers }),
+            const currentToken = getAuthToken();
+            const authHeaders = { Authorization: `Bearer ${currentToken}` };
+            const [summaryRes, forecastRes, recurrenceRes, heatmapRes, borderRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/gov/analytics/summary`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/forecast`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/recurrence`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/gov/analytics/heatmap?days_back=${daysBack}`, { headers: authHeaders }),
+                fetch(`${API_BASE_URL}/api/geo/caloocan-border`, { headers: authHeaders }),
             ]);
             if (summaryRes.ok)    setSummary(await summaryRes.json());
             else throw new Error(`Summary: ${summaryRes.status}`);
-            if (clustersRes.ok)   setClusters((await clustersRes.json()).clusters || []);
             if (forecastRes.ok)   setForecast(await forecastRes.json());
             if (recurrenceRes.ok) setRecurrence((await recurrenceRes.json()).recurrence_events || []);
             if (heatmapRes.ok)    setHeatmapData(await heatmapRes.json());
@@ -253,7 +259,70 @@ export default function GovAnalyticsPage({ workspace }) {
         } finally {
             setLoading(false);
         }
-    }, [daysBack, categoryFilter]);
+    }, [daysBack]);
+
+    // ── Fetch DBSCAN Spatial Clusters (Isolated lifecycle with 15s timeout & AbortController) ──
+    useEffect(() => {
+        let isCancelled = false;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort(new Error('Clustering request timed out after 15 seconds'));
+        }, 15000);
+
+        setClusteringLoading(true);
+        setClusteringError(null);
+
+        const runClustering = async () => {
+            try {
+                const authToken = getAuthToken();
+                const clusterHeaders = { Authorization: `Bearer ${authToken}` };
+                const params = new URLSearchParams({
+                    days_back: String(daysBack),
+                    min_points: '3',
+                    eps: '100',
+                });
+                if (categoryFilter) {
+                    params.set('category', categoryFilter);
+                }
+
+                const res = await fetch(`${API_BASE_URL}/api/gov/analytics/clusters?${params.toString()}`, {
+                    headers: clusterHeaders,
+                    signal: controller.signal,
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
+                }
+
+                const data = await res.json();
+                if (!isCancelled) {
+                    setClusters(Array.isArray(data.clusters) ? data.clusters : []);
+                }
+            } catch (err) {
+                if (isCancelled) return;
+                if (err.name === 'AbortError' || controller.signal.aborted) {
+                    console.error('DBSCAN clustering aborted or timed out (15s limit):', err);
+                    setClusteringError('Analysis timed out. Please check connection and try again.');
+                } else {
+                    console.error('DBSCAN clustering failed:', err);
+                    setClusteringError(err.message || 'Failed to complete spatial clustering');
+                }
+            } finally {
+                clearTimeout(timeoutId);
+                if (!isCancelled) {
+                    setClusteringLoading(false);
+                }
+            }
+        };
+
+        runClustering();
+
+        return () => {
+            isCancelled = true;
+            clearTimeout(timeoutId);
+            controller.abort();
+        };
+    }, [daysBack, categoryFilter, clusterRetryTrigger]);
 
     // ── Fetch Live Reports ──────────────────────────────────────────────────
     const fetchLiveReports = useCallback(async () => {
@@ -441,11 +510,13 @@ export default function GovAnalyticsPage({ workspace }) {
         return '#6366f1';
     };
 
-    const filteredClusters = clusters.filter(c =>
-        !searchTerm ||
-        c.barangay?.includes(searchTerm) ||
-        c.dominant_category?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredClusters = useMemo(() => {
+        return (clusters || []).filter(c =>
+            !searchTerm ||
+            c.barangay?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.dominant_category?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [clusters, searchTerm]);
 
     const TABS = [
         { key: 'map',        label: 'Intelligence Map',  icon: Globe },
@@ -455,6 +526,10 @@ export default function GovAnalyticsPage({ workspace }) {
         { key: 'recurrence', label: 'Chronic Failures',  icon: RotateCcw },
     ];
 
+    const formatAnalyticsTicketId = (r) => {
+        return formatTicketId(r?.ticket_id || r?.report_id, r?.id, true);
+    };
+
     // Reports tab filtered list
     const filteredLiveReports = liveReports.filter(r => {
         if (!reportSearch) return true;
@@ -463,14 +538,60 @@ export default function GovAnalyticsPage({ workspace }) {
             (r.full_location || '').toLowerCase().includes(s) ||
             (r.category || '').toLowerCase().includes(s) ||
             (r.description || '').toLowerCase().includes(s) ||
+            (r.ticket_id || '').toLowerCase().includes(s) ||
             (r.report_id || '').toLowerCase().includes(s) ||
+            formatAnalyticsTicketId(r).toLowerCase().includes(s) ||
             (r.location_barangay || '').toLowerCase().includes(s)
         );
     });
 
-    // Urgency/status color helpers for reports tab
-    const urgencyColor = u => ({ Critical: 'text-red-400 bg-red-900/20 border-red-800/40', High: 'text-orange-400 bg-orange-900/20 border-orange-800/40', Medium: 'text-yellow-400 bg-yellow-900/20 border-yellow-800/40', Low: 'text-green-400 bg-green-900/20 border-green-800/40' }[u] || 'text-slate-400 bg-slate-800 border-slate-700');
-    const statusColor = s => ({ pending: 'text-slate-300 bg-slate-800 border-slate-700', validated: 'text-blue-400 bg-blue-900/20 border-blue-800/40', dispatched: 'text-indigo-400 bg-indigo-900/20 border-indigo-800/40', in_progress: 'text-yellow-400 bg-yellow-900/20 border-yellow-800/40', resolved: 'text-green-400 bg-green-900/20 border-green-800/40', approved_internal: 'text-violet-400 bg-violet-900/20 border-violet-800/40' }[s] || 'text-slate-400 bg-slate-800 border-slate-700');
+    // Urgency/status color helpers for reports tab (high-contrast in both Light & Dark themes)
+    const urgencyColor = u => {
+        if (isDarkMode) {
+            return ({
+                Critical: 'text-red-300 bg-red-950/60 border-red-700/60',
+                High: 'text-orange-300 bg-orange-950/60 border-orange-700/60',
+                Medium: 'text-amber-300 bg-amber-950/60 border-amber-700/60',
+                Low: 'text-emerald-300 bg-emerald-950/60 border-emerald-700/60',
+            }[u] || 'text-slate-200 bg-slate-800 border-slate-600');
+        }
+        return ({
+            Critical: 'text-red-700 bg-red-50 border-red-300',
+            High: 'text-orange-700 bg-orange-50 border-orange-300',
+            Medium: 'text-amber-800 bg-amber-50 border-amber-300',
+            Low: 'text-emerald-700 bg-emerald-50 border-emerald-300',
+        }[u] || 'text-slate-700 bg-slate-100 border-slate-300');
+    };
+
+    const statusColor = s => {
+        const key = String(s || 'pending').toLowerCase();
+        if (isDarkMode) {
+            return ({
+                pending: 'text-amber-300 bg-amber-950/60 border-amber-700/60',
+                unverified: 'text-amber-300 bg-amber-950/60 border-amber-700/60',
+                pending_approval: 'text-amber-300 bg-amber-950/60 border-amber-700/60',
+                validated: 'text-blue-300 bg-blue-950/60 border-blue-700/60',
+                verified: 'text-blue-300 bg-blue-950/60 border-blue-700/60',
+                dispatched: 'text-orange-300 bg-orange-950/60 border-orange-700/60',
+                in_progress: 'text-orange-300 bg-orange-950/60 border-orange-700/60',
+                resolved: 'text-emerald-300 bg-emerald-950/60 border-emerald-700/60',
+                approved_internal: 'text-violet-300 bg-violet-950/60 border-violet-700/60',
+                rejected: 'text-rose-300 bg-rose-950/60 border-rose-700/60',
+            }[key] || 'text-slate-200 bg-slate-800 border-slate-600');
+        }
+        return ({
+            pending: 'text-amber-800 bg-amber-100 border-amber-300',
+            unverified: 'text-amber-800 bg-amber-100 border-amber-300',
+            pending_approval: 'text-amber-800 bg-amber-100 border-amber-300',
+            validated: 'text-blue-700 bg-blue-50 border-blue-300',
+            verified: 'text-blue-700 bg-blue-50 border-blue-300',
+            dispatched: 'text-orange-700 bg-orange-50 border-orange-300',
+            in_progress: 'text-orange-700 bg-orange-50 border-orange-300',
+            resolved: 'text-emerald-700 bg-emerald-50 border-emerald-300',
+            approved_internal: 'text-violet-700 bg-violet-50 border-violet-300',
+            rejected: 'text-rose-700 bg-rose-50 border-rose-300',
+        }[key] || 'text-slate-700 bg-slate-100 border-slate-300');
+    };
 
     return (
         <div className={`flex h-screen overflow-hidden ${isDarkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
@@ -590,29 +711,47 @@ export default function GovAnalyticsPage({ workspace }) {
                             {/* Cluster List Sidebar */}
                             <div className={`w-80 border-r flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
                                 <div className={`p-4 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                                    <div className="relative">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                        <input
-                                            type="text" placeholder="Search barangay or category..."
-                                            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                            className={`w-full border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 ${
-                                                isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'
-                                            }`}
-                                        />
-                                    </div>
-                                    <p className="text-xs text-slate-500 font-bold mt-2">{filteredClusters.length} stress zone{filteredClusters.length !== 1 ? 's' : ''} detected</p>
+                                    <SearchInput
+                                        value={searchTerm}
+                                        onChange={setSearchTerm}
+                                        placeholder="Search barangay or category"
+                                        ariaLabel="Search barangay or category"
+                                        onClear={() => setSearchTerm('')}
+                                        className="w-full"
+                                    />
+                                    <p className="text-xs text-slate-500 font-bold mt-2">
+                                        {clusteringLoading 
+                                            ? '- stress zones detected' 
+                                            : `${filteredClusters.length} stress zone${filteredClusters.length !== 1 ? 's' : ''} detected`
+                                        }
+                                    </p>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                                    {loading ? (
+                                    {clusteringLoading ? (
                                         <div className="text-center py-12 text-slate-500">
-                                            <Loader2 size={24} className="animate-spin mx-auto mb-2" />
-                                            Running DBSCAN clustering...
+                                            <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-500" />
+                                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Running DBSCAN clustering...</p>
+                                            <p className="text-xs text-slate-400 mt-1">Analyzing spatial density (100m radius)</p>
+                                        </div>
+                                    ) : clusteringError ? (
+                                        <div className="text-center py-10 px-4 text-slate-500">
+                                            <AlertTriangle size={32} className="mx-auto mb-2 text-rose-500 opacity-80" />
+                                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">We couldn't analyze this right now.</p>
+                                            <p className="text-xs text-slate-400 mt-1 max-w-[200px] mx-auto mb-3">{clusteringError}</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setClusterRetryTrigger(prev => prev + 1)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer shadow-sm"
+                                            >
+                                                <RotateCcw size={13} />
+                                                Retry
+                                            </button>
                                         </div>
                                     ) : filteredClusters.length === 0 ? (
                                         <div className="text-center py-12 text-slate-500">
                                             <Target size={32} className="mx-auto mb-2 opacity-30" />
-                                            <p className="text-sm font-bold">No stress zones detected</p>
-                                            <p className="text-xs mt-1">Try a wider date range</p>
+                                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No stress zones found for the selected period.</p>
+                                            <p className="text-xs text-slate-400 mt-1">Try a wider date range or clear filters</p>
                                         </div>
                                     ) : filteredClusters.map(c => (
                                         <ClusterCard key={c.cluster_id} cluster={c}
@@ -687,39 +826,15 @@ export default function GovAnalyticsPage({ workspace }) {
                                                     options={{ zIndex: 20 }}
                                                 />
                                             )}
-                                            {/* Caloocan City Borders — North & South (Orange) */}
-                                            {borderData?.features?.map((feature, i) => {
-                                                const props = feature.properties || {};
-                                                const sector = props.sector || 'Caloocan';
-                                                const isNorth = sector === 'North';
-                                                // Respect toggles
-                                                if (isNorth && !showNorthBorder) return null;
-                                                if (!isNorth && !showSouthBorder) return null;
-
-                                                const polygonOptions = {
-                                                    strokeColor: isNorth ? '#f97316' : '#ff6b00',
-                                                    strokeOpacity: 1.0,
-                                                    strokeWeight: isNorth ? 2.5 : 2.5,
-                                                    fillColor: isNorth ? '#f97316' : '#ff6b00',
-                                                    fillOpacity: isNorth
-                                                        ? (isDarkMode ? 0.10 : 0.06)
-                                                        : (isDarkMode ? 0.08 : 0.05),
-                                                    clickable: false,
-                                                    zIndex: isNorth ? 2 : 1,
-                                                };
-
-                                                const paths = feature.geometry.type === 'MultiPolygon'
-                                                    ? feature.geometry.coordinates.map(poly => poly[0].map(c => ({ lng: c[0], lat: c[1] })))
-                                                    : [feature.geometry.coordinates[0].map(c => ({ lng: c[0], lat: c[1] }))];
-
-                                                return paths.map((path, pi) => (
-                                                    <PolygonF
-                                                        key={`border-${i}-${pi}`}
-                                                        paths={path}
-                                                        options={polygonOptions}
-                                                    />
-                                                ));
-                                            })}
+                                            {/* Caloocan City Borders — Unified Single Orange Style */}
+                                            {(showNorthBorder || showSouthBorder) && (
+                                                <CaloocanBoundaryLayer
+                                                    activeSector={showNorthBorder && showSouthBorder ? 'all' : showNorthBorder ? 'north' : 'south'}
+                                                    isDarkMode={isDarkMode}
+                                                    showBarangays={true}
+                                                    showLabels={false}
+                                                />
+                                            )}
                                         </GoogleMap>
                                     ) : (
                                         <div className={`w-full h-full flex items-center justify-center text-slate-500 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
@@ -934,38 +1049,54 @@ export default function GovAnalyticsPage({ workspace }) {
                     {activeTab === 'reports' && (
                         <div className="flex-1 flex flex-col overflow-hidden">
                             {/* Filters bar */}
-                            <div className={`px-8 py-3 flex items-center gap-3 shrink-0 border-b ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
-                                <div className="relative flex-1 max-w-sm">
-                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                    <input type="text" placeholder="Search location, category, description..."
-                                        value={reportSearch} onChange={e => setReportSearch(e.target.value)}
-                                        className={`w-full border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}
-                                    />
-                                </div>
-                                <select value={reportStatusFilter} onChange={e => setReportStatusFilter(e.target.value)}
-                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
-                                    <option value="">All Statuses</option>
-                                    {['pending','validated','dispatched','approved_internal','in_progress','resolved'].map(s => (
-                                        <option key={s} value={s}>{s.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
-                                    ))}
-                                </select>
-                                <select value={reportCategoryFilter} onChange={e => setReportCategoryFilter(e.target.value)}
-                                    className={`border text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
-                                    <option value="">All Categories</option>
-                                    {[
-                                        { value: 'roads_bridges', label: 'Roads & Bridges' },
-                                        { value: 'water_drainage', label: 'Water & Drainage' },
-                                        { value: 'street_lighting', label: 'Street Lighting' },
-                                        { value: 'public_safety_regulatory', label: 'Public Safety & Regulatory' },
-                                        { value: 'public_facilities', label: 'Public Facilities' },
-                                        { value: 'other', label: 'Others' }
-                                    ].map(c => (
-                                        <option key={c.value} value={c.value}>{c.label}</option>
-                                    ))}
-                                </select>
+                            <div className={`px-8 py-3 flex items-center gap-3 flex-wrap shrink-0 border-b relative z-30 ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                <SearchInput
+                                    value={reportSearch}
+                                    onChange={setReportSearch}
+                                    placeholder="Search location, category, description..."
+                                    ariaLabel="Search location, category, description"
+                                    onClear={() => setReportSearch('')}
+                                    className="flex-1 min-w-[240px] max-w-sm"
+                                />
+                                <OrangeSelect
+                                    value={reportStatusFilter}
+                                    onChange={setReportStatusFilter}
+                                    size="md"
+                                    minWidth="175px"
+                                    searchable={false}
+                                    icon={Filter}
+                                    placeholder="All Statuses"
+                                    options={[
+                                        { value: '', label: 'All Statuses', description: 'Show reports across every workflow state' },
+                                        { value: 'pending', label: 'Pending', description: 'Newly submitted reports awaiting triage' },
+                                        { value: 'validated', label: 'Validated', description: 'Verified reports ready for dispatch' },
+                                        { value: 'dispatched', label: 'Dispatched', description: 'Assigned to field engineering crew' },
+                                        { value: 'approved_internal', label: 'Approved Internal', description: 'Cleared by internal engineering review' },
+                                        { value: 'in_progress', label: 'In Progress', description: 'Active repair or field work underway' },
+                                        { value: 'resolved', label: 'Resolved', description: 'Completed and verified field resolution' }
+                                    ]}
+                                />
+                                <OrangeSelect
+                                    value={reportCategoryFilter}
+                                    onChange={setReportCategoryFilter}
+                                    size="md"
+                                    minWidth="210px"
+                                    searchable={false}
+                                    icon={Layers}
+                                    placeholder="All Categories"
+                                    options={[
+                                        { value: '', label: 'All Categories', description: 'All civic infrastructure domains' },
+                                        { value: 'roads_bridges', label: 'Roads & Bridges', description: 'Potholes, pavement collapse, and bridge defects' },
+                                        { value: 'water_drainage', label: 'Water & Drainage', description: 'Flooding, clogged canals, and culvert damage' },
+                                        { value: 'street_lighting', label: 'Street Lighting', description: 'Broken luminaires, poles, and wiring' },
+                                        { value: 'public_safety_regulatory', label: 'Public Safety & Regulatory', description: 'Safety hazards and regulatory compliance' },
+                                        { value: 'public_facilities', label: 'Public Facilities', description: 'Courts, barangay halls, and public structures' },
+                                        { value: 'other', label: 'Others', description: 'General civic engineering concerns' }
+                                    ]}
+                                />
                                 <button onClick={fetchLiveReports} disabled={liveReportsLoading}
-                                    className={`flex items-center gap-1.5 border font-bold text-sm px-3 py-2 rounded-xl transition-colors disabled:opacity-50 ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}>
-                                    <RefreshCw size={13} className={liveReportsLoading ? 'animate-spin' : ''} /> Refresh
+                                    className={`flex items-center gap-1.5 border font-bold text-sm px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer disabled:opacity-50 ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                    <RefreshCw size={14} className={liveReportsLoading ? 'animate-spin' : ''} /> Refresh
                                 </button>
                                 <div className="ml-auto">
                                     <span className={`text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -1014,9 +1145,11 @@ export default function GovAnalyticsPage({ workspace }) {
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${urgencyColor(r.urgency)}`}>{r.urgency}</span>
                                                             <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${statusColor(r.status)}`}>{r.status?.replace(/_/g,' ')}</span>
-                                                            <span className={`text-[10px] font-semibold capitalize ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{r.category?.replace(/_/g,' ')}</span>
+                                                            <span className={`text-[10px] font-bold capitalize ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{r.category?.replace(/_/g,' ')}</span>
                                                         </div>
-                                                        <span className={`shrink-0 text-[10px] font-black font-mono ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{r.report_id}</span>
+                                                        <span className={`shrink-0 text-[11px] font-black font-mono px-2.5 py-0.5 rounded-md border ${isDarkMode ? 'bg-slate-800/80 text-orange-400 border-slate-700' : 'bg-slate-100 text-slate-800 border-slate-200'}`}>
+                                                            {formatAnalyticsTicketId(r)}
+                                                        </span>
                                                     </div>
                                                     {/* FULL LOCATION — not lat/lng */}
                                                     <div className="flex items-start gap-1.5 mb-1.5">
@@ -1098,12 +1231,15 @@ export default function GovAnalyticsPage({ workspace }) {
                     {/* ── Stress Zones Tab ── */}
                     {activeTab === 'clusters' && (
                         <div className="flex-1 overflow-y-auto p-8">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="relative flex-1 max-w-xs">
-                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                    <input type="text" placeholder="Search zones..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                        className="w-full bg-slate-900 border border-slate-700 text-slate-300 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
-                                </div>
+                            <div className="flex items-center gap-4 mb-6 relative z-30">
+                                <SearchInput
+                                    value={searchTerm}
+                                    onChange={setSearchTerm}
+                                    placeholder="Search zones..."
+                                    ariaLabel="Search zones"
+                                    onClear={() => setSearchTerm('')}
+                                    className="flex-1 max-w-xs"
+                                />
                                 <OrangeSelect
                                     value={categoryFilter}
                                     onChange={setCategoryFilter}
@@ -1127,11 +1263,13 @@ export default function GovAnalyticsPage({ workspace }) {
                             </div>
                             <div className={`border rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                                 <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-                                    <span className="font-bold text-slate-300">{filteredClusters.length} Infrastructure Stress Zones</span>
+                                    <span className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                        {clusteringLoading ? '-' : filteredClusters.length} Infrastructure Stress Zone{filteredClusters.length !== 1 ? 's' : ''}
+                                    </span>
                                     <span className="text-xs text-slate-500 font-semibold">Sorted by threat severity</span>
                                 </div>
                                 <table className="w-full">
-                                    <thead className={`text-xs uppercase font-bold border-b ${isDarkMode ? 'text-slate-500 border-slate-800' : 'text-slate-400 border-slate-100 bg-slate-50/50'}`}>
+                                    <thead className={`text-xs uppercase font-bold border-b ${isDarkMode ? 'text-slate-500 border-slate-800' : 'text-slate-500 border-slate-100 bg-slate-50/50'}`}>
                                         <tr>
                                             <th className="p-4 text-left">Zone</th>
                                             <th className="p-4 text-left">Category</th>
@@ -1144,22 +1282,54 @@ export default function GovAnalyticsPage({ workspace }) {
                                         </tr>
                                     </thead>
                                     <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                        {filteredClusters.map(c => (
+                                        {clusteringLoading ? (
+                                            <tr>
+                                                <td colSpan={8} className="p-10 text-center text-slate-500">
+                                                    <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-500" />
+                                                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Running DBSCAN clustering...</p>
+                                                    <p className="text-xs text-slate-400 mt-1">Analyzing spatial density within 100m</p>
+                                                </td>
+                                            </tr>
+                                        ) : clusteringError ? (
+                                            <tr>
+                                                <td colSpan={8} className="p-10 text-center text-slate-500">
+                                                    <AlertTriangle size={28} className="mx-auto mb-2 text-rose-500" />
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">We couldn't analyze this right now.</p>
+                                                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto mb-3">{clusteringError}</p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setClusterRetryTrigger(prev => prev + 1)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
+                                                    >
+                                                        <RotateCcw size={13} />
+                                                        Retry
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ) : filteredClusters.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={8} className="p-10 text-center text-slate-500">
+                                                    <Target size={32} className="mx-auto mb-2 opacity-30" />
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No stress zones found for the selected period.</p>
+                                                    <p className="text-xs text-slate-400 mt-1">Try expanding the date filter or clearing filters</p>
+                                                </td>
+                                            </tr>
+                                        ) : filteredClusters.map(c => (
                                             <tr key={c.cluster_id} className={`transition-colors cursor-pointer ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}`}
                                                 onClick={() => { setActiveTab('map'); setSelectedCluster(c); }}>
                                                 <td className="p-4"><ThreatBadge level={c.threat_level} /></td>
-                                                <td className="p-4 font-bold text-slate-300">
+                                                <td className={`p-4 font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-800'}`}>
                                                     {CATEGORY_LABELS[c.dominant_category] || c.dominant_category.replace(/_/g,' ').replace(/\b\w/g, l => l.toUpperCase())}
                                                 </td>
-                                                <td className="p-4 text-slate-400 font-semibold">Brgy {c.barangay}</td>
-                                                <td className="p-4 text-right font-black text-white">{c.report_count}</td>
-                                                <td className="p-4 text-right font-bold text-orange-400">{c.severity_score.toFixed(1)}</td>
+                                                <td className={`p-4 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Brgy {c.barangay}</td>
+                                                <td className={`p-4 text-right font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{c.report_count}</td>
+                                                <td className={`p-4 text-right font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>{c.severity_score.toFixed(1)}</td>
                                                 <td className="p-4 text-right">
-                                                    <span className={`font-bold text-sm ${c.recurrence_score > 0.6 ? 'text-red-400' : c.recurrence_score > 0.3 ? 'text-orange-400' : 'text-green-400'}`}>
+                                                    <span className={`font-bold text-sm ${c.recurrence_score > 0.6 ? (isDarkMode ? 'text-red-400' : 'text-red-600') : c.recurrence_score > 0.3 ? (isDarkMode ? 'text-orange-400' : 'text-orange-600') : (isDarkMode ? 'text-green-400' : 'text-emerald-600')}`}>
                                                         {(c.recurrence_score * 100).toFixed(0)}%
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-right font-bold text-emerald-400 font-mono text-sm">{c.estimated_cost_formatted}</td>
+                                                <td className={`p-4 text-right font-bold font-mono text-sm ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>{c.estimated_cost_formatted}</td>
                                                 <td className="p-4 text-right">
                                                     <button
                                                         onClick={e => { e.stopPropagation(); setActiveTab('map'); setSelectedCluster(c); }}

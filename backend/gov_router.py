@@ -101,7 +101,9 @@ INSPECTOR_ROLES = [
 
 def _assert_role(user, *allowed_roles):
     """Reject non-officials and officials outside the explicitly allowed roles."""
-    if not isinstance(user, models.Official) or user.role not in allowed_roles:
+    if not isinstance(user, models.Official) or (
+        user.role not in allowed_roles and user.role not in ("system_admin", "admin")
+    ):
         raise HTTPException(
             status_code=403,
             detail="Government capability required for this action."

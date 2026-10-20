@@ -700,7 +700,13 @@
         "resAddress": "Residential Address",
         "connectivity": "Contact Connectivity",
         "secureEmail": "Secure Email",
-        "mobileNumber": "Mobile Number"
+        "mobileNumber": "Mobile Number",
+        "darkMode": "Dark mode",
+        "lightMode": "Light mode",
+        "darkModeOn": "Dark mode on",
+        "lightModeOn": "Light mode on",
+        "darkModeEnabled": "Dark mode enabled",
+        "lightModeEnabled": "Light mode enabled"
       },
       "settings": {
         "portal": "Security Portal",
@@ -776,8 +782,13 @@
         "s1_desc": "Residents are accountable for the accuracy of their reports. Submitting false or fake reports may result in account restrictions or suspension."
       },
       "topNav": {
-        "searchPlaceholder": "Search PULSO...",
-        "recentSearches": "Recent Searches"
+        "greeting": "Hello, {{name}}",
+        "headline": "Your city, your reports",
+        "searchPlaceholder": "Search PULSO",
+        "searchCompactPlaceholder": "Search",
+        "recentSearches": "Recent Searches",
+        "notifications": "Notifications",
+        "notificationsUnread": "Notifications, {{count}} unread"
       }
     },
     "knowledge": {

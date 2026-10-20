@@ -97,7 +97,7 @@ export default function GovNotificationDropdown() {
             <button
                 type="button"
                 onClick={() => setIsOpen((prev) => !prev)}
-                className={`relative p-2 rounded-xl transition-all duration-150 cursor-pointer ${
+                className={`relative w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
                     isOpen
                         ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00]'
                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
@@ -107,8 +107,8 @@ export default function GovNotificationDropdown() {
             >
                 <Bell size={18} />
                 {unreadCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#ff6b00] text-white text-[10px] font-mono-data font-bold flex items-center justify-center shadow-xs animate-pulse">
-                        {unreadCount}
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ff6b00] text-white text-[10px] font-mono-data font-bold flex items-center justify-center shadow-xs border-2 border-white dark:border-[#090e1a] pointer-events-none z-10">
+                        {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
             </button>

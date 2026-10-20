@@ -1,9 +1,10 @@
 import React from 'react';
-import { Sun, Moon, Monitor } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function ResidentThemeToggle({ size = 14, className = '', isOverHero = false }) {
-    const { theme, changeTheme } = useTheme();
+    const { theme, changeTheme, isDark } = useTheme();
+    const isDarkActive = isDark ?? (theme === 'dark');
 
     return (
         <div className={`flex items-center rounded-xl p-0.5 sm:p-1 transition-all ${
@@ -15,7 +16,7 @@ export default function ResidentThemeToggle({ size = 14, className = '', isOverH
                 type="button"
                 onClick={() => changeTheme('light')}
                 className={`p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer ${
-                    theme === 'light'
+                    !isDarkActive
                         ? isOverHero
                             ? 'bg-white text-orange-600 shadow-sm'
                             : 'bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-xs'
@@ -25,31 +26,15 @@ export default function ResidentThemeToggle({ size = 14, className = '', isOverH
                 }`}
                 title="Light Mode"
                 aria-label="Light mode"
+                aria-pressed={!isDarkActive}
             >
                 <Sun size={size} />
             </button>
             <button
                 type="button"
-                onClick={() => changeTheme('system')}
-                className={`p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer ${
-                    theme === 'system'
-                        ? isOverHero
-                            ? 'bg-white/25 text-white shadow-sm'
-                            : 'bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-xs'
-                        : isOverHero
-                            ? 'text-white/70 hover:text-white'
-                            : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}
-                title="System Theme"
-                aria-label="System theme"
-            >
-                <Monitor size={size} />
-            </button>
-            <button
-                type="button"
                 onClick={() => changeTheme('dark')}
                 className={`p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer ${
-                    theme === 'dark'
+                    isDarkActive
                         ? isOverHero
                             ? 'bg-slate-900/90 text-orange-400 shadow-sm border border-white/20'
                             : 'bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-xs'
@@ -59,6 +44,7 @@ export default function ResidentThemeToggle({ size = 14, className = '', isOverH
                 }`}
                 title="Dark Mode"
                 aria-label="Dark mode"
+                aria-pressed={isDarkActive}
             >
                 <Moon size={size} />
             </button>

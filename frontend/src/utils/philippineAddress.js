@@ -578,6 +578,69 @@ export function formatNearbyAddress(addressOrStructured) {
 }
 
 /**
+ * Formats a nearby report's location for the Nearby Issues list.
+ * Returns { primary, secondary }:
+ *   primary: Specific Street / Landmark / Subdivision / Plus Code
+ *   secondary: Barangay, Caloocan
+ */
+export function formatNearbyIssueLocation(issue) {
+    if (!issue) return { primary: 'Caloocan City', secondary: 'Metro Manila' };
+
+    const rawLoc = issue.location_string || issue.location || issue.address || '';
+    const lat = issue.lat ?? issue.location_lat;
+    const lng = issue.lng ?? issue.location_lng;
+    const parsed = typeof rawLoc === 'string'
+        ? parseAddressString(rawLoc, lat, lng)
+        : (rawLoc || {});
+
+    const details = issue.location_details || {};
+    const landmark = details.landmark || '';
+    const subdivision = details.subdivision || parsed.subdivision || '';
+    const street = details.houseNumber
+        ? `${details.houseNumber} ${parsed.streetAddress || ''}`.trim()
+        : (parsed.streetAddress || '');
+    const plusCode = parsed.plusCode || extractCleanPlusCode(rawLoc, lat, lng);
+
+    // 1. Identify specific landmark, street, subdivision, or plus code
+    const specificParts = [landmark, subdivision, street, plusCode].filter(Boolean);
+    let primary = specificParts[0] || '';
+
+    // If still no primary, check if rawLoc has a prefix before "Barangay"
+    if (!primary && typeof rawLoc === 'string') {
+        const brgyIdx = rawLoc.toLowerCase().indexOf('barangay');
+        if (brgyIdx > 0) {
+            const beforeBrgy = rawLoc.slice(0, brgyIdx).replace(/[,\s]+$/, '').trim();
+            if (beforeBrgy && !/^lat:?/i.test(beforeBrgy)) {
+                primary = beforeBrgy;
+            }
+        }
+    }
+
+    const brgy = issue.barangay || parsed.barangay || '';
+    const cleanBrgy = brgy ? `Barangay ${String(brgy).replace(/^Barangay\s*/i, '')}` : '';
+
+    if (primary) {
+        return {
+            primary,
+            secondary: cleanBrgy ? `${cleanBrgy}, Caloocan` : 'Caloocan City'
+        };
+    }
+
+    // Fallback: If only barangay is known, primary is Barangay, secondary is Caloocan City
+    if (cleanBrgy) {
+        return {
+            primary: cleanBrgy,
+            secondary: 'Caloocan City'
+        };
+    }
+
+    return {
+        primary: 'Caloocan City',
+        secondary: 'Metro Manila'
+    };
+}
+
+/**
  * Validates whether address meets minimum viable standard:
  * Plus Code + Barangay + City + ZIP
  * Returns true if barangay is resolved.
@@ -597,11 +660,9 @@ export function isMinimumViableAddress(structured) {
 export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates = null) {
     if (!addressOrStructured) {
         if (fallbackCoordinates && fallbackCoordinates.lat && fallbackCoordinates.lng) {
-            const pc = extractCleanPlusCode('', fallbackCoordinates.lat, fallbackCoordinates.lng);
             const brgy = findBarangayByCoordinates(fallbackCoordinates.lat, fallbackCoordinates.lng);
             const postal = brgy ? getPostalCodeForBarangay(brgy.name) : '1421';
             const parts = [
-                pc,
                 brgy ? brgy.name : 'Barangay 171',
                 'Caloocan',
                 `${postal} Metro Manila`
@@ -616,13 +677,8 @@ export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates 
         : addressOrStructured;
 
     if (!s) {
-        return typeof addressOrStructured === 'string' ? addressOrStructured : 'Caloocan City';
-    }
-
-    // Resolve Plus Code
-    let pc = s.plusCode;
-    if (!pc && fallbackCoordinates?.lat && fallbackCoordinates?.lng) {
-        pc = extractCleanPlusCode('', fallbackCoordinates.lat, fallbackCoordinates.lng);
+        const raw = typeof addressOrStructured === 'string' ? addressOrStructured : 'Caloocan City';
+        return raw.replace(/\b[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,4}\b,?\s*/gi, '').trim().replace(/,\s*$/, '');
     }
 
     // Resolve Barangay
@@ -644,7 +700,8 @@ export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates 
     const city = s.city ? s.city.replace(/\s*City$/i, '') : 'Caloocan';
 
     // Assemble components in standard order:
-    // [Subdivision], [Street / Block-Lot], [Plus Code], [Barangay], [City], [ZIP Region]
+    // [Subdivision / Building], [Street / Block-Lot], [Barangay], [City], [ZIP Region]
+    // STRICT RULE: Do NOT put a Plus Code in the address.
     const parts = [];
 
     if (s.subdivision) {
@@ -652,11 +709,9 @@ export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates 
     }
 
     if (s.streetAddress && (!s.subdivision || !s.streetAddress.includes(s.subdivision))) {
-        parts.push(s.streetAddress);
-    }
-
-    if (pc) {
-        parts.push(pc);
+        // Strip any inline plus code
+        const cleanStreet = s.streetAddress.replace(/\b[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,4}\b,?\s*/gi, '').trim().replace(/,\s*$/, '');
+        if (cleanStreet) parts.push(cleanStreet);
     }
 
     if (brgy) {

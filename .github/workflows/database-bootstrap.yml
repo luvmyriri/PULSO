@@ -49,7 +49,7 @@ jobs:
         working-directory: backend
         run: |
           python -m alembic -c alembic.ini current
-          python ../scripts/db_schema.py assert-revision e4b7c9d2f610
+          python ../scripts/db_schema.py assert-revision f3a6d8c1b250
       - name: Compare normalized schema inventory
         run: |
           python scripts/db_schema.py inventory --output "$RUNNER_TEMP/head-inventory.json"
@@ -58,7 +58,7 @@ jobs:
           import sys
           from pathlib import Path
 
-          expected = json.loads(Path("backend/schema/head_e4b7c9d2f610.inventory.json").read_text())
+          expected = json.loads(Path("backend/schema/head_f3a6d8c1b250.inventory.json").read_text())
           actual = json.loads(Path(sys.argv[1]).read_text())
           assert actual == expected, "Normalized schema inventory differs from the checked-in manifest"
           print("Normalized schema inventory: PASS")

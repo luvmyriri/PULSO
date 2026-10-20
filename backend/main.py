@@ -28,6 +28,8 @@ import xml.etree.ElementTree as ET
 import email.utils
 from html import unescape
 load_dotenv()
+import mimetypes
+mimetypes.add_type("image/webp", ".webp")
 
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe") # Default to test key
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "1005696776742-cb6hpoeho2qap0plhgljboc3agf33d2s.apps.googleusercontent.com")
@@ -41,8 +43,10 @@ import gemini_service
 import deduplication_service
 import maps_service
 import sms_utils
+import analytics_service
 
 # Database imports
+import database
 import gov_models, gov_router, gov_schemas, gov_crud           # Government-side modules
 import models, schemas, crud
 import command_integrity
@@ -53,6 +57,9 @@ import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
 import pulseai_router                    # PULSEAI Persistent Chat & History Engine
 from database import get_db
+import spatial_router                    # PostGIS Spatial Queries & GeoEngine
+import admin_router                      # Staff, Residents, Settings & Governance
+from services.spatial_service import PUBLIC_REPORT_STATUSES
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter
@@ -75,7 +82,11 @@ class PublicUploadFiles(StaticFiles):
     async def get_response(self, path: str, scope):
         if path.replace("\\", "/").lstrip("/").split("/", 1)[0].lower() == "docs":
             raise HTTPException(status_code=404, detail="File not found")
-        return await super().get_response(path, scope)
+        response = await super().get_response(path, scope)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        return response
 
 
 app.mount("/api/uploads", PublicUploadFiles(directory="uploads"), name="uploads")
@@ -242,7 +253,12 @@ async def get_thumbnail(src: str = Query(..., description="Relative path to uplo
         return FileResponse(
             thumb_path,
             media_type="image/jpeg",
-            headers={"Cache-Control": "public, max-age=31536000, immutable"}
+            headers={
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Cross-Origin-Resource-Policy": "cross-origin",
+            }
         )
     except HTTPException:
         raise
@@ -273,7 +289,9 @@ get_current_user = auth.get_current_user
 def require_role(*roles):
     """Dependency factory for explicitly listed active government roles."""
     def _check(current_user: Union[models.Official, models.Resident] = Depends(get_current_user)):
-        if not isinstance(current_user, models.Official) or current_user.role not in roles:
+        if not isinstance(current_user, models.Official) or (
+            current_user.role not in roles and current_user.role not in ("system_admin", "admin")
+        ):
             raise HTTPException(status_code=403, detail="Government role required for this action.")
         return current_user
     return _check
@@ -329,6 +347,10 @@ app.include_router(announcements_router.router)
 app.include_router(announcements_router.public_router)
 # PULSEAI Persistent Chat & History Module
 app.include_router(pulseai_router.router)
+# PostGIS Spatial Engine (Reverse geocoding, Nearby, Viewport GeoJSON, Hotspots, Duplicates)
+app.include_router(spatial_router.router)
+# Administrative & Governance Engine (Staff, Residents, System Settings, Audit)
+app.include_router(admin_router.router)
 
 # ---------------------------------------------------------------------------
 # Health & Root
@@ -345,6 +367,30 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "service": "PULSO Core Engine"}
+
+@app.get("/api/analytics/stress-zones")
+def get_stress_zones_alias(
+    category: Optional[str] = Query(None, description="Filter by infrastructure category"),
+    days_back: int = Query(90, ge=7, le=365, description="Lookback window in days"),
+    min_points: int = Query(3, ge=2, le=20, description="Minimum reports to form a cluster"),
+    eps: float = Query(100.0, ge=10, le=2000, description="Clustering radius in meters"),
+    db: Session = Depends(get_db),
+    current_user=Depends(auth.get_current_user),
+):
+    """
+    DBSCAN spatial clustering endpoint for infrastructure stress zones.
+    Powered by PostgreSQL PostGIS ST_ClusterDBSCAN (units: meters).
+    """
+    if not isinstance(current_user, models.Official):
+        raise HTTPException(status_code=403, detail="Government capability required")
+    clusters = analytics_service.get_infrastructure_clusters(
+        db,
+        category_filter=category,
+        days_back=days_back,
+        min_samples=min_points,
+        radius_meters=eps,
+    )
+    return {"clusters": clusters, "count": len(clusters), "eps": eps, "min_points": min_points}
 
 @app.get("/api/ai/rate-limits")
 async def ai_rate_limit_status(
@@ -575,7 +621,9 @@ async def google_auth(
                     "phone_number": resident.phone_number,
                     "address": getattr(resident, "address", ""),
                     "display_name": getattr(resident, "display_name", resident.full_name),
+                    "avatar_url": resident.avatar_url,
                     "created_at": resident.created_at,
+                    "updated_at": resident.updated_at,
                     "is_verified": True,
                     "kyc_level": resident.kyc_level,
                     "capabilities": resident.capabilities,
@@ -721,7 +769,9 @@ async def google_complete_verification(
                 "phone_number": resident.phone_number,
                 "address": getattr(resident, "address", ""),
                 "display_name": getattr(resident, "display_name", resident.full_name),
+                "avatar_url": resident.avatar_url,
                 "created_at": resident.created_at,
+                "updated_at": resident.updated_at,
                 "kyc_level": resident.kyc_level,
                 "is_verified": resident.is_verified,
                 "capabilities": resident.capabilities,
@@ -873,11 +923,12 @@ async def login(
             detail="Account not verified. Please check your email for the verification code.",
         )
 
-    # 4. Check suspension status (Officials only)
-    if getattr(user, "is_suspended", False):
+    # 4. Check suspension status (Officials and Residents)
+    if getattr(user, "is_suspended", False) or getattr(user, "status", "active") == "suspended":
+        msg = "Account suspended by administration. Please contact City Engineering Administration." if getattr(user, "role", "") == "resident" else "Account suspended by administration. Please contact your department head."
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account suspended by administration. Please contact your department head.",
+            detail=msg,
         )
         
     from datetime import timedelta
@@ -897,7 +948,9 @@ async def login(
             "phone_number": user.phone_number,
             "address": getattr(user, "address", ""),
             "display_name": getattr(user, "display_name", user.full_name),
+            "avatar_url": user.avatar_url,
             "created_at": user.created_at,
+            "updated_at": getattr(user, "updated_at", None),
             "capabilities": user.capabilities,
             "access_level": getattr(getattr(user, "role_ref", None), "access_level", None)
         }
@@ -1519,7 +1572,9 @@ async def verify_phone_otp(req: VerifyPhoneOTPRequest, db: Session = Depends(get
             "phone_number": user.phone_number,
             "address": getattr(user, "address", ""),
             "display_name": getattr(user, "display_name", user.full_name),
+            "avatar_url": user.avatar_url,
             "created_at": user.created_at,
+            "updated_at": getattr(user, "updated_at", None),
             "capabilities": user.capabilities,
             "access_level": getattr(getattr(user, "role_ref", None), "access_level", None)
         }
@@ -1699,30 +1754,197 @@ def read_user_reports(
         
     return query.order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
 
+@app.get("/api/reports/heatmap")
+def get_reports_heatmap(db: Session = Depends(get_db)):
+    """
+    Authoritative public heatmap endpoint dynamically aggregating real database reports by barangay
+    using PostGIS spatial containment and returning public incident markers and density points.
+    """
+    import re
+    from services.spatial_service import locate_point, mask_coordinates_for_privacy
+
+    reports = db.query(models.Report).filter(
+        models.Report.location_lat.isnot(None),
+        models.Report.location_lng.isnot(None),
+        models.Report.status.in_(PUBLIC_REPORT_STATUSES)
+    ).order_by(models.Report.created_at.desc()).all()
+
+    barangay_counts = {}
+    barangay_details = {}
+    report_items = []
+    raw_points = []
+
+    for r in reports:
+        b_num = None
+        b_name = r.location_barangay
+
+        # 1. Check direct barangay relation or ID
+        if r.barangay_ref and r.barangay_ref.brgy_num:
+            b_num = r.barangay_ref.brgy_num
+            b_name = r.barangay_ref.display_name or f"Brgy. {b_num}"
+        elif r.barangay_id:
+            brgy = db.query(models.Barangay).filter(models.Barangay.id == r.barangay_id).first()
+            if brgy:
+                b_num = brgy.brgy_num
+                b_name = brgy.display_name or f"Brgy. {b_num}"
+
+        # 2. Dynamic PostGIS spatial resolution from GPS point
+        if b_num is None and r.location_lat and r.location_lng:
+            try:
+                loc = locate_point(db, float(r.location_lat), float(r.location_lng))
+                if loc and loc.get("brgy_num"):
+                    b_num = loc["brgy_num"]
+                    b_name = loc.get("barangay_display") or f"Brgy. {b_num}"
+            except Exception:
+                pass
+
+        # 3. Fallback regex extraction from string
+        if b_num is None and (r.barangay or b_name):
+            cand = r.barangay or b_name
+            num_match = re.search(r"\b(\d+)\b", cand)
+            if num_match:
+                b_num = int(num_match.group(1))
+                b_name = f"Brgy. {b_num}"
+
+        b_key = str(b_num) if b_num is not None else (b_name or "Caloocan City")
+        barangay_counts[b_key] = barangay_counts.get(b_key, 0) + 1
+
+        cat_lower = (r.category or "").lower()
+        cat_group = "road"
+        if "water" in cat_lower or "drainage" in cat_lower or "pipe" in cat_lower or "leak" in cat_lower or "flood" in cat_lower:
+            cat_group = "water"
+        elif "light" in cat_lower or "power" in cat_lower or "electric" in cat_lower or "lamp" in cat_lower:
+            cat_group = "power"
+        elif "safety" in cat_lower or "hazard" in cat_lower or "danger" in cat_lower or "debris" in cat_lower:
+            cat_group = "safety"
+        elif "facilit" in cat_lower or "building" in cat_lower or "park" in cat_lower or "hall" in cat_lower:
+            cat_group = "facilities"
+        elif "traffic" in cat_lower or "sign" in cat_lower or "signal" in cat_lower:
+            cat_group = "traffic"
+        elif "road" in cat_lower or "pothole" in cat_lower or "asphalt" in cat_lower or "bridge" in cat_lower:
+            cat_group = "road"
+        else:
+            cat_group = "others"
+
+        if b_key not in barangay_details:
+            barangay_details[b_key] = {
+                "brgy_num": b_num,
+                "display_name": b_name or (f"Brgy. {b_num}" if b_num else b_key),
+                "sector": r.sector or ("North" if r.location_lat and r.location_lat >= 14.70 else "South"),
+                "total": 0,
+                "categories": {
+                    "road": 0,
+                    "water": 0,
+                    "power": 0,
+                    "facilities": 0,
+                    "safety": 0,
+                    "traffic": 0,
+                    "others": 0
+                }
+            }
+        barangay_details[b_key]["total"] += 1
+        barangay_details[b_key]["categories"][cat_group] = barangay_details[b_key]["categories"].get(cat_group, 0) + 1
+
+        # Format public title safely from description or category
+        report_title = r.description[:90] if r.description else (r.category or "Civic Report")
+        if len(r.description or "") > 90:
+            report_title += "..."
+
+        full_addr = f"{b_name or (f'Brgy. {b_num}' if b_num else 'Caloocan City')}, Caloocan City" if b_num or b_name else "Caloocan City"
+        public_lat, public_lng = mask_coordinates_for_privacy(r.location_lat, r.location_lng)
+
+        report_items.append({
+            "id": r.id,
+            "ticket_id": r.ticket_id,
+            "category": r.category or "Infrastructure",
+            "category_group": cat_group,
+            "title": report_title,
+            "description": r.description or "",
+            "location_string": full_addr,
+            "full_address": full_addr,
+            "barangay": b_name or (f"Brgy. {b_num}" if b_num else "Caloocan City"),
+            "brgy_num": b_num,
+            "sector": r.sector or ("North" if r.location_lat and r.location_lat >= 14.70 else "South"),
+            "district": r.district or ("North Caloocan" if r.location_lat and r.location_lat >= 14.70 else "South Caloocan"),
+            "status": (r.status or "In Progress").replace("_", " ").title(),
+            "lat": public_lat,
+            "lng": public_lng,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "urgency": r.urgency
+        })
+
+        raw_points.append({
+            "lat": public_lat,
+            "lng": public_lng,
+            "weight": 2.0 if r.urgency in ["critical", "high"] else 1.0,
+            "category": r.category,
+            "ticket_id": r.ticket_id
+        })
+
+    max_count = max(barangay_counts.values()) if barangay_counts else 0
+
+    return {
+        "total_reports": len(reports),
+        "barangay_counts": barangay_counts,
+        "barangay_details": barangay_details,
+        "raw_points": raw_points,
+        "max_count": max_count,
+        "reports": report_items,
+        "last_updated": datetime.now(timezone.utc).isoformat()
+    }
+
 @app.get("/api/reports/public", response_model=List[schemas.ReportResponse])
 def read_public_reports(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 300,
     db: Session = Depends(get_db),
     current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
-    Returns public/verified reports that residents should see as 'Nearby Hazards'.
-    Excludes pending/unverified reports and anonymizes reporters for privacy.
+    Returns public reports that all residents can see as pin locations on the map.
+    Includes only reports approved for public display after validation.
+    Strictly strips and anonymizes all resident personal information (name, email, phone, user IDs, tracking tokens)
+    so viewers only see the reported pin location, category, status, and evidence.
     """
-    reports = crud.get_reports(db, skip=skip, limit=limit)
+    query = db.query(models.Report).filter(
+        models.Report.location_lat.isnot(None),
+        models.Report.location_lng.isnot(None),
+        models.Report.status.in_(PUBLIC_REPORT_STATUSES)
+    ).order_by(models.Report.created_at.desc())
     
-    # Filter for reports that are validated or further in the workflow
-    public_statuses = ["validated", "dispatched", "approved_internal", "in_progress", "resolved"]
-    public_reports = [r for r in reports if r.status in public_statuses]
+    db_reports = query.offset(skip).limit(min(limit, 500)).all()
     
-    # Anonymize reporter names if the requester is not an official or is another resident
-    for r in public_reports:
-        if not current_user or not isinstance(current_user, models.Official):
-            if not current_user or r.resident_id != current_user.id:
-                r.reporter_name = "Anonymous Resident"
-                
-    return public_reports
+    results = []
+    is_official = current_user is not None and isinstance(current_user, models.Official)
+    current_resident_id = current_user.id if (current_user is not None and isinstance(current_user, models.Resident)) else None
+
+    for r in db_reports:
+        is_owner = (current_resident_id is not None) and (
+            r.resident_id == current_resident_id or r.claimed_by_user_id == current_resident_id
+        )
+
+        resp = schemas.ReportResponse.model_validate(r)
+
+        # If requester is not an official and not the report author/claimant,
+        # strip all personal resident information so only the pin location & civic details are exposed
+        if not is_official and not is_owner:
+            resp.reporter_name = "Anonymous Resident"
+            resp.contact_email = None
+            resp.contact_phone = None
+            resp.resident_id = None
+            resp.claimed_by_user_id = None
+            resp.tracking_token = None
+            resp.tracking_url = None
+            resp.location_lat = round(resp.location_lat, 3) if resp.location_lat is not None else None
+            resp.location_lng = round(resp.location_lng, 3) if resp.location_lng is not None else None
+            resp.location_string = resp.location_barangay or resp.barangay or "Caloocan City"
+            resp.ai_metadata = None
+            resp.ai_reasoning = None
+            resp.budget = None
+
+        results.append(resp)
+
+    return results
 
 @app.get("/api/reports/{report_id}", response_model=schemas.ReportResponse)
 def read_report(
@@ -2012,8 +2234,8 @@ def track_report_status(
             is_authorized = True
         # Check phone match
         if not is_authorized and report.contact_phone:
-            clean_input = re.sub(r'\D', '', provided_contact)
-            clean_stored = re.sub(r'\D', '', report.contact_phone)
+            clean_input = req.sub(r'\D', '', provided_contact)
+            clean_stored = req.sub(r'\D', '', report.contact_phone)
             if len(clean_input) >= 10 and len(clean_stored) >= 10:
                 if clean_input[-10:] == clean_stored[-10:]:
                     is_authorized = True
@@ -2305,6 +2527,95 @@ def get_kyc_status(
         "registration_date": current_user.created_at
     }
 
+# ---------------------------------------------------------------------------
+# Profile Avatar Upload & Server-side Persistence
+# ---------------------------------------------------------------------------
+AVATAR_UPLOAD_DIR = "uploads/avatars"
+os.makedirs(AVATAR_UPLOAD_DIR, exist_ok=True)
+
+@app.post("/api/residents/{resident_id}/avatar")
+@app.post("/api/users/{resident_id}/avatar")
+async def upload_resident_avatar(
+    resident_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: Union[models.Resident, models.Official] = Depends(get_current_user)
+):
+    """
+    Upload and persist profile avatar on the server.
+    Validates MIME type (JPEG/PNG/WebP), limits size (2MB),
+    resizes server-side to 256x256 square, strips EXIF metadata,
+    stores in persistent uploads/avatars, and saves avatar_url in the database.
+    """
+    # 1. Authorization check
+    if current_user.id != resident_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this avatar")
+
+    # 2. Content-Type and extension validation
+    allowed_types = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+    content_type = (file.content_type or "").lower()
+    filename_ext = os.path.splitext(file.filename or "")[1].lower()
+    
+    if content_type not in allowed_types and filename_ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(status_code=400, detail="Invalid image format. Only JPEG, PNG, or WebP files are allowed.")
+
+    # 3. Size validation (max 2 MB = 2 * 1024 * 1024 bytes)
+    MAX_BYTES = 2 * 1024 * 1024
+    image_bytes = await file.read()
+    if len(image_bytes) > MAX_BYTES:
+        raise HTTPException(status_code=400, detail=f"File exceeds maximum limit of 2MB (received {round(len(image_bytes) / (1024*1024), 2)}MB)")
+
+    if len(image_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    # 4. Image decode, EXIF strip, and 256x256 square resize via PIL
+    try:
+        from PIL import Image, ImageOps
+        import io
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            # Transpose orientation per EXIF, then strip all EXIF metadata by omitting exif in save
+            img = ImageOps.exif_transpose(img)
+            # Resize and crop to 256x256 square using high quality LANCZOS
+            img_square = ImageOps.fit(img, (256, 256), Image.Resampling.LANCZOS)
+            
+            # Save as high-quality WebP for minimal payload and crisp cross-browser fidelity
+            avatar_filename = f"avatar_u{resident_id}_{int(datetime.now(timezone.utc).timestamp())}.webp"
+            avatar_filepath = os.path.join(AVATAR_UPLOAD_DIR, avatar_filename)
+            
+            if img_square.mode in ("RGBA", "LA") or (img_square.mode == "P" and "transparency" in img_square.info):
+                img_square.save(avatar_filepath, "WEBP", quality=90, method=6)
+            else:
+                img_square.convert("RGB").save(avatar_filepath, "WEBP", quality=90, method=6)
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Avatar processing failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid or corrupt image file.")
+
+    # 5. Persist relative public URL in database
+    public_url = f"/api/uploads/avatars/{avatar_filename}"
+    
+    # Check if target is a Resident or Official
+    user_model = models.Resident if isinstance(current_user, models.Resident) else models.Official
+    target_user = db.query(user_model).filter(user_model.id == resident_id).first()
+        
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_user.avatar_url = public_url
+    target_user.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(target_user)
+
+    version_param = int(target_user.updated_at.timestamp()) if target_user.updated_at else int(datetime.now(timezone.utc).timestamp())
+    versioned_url = f"{public_url}?v={version_param}"
+
+    return {
+        "status": "success",
+        "message": "Avatar uploaded and saved successfully.",
+        "avatar_url": public_url,
+        "versioned_avatar_url": versioned_url,
+        "updated_at": target_user.updated_at.isoformat() if target_user.updated_at else None
+    }
+
 @app.post("/api/residents/upgrade-kyc")
 async def upgrade_resident_kyc(
     front_image: UploadFile = File(...),
@@ -2409,7 +2720,7 @@ def update_report_status(
     if_match: Optional[str] = Header(None, alias="If-Match"),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "system_admin", "admin"))
 ):
     """Legacy verification command; other transitions use their dedicated routes."""
     status = status_update.status or status_update.targetStatus
@@ -2433,7 +2744,7 @@ def update_report_status(
     if expected is not None:
         command_integrity.check_version(getattr(report, 'version', 1), expected)
 
-    if report.status not in ("pending", "unverified", "needs_information"):
+    if report.status not in ("pending", "unverified", "needs_information", "received", "unvalidated", "under_review"):
         raise HTTPException(status_code=409, detail="Report is not eligible for verification")
     updated_report = crud.update_report_status(
         db=db, 
@@ -2462,7 +2773,7 @@ def reject_report(
     if_match: Optional[str] = Header(None, alias="If-Match"),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "system_admin", "admin"))
 ):
     """Record a reasoned intake rejection before a report enters field work."""
     reason = decision.reason.strip()
@@ -2485,7 +2796,7 @@ def reject_report(
     if expected is not None:
         command_integrity.check_version(getattr(report, 'version', 1), expected)
 
-    if report.status not in ("pending", "unverified", "needs_information", "pending_approval"):
+    if report.status not in ("pending", "unverified", "needs_information", "pending_approval", "received", "unvalidated", "under_review"):
         raise HTTPException(status_code=409, detail="Report cannot be rejected after approval or dispatch")
     updated_report = crud.reject_report(db, report_id=report_id, actor_id=current_user.id, reason=reason)
     if key:
