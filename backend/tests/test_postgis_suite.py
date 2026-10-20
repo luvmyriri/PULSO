@@ -200,13 +200,89 @@ def test_api_spatial_boundaries(synthetic_boundaries):
 
 
 def test_api_preventive_risk_inputs(clean_postgis, staff_client):
-    """Test /api/preventive/risk-inputs returns rule-based spatial recurrence counts."""
+    """Test /api/preventive/risk-inputs returns rule-based spatial recurrence counts + LightGBM TreeSHAP."""
     resp = client.get("/api/preventive/risk-inputs?days=90")
     assert resp.status_code == 200
     data = resp.json()
     assert "methodology" in data
     assert "window_days" in data
+    assert "ml_engine" in data
     assert "results" in data
+
+
+def test_lightgbm_postgis_predictive_integration(clean_postgis, staff_client):
+    """Verify LightGBM + PostGIS spatial rings, P50/P90 quantile turnaround, and TreeSHAP attributions."""
+    import gov_models
+    from auth import get_current_user
+    db = SessionLocal()
+    try:
+        asset = db.query(gov_models.InfrastructureAsset).filter_by(asset_id="AST-LGBM-001").first()
+        if not asset:
+            asset = gov_models.InfrastructureAsset(
+                asset_id="AST-LGBM-001",
+                asset_name="Camarin Drainage Culvert A",
+                category="Drainage",
+                barangay="175",
+                design_life=15,
+                condition_score=38.0,
+            )
+            db.add(asset)
+            db.commit()
+    finally:
+        db.close()
+
+    app.dependency_overrides[get_current_user] = lambda: models.Official(id=1, role="system_admin")
+    try:
+        resp_health = client.get("/api/gov/predictive/health")
+        assert resp_health.status_code == 200
+        h_data = resp_health.json()
+        assert "ml_engine" in h_data
+        assert h_data["ml_engine"]["feature_count"] == 14
+        assert len(h_data["health_scores"]) >= 1
+
+        target = next((x for x in h_data["health_scores"] if x["asset_id"] == "AST-LGBM-001"), h_data["health_scores"][0])
+        assert 0.0 <= target["lgbm_failure_probability_30d"] <= target["lgbm_failure_probability_60d"] <= target["lgbm_failure_probability_90d"] <= 1.0
+        assert target["predicted_repair_days_p50"] <= target["predicted_repair_days_p90"]
+        assert "spatial_telemetry" in target
+        assert "reports_50m_90d" in target["spatial_telemetry"]
+        assert isinstance(target["risk_drivers"], list)
+        assert len(target["risk_drivers"]) >= 1
+        assert "shap_impact" in target["risk_drivers"][0]
+
+        resp_diag = client.get("/api/gov/predictive/model-diagnostics")
+        assert resp_diag.status_code == 200
+        diag_data = resp_diag.json()
+        assert "global_feature_importances" in diag_data
+        assert "top_asset_predictions" in diag_data
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_pulseai_grounded_in_postgis_and_lightgbm(clean_postgis):
+    """Verify PULSEAI predictive tool responses include live PostGIS ring telemetry, LightGBM P50/P90 turnaround, and TreeSHAP drivers."""
+    import gemini_service
+    db = SessionLocal()
+    try:
+        res1 = gemini_service.get_ai_assistant_response(
+            query="How long will it take to repair and maintain the drainage issue in Barangay 175?",
+            context="Government Staff Operations",
+            db=db,
+        )
+        text1 = res1["response"]
+        assert "PostGIS" in text1
+        assert "LightGBM" in text1
+        assert "P50" in text1 and "P90" in text1
+
+        res2 = gemini_service.get_ai_assistant_response(
+            query="Which infrastructure assets have the highest risk and what are their LightGBM SHAP risk drivers?",
+            context="Government Staff Operations",
+            db=db,
+        )
+        text2 = res2["response"]
+        assert "LightGBM" in text2
+        assert "PostGIS" in text2
+    finally:
+        db.close()
 
 
 def test_gist_index_usage(clean_postgis):

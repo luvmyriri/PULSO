@@ -1113,12 +1113,114 @@ def get_ai_assistant_response(
                 preventive_cycle,
             ])
 
+            if db:
+                try:
+                    from services import lightgbm_service
+                    lgbm_telemetry = lightgbm_service.predict_for_location_or_ticket(
+                        db,
+                        report=matched_report,
+                        category=cat_text,
+                    )
+                    if lgbm_telemetry:
+                        st = lgbm_telemetry.get("spatial_telemetry") or {}
+                        p30 = lgbm_telemetry.get("lgbm_failure_probability_30d", 0.0) * 100.0
+                        p60 = lgbm_telemetry.get("lgbm_failure_probability_60d", 0.0) * 100.0
+                        p90 = lgbm_telemetry.get("lgbm_failure_probability_90d", 0.0) * 100.0
+                        p50_days = lgbm_telemetry.get("predicted_repair_days_p50", 2.0)
+                        p90_days = lgbm_telemetry.get("predicted_repair_days_p90", 5.0)
+                        drivers = lgbm_telemetry.get("risk_drivers") or []
+                        hotspot_flag = (
+                            f"**Active DBSCAN Hotspot** (**{st.get('hotspot_cluster_size', 0)} incidents** clustered within 50m)"
+                            if st.get("in_dbscan_hotspot")
+                            else "No active 50m cluster threshold exceeded"
+                        )
+                        lines.extend([
+                            "",
+                            "**4. PostGIS Spatial Ring & LightGBM Telemetry (Live Grounded Data)**",
+                            f"- **PostGIS 50m / 150m Proximity Ring**: **{st.get('reports_50m_90d', 0)} reports** within 50m (90d) | **{st.get('reports_150m_90d', 0)} reports** within 150m | **{st.get('nearby_drainage_150m_90d', 0)} drainage/flood stress incidents** within 150m",
+                            f"- **Spatial Cluster Status**: {hotspot_flag}",
+                            f"- **LightGBM Quantile Turnaround Forecast**: **P50 Median: {p50_days:.1f} working days** | **P90 Upper-Bound (with weather/curing buffer): {p90_days:.1f} working days**",
+                            f"- **LightGBM Recurrence Risk Horizon**: **30-Day: {p30:.1f}%** | **60-Day: {p60:.1f}%** | **90-Day: {p90:.1f}%**",
+                        ])
+                        if drivers:
+                            driver_str = "; ".join(
+                                [f"**{d['label']}** (value: {d['value']}, SHAP impact: {d['shap_impact']:+.2f})" for d in drivers[:3]]
+                            )
+                            lines.append(f"- **Top TreeSHAP Risk Drivers**: {driver_str}")
+                except Exception:
+                    pass
+
             full_res = "\n".join(lines)
             invoked_tools.append({"tool": "predict_maintenance_and_resolution_plan", "data": full_res[:500]})
             return full_res
         except Exception as err:
             err_msg = f"Unable to compute predictive maintenance estimate right now: {err}"
             invoked_tools.append({"tool": "predict_maintenance_and_resolution_plan", "data": err_msg})
+            return err_msg
+
+    def get_predictive_hotspots_and_asset_risks(barangay_or_category: Optional[str] = None) -> str:
+        """Fetch live PostGIS spatial hotspots and LightGBM predictive maintenance scores, P50/P90 repair turnaround estimates, and TreeSHAP risk drivers for registered infrastructure assets."""
+        if not db:
+            return "Database connection unavailable for PostGIS + LightGBM asset risk analysis."
+        try:
+            import gov_models
+            from services import lightgbm_service
+
+            q = db.query(gov_models.InfrastructureAsset)
+            scope_str = (barangay_or_category or "").strip()
+            if scope_str:
+                brgy_match = re.findall(r"\b(1[678]\d)\b", scope_str)
+                if brgy_match:
+                    q = q.filter(gov_models.InfrastructureAsset.barangay == brgy_match[0])
+                elif any(c in scope_str.lower() for c in ["road", "bridge", "drain", "light", "flood", "school", "facil"]):
+                    for kw in ["road", "bridge", "drain", "light", "facil"]:
+                        if kw in scope_str.lower():
+                            q = q.filter(gov_models.InfrastructureAsset.category.ilike(f"%{kw}%"))
+                            break
+
+            assets = q.limit(25).all()
+            diag = lightgbm_service.get_global_model_diagnostics(db)
+            if not assets:
+                res = (
+                    f"**PostGIS + LightGBM Predictive Maintenance Engine** (`{diag.get('engine')}`):\n\n"
+                    "- No registered infrastructure assets matched the requested filter. Try querying all North Caloocan assets or a specific barangay (165-188)."
+                )
+                invoked_tools.append({"tool": "get_predictive_hotspots_and_asset_risks", "data": res})
+                return res
+
+            scored = []
+            for a in assets:
+                pred = lightgbm_service.predict_for_asset(db, a)
+                scored.append((a, pred))
+
+            scored.sort(key=lambda item: item[1]["lgbm_failure_probability_30d"], reverse=True)
+            top_items = scored[:5]
+
+            lines = [
+                f"**PostGIS + LightGBM Predictive Maintenance & Spatial Risk Summary** (`{diag.get('model_status')}`):",
+                "",
+            ]
+            for idx, (asset, pred) in enumerate(top_items, 1):
+                st = pred.get("spatial_telemetry") or {}
+                drivers = pred.get("risk_drivers") or []
+                top_driver = drivers[0]["label"] if drivers else "Baseline Age & Wear"
+                p30 = pred["lgbm_failure_probability_30d"] * 100.0
+                p90 = pred["lgbm_failure_probability_90d"] * 100.0
+                p50_d = pred["predicted_repair_days_p50"]
+                p90_d = pred["predicted_repair_days_p90"]
+                lines.append(
+                    f"{idx}. **{asset.asset_name}** (**{asset.asset_id}** | Brgy **{asset.barangay}** | {asset.category})\n"
+                    f"   - **LightGBM Recurrence Risk**: **30d: {p30:.1f}%** | **90d: {p90:.1f}%** | **Primary SHAP Driver**: **{top_driver}**\n"
+                    f"   - **PostGIS Spatial Ring (90d)**: **{st.get('reports_50m_90d', 0)} reports** within 50m | **{st.get('reports_150m_90d', 0)} reports** within 150m\n"
+                    f"   - **Predicted Repair Turnaround**: **P50: {p50_d:.1f} days** (P90 upper-bound: **{p90_d:.1f} days**)"
+                )
+
+            full_res = "\n\n".join(lines)
+            invoked_tools.append({"tool": "get_predictive_hotspots_and_asset_risks", "data": full_res[:500]})
+            return full_res
+        except Exception as err:
+            err_msg = f"Unable to query PostGIS + LightGBM asset risks right now: {err}"
+            invoked_tools.append({"tool": "get_predictive_hotspots_and_asset_risks", "data": err_msg})
             return err_msg
 
     # ── Grounded Knowledge: Filing a report in PULSO ───────────────────────────
@@ -1134,6 +1236,11 @@ def get_ai_assistant_response(
     # ── Deterministic Keyword Fallback Handler ─────────────────────────────────
     def _deterministic_fallback(q: str) -> str:
         ql = q.lower()
+        if any(w in ql for w in [
+            "hotspot", "hotspots", "at risk", "highest risk", "asset risk",
+            "lightgbm", "postgis", "shap", "risk driver", "risk drivers"
+        ]):
+            return get_predictive_hotspots_and_asset_risks(q)
         if any(w in ql for w in [
             "predict", "predictive", "duration", "how long", "long it takes",
             "maintenance", "what can i do", "how to fix", "how to resolve",
@@ -1181,7 +1288,8 @@ STRICT OPERATIONAL & TONE RULES:
 1. NO EMOJIS: Do not use emojis in any response. Maintain a professional, helpful tone appropriate for an official city government service.
 2. MARKDOWN STRUCTURE: Always structure responses with clean paragraph breaks (double newlines). Use markdown bold (**text**) for all key terms: hotline numbers, ticket IDs, work order IDs, durations/timelines, report statuses (**pending**, **in_progress**, **resolved**), department names, and important notices. Use bullet points (- ) or numbered lists (1. ) for readability.
 3. GROUNDING IN REAL DATA (MANDATORY TOOL USE):
-   - When asked what to do for a report, how long repair or maintenance takes, or to predict maintenance duration/schedule (before or after resolution): You MUST call `predict_maintenance_and_resolution_plan` and present the complete engineering action plan, predicted repair duration (hours/days), and post-resolution preventive maintenance cycle (30-day check, 6-month cycle, and expected service lifespan in years). NEVER say you cannot predict maintenance durations or timelines.
+   - When asked what to do for a report, how long repair or maintenance takes, or to predict maintenance duration/schedule (before or after resolution): You MUST call `predict_maintenance_and_resolution_plan` and present the complete engineering action plan, predicted repair duration (hours/days), PostGIS spatial ring telemetry, LightGBM P50/P90 turnaround forecast, TreeSHAP risk drivers, and post-resolution preventive maintenance cycle. NEVER say you cannot predict maintenance durations or timelines.
+   - When asked about highest-risk infrastructure assets, spatial hotspots, LightGBM recurrence probabilities, or PostGIS risk rankings: You MUST call `get_predictive_hotspots_and_asset_risks` and report the exact asset IDs, 30d/90d LightGBM failure probabilities, primary TreeSHAP risk drivers, PostGIS 50m/150m report counts, and P50/P90 repair turnaround days.
    - When asked about unassigned reports, reports awaiting verification, or critical/priority reports by staff: You MUST call `get_staff_reports_overview` with `status_or_scope` set to `"unassigned"`, `"needs_verification"`, or `"today_priorities"`. Present the exact ticket IDs, categories, locations, and statuses returned by the tool.
    - When asked about work orders, overdue work orders, or SLA alerts: You MUST call `get_staff_work_orders_overview` with `status_or_scope="overdue"`. Present the exact work order numbers, titles, statuses, and priorities returned by the tool.
    - When asked about a resident's own reports or report status: You MUST call `get_my_reports` to fetch their real database records.
@@ -1202,7 +1310,8 @@ User Query: {query}
         get_evacuation_routes,
         get_staff_reports_overview,
         get_staff_work_orders_overview,
-        predict_maintenance_and_resolution_plan
+        predict_maintenance_and_resolution_plan,
+        get_predictive_hotspots_and_asset_risks,
     ]
     user_id = str(getattr(user, "id", "citizen"))
 
@@ -1316,6 +1425,10 @@ Asset Information:
 - Design Life: {asset_data.get('design_life')} years
 - Last Maintenance: {asset_data.get('last_maintenance_date', 'Unknown')}
 - Environmental Risks: {asset_data.get('environmental_risks', 'Standard')}
+- LightGBM 30-Day Failure Probability: {asset_data.get('lgbm_failure_probability_30d', 'N/A')}
+- LightGBM P50/P90 Repair Turnaround (Days): {asset_data.get('predicted_repair_days_p50', 'N/A')} / {asset_data.get('predicted_repair_days_p90', 'N/A')}
+- PostGIS Spatial Telemetry: {asset_data.get('spatial_telemetry', {})}
+- Top TreeSHAP Risk Drivers: {asset_data.get('risk_drivers', [])}
 
 Return ONLY a valid JSON object with these EXACT fields:
 {{

@@ -595,6 +595,9 @@ def get_preventive_risk_inputs(
         "cutoff": cutoff
     }).fetchall()
 
+    from services import lightgbm_service
+    import gov_models
+
     asset_risks = []
     for row in rows:
         count = row.related_report_count
@@ -608,6 +611,12 @@ def get_preventive_risk_inputs(
         else:
             priority = "ROUTINE"
 
+        asset_obj = db.query(gov_models.InfrastructureAsset).filter_by(asset_id=row.asset_id).first()
+        lgbm_data = (
+            lightgbm_service.predict_for_asset(db, asset_obj)
+            if asset_obj else {}
+        )
+
         asset_risks.append({
             "asset_id": row.asset_id,
             "asset_name": row.asset_name,
@@ -616,12 +625,17 @@ def get_preventive_risk_inputs(
             "failure_frequency_90d": count,
             "last_incident": row.last_report_date.isoformat() if row.last_report_date else None,
             "rule_based_recommendation": priority,
-            "model_type": "Deterministic Rule-Based Spatial Heuristic"
+            "model_type": "PostGIS Spatial + LightGBM GBDT Ensemble",
+            "lgbm_failure_probability_30d": lgbm_data.get("lgbm_failure_probability_30d"),
+            "predicted_repair_days_p50": lgbm_data.get("predicted_repair_days_p50"),
+            "predicted_repair_days_p90": lgbm_data.get("predicted_repair_days_p90"),
+            "risk_drivers": lgbm_data.get("risk_drivers", []),
         })
 
     return {
-        "methodology": "Rule-based historical incident recurrence analysis (50m radius / category match)",
+        "methodology": "Rule-based historical incident recurrence analysis (50m radius / category match) + LightGBM TreeSHAP",
         "window_days": days,
+        "ml_engine": lightgbm_service.get_global_model_diagnostics(db),
         "assets_evaluated": len(asset_risks),
         "results": asset_risks
     }

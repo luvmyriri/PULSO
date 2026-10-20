@@ -18,3 +18,4 @@ scikit-learn
 scipy
 numpy
 haversine
+lightgbm>=4.5.0

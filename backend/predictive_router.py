@@ -20,6 +20,7 @@ from datetime import timezone
 import roles_service
 import gov_crud
 import gov_schemas
+from services import lightgbm_service
 
 router = APIRouter(prefix="/api/gov/predictive", tags=["predictive"])
 
@@ -159,12 +160,21 @@ def get_predictive_summary(
             scheduled_90d_cost += unit_cost * PREVENTIVE_COST_RATIO
             
         if priority in ["CRITICAL", "HIGH"]:
+            lgbm_pred = lightgbm_service.predict_for_asset(
+                db, a, days_since_override=days_since, linked_reports_override=report_count
+            )
             top_at_risk.append({
+                "asset_id": a.asset_id,
+                "asset_name": a.asset_name,
                 "priority": priority,
                 "health_score": ahs,
                 "category": a.category,
                 "barangay": str(a.barangay),
-                "failure_probability_30d": fail_prob
+                "failure_probability_30d": fail_prob,
+                "lgbm_failure_probability_30d": lgbm_pred["lgbm_failure_probability_30d"],
+                "predicted_repair_days_p50": lgbm_pred["predicted_repair_days_p50"],
+                "predicted_repair_days_p90": lgbm_pred["predicted_repair_days_p90"],
+                "risk_drivers": lgbm_pred["risk_drivers"],
             })
             
     top_at_risk.sort(key=lambda x: x["health_score"])
@@ -176,6 +186,7 @@ def get_predictive_summary(
 
     return {
         "model_status": "exploratory_heuristic_unvalidated",
+        "ml_engine": lightgbm_service.get_global_model_diagnostics(db),
         "data_window_days": 90,
         "source": "infrastructure_assets, maintenance_history, work_orders, reports",
         "limitation": "Scores and costs are inspection prompts, not validated failure probabilities, schedules, or approved budgets.",
@@ -242,6 +253,9 @@ def get_predictive_health(
                     "date": d.uploaded_at.strftime("%Y-%m-%d") if d.uploaded_at else "N/A"
                 })
 
+        lgbm_pred = lightgbm_service.predict_for_asset(
+            db, a, days_since_override=days_since, linked_reports_override=report_count
+        )
         health_scores.append({
             "asset_id": a.asset_id,
             "asset_name": a.asset_name,
@@ -253,6 +267,13 @@ def get_predictive_health(
             "failure_probability_30d": fail_prob_30,
             "failure_probability_60d": fail_prob_60,
             "failure_probability_90d": fail_prob_90,
+            "lgbm_failure_probability_30d": lgbm_pred["lgbm_failure_probability_30d"],
+            "lgbm_failure_probability_60d": lgbm_pred["lgbm_failure_probability_60d"],
+            "lgbm_failure_probability_90d": lgbm_pred["lgbm_failure_probability_90d"],
+            "predicted_repair_days_p50": lgbm_pred["predicted_repair_days_p50"],
+            "predicted_repair_days_p90": lgbm_pred["predicted_repair_days_p90"],
+            "spatial_telemetry": lgbm_pred["spatial_telemetry"],
+            "risk_drivers": lgbm_pred["risk_drivers"],
             "report_count": report_count,
             "trend": trend,
             "growth_pct": round(dv * 100),
@@ -267,6 +288,7 @@ def get_predictive_health(
 
     return {
         "model_status": "exploratory_heuristic_unvalidated",
+        "ml_engine": lightgbm_service.get_global_model_diagnostics(db),
         "data_window_days": 90,
         "health_scores": health_scores
     }
@@ -441,6 +463,7 @@ def generate_ai_plan(
 
     ahs = calculate_ahs(db, asset.asset_id)
     env = db.query(EnvironmentalContext).filter_by(barangay_id=asset.barangay_id).first()
+    lgbm_pred = lightgbm_service.predict_for_asset(db, asset)
     asset_data = {
         "asset_name": asset.asset_name,
         "category": asset.category,
@@ -448,7 +471,12 @@ def generate_ai_plan(
         "health_score": ahs,
         "material_type": asset.material_type,
         "design_life": asset.design_life,
-        "environmental_risks": env.flood_risk_level if env else "Unknown"
+        "environmental_risks": env.flood_risk_level if env else "Unknown",
+        "lgbm_failure_probability_30d": lgbm_pred["lgbm_failure_probability_30d"],
+        "predicted_repair_days_p50": lgbm_pred["predicted_repair_days_p50"],
+        "predicted_repair_days_p90": lgbm_pred["predicted_repair_days_p90"],
+        "risk_drivers": lgbm_pred["risk_drivers"],
+        "spatial_telemetry": lgbm_pred["spatial_telemetry"],
     }
 
     plan = gemini_service.generate_maintenance_plan(asset_data)
@@ -469,7 +497,8 @@ def generate_ai_plan(
         "review_state": "draft_unreviewed",
         "source": "infrastructure_asset_registry",
         "estimated_cost": plan.get("estimated_cost"),
-        "estimated_duration_days": plan.get("estimated_duration_days")
+        "estimated_duration_days": plan.get("estimated_duration_days") or lgbm_pred["predicted_repair_days_p50"],
+        "lgbm_insights": lgbm_pred,
     }
 
 
@@ -615,6 +644,9 @@ def get_maintenance_scores(
         fail_90 = max(fail_60, _failure_probability(freq_per_month, recurrence_rate, days_since, a.category or "default", target_days=90))
         next_maint = _next_maintenance_date(ahs)
         
+        lgbm_pred = lightgbm_service.predict_for_asset(
+            db, a, days_since_override=days_since, linked_reports_override=report_count
+        )
         results.append({
             "asset_id": a.asset_id,
             "asset_name": a.asset_name,
@@ -632,6 +664,13 @@ def get_maintenance_scores(
             "failure_probability_30d": fail_30,
             "failure_probability_60d": fail_60,
             "failure_probability_90d": fail_90,
+            "lgbm_failure_probability_30d": lgbm_pred["lgbm_failure_probability_30d"],
+            "lgbm_failure_probability_60d": lgbm_pred["lgbm_failure_probability_60d"],
+            "lgbm_failure_probability_90d": lgbm_pred["lgbm_failure_probability_90d"],
+            "predicted_repair_days_p50": lgbm_pred["predicted_repair_days_p50"],
+            "predicted_repair_days_p90": lgbm_pred["predicted_repair_days_p90"],
+            "spatial_telemetry": lgbm_pred["spatial_telemetry"],
+            "risk_drivers": lgbm_pred["risk_drivers"],
             "next_maintenance_date": next_maint
         })
         
@@ -653,3 +692,33 @@ def get_demand_forecast(
         raise HTTPException(status_code=403, detail="Access denied to predictive engine")
         
     return get_forecast(db, weeks_back=weeks_back, weeks_forward=weeks_forward)
+
+
+@router.get("/model-diagnostics")
+def get_model_diagnostics(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """
+    Exposes PostGIS + LightGBM model diagnostics, feature importances,
+    calibration status, and TreeSHAP attributions for top-priority assets.
+    """
+    if not _allow_access(current_user):
+        raise HTTPException(status_code=403, detail="Access denied to predictive engine")
+    diagnostics = lightgbm_service.get_global_model_diagnostics(db)
+    assets = db.query(InfrastructureAsset).limit(10).all()
+    asset_predictions = []
+    for a in assets:
+        pred = lightgbm_service.predict_for_asset(db, a)
+        asset_predictions.append({
+            "asset_id": a.asset_id,
+            "asset_name": a.asset_name,
+            "category": a.category,
+            "barangay": str(a.barangay),
+            **pred,
+        })
+    asset_predictions.sort(key=lambda x: x["lgbm_failure_probability_30d"], reverse=True)
+    return {
+        **diagnostics,
+        "top_asset_predictions": asset_predictions[:5],
+    }
