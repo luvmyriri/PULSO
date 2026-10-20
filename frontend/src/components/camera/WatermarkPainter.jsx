@@ -53,8 +53,11 @@ export default function WatermarkPainter({
         metadata?.capturedAt,
         metadata?.location?.lat,
         metadata?.location?.lng,
+        metadata?.location?.accuracy,
         metadata?.coordinates?.lat,
         metadata?.coordinates?.lng,
+        metadata?.coordinates?.accuracy,
+        metadata?.accuracy,
         metadata?.lat,
         metadata?.lng
     ]);

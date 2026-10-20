@@ -67,14 +67,27 @@ export function drawEvidenceWatermark(canvas, metadata = {}) {
     const addressSource = metadata.structuredAddress || metadata.locationAddress || metadata.address;
     const addressText = formatWatermarkAddress(addressSource, metadata.location || metadata.coordinates);
 
-    // Format coordinates: "14.7520, 121.0263"
+    // Format coordinates: "14.7520° N, 121.0263° E"
     let coordsText = '';
     const loc = metadata.location || metadata.coordinates;
     if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
-        coordsText = `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`;
+        const latDir = loc.lat >= 0 ? 'N' : 'S';
+        const lngDir = loc.lng >= 0 ? 'E' : 'W';
+        coordsText = `${Math.abs(loc.lat).toFixed(4)}° ${latDir}, ${Math.abs(loc.lng).toFixed(4)}° ${lngDir}`;
     } else if (metadata.lat && metadata.lng) {
-        coordsText = `${Number(metadata.lat).toFixed(4)}, ${Number(metadata.lng).toFixed(4)}`;
+        const latVal = Number(metadata.lat);
+        const lngVal = Number(metadata.lng);
+        const latDir = latVal >= 0 ? 'N' : 'S';
+        const lngDir = lngVal >= 0 ? 'E' : 'W';
+        coordsText = `${Math.abs(latVal).toFixed(4)}° ${latDir}, ${Math.abs(lngVal).toFixed(4)}° ${lngDir}`;
     }
+
+    // Accuracy indicator pill (e.g. "(±12m)")
+    const rawAccuracy = loc?.accuracy ?? metadata.accuracy ?? metadata.location?.accuracy ?? metadata.coordinates?.accuracy ?? metadata.reportLocation?.accuracy;
+    const accuracyNum = (typeof rawAccuracy === 'number' && !isNaN(rawAccuracy) && rawAccuracy > 0)
+        ? Math.round(rawAccuracy)
+        : (coordsText ? 12 : null);
+    const accuracyText = accuracyNum ? `(±${accuracyNum}m)` : '';
 
     // 2. Base Unit "u" = shorter side
     const u = Math.min(width, height);
@@ -126,7 +139,7 @@ export function drawEvidenceWatermark(canvas, metadata = {}) {
         const addressFont = `bold ${mainFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
         const addressLines = getWrappedLines(addressText, availableAddressWidth, addressFont);
 
-        const linesHeight = mainLineHeight + gap + (addressLines.length * mainLineHeight) + (coordsText ? gap + smallLineHeight : 0);
+        const linesHeight = mainLineHeight + gap + (addressLines.length * mainLineHeight) + ((coordsText || accuracyText) ? gap + smallLineHeight : 0);
         const totalHeight = (padY * 2) + linesHeight;
 
         selectedLayout = {
@@ -160,7 +173,7 @@ export function drawEvidenceWatermark(canvas, metadata = {}) {
         const addressFont = `bold ${mainFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
         const addressLines = getWrappedLines(addressText, availableAddressWidth, addressFont);
 
-        const linesHeight = selectedLayout.mainLineHeight + selectedLayout.gap + (addressLines.length * selectedLayout.mainLineHeight) + (coordsText ? selectedLayout.gap + selectedLayout.smallLineHeight : 0);
+        const linesHeight = selectedLayout.mainLineHeight + selectedLayout.gap + (addressLines.length * selectedLayout.mainLineHeight) + ((coordsText || accuracyText) ? selectedLayout.gap + selectedLayout.smallLineHeight : 0);
         const totalHeight = (selectedLayout.padY * 2) + linesHeight;
 
         selectedLayout = {
@@ -193,7 +206,7 @@ export function drawEvidenceWatermark(canvas, metadata = {}) {
     ctx.miterLimit = 2;
 
     const fontMain = `bold ${mainFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-    const fontSmall = `500 ${smallFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    const fontSmall = `bold ${smallFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
     const outlineColor = 'rgba(0, 0, 0, 0.65)';
     const outlineWidth = Math.max(2, Math.round(mainFontSize * 0.14));
 
@@ -242,15 +255,16 @@ export function drawEvidenceWatermark(canvas, metadata = {}) {
         ctx.fillText(addrLine, padX, currentY);
     }
 
-    // ── LAST LINE: Coordinates in soft white small text ───────────────────────
-    if (coordsText) {
+    // ── LAST LINE: Coordinates & Accuracy (Bold White, No Oval/Pill Shape) ───
+    const fullCoordsLine = coordsText && accuracyText ? `${coordsText} ${accuracyText}` : (coordsText || accuracyText);
+    if (fullCoordsLine) {
         currentY += gap + smallLineHeight;
         ctx.font = fontSmall;
         ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = Math.max(1.5, Math.round(smallFontSize * 0.12));
-        ctx.strokeText(coordsText, padX, currentY);
-        ctx.fillStyle = '#cbd5e1';
-        ctx.fillText(coordsText, padX, currentY);
+        ctx.lineWidth = Math.max(1.8, Math.round(smallFontSize * 0.14));
+        ctx.strokeText(fullCoordsLine, padX, currentY);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(fullCoordsLine, padX, currentY);
     }
 
     ctx.restore();

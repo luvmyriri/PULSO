@@ -261,12 +261,18 @@ const IDCameraModal = ({
     let coordsText = '';
     const loc = metadata?.location || metadata?.coordinates;
     if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
-        coordsText = `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`;
+        const latDir = loc.lat >= 0 ? 'N' : 'S';
+        const lngDir = loc.lng >= 0 ? 'E' : 'W';
+        coordsText = `${Math.abs(loc.lat).toFixed(4)}° ${latDir}, ${Math.abs(loc.lng).toFixed(4)}° ${lngDir}`;
         if (typeof loc.accuracy === 'number' && loc.accuracy > 0 && loc.accuracy < 100) {
             coordsText += ` (±${Math.round(loc.accuracy)}m)`;
         }
     } else if (metadata?.lat && metadata?.lng) {
-        coordsText = `${Number(metadata.lat).toFixed(4)}, ${Number(metadata.lng).toFixed(4)}`;
+        const latVal = Number(metadata.lat);
+        const lngVal = Number(metadata.lng);
+        const latDir = latVal >= 0 ? 'N' : 'S';
+        const lngDir = lngVal >= 0 ? 'E' : 'W';
+        coordsText = `${Math.abs(latVal).toFixed(4)}° ${latDir}, ${Math.abs(lngVal).toFixed(4)}° ${lngDir}`;
     }
 
     const stopStream = useCallback(() => {
@@ -729,9 +735,7 @@ const IDCameraModal = ({
                                         />
                                     )}
                                     <div className={`absolute inset-0 ${isDark ? 'bg-slate-950/75' : 'bg-white/85'} backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center space-y-3`}>
-                                        <div className="w-14 h-14 rounded-2xl bg-[#ff6b00]/15 border border-[#ff6b00]/30 flex items-center justify-center text-[#ff6b00] shadow-inner">
-                                            <Loader2 size={26} className="animate-spin text-[#ff6b00]" />
-                                        </div>
+                                        <Loader2 size={32} className="animate-spin text-[#ff6b00]" />
                                         <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                                             Checking your photo...
                                         </h3>
