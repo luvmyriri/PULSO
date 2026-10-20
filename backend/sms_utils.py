@@ -302,11 +302,26 @@ def send_emergency_sms(phone_number: str, title: str, message: str) -> SmsSendRe
     return SmsSendResult(False)
 
 
+def _portal_url() -> str:
+    return os.getenv("PULSO_PUBLIC_URL", "https://pulso-caloocan.gov.ph").strip().rstrip("/")
+
+
+def _sender_header() -> str:
+    return os.getenv("PULSO_SENDER_HEADER", "PULSO | Caloocan City Engineering Division").strip()
+
+
 def send_login_otp_sms(phone_number: str, otp_code: str, ref_id: str | None = None) -> SmsSendResult:
     """Send a caller-generated code using the configured SMS provider."""
     ref_suffix = f" Ref: {ref_id}." if ref_id else ""
     if _provider() == "textbee":
-        message = f"PULSO Caloocan: Your sign-in code is {otp_code}. Valid for 10 minutes. Do not share it.{ref_suffix}"
+        header = _sender_header()
+        portal = _portal_url()
+        message = (
+            f"[{header}]\n\n"
+            f"PULSO Caloocan: Your sign-in code is {otp_code}.\n"
+            f"Valid for 10 minutes. Do not share it with anyone.{ref_suffix}\n\n"
+            f"Portal: {portal}"
+        )
         return _send_textbee_sms(phone_number, message)
     if _provider() == "philsms":
         message = f"PULSO Caloocan: Your sign-in code is {otp_code}. Valid for 10 minutes. Do not share it.{ref_suffix}"
@@ -328,16 +343,50 @@ def send_templated_sms(
     barangay: str = "175",
     category: str = "Roads & Bridges",
     status: str = "Validated",
+    eta_days: str = "2-5 working days (LightGBM P50-P90)",
+    wo_number: str = "WO-2026-0104",
+    asset_id: str = "CAL-DR-002",
+    asset_name: str = "Camarin Drainage Culvert",
+    priority: str = "HIGH",
 ) -> SmsSendResult:
-    """Send a governed PULSO Caloocan templated SMS notification."""
+    """Send a governed PULSO Caloocan templated SMS notification with official header and portal links."""
+    header = _sender_header()
+    portal = _portal_url()
+
     if template_name == "report_status_update":
         msg = (
-            f"PULSO Caloocan Update: Your report {ticket_id} ({category}, Brgy. {barangay}) "
-            f"is now {status.upper()}. Open your PULSO portal to track progress."
+            f"[{header}]\n\n"
+            f"CIVIC RECORD STATUS UPDATE\n"
+            f"- Ticket ID: {ticket_id}\n"
+            f"- Category: {category} (Brgy. {barangay})\n"
+            f"- Current Status: {status.upper()}\n"
+            f"- Est. Turnaround: {eta_days}\n\n"
+            f"View engineering docket & field photos:\n"
+            f"{portal}/track?ticket={ticket_id}\n\n"
+            f"Caloocan Action Center: (02) 8288-8811"
+        )
+    elif template_name == "predictive_work_order":
+        msg = (
+            f"[{header}]\n\n"
+            f"PREEMPTIVE MAINTENANCE DISPATCH\n"
+            f"- Work Order: {wo_number}\n"
+            f"- Target Asset: {asset_name} ({asset_id})\n"
+            f"- Location: Brgy. {barangay} | Priority: {priority.upper()}\n"
+            f"- Turnaround Forecast: {eta_days}\n\n"
+            f"Open Staff Operations Workspace:\n"
+            f"{portal}/gov/predictive"
         )
     else:
         msg = (
-            f"PULSO Caloocan: Your infrastructure report {ticket_id} in Brgy. {barangay} "
-            f"({category}) has been received and queued for engineering review."
+            f"[{header}]\n\n"
+            f"OFFICIAL REPORT RECEIPT\n"
+            f"- Ticket ID: {ticket_id}\n"
+            f"- Category: {category}\n"
+            f"- Location: Brgy. {barangay}, North Caloocan\n"
+            f"- Status: QUEUED FOR ENGINEERING TRIAGE\n"
+            f"- Est. Turnaround: {eta_days}\n\n"
+            f"Track live status & field evidence:\n"
+            f"{portal}/track?ticket={ticket_id}\n\n"
+            f"Caloocan Action Center: (02) 8288-8811"
         )
     return send_plain_sms(phone_number, msg)

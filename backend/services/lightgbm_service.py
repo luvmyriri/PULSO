@@ -699,16 +699,28 @@ def _extract_top_shap_drivers(
         contribs = clf.booster_.predict(x_vec.reshape(1, -1), pred_contrib=True)[0]
         # Last element is the expected value (bias term); first 14 match FEATURE_NAMES
         feat_contribs = contribs[:len(FEATURE_NAMES)]
+        zero_count_features = {
+            "spatial_reports_50m_30d",
+            "spatial_reports_50m_90d",
+            "spatial_reports_150m_90d",
+            "nearby_drainage_150m_90d",
+            "linked_report_count_90d",
+            "hotspot_cluster_size",
+            "maint_count_180d",
+            "qa_rejection_count",
+            "flood_risk_ordinal",
+        }
         scored = []
         for idx, fname in enumerate(FEATURE_NAMES):
             val = raw_dict[fname]
             impact = float(feat_contribs[idx])
-            # Filter out zero-activity spatial features so drivers reflect active signals
-            if fname in ("spatial_reports_50m_30d", "spatial_reports_50m_90d", "linked_report_count_90d", "hotspot_cluster_size", "qa_rejection_count") and val <= 0:
+            # Filter out zero-activity spatial/count features so drivers reflect active signals
+            if fname in zero_count_features and val <= 0:
                 continue
             scored.append((abs(impact), impact, fname, val))
 
-        scored.sort(key=lambda item: (-item[0], item[2]))
+        # Prioritize risk-increasing drivers (impact >= 0) first, then magnitude
+        scored.sort(key=lambda item: (0 if item[1] >= 0 else 1, -item[0], item[2]))
         drivers = []
         for _, impact, fname, val in scored[:top_k]:
             label_fn = _HUMAN_FEATURE_LABELS.get(fname, lambda v: f"{fname}={v}")
@@ -751,11 +763,14 @@ def predict_for_asset(
 
     days_since = int(round(raw_dict["days_since_last_maint"]))
     cat_str = asset.category or "default"
+    eff_freq = max(freq_per_month, round(raw_dict["spatial_reports_50m_90d"] / 3.0, 2))
+    cond_penalty = max(0.0, (100.0 - float(asset.condition_score)) / 100.0) if asset.condition_score is not None else 0.25
 
     # Baseline deterministic heuristic probabilities
-    heur_30 = _failure_probability(freq_per_month, recurrence_rate, days_since, cat_str, target_days=30)
-    heur_60 = max(heur_30, _failure_probability(freq_per_month, recurrence_rate, days_since, cat_str, target_days=60))
-    heur_90 = max(heur_60, _failure_probability(freq_per_month, recurrence_rate, days_since, cat_str, target_days=90))
+    heur_30 = _failure_probability(eff_freq, recurrence_rate, days_since, cat_str, target_days=30)
+    heur_30 = min(0.98, round(0.75 * heur_30 + 0.25 * cond_penalty, 4))
+    heur_60 = max(heur_30, _failure_probability(eff_freq, recurrence_rate, days_since, cat_str, target_days=60))
+    heur_90 = max(heur_60, _failure_probability(eff_freq, recurrence_rate, days_since, cat_str, target_days=90))
 
     if _LGBM_AVAILABLE and _ENGINE.clf is not None:
         raw_lgbm_p30 = float(_ENGINE.clf.predict_proba(x_vec.reshape(1, -1))[0, 1])

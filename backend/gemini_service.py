@@ -1197,7 +1197,7 @@ def get_ai_assistant_response(
             top_items = scored[:5]
 
             lines = [
-                f"**PostGIS + LightGBM Predictive Maintenance & Spatial Risk Summary** (`{diag.get('model_status')}`):",
+                f"**PostGIS + LightGBM Predictive Maintenance & Spatial Risk Summary** (`{diag.get('training_mode', 'lightgbm_hybrid_cold_start')}`):",
                 "",
             ]
             for idx, (asset, pred) in enumerate(top_items, 1):
