@@ -52,7 +52,7 @@ function parseOcrAddress(raw, data) {
     }
 
     if (!blockLot) {
-        const houseRe = /^(#?\d+[-–\/]?[A-Za-z]?)\s/;
+        const houseRe = /^(#?\d+[-–/]?[A-Za-z]?)\s/;
         const houseMatch = s.match(houseRe);
         if (houseMatch) {
             houseNo = houseMatch[1].replace(/^#/, '');
@@ -60,7 +60,7 @@ function parseOcrAddress(raw, data) {
         }
     }
 
-    const streetRe = /\b((?:[A-Za-z0-9#.\-]+\s+)*(?:[A-Za-z0-9#.\-]+)\s+(?:STREET|ST\.?|AVENUE|AVE\.?|ROAD|RD\.?|BOULEVARD|BLVD\.?|DRIVE|DR\.?|LANE|LN\.?|HIGHWAY|HWY\.?|EXTENSION|EXT\.?|LOOP|WALK|WAY|CIRCLE|CIR\.?))\b/i;
+    const streetRe = /\b((?:[A-Za-z0-9#.-]+\s+)*(?:[A-Za-z0-9#.-]+)\s+(?:STREET|ST\.?|AVENUE|AVE\.?|ROAD|RD\.?|BOULEVARD|BLVD\.?|DRIVE|DR\.?|LANE|LN\.?|HIGHWAY|HWY\.?|EXTENSION|EXT\.?|LOOP|WALK|WAY|CIRCLE|CIR\.?))\b/i;
     const streetMatch = s.match(streetRe);
     if (streetMatch) {
         street = streetMatch[1].replace(/\s+/g, ' ').trim();
@@ -68,7 +68,7 @@ function parseOcrAddress(raw, data) {
         s = s.replace(streetMatch[0], '').trim();
     }
 
-    const subdivRe = /\b((?:[A-Za-z0-9#.\-]+\s+)*(?:[A-Za-z0-9#.\-]+\s+)?(?:HOMES?(?:\s+\d+[A-Z]?)?|VILLAGE|VILL(?:AGE)?\.?|HEIGHTS?|SUBD(?:\.?|IVISION)?|SUBDIVISION|VILLE|ESTATE|PARK(?:\s+\d+)?|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+)?|FAIRVIEW|TOWNVILLE|RESIDENCES?|COMPOUND|ROYALE|VERDE|PALMS?|GARDENS?|GROVE|OAKS?|PINES|HILLS?|VISTAS?))\b/i;
+    const subdivRe = /\b((?:[A-Za-z0-9#.-]+\s+)*(?:[A-Za-z0-9#.-]+\s+)?(?:HOMES?(?:\s+\d+[A-Z]?)?|VILLAGE|VILL(?:AGE)?\.?|HEIGHTS?|SUBD(?:\.?|IVISION)?|SUBDIVISION|VILLE|ESTATE|PARK(?:\s+\d+)?|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+)?|FAIRVIEW|TOWNVILLE|RESIDENCES?|COMPOUND|ROYALE|VERDE|PALMS?|GARDENS?|GROVE|OAKS?|PINES|HILLS?|VISTAS?))\b/i;
     const subdivMatch = s.match(subdivRe);
     if (subdivMatch) {
         subdivision = subdivMatch[1].replace(/\s+/g, ' ').trim();
@@ -81,10 +81,10 @@ function parseOcrAddress(raw, data) {
         try {
             const bn = data.barangay.replace(/^Barangay\s*/i, '').trim();
             if (bn) s = s.replace(new RegExp(`\\b${bn.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`, 'gi'), '');
-        } catch(_) {}
+        } catch { /* ignore */ }
     }
     s = s.replace(/\b(?:CALOOCAN|KALOOKAN|CITY|NCR|METRO\s+MANILA|MANILA|DISTRICT|ZONE|THIRD\s*DISTRICT)\b/gi, '');
-    s = s.replace(/[,\/\s]+$/, '').replace(/^[,\/\s]+/, '').replace(/\s{2,}/g, ' ').trim();
+    s = s.replace(/[,/\s]+$/, '').replace(/^[,/\s]+/, '').replace(/\s{2,}/g, ' ').trim();
 
     if (!street && s) {
         street = s.replace(/\b\w/g, c => c.toUpperCase()).trim();
@@ -316,7 +316,7 @@ export const SUPPORTED_ID_TYPES = [
         shortName: 'Barangay ID / Cert',
         idNumberLabel: 'Certificate / Control Number',
         formatHint: 'Control or Certificate No. (e.g. BRGY-171-2026-001)',
-        pattern: /^[A-Z0-9\/-]{4,25}$/i,
+        pattern: /^[A-Z0-9/-]{4,25}$/i,
         frontCopy: 'Front of Barangay ID / Cert',
         backCopy: 'Back / Official Seal',
         instructions: 'Ensure control number, barangay dry seal, and resident photo are clearly visible for AI verification.',

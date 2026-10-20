@@ -109,7 +109,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import Swal from 'sweetalert2';
 import Branding from '../components/Branding';
 import { useTranslation } from 'react-i18next';
-import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSession';
+import { getAuthToken, getAuthUser, setAuthSession, clearAuthSession } from '../utils/authSession';
 import {
     formatTicketId,
     getStatusDescriptor,
@@ -4931,7 +4931,8 @@ const ResidentModals = ({
     t,
     handleQuickReportSubmit,
     currentUser,
-    setActiveTab
+    setActiveTab,
+    setIsAIChatOpen
 }) => {
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
@@ -5561,6 +5562,7 @@ const TopNavigation = ({
     userReports = [],
     lguUpdates = [],
     processedHazards = [],
+    setReportStatusFilter = null,
     setSelectedPost,
     setSelectedHazard,
     token,
@@ -8829,9 +8831,9 @@ export default function ResidentDashboard() {
                 userReports={userReports}
                 lguUpdates={lguUpdates}
                 processedHazards={processedHazards}
+                setReportStatusFilter={setReportStatusFilter}
                 setSelectedPost={setSelectedPost}
                 setSelectedHazard={setSelectedHazard}
-                setReportStatusFilter={setReportStatusFilter}
                 token={token}
                 isSearchOpen={isHeaderSearchOpen}
                 setIsSearchOpen={setIsHeaderSearchOpen}

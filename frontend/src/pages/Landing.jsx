@@ -52,6 +52,10 @@ export default function Landing() {
     if (!inApp) return true;
     return Boolean(sessionStorage.getItem('pulso_session_started'));
   });
+  const [activeTab, setActiveTab] = useState('home');
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
+  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
+  const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
 
   // Hide static placeholder HTML splash once React mounts
   useEffect(() => {
@@ -90,10 +94,6 @@ export default function Landing() {
   }
 
   // 2. Public Website Context
-  const [activeTab, setActiveTab] = useState('home');
-  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
-  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
-  const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'privacy' });
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-white dark:bg-[#070a12] text-slate-900 dark:text-slate-100 font-sans selection:bg-[#ff6b00] selection:text-white transition-colors duration-200 overflow-x-clip">

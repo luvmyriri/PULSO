@@ -44,8 +44,6 @@ export default function ReportDetailView({
     onWithdrawReport,
     setZoomedImage
 }) {
-    if (!report) return null;
-
     const [isCopied, setIsCopied] = useState(false);
     const [isDescExpanded, setIsDescExpanded] = useState(false);
     const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -72,6 +70,8 @@ export default function ReportDetailView({
             }
         }
     }, [report?.id, report?.ticket_id]);
+
+    if (!report) return null;
 
     const ticketId = report.ticket_id || `PUL-2026-${String(report.id || '').padStart(4, '0')}`;
     const categoryName = report.category || report.ai_category || 'Civic Infrastructure';

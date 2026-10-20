@@ -624,11 +624,6 @@ export default function DevAppPreviewPage() {
     user && ['super_admin', 'city_engineer', 'asst_city_engineer', 'admin_officer', 'admin_clerk'].includes(user.role)
   );
 
-  // If unauthorized in production, route away to root
-  if (!isDev && !isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
   // 2. Isolated Test States (never written to real localStorage)
   const [simulateInstalled, setSimulateInstalled] = useState(true);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
@@ -1023,8 +1018,6 @@ export default function DevAppPreviewPage() {
 
     const currentMeta = screenHeadings[testStep] || { heading: '', words: 0 };
     const headingWordsPass = currentMeta.words <= 5;
-    const skipOnThisScreen = testStep >= 1 && testStep <= 4;
-    const backArrowOnThisScreen = testStep >= 2;
 
     return [
       {
@@ -1357,6 +1350,11 @@ export default function DevAppPreviewPage() {
       }
     ];
   }, [testStep, screenSize, scrollCheckPassed, previewIsDark, fontLoaded, previewTarget, headerActiveTab, headerUserType, headerUnreadCount, splashSimulateMode]);
+
+  // Authorization guard (placed after all hooks to comply with React Rules of Hooks)
+  if (!isDev && !isAdmin) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="min-h-screen w-full bg-[#040711] text-slate-100 font-sans p-4 sm:p-6 lg:p-8">
@@ -2572,7 +2570,7 @@ export default function DevAppPreviewPage() {
                     onClose={() => {
                       addLog('Quick Report closed.');
                     }}
-                    onSubmitReport={async ({ categories, notes }) => {
+                    onSubmitReport={async ({ categories }) => {
                       addLog(`Report submitted for ${categories.length} issue(s): ${categories.join(', ')}`);
                       return {
                         trackingNumbers: categories.map((_, i) => `#PUL-2026-523${1 + i}`)
@@ -2614,7 +2612,7 @@ export default function DevAppPreviewPage() {
                       addLog('Camera closed via round X button.');
                       setPreviewTarget('report');
                     }}
-                    onCapture={(file, aiData) => {
+                    onCapture={(file) => {
                       addLog(`Photo accepted & confirmed: ${file?.name || 'captured.jpg'} (${cameraPhotoRatio})`);
                     }}
                     onPickFromGallery={() => {
@@ -2886,7 +2884,7 @@ export default function DevAppPreviewPage() {
                   setPreviewTarget('report');
                   try {
                     localStorage.removeItem('pulso_quick_report_draft_v2');
-                  } catch (e) {}
+                  } catch { /* ignore */ }
                   setReportPreviewKey((k) => k + 1);
                   addLog('Reset Quick Report to pristine Step 1 (Photo).');
                 }}

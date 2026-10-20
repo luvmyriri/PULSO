@@ -160,7 +160,7 @@ export default function WorkOrdersPage({ workspace }) {
 
     useEffect(() => {
         fetchWorkOrders();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, []);
 
     const updateParam = (key, value) => {

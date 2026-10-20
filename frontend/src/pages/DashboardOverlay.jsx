@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import Branding from '../components/Branding';
 import { getAuthToken } from '../utils/authSession';
+import { API_BASE_URL } from '../utils/apiBase';
 
 import { useInteractionHarden } from '../hooks/useInteractionHarden';
 import PulseAIMarkdown from '../components/PulseAIMarkdown';
@@ -198,6 +199,9 @@ export default function DashboardOverlay({ onNavigate }) {
                 setIsSubmitting(false);
             }
 
+
+        });
+    };
 
     return (
         <motion.div

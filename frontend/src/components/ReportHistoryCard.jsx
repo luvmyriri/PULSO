@@ -45,9 +45,9 @@ export default function ReportHistoryCard({
     categoryIcon: FallbackIcon = Wrench,
     className = ''
 }) {
-    if (!report) return null;
-
     const [imgLoadFailed, setImgLoadFailed] = React.useState(false);
+
+    if (!report) return null;
 
     const ticketId = report.ticket_id || `PUL-2026-${String(report.id || '').padStart(4, '0')}`;
     const categoryName = report.category || report.ai_category || 'Civic Infrastructure';

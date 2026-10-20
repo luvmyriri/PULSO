@@ -158,6 +158,13 @@ const BarangayMesh = ({ data }) => {
     );
 };
 
+// Pre-generated static utility data lines to preserve purity during render
+const UTILITY_LINES = [...Array(6)].map(() => [
+    new THREE.Vector3(Math.random() * 300, Math.random() * 300, -12 - Math.random() * 10),
+    new THREE.Vector3(Math.random() * 300, Math.random() * 300, -12 - Math.random() * 10),
+    new THREE.Vector3(Math.random() * 300, Math.random() * 300, -12 - Math.random() * 10)
+]);
+
 const SmartMapAssembly = () => {
     const groupRef = useRef();
     const pivotRef = useRef();
@@ -178,19 +185,15 @@ const SmartMapAssembly = () => {
                 <group position={[-175, -150, 0]}>
 
             {/* 13 Geometrically accurate Extruded Barangays */}
-            {regionsData.map((data, idx) => (
+            {regionsData.map((data) => (
                 <BarangayMesh key={data.id} data={data} />
             ))}
 
             {/* Simulated Glowing Utility Data Lines bridging the regions */}
-            {[...Array(6)].map((_, i) => (
+            {UTILITY_LINES.map((points, i) => (
                 <Line
                     key={`data-line-${i}`}
-                    points={[
-                        new THREE.Vector3(Math.random() * 300, Math.random() * 300, -12 - Math.random() * 10),
-                        new THREE.Vector3(Math.random() * 300, Math.random() * 300, -12 - Math.random() * 10),
-                        new THREE.Vector3(Math.random() * 300, Math.random() * 300, -12 - Math.random() * 10)
-                    ]}
+                    points={points}
                     color="#f97316"
                     lineWidth={2.5}
                     opacity={0.4}

@@ -2580,7 +2580,7 @@ const GovDivisionPage = ({ workspace, activePathOverride }) => {
                         project={punchListProject} 
                         onBack={() => {
                             setShowPunchList(false);
-                            fetchData(); // Refresh to show audit results
+                            if (punchListProject?.id) { fetchProjectDocuments(punchListProject.id); }
                         }} 
                     />
                 </div>
