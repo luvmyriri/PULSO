@@ -39,15 +39,23 @@ Ensure you have the following installed on your system:
    - Copy `backend/.env.example` to `backend/.env.local` and fill in local values. Keep that file untracked.
    - Set `DATABASE_URL` in the terminal to the URL of your own blank PostGIS database. The bootstrap command requires an explicit URL and refuses to run without one.
 
-6. **Bootstrap the database**:
-   - Ensure PostgreSQL with PostGIS is running. Use a blank database; the bootstrap refuses a database with application objects.
-   - From the repository root, run the command for your shell:
+6. **Start PostGIS & Bootstrap the Database**:
+   - **Option A (Recommended - 1-Command Docker)**:
+     If Docker is installed, spin up PostGIS in seconds:
+     `ash
+     docker compose up -d db
+     `
+   - **Option B (Native PostgreSQL/PostGIS)**:
+     Ensure local PostgreSQL with the PostGIS extension is running.
 
-     ```bash
-     bash scripts/bootstrap_db.sh
-     ```
-
-     On Windows PowerShell, run `./scripts/bootstrap_db.ps1 -Python python` instead. The script loads the schema snapshot, stamps its baseline revision, and applies the remaining Alembic migrations. Do not run `alembic upgrade head` against an empty database.
+   - **Bootstrap the Database**:
+     For a fresh setup, run the bootstrap script from the repository root:
+     - Windows PowerShell: ./scripts/bootstrap_db.ps1
+     - Linux/macOS: ash scripts/bootstrap_db.sh
+     
+     *(This script loads the checked-in schema snapshot, stamps Alembic, and migrates to head e4b7c9d2f610).*
+     
+     *(If upgrading an existing working database, simply run cd backend && python -m alembic upgrade head).*
 
 7. **Run the Backend**:
 
