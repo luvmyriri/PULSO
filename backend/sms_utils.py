@@ -354,37 +354,61 @@ def send_templated_sms(
     barangay: str = "175",
     category: str = "Roads & Bridges",
     status: str = "Validated",
-    eta_days: str = "2-5 days",
+    eta_days: str = "2 to 5 working days",
     wo_number: str = "WO-2026-0104",
     asset_id: str = "CAL-DR-002",
-    asset_name: str = "Camarin Drainage",
+    asset_name: str = "Camarin Drainage Line",
     priority: str = "HIGH",
 ) -> SmsSendResult:
     """
-    Send a governed PULSO Caloocan templated SMS notification.
-    Uses compact GSM-7 ASCII (<160 chars) and protocol-free domain references
-    to avoid Philippine telco (Smart/Globe) URL-filtering and UCS-2 multipart drops.
+    Send a warm, official PULSO Caloocan civic update or public works announcement SMS.
+    Sanitizes punctuation to GSM-7 ASCII so multi-part messages deliver cleanly across PH carriers.
     """
     domain = _portal_domain()
 
     if template_name == "report_status_update":
         msg = (
-            f"[PULSO Caloocan Engineering]\n"
-            f"Ticket {ticket_id} (Brgy {barangay}, {category})\n"
-            f"Status: {status.upper()} (Est: {eta_days})\n"
-            f"Track: {domain} | (02)8288-8811"
+            f"PULSO | Caloocan City Engineering Advisory\n\n"
+            f"Good day! Your infrastructure report under Ticket #{ticket_id} "
+            f"({category} in Brgy. {barangay}) has been updated to: {status.upper()}.\n\n"
+            f"A City Engineering team has been assigned to address the issue on-site. "
+            f"Estimated completion window: {eta_days}.\n\n"
+            f"Follow live field progress & photo updates at:\n"
+            f"{domain}/track/{ticket_id}\n"
+            f"Caloocan Action Center: (02) 8288-8811"
+        )
+    elif template_name == "city_announcement":
+        msg = (
+            f"PULSO | Caloocan City Public Works Advisory\n\n"
+            f"COMMUNITY NOTICE - Brgy. {barangay}:\n"
+            f"Scheduled {category} maintenance and rehabilitation works are now underway "
+            f"in your area ({asset_name}).\n\n"
+            f"Current Phase: {status.upper()}\n"
+            f"Estimated Completion: {eta_days}\n\n"
+            f"Thank you for your patience as we keep North Caloocan safe and moving. "
+            f"View full city advisories at:\n"
+            f"{domain}/updates\n"
+            f"Hotline: (02) 8288-8811"
         )
     elif template_name == "predictive_work_order":
         msg = (
-            f"[PULSO Caloocan Engineering]\n"
-            f"Preemptive WO {wo_number}: {asset_name} ({asset_id}, Brgy {barangay})\n"
-            f"Priority: {priority.upper()} | Est: {eta_days}\n"
-            f"Portal: {domain}"
+            f"PULSO | Engineering Operations Dispatch\n\n"
+            f"PREEMPTIVE MAINTENANCE NOTICE ({priority.upper()} PRIORITY):\n"
+            f"Preventive Work Order #{wo_number} has been opened for {asset_name} ({asset_id}) "
+            f"in Brgy. {barangay} following PostGIS + LightGBM risk inspection.\n\n"
+            f"Target Turnaround: {eta_days}\n\n"
+            f"Review the engineering docket and crew assignment at:\n"
+            f"{domain}/gov/predictive"
         )
     else:
         msg = (
-            f"[PULSO Caloocan Engineering]\n"
-            f"Receipt: Ticket {ticket_id} (Brgy {barangay}, {category}) is QUEUED for review.\n"
-            f"Est: {eta_days} | Track: {domain}"
+            f"PULSO | Caloocan City Engineering Office\n\n"
+            f"Good day! Thank you for helping keep North Caloocan safe. "
+            f"We have received your report for Brgy. {barangay} ({category}) under Ticket #{ticket_id}.\n\n"
+            f"Our engineering triage team is now reviewing your field evidence and location. "
+            f"Estimated resolution window: {eta_days}.\n\n"
+            f"Track live updates on your PULSO portal:\n"
+            f"{domain}/track/{ticket_id}\n"
+            f"Hotline: (02) 8288-8811"
         )
     return send_plain_sms(phone_number, _sanitize_gsm7(msg))
