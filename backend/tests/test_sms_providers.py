@@ -192,6 +192,49 @@ def test_iprogsms_blocks_smart_without_approved_sender(monkeypatch):
     assert sms_utils.send_plain_sms("09690390776", "1").accepted is False
 
 
+def test_textbee_send_and_failure_handling(monkeypatch):
+    monkeypatch.setenv("SMS_PROVIDER", "textbee")
+    monkeypatch.setenv("TEXTBEE_API_KEY", "test-only-textbee-key")
+    monkeypatch.setenv("TEXTBEE_DEVICE_ID", "dev123")
+    monkeypatch.setenv("TEXTBEE_ENABLE_OUTBOUND", "true")
+    captured = {}
+
+    def post(url, headers, json, timeout):
+        captured.update(url=url, headers=headers, payload=json, timeout=timeout)
+        return FakeResponse(body={"data": {"success": True, "smsBatchId": "batch_98765", "message": "SMS sent to queue"}})
+
+    monkeypatch.setattr(sms_utils.requests, "post", post)
+    result = sms_utils.send_templated_sms(
+        "+639606973001",
+        "report_received",
+        ticket_id="CE-2026-1021",
+        barangay="175",
+        category="Roads & Bridges",
+    )
+    assert result.accepted is True
+    assert result.provider_message_id == "batch_98765"
+    assert captured["url"] == "https://api.textbee.dev/api/v1/gateway/devices/dev123/send-sms"
+    assert captured["headers"]["x-api-key"] == "test-only-textbee-key"
+    assert captured["payload"]["recipients"] == ["+639606973001"]
+    assert "CE-2026-1021" in captured["payload"]["message"]
+
+    otp_res = sms_utils.send_login_otp_sms("09606973001", "654321", "OTP-99")
+    assert otp_res.accepted is True
+    assert captured["payload"]["recipients"] == ["+639606973001"]
+    assert "654321" in captured["payload"]["message"]
+
+    monkeypatch.setattr(sms_utils.requests, "post", lambda *a, **kw: FakeResponse(400, body={"success": False}))
+    assert sms_utils.send_plain_sms("+639606973001", "test").accepted is False
+
+
+def test_textbee_is_disabled_by_default(monkeypatch):
+    monkeypatch.setenv("SMS_PROVIDER", "textbee")
+    monkeypatch.setenv("TEXTBEE_API_KEY", "test-only-textbee-key")
+    monkeypatch.delenv("TEXTBEE_ENABLE_OUTBOUND", raising=False)
+    monkeypatch.setattr(sms_utils.requests, "post", lambda *a, **kw: pytest.fail("outbound should be disabled"))
+    assert sms_utils.send_plain_sms("+639606973001", "test").accepted is False
+
+
 @pytest.fixture
 def phone_client(monkeypatch, clean_postgis):
     monkeypatch.setenv("JWT_SECRET_KEY", "unit-test-only-secret")

@@ -18,6 +18,7 @@ _PHILSMS_SEND_URL = "https://dashboard.philsms.com/api/v3/sms/send"
 _PHILSMS_MESSAGE_URL = "https://dashboard.philsms.com/api/v3/sms"
 _IPROG_SEND_URL = "https://www.iprogsms.com/api/v1/sms_messages"
 _IPROG_NETWORK_URL = "https://www.iprogsms.com/api/v1/phone_numbers/detect"
+_TEXTBEE_BASE_URL = "https://api.textbee.dev/api/v1/gateway"
 _ACCEPTED_STATUSES = {"queued", "pending", "sent"}
 
 
@@ -205,8 +206,78 @@ def _send_iprogsms_sms(phone_number: str, message: str) -> SmsSendResult:
     return SmsSendResult(True, provider_id, "queued")
 
 
+def _normalize_e164_ph_phone(phone_number: str) -> str | None:
+    digits = "".join(character for character in (phone_number or "") if character.isdigit())
+    if digits.startswith("09") and len(digits) == 11:
+        return "+63" + digits[1:]
+    if digits.startswith("639") and len(digits) == 12:
+        return "+" + digits
+    return None
+
+
+def _send_textbee_sms(phone_number: str, message: str) -> SmsSendResult:
+    if os.getenv("TEXTBEE_ENABLE_OUTBOUND", "false").strip().lower() != "true":
+        _LOG.warning("TextBee SMS outbound is disabled")
+        return SmsSendResult(False)
+
+    api_key = os.getenv("TEXTBEE_API_KEY", "").strip()
+    device_id = os.getenv("TEXTBEE_DEVICE_ID", "").strip()
+    recipient = _normalize_e164_ph_phone(phone_number)
+    if not recipient:
+        _LOG.warning("TextBee SMS recipient number is invalid")
+        return SmsSendResult(False)
+    if not api_key or not (message or "").strip():
+        _LOG.warning("TextBee SMS API key or message is not configured; no message was sent")
+        return SmsSendResult(False)
+
+    headers = {
+        "x-api-key": api_key,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if device_id:
+        send_url = f"{_TEXTBEE_BASE_URL}/devices/{device_id}/send-sms"
+    else:
+        send_url = f"{_TEXTBEE_BASE_URL}/send-sms"
+
+    payload: dict = {"recipients": [recipient], "message": message}
+    sim_sub = os.getenv("TEXTBEE_SIM_SUBSCRIPTION_ID", "").strip()
+    if sim_sub.isdigit():
+        payload["simSubscriptionId"] = int(sim_sub)
+
+    try:
+        response = requests.post(send_url, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        body = response.json()
+    except (requests.RequestException, ValueError):
+        _LOG.warning("TextBee SMS request failed")
+        return SmsSendResult(False)
+
+    if not isinstance(body, dict):
+        _LOG.warning("TextBee SMS returned an unexpected response")
+        return SmsSendResult(False)
+
+    data = body.get("data") if isinstance(body.get("data"), dict) else body
+    success = data.get("success") is True or body.get("success") is True
+    provider_id = (
+        data.get("smsBatchId")
+        or data.get("_id")
+        or data.get("id")
+        or data.get("message_id")
+        or body.get("smsBatchId")
+    )
+    if not success or not isinstance(provider_id, (str, int)) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", str(provider_id)):
+        _LOG.warning("TextBee SMS did not accept the message")
+        return SmsSendResult(False)
+
+    provider_status = str(data.get("status") or data.get("message") or "queued").lower()
+    return SmsSendResult(True, provider_id, provider_status)
+
+
 def send_plain_sms(phone_number: str, message: str) -> SmsSendResult:
     """Send one plain SMS using the configured provider."""
+    if _provider() == "textbee":
+        return _send_textbee_sms(phone_number, message)
     if _provider() == "philsms":
         return _send_philsms_sms(phone_number, message)
     if _provider() == "iprogsms":
@@ -220,6 +291,8 @@ def send_plain_sms(phone_number: str, message: str) -> SmsSendResult:
 def send_emergency_sms(phone_number: str, title: str, message: str) -> SmsSendResult:
     """Alert staff without disclosing case details in the SMS body."""
     sms_text = "Urgent PULSO engineering alert. Open your staff workspace for details."
+    if _provider() == "textbee":
+        return _send_textbee_sms(phone_number, sms_text)
     if _provider() == "philsms":
         return _send_philsms_sms(phone_number, sms_text)
     if _provider() == "iprogsms":
@@ -232,6 +305,9 @@ def send_emergency_sms(phone_number: str, title: str, message: str) -> SmsSendRe
 def send_login_otp_sms(phone_number: str, otp_code: str, ref_id: str | None = None) -> SmsSendResult:
     """Send a caller-generated code using the configured SMS provider."""
     ref_suffix = f" Ref: {ref_id}." if ref_id else ""
+    if _provider() == "textbee":
+        message = f"PULSO Caloocan: Your sign-in code is {otp_code}. Valid for 10 minutes. Do not share it.{ref_suffix}"
+        return _send_textbee_sms(phone_number, message)
     if _provider() == "philsms":
         message = f"PULSO Caloocan: Your sign-in code is {otp_code}. Valid for 10 minutes. Do not share it.{ref_suffix}"
         return _send_philsms_sms(phone_number, message)
@@ -242,3 +318,26 @@ def send_login_otp_sms(phone_number: str, otp_code: str, ref_id: str | None = No
         return SmsSendResult(False)
     message = f"PULSO Caloocan: Your sign-in code is {{otp}}. Valid for 10 minutes. Do not share it.{ref_suffix}"
     return _send_semaphore_sms("otp", phone_number, message, code=otp_code)
+
+
+def send_templated_sms(
+    phone_number: str,
+    template_name: str = "report_received",
+    *,
+    ticket_id: str = "CE-2026-0001",
+    barangay: str = "175",
+    category: str = "Roads & Bridges",
+    status: str = "Validated",
+) -> SmsSendResult:
+    """Send a governed PULSO Caloocan templated SMS notification."""
+    if template_name == "report_status_update":
+        msg = (
+            f"PULSO Caloocan Update: Your report {ticket_id} ({category}, Brgy. {barangay}) "
+            f"is now {status.upper()}. Open your PULSO portal to track progress."
+        )
+    else:
+        msg = (
+            f"PULSO Caloocan: Your infrastructure report {ticket_id} in Brgy. {barangay} "
+            f"({category}) has been received and queued for engineering review."
+        )
+    return send_plain_sms(phone_number, msg)
