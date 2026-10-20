@@ -187,27 +187,14 @@ export function drawEvidenceWatermark(canvas, metadata = {}) {
 
     const panelTop = height - totalHeight;
 
-    // 4. Render Dark Vertical Gradient Scrim
+    // 4. Render Text with Crisp Dark Shadow/Outline (No background scrim)
     ctx.save();
-
-    // Dark vertical gradient: fades to clear at top, solid 78% opacity at bottom (#070d1a token)
-    const fadeHeight = Math.max(28, Math.round(totalHeight * 0.28));
-    const gradient = ctx.createLinearGradient(0, panelTop - fadeHeight, 0, height);
-    gradient.addColorStop(0, 'rgba(7, 13, 26, 0)');
-    gradient.addColorStop(0.35, 'rgba(7, 13, 26, 0.48)');
-    gradient.addColorStop(0.70, 'rgba(7, 13, 26, 0.70)');
-    gradient.addColorStop(1.0, 'rgba(7, 13, 26, 0.78)');
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, panelTop - fadeHeight, width, totalHeight + fadeHeight);
-
-    // 5. Render Text with Crisp Dark Outline (Guarantees legibility on bright/noisy backgrounds)
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
 
     const fontMain = `bold ${mainFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
     const fontSmall = `500 ${smallFontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-    const outlineColor = 'rgba(7, 13, 26, 0.90)';
+    const outlineColor = 'rgba(0, 0, 0, 0.65)';
     const outlineWidth = Math.max(2, Math.round(mainFontSize * 0.14));
 
     let currentY = panelTop + padY + (mainLineHeight * 0.78);

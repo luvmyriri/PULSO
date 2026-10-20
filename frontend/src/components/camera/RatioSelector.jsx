@@ -18,6 +18,12 @@ export const RATIO_OPTIONS = [
         label: '1:1',
         note: 'Square view. Crops the sides.',
         ariaNote: '1:1, square view, crops sides'
+    },
+    {
+        id: 'Full',
+        label: 'Full',
+        note: 'Full screen view. Fills the entire frame.',
+        ariaNote: 'Full screen view, fills entire frame'
     }
 ];
 
@@ -36,7 +42,7 @@ export default function RatioSelector({
     value = '4:3',
     onChange,
     className = '',
-    availableRatios = ['4:3', '16:9', '1:1'],
+    availableRatios = ['4:3', '16:9', '1:1', 'Full'],
     isDark = true
 }) {
     const groupRef = useRef(null);
@@ -57,21 +63,21 @@ export default function RatioSelector({
     };
 
     return (
-        <div className={`w-full max-w-xs mx-auto flex flex-col items-center space-y-1.5 select-none ${className}`}>
+        <div className={`w-full mx-auto flex flex-col items-center space-y-1.5 select-none ${className}`}>
             {/* Live screen reader announcement */}
             <div className="sr-only" role="status" aria-live="polite">
                 {`Photo size ${currentOption?.id}. ${currentOption?.note}`}
             </div>
 
-            {/* Segmented Control Container (44px tall on mobile, 3 equal segments) */}
+            {/* Smartphone Camera Ratio Selector Strip */}
             <div
                 ref={groupRef}
                 role="radiogroup"
                 aria-label="Photo size"
-                className={`w-full h-11 min-h-[44px] p-1 rounded-2xl border flex items-center gap-1 shadow-inner ${
+                className={`w-full h-10 min-h-[40px] p-1 rounded-full border flex items-center gap-1 ${
                     isDark
-                        ? 'bg-[#0c1427] border-slate-800/90'
-                        : 'bg-slate-200/70 dark:bg-[#0c1427] border-slate-300/80 dark:border-slate-800/90'
+                        ? 'bg-neutral-900 border-white/15'
+                        : 'bg-slate-100 border-slate-200'
                 }`}
             >
                 {filteredOptions.map((opt, idx) => {
@@ -85,24 +91,24 @@ export default function RatioSelector({
                             tabIndex={isSelected ? 0 : -1}
                             onClick={() => onChange?.(opt.id)}
                             onKeyDown={(e) => handleKeyDown(e, idx)}
-                            className={`flex-1 h-full min-h-[36px] rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
+                            className={`flex-1 h-full rounded-full text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
                                 isSelected
-                                    ? 'bg-[#ff6b00] text-white font-bold shadow-sm'
+                                    ? 'bg-[#ff6b00] text-white shadow-sm'
                                     : (isDark
-                                        ? 'bg-transparent text-slate-200 hover:bg-white/5 hover:text-white'
-                                        : 'bg-transparent text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white')
+                                        ? 'bg-transparent text-white/85 hover:bg-white/10 hover:text-white'
+                                        : 'bg-transparent text-slate-700 hover:bg-white hover:text-slate-900')
                             }`}
                         >
-                            <span className="tabular-nums">{opt.label}</span>
+                            <span className="tabular-nums tracking-wide">{opt.label}</span>
                         </button>
                     );
                 })}
             </div>
 
-            {/* Dynamic 12px High Contrast Note Under Control */}
-            <p className={`text-xs text-center font-medium leading-tight px-1 ${
-                isDark ? 'text-slate-200' : 'text-slate-700'
-            } dark:text-slate-200`}>
+            {/* Dynamic 11px High Contrast Note Under Control */}
+            <p className={`text-[11px] text-center font-medium leading-tight px-1 ${
+                isDark ? 'text-white/75' : 'text-slate-600'
+            }`}>
                 {currentOption?.note}
             </p>
         </div>

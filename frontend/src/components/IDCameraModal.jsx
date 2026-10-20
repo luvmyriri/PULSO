@@ -110,7 +110,8 @@ const IDCameraModal = ({
         return () => observer.disconnect();
     }, []);
 
-    const isDark = theme ? theme === 'dark' : isSystemDark;
+    // Always use standard black smartphone camera theme across both light and dark modes
+    const isDark = true;
 
     const isIssue = side === 'ISSUE';
     const isBack = typeof side === 'string' && (side.toLowerCase().includes('back') || side.toLowerCase() === 'secondback');
@@ -380,21 +381,18 @@ const IDCameraModal = ({
         setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
     };
 
-    const getFrameRatioClass = (ratio, isLand) => {
-        if (ratio === '16:9') {
-            return isLand
-                ? 'aspect-[16/9] h-[min(56vh,320px)] sm:h-[min(62vh,420px)] md:h-[min(66vh,500px)] w-auto max-w-full'
-                : 'aspect-[9/16] h-[min(46vh,340px)] min-[390px]:h-[min(50vh,420px)] sm:h-[min(54vh,480px)] md:h-[min(58vh,540px)] w-auto max-w-full';
-        }
+    const getFrameRatioClass = (ratio) => {
         if (ratio === '1:1') {
-            return isLand
-                ? 'aspect-square h-[min(48vh,280px)] sm:h-[min(54vh,360px)] md:h-[min(58vh,420px)] w-auto max-w-full'
-                : 'aspect-square h-[min(38vh,290px)] min-[390px]:h-[min(42vh,340px)] sm:h-[min(46vh,400px)] md:h-[min(50vh,460px)] w-auto max-w-full';
+            return 'w-full aspect-square';
         }
-        // '4:3'
-        return isLand
-            ? 'aspect-[4/3] h-[min(56vh,320px)] sm:h-[min(62vh,420px)] md:h-[min(66vh,500px)] w-auto max-w-full'
-            : 'aspect-[3/4] h-[min(46vh,340px)] min-[390px]:h-[min(50vh,420px)] sm:h-[min(54vh,480px)] md:h-[min(58vh,540px)] w-auto max-w-full';
+        if (ratio === '4:3') {
+            return 'w-full h-[min(calc(100%-190px),549px)]';
+        }
+        if (ratio === '16:9') {
+            return 'w-full h-[calc(100%-136px)]';
+        }
+        // 'Full' (fills 100% of the entire screen from top edge to bottom edge)
+        return 'w-full h-full';
     };
 
     const handleCapture = () => {
@@ -415,6 +413,7 @@ const IDCameraModal = ({
                 let targetRatio = 1.0;
                 if (photoRatio === '4:3') targetRatio = isLandImg ? 4 / 3 : 3 / 4;
                 else if (photoRatio === '16:9') targetRatio = isLandImg ? 16 / 9 : 9 / 16;
+                else if (photoRatio === 'Full') targetRatio = isLandImg ? 19.5 / 9 : 9 / 19.5;
                 else targetRatio = 1.0;
 
                 let cW = imgW, cH = imgH, cX = 0, cY = 0;
@@ -465,6 +464,10 @@ const IDCameraModal = ({
             targetRatio = isLand ? 4 / 3 : 3 / 4;
         } else if (photoRatio === '16:9') {
             targetRatio = isLand ? 16 / 9 : 9 / 16;
+        } else if (photoRatio === 'Full') {
+            const displayW = video.clientWidth || 390;
+            const displayH = video.clientHeight || 844;
+            targetRatio = displayW / displayH;
         } else {
             targetRatio = 1.0;
         }
@@ -608,6 +611,7 @@ const IDCameraModal = ({
     const isCheckingState = isVerifying;
     const isPreviewAcceptedState = isAccepted && capturedPreviewUrl && !validationError && !isVerifying;
     const isLiveState = !capturedPreviewUrl && !error && !isCheckingState;
+    const isFullBleed16x9 = (isLiveState || isCheckingState || isPreviewAcceptedState) && photoRatio === 'Full';
 
     const displayTitle = isIssue ? 'Take a photo' : (title || 'Take a photo');
     const displaySubtitle = isIssue ? 'Photos are saved with your location and time.' : (subtitle || '');
@@ -620,97 +624,124 @@ const IDCameraModal = ({
                     aria-modal="true"
                     aria-labelledby="camera-screen-title"
                     ref={modalRef}
-                    className={`${standalone ? 'absolute inset-0 z-20 w-full h-full' : 'fixed inset-0 z-[200] w-full h-[100dvh]'} ${
-                        isDark ? 'bg-[#070d1a] text-white' : 'bg-slate-50 text-slate-900'
-                    } flex flex-col justify-between overflow-hidden select-none transition-colors duration-200`}
+                    className={`${
+                        standalone
+                            ? `absolute inset-0 z-20 w-full h-full ${isDark ? 'bg-black text-white' : 'bg-white text-slate-900'}`
+                            : 'fixed inset-0 z-[200] w-full h-[100dvh] bg-black/75 backdrop-blur-md flex items-center justify-center'
+                    } overflow-hidden select-none`}
                     style={{
                         paddingTop: standalone ? '0px' : 'env(safe-area-inset-top, 0px)',
                         paddingBottom: standalone ? '0px' : 'env(safe-area-inset-bottom, 0px)'
                     }}
                 >
-                    {/* Live accessibility announcements */}
-                    <div className="sr-only" role="status" aria-live="polite">
-                        {announcement}
-                    </div>
+                    {/* Smartphone Camera Frame: Fullscreen on mobile/standalone, sleek smartphone viewport on desktop */}
+                    <div
+                        className={`relative w-full h-full ${
+                            standalone
+                                ? ''
+                                : `sm:w-[412px] sm:h-[min(92dvh,860px)] sm:rounded-[2.25rem] sm:border-[3px] ${
+                                    isDark
+                                        ? 'sm:border-white/15 sm:shadow-[0_24px_80px_rgba(0,0,0,0.9)]'
+                                        : 'sm:border-slate-200 sm:shadow-[0_24px_80px_rgba(15,23,42,0.35)]'
+                                }`
+                        } ${isDark ? 'bg-black text-white' : 'bg-white text-slate-900'} flex flex-col justify-between overflow-hidden transition-colors duration-200`}
+                    >
+                        {/* Live accessibility announcements */}
+                        <div className="sr-only" role="status" aria-live="polite">
+                            {announcement}
+                        </div>
 
-                    {/* ─────────────────────────────────────────────────────────── */}
-                    {/* ZONE 1: TOP BAR                                            */}
-                    {/* ─────────────────────────────────────────────────────────── */}
-                    <CameraTopBar
-                        title={displayTitle}
-                        subtitle={displaySubtitle}
-                        onClose={onClose}
-                        titleId="camera-screen-title"
-                        isDark={isDark}
-                    />
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        {/* ZONE 1: TOP BAR (Down chevron sizing pop-up + X button)     */}
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        <CameraTopBar
+                            title={displayTitle}
+                            subtitle={displaySubtitle}
+                            onClose={onClose}
+                            titleId="camera-screen-title"
+                            isDark={isDark}
+                            translucent={isFullBleed16x9}
+                            showRatioControl={isIssue && isLiveState}
+                            photoRatio={photoRatio}
+                            onRatioChange={(newRatio) => {
+                                setPhotoRatio(newRatio);
+                                onRatioChange?.(newRatio);
+                                const notes = {
+                                    '4:3': 'Photo size 4:3. Most detail. Best for reports.',
+                                    '16:9': 'Photo size 16:9. Wide view. Crops the top and bottom.',
+                                    '1:1': 'Photo size 1:1. Square view. Crops the sides.',
+                                    'Full': 'Photo size Full. Full screen view. Fills the entire frame.'
+                                };
+                                setAnnouncement(notes[newRatio] || `Photo size ${newRatio}`);
+                            }}
+                        />
 
-                    {/* ─────────────────────────────────────────────────────────── */}
-                    {/* ZONE 2: CONTENT ZONE (fills remaining space)                */}
-                    {/* ─────────────────────────────────────────────────────────── */}
-                    <main className="flex-1 min-h-0 w-full flex items-center justify-center p-3 sm:p-5 overflow-y-auto no-scrollbar relative">
-                        {/* ── State A: Permission Denied ── */}
-                        {isPermissionDenied && (
-                            <CameraMessage
-                                type="permission_denied"
-                                onPrimaryAction={startStream}
-                                primaryButtonText="Try again"
-                                onSecondaryAction={onPickFromGallery}
-                                secondaryButtonText={onPickFromGallery ? "Choose from gallery instead" : undefined}
-                                isDark={isDark}
-                            />
-                        )}
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        {/* ZONE 2: VIEWFINDER / CONTENT STAGE                         */}
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        <main
+                            className={`absolute inset-0 z-10 flex items-center justify-center ${
+                                isDark ? 'bg-black' : 'bg-white'
+                            } overflow-hidden transition-colors duration-200`}
+                        >
+                            {/* ── State A: Permission Denied ── */}
+                            {isPermissionDenied && (
+                                <CameraMessage
+                                    type="permission_denied"
+                                    onPrimaryAction={startStream}
+                                    primaryButtonText="Try again"
+                                    onSecondaryAction={onPickFromGallery}
+                                    secondaryButtonText={onPickFromGallery ? "Choose from gallery instead" : undefined}
+                                    isDark={isDark}
+                                />
+                            )}
 
-                        {/* ── State B: Camera Hardware / Startup Error ── */}
-                        {isOtherCameraError && (
-                            <CameraMessage
-                                type="error"
-                                reason={typeof error === 'string' && !error.startsWith('Camera error:') ? error : undefined}
-                                onPrimaryAction={startStream}
-                                primaryButtonText="Try again"
-                                isDark={isDark}
-                            />
-                        )}
+                            {/* ── State B: Camera Hardware / Startup Error ── */}
+                            {isOtherCameraError && (
+                                <CameraMessage
+                                    type="error"
+                                    reason={typeof error === 'string' && !error.startsWith('Camera error:') ? error : undefined}
+                                    onPrimaryAction={startStream}
+                                    primaryButtonText="Try again"
+                                    isDark={isDark}
+                                />
+                            )}
 
-                        {/* ── State C: Invalid Photo (Selfie / Non-Infrastructure) ── */}
-                        {isInvalidState && (
-                            <CameraMessage
-                                type="invalid"
-                                reason={validationError}
-                                onPrimaryAction={handleRetake}
-                                primaryButtonText="Retake photo"
-                                isDark={isDark}
-                            />
-                        )}
+                            {/* ── State C: Invalid Photo (Selfie / Non-Infrastructure) ── */}
+                            {isInvalidState && (
+                                <CameraMessage
+                                    type="invalid"
+                                    reason={validationError}
+                                    onPrimaryAction={handleRetake}
+                                    primaryButtonText="Retake photo"
+                                    isDark={isDark}
+                                />
+                            )}
 
-                        {/* ── State D: Checking State (Verifying with PULSO Pulse Line) ── */}
-                        {isCheckingState && (
-                            <div className={`relative ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden ${
-                                isDark ? 'bg-black border border-slate-800' : 'bg-slate-100 border border-slate-200'
-                            } flex items-center justify-center shadow-lg transition-all duration-200 motion-reduce:transition-none`}>
-                                {capturedPreviewUrl && (
-                                    <img
-                                        src={capturedPreviewUrl}
-                                        alt=""
-                                        className="w-full h-full object-cover opacity-35 filter brightness-75"
-                                    />
-                                )}
-                                <div className={`absolute inset-0 ${isDark ? 'bg-slate-950/70' : 'bg-white/90'} backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center space-y-3`}>
-                                    <div className="w-14 h-14 rounded-2xl bg-[#ff6b00]/15 border border-[#ff6b00]/30 flex items-center justify-center text-[#ff6b00] shadow-inner">
-                                        <Loader2 size={26} className="animate-spin text-[#ff6b00]" />
+                            {/* ── State D: Checking State (Verifying with PULSO Pulse Line) ── */}
+                            {isCheckingState && (
+                                <div className={`relative ${getFrameRatioClass(photoRatio)} overflow-hidden ${isDark ? 'bg-black' : 'bg-slate-100'} flex items-center justify-center transition-all duration-300 motion-reduce:transition-none`}>
+                                    {capturedPreviewUrl && (
+                                        <img
+                                            src={capturedPreviewUrl}
+                                            alt=""
+                                            className="w-full h-full object-cover opacity-35 filter brightness-75"
+                                        />
+                                    )}
+                                    <div className={`absolute inset-0 ${isDark ? 'bg-slate-950/75' : 'bg-white/85'} backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center space-y-3`}>
+                                        <div className="w-14 h-14 rounded-2xl bg-[#ff6b00]/15 border border-[#ff6b00]/30 flex items-center justify-center text-[#ff6b00] shadow-inner">
+                                            <Loader2 size={26} className="animate-spin text-[#ff6b00]" />
+                                        </div>
+                                        <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                            Checking your photo...
+                                        </h3>
                                     </div>
-                                    <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'} dark:text-white`}>
-                                        Checking your photo...
-                                    </h3>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* ── State E: Accepted Preview State ── */}
-                        {isPreviewAcceptedState && (
-                            <div className="w-full max-w-md flex flex-col items-center space-y-4">
-                                <div className={`relative ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black ${
-                                    isDark ? 'border border-slate-800' : 'border border-slate-200'
-                                } shadow-md transition-all duration-200 motion-reduce:transition-none flex items-center justify-center`}>
+                            {/* ── State E: Accepted Preview State ── */}
+                            {isPreviewAcceptedState && (
+                                <div className={`relative ${getFrameRatioClass(photoRatio)} overflow-hidden bg-black transition-all duration-300 motion-reduce:transition-none flex items-center justify-center`}>
                                     <img
                                         src={capturedPreviewUrl}
                                         alt="Captured problem photo"
@@ -718,7 +749,13 @@ const IDCameraModal = ({
                                     />
                                     {/* For preview simulation, render WatermarkPainter overlay so reviewer sees the exact watermark on accepted preview */}
                                     {isIssue && previewMode === 'accepted' && (
-                                        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-end">
+                                        <div
+                                            className={`absolute inset-x-0 ${
+                                                isFullBleed16x9
+                                                    ? 'top-[64px] bottom-[148px]'
+                                                    : (photoRatio === '16:9' ? 'top-0 bottom-7' : 'inset-y-0')
+                                            } pointer-events-none z-20 flex flex-col justify-end`}
+                                        >
                                             <WatermarkPainter
                                                 metadata={{
                                                     ...metadata,
@@ -728,46 +765,16 @@ const IDCameraModal = ({
                                         </div>
                                     )}
                                     {/* Success check badge top-left */}
-                                    <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/90 backdrop-blur-md text-white text-xs font-bold shadow-md z-30">
+                                    <div className={`absolute ${isFullBleed16x9 ? 'top-[74px]' : 'top-3'} left-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/90 backdrop-blur-md text-white text-xs font-bold shadow-md z-30`}>
                                         <Check size={14} strokeWidth={3} />
                                         <span>Photo accepted ({photoRatio})</span>
                                     </div>
                                 </div>
+                            )}
 
-                                {/* Acceptance actions */}
-                                <div className="w-full space-y-2.5 pt-1">
-                                    <button
-                                        type="button"
-                                        onClick={handleConfirmAcceptedPhoto}
-                                        className="w-full h-[52px] min-h-[52px] rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-white font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
-                                    >
-                                        <Check size={18} strokeWidth={2.75} />
-                                        <span>Use this photo</span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={handleRetake}
-                                        className={`w-full h-[52px] min-h-[52px] rounded-xl border font-semibold text-base flex items-center justify-center gap-2 cursor-pointer transition-colors active:scale-[0.99] ${
-                                            isDark
-                                                ? 'border-slate-700 bg-white/5 hover:bg-white/10 text-white'
-                                                : 'border-slate-300 bg-white hover:bg-slate-100 text-slate-800 shadow-xs'
-                                        }`}
-                                    >
-                                        <RotateCcw size={16} strokeWidth={2.25} />
-                                        <span>Retake</span>
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── State F: Live Camera View ── */}
-                        {isLiveState && (
-                            <div className="w-full max-w-md flex flex-col items-center space-y-2 sm:space-y-2.5">
-                                {/* Reshaping Live Camera Frame with 200ms transition and corner marks */}
-                                <div className={`relative ${getFrameRatioClass(photoRatio, isLandscape)} rounded-2xl overflow-hidden bg-black ${
-                                    isDark ? 'border border-slate-800 shadow-2xl' : 'border border-slate-200 shadow-xl'
-                                } flex items-center justify-center transition-all duration-200 motion-reduce:transition-none`}>
+                            {/* ── State F: Live Camera View (16:9 Full-Bleed, 4:3 Standard, 1:1 Square) ── */}
+                            {isLiveState && (
+                                <div className={`relative ${getFrameRatioClass(photoRatio)} overflow-hidden bg-black flex items-center justify-center transition-all duration-300 motion-reduce:transition-none`}>
                                     {previewMode === 'live' && !streamRef.current ? (
                                         <img
                                             src={previewSamplePhoto || "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=80"}
@@ -783,18 +790,6 @@ const IDCameraModal = ({
                                             className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
                                         />
                                     )}
-
-                                    {/* 4 Thin White Corner Marks (follow frame geometry) */}
-                                    <div className="absolute inset-3 pointer-events-none z-10">
-                                        {/* Top Left */}
-                                        <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white/90 rounded-tl-sm" />
-                                        {/* Top Right */}
-                                        <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white/90 rounded-tr-sm" />
-                                        {/* Bottom Left */}
-                                        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white/90 rounded-bl-sm" />
-                                        {/* Bottom Right */}
-                                        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white/90 rounded-br-sm" />
-                                    </div>
 
                                     {/* ID Card Silhouette (Only when capturing resident ID) */}
                                     {!isIssue && (
@@ -812,7 +807,13 @@ const IDCameraModal = ({
 
                                     {/* Live Evidence Watermark Overlay on Viewfinder (Drawn with shared drawEvidenceWatermark) */}
                                     {isIssue && (
-                                        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-end">
+                                        <div
+                                            className={`absolute inset-x-0 ${
+                                                isFullBleed16x9
+                                                    ? 'top-[60px] bottom-[108px]'
+                                                    : (photoRatio === '16:9' ? 'top-0 bottom-7' : 'inset-y-0')
+                                            } pointer-events-none z-20 flex flex-col justify-end transition-all duration-300`}
+                                        >
                                             <WatermarkPainter
                                                 metadata={{
                                                     ...metadata,
@@ -824,107 +825,108 @@ const IDCameraModal = ({
 
                                     {/* Loading spinner while stream initializes */}
                                     {isLoading && (
-                                        <div className={`absolute inset-0 ${isDark ? 'bg-[#070d1a]' : 'bg-slate-100'} flex flex-col items-center justify-center space-y-3 z-30`}>
+                                        <div className={`absolute inset-0 ${isDark ? 'bg-black' : 'bg-slate-100'} flex flex-col items-center justify-center space-y-3 z-30`}>
                                             <Loader2 size={32} className="animate-spin text-[#ff6b00]" />
                                             <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Starting camera...</p>
                                         </div>
                                     )}
                                 </div>
+                            )}
 
-                                {/* Frame Helper Text: high-contrast in both themes */}
-                                <p className={`text-xs sm:text-sm text-center font-medium ${
-                                    isDark ? 'text-slate-200' : 'text-slate-700'
-                                } dark:text-slate-200`}>
-                                    Show the problem clearly, in good light.
-                                </p>
+                            <canvas ref={canvasRef} className="hidden" />
+                        </main>
 
-                                {/* Photo Size Choices (4:3, 16:9, 1:1) Segmented Control & Dynamic Note */}
-                                {isIssue && (
-                                    <RatioSelector
-                                        value={photoRatio}
-                                        onChange={(newRatio) => {
-                                            setPhotoRatio(newRatio);
-                                            onRatioChange?.(newRatio);
-                                            const notes = {
-                                                '4:3': 'Photo size 4:3. Most detail. Best for reports.',
-                                                '16:9': 'Photo size 16:9. Wide view. Crops the top and bottom.',
-                                                '1:1': 'Photo size 1:1. Square view. Crops the sides.'
-                                            };
-                                            setAnnouncement(notes[newRatio] || `Photo size ${newRatio}`);
-                                        }}
-                                        className="pt-1"
-                                        isDark={isDark}
-                                    />
-                                )}
-                            </div>
-                        )}
-
-                        <canvas ref={canvasRef} className="hidden" />
-                    </main>
-
-                    {/* ─────────────────────────────────────────────────────────── */}
-                    {/* ZONE 3: BOTTOM BAR                                          */}
-                    {/* ─────────────────────────────────────────────────────────── */}
-                    <footer className={`w-full ${
-                        isDark ? 'bg-[#0c1427] border-t border-slate-800' : 'bg-white border-t border-slate-200 shadow-md'
-                    } px-[clamp(1rem,5vw,1.5rem)] py-4 sm:py-5 z-30 shrink-0`}>
-                        <div className="max-w-md mx-auto grid grid-cols-3 items-center">
-                            {/* Left: Camera Switcher (if multiple cameras exist) or Empty so shutter stays centered */}
-                            <div className="flex items-center justify-start">
-                                {hasMultipleCameras && isLiveState && (
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        {/* ZONE 3: SMARTPHONE BOTTOM CAMERA DECK                       */}
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        <footer
+                            className="w-full bg-transparent px-4 pt-2.5 pb-4 z-30 shrink-0 transition-colors duration-300"
+                        >
+                            {isPreviewAcceptedState ? (
+                                /* Acceptance actions in bottom deck */
+                                <div className="max-w-md mx-auto w-full space-y-2">
                                     <button
                                         type="button"
-                                        onClick={handleSwitchCamera}
-                                        aria-label="Switch camera"
-                                        className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-full flex flex-col items-center justify-center transition-colors cursor-pointer border ${
+                                        onClick={handleConfirmAcceptedPhoto}
+                                        className="w-full h-12 min-h-[48px] rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-white font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
+                                    >
+                                        <Check size={18} strokeWidth={2.75} />
+                                        <span>Use this photo</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleRetake}
+                                        className={`w-full h-12 min-h-[48px] rounded-xl border font-semibold text-base flex items-center justify-center gap-2 cursor-pointer transition-colors active:scale-[0.99] ${
                                             isDark
-                                                ? 'text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-800 border-slate-700/80'
-                                                : 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border-slate-200 shadow-xs'
+                                                ? 'border-white/20 bg-white/10 hover:bg-white/15 text-white'
+                                                : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800'
                                         }`}
                                     >
-                                        <RotateCcw size={18} strokeWidth={2.25} />
+                                        <RotateCcw size={16} strokeWidth={2.25} />
+                                        <span>Retake</span>
                                     </button>
-                                )}
-                            </div>
+                                </div>
+                            ) : (
+                                <div className="max-w-md mx-auto flex flex-col items-center">
+                                    {/* 3-Column Smartphone Shutter Bar */}
+                                    <div className="w-full grid grid-cols-3 items-center py-0.5">
+                                        {/* Left: Camera Switcher */}
+                                        <div className={`flex items-center justify-center transition-transform duration-200 ${photoRatio === '16:9' ? 'translate-y-2' : ''}`}>
+                                            {isLiveState && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSwitchCamera}
+                                                    aria-label="Switch camera"
+                                                    className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all cursor-pointer bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg ${
+                                                        isDark || isFullBleed16x9
+                                                            ? 'text-white hover:text-white/80'
+                                                            : 'text-[#ff6b00] hover:text-[#e05e00]'
+                                                    }`}
+                                                >
+                                                    <RotateCcw size={22} strokeWidth={2.5} className="drop-shadow-sm" />
+                                                </button>
+                                            )}
+                                        </div>
 
-                            {/* Center: 4.5rem (72px) Shutter Button */}
-                            <div className="flex items-center justify-center">
-                                <ShutterButton
-                                    onClick={handleCapture}
-                                    disabled={!isLiveState || isLoading}
-                                    className={isInvalidState ? 'opacity-30 pointer-events-none' : ''}
-                                    ariaLabel="Take photo"
-                                    isDark={isDark}
-                                />
-                            </div>
+                                        {/* Center: Shutter Button */}
+                                        <div className="flex items-center justify-center">
+                                            <ShutterButton
+                                                onClick={handleCapture}
+                                                disabled={!isLiveState || isLoading}
+                                                className={isInvalidState ? 'opacity-30 pointer-events-none' : ''}
+                                                ariaLabel="Take photo"
+                                                isDark={isDark}
+                                            />
+                                        </div>
 
-                            {/* Right: Flash Toggle Button (48px tap area with label under it) */}
-                            <div className="flex items-center justify-end">
-                                {(isFlashSupported || previewMode) && (
-                                    <button
-                                        type="button"
-                                        onClick={handleToggleFlash}
-                                        aria-pressed={flashOn}
-                                        aria-label={flashOn ? "Turn flash off" : "Turn flash on"}
-                                        className="min-w-[48px] min-h-[48px] flex flex-col items-center justify-center text-center cursor-pointer transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl px-2 py-1"
-                                    >
-                                        {flashOn ? (
-                                            <Zap size={22} className="text-[#ff6b00]" strokeWidth={2.5} />
-                                        ) : (
-                                            <ZapOff size={22} className={isDark ? "text-slate-300 group-hover:text-white" : "text-slate-500 group-hover:text-slate-900"} strokeWidth={2} />
-                                        )}
-                                        <span className={`text-[11px] font-bold mt-1 leading-none ${
-                                            flashOn
-                                                ? 'text-[#ff6b00]'
-                                                : (isDark ? 'text-slate-200' : 'text-slate-600')
-                                        }`}>
-                                            {flashOn ? 'Flash on' : 'Flash off'}
-                                        </span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </footer>
+                                        {/* Right beside Snapshot: Flash Icon Button */}
+                                        <div className={`flex items-center justify-center transition-transform duration-200 ${photoRatio === '16:9' ? 'translate-y-2' : ''}`}>
+                                            {isLiveState && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleToggleFlash}
+                                                    aria-pressed={flashOn}
+                                                    aria-label={flashOn ? "Turn flash off" : "Turn flash on"}
+                                                    className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all cursor-pointer bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg ${
+                                                        isDark || isFullBleed16x9
+                                                            ? 'text-white hover:text-white/80'
+                                                            : 'text-[#ff6b00] hover:text-[#e05e00]'
+                                                    }`}
+                                                >
+                                                    {flashOn ? (
+                                                        <Zap size={22} className="text-[#ff6b00] fill-[#ff6b00] drop-shadow-sm" strokeWidth={2.5} />
+                                                    ) : (
+                                                        <ZapOff size={22} className="drop-shadow-sm" strokeWidth={2.5} />
+                                                    )}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </footer>
+                    </div>
                 </div>
             )}
         </AnimatePresence>

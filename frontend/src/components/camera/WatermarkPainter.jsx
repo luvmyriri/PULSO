@@ -70,6 +70,10 @@ export default function WatermarkPainter({
                 const dpr = window.devicePixelRatio || 1;
                 canvas.width = Math.round(rect.width * dpr);
                 canvas.height = Math.round(rect.height * dpr);
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
                 drawEvidenceWatermark(canvas, metadata);
             }
         });
