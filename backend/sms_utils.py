@@ -368,47 +368,22 @@ def send_templated_sms(
 
     if template_name == "report_status_update":
         msg = (
-            f"PULSO | Caloocan City Engineering Advisory\n\n"
-            f"Good day! Your infrastructure report under Ticket #{ticket_id} "
-            f"({category} in Brgy. {barangay}) has been updated to: {status.upper()}.\n\n"
-            f"A City Engineering team has been assigned to address the issue on-site. "
-            f"Estimated completion window: {eta_days}.\n\n"
-            f"Follow live field progress & photo updates at:\n"
-            f"{domain}/track/{ticket_id}\n"
-            f"Caloocan Action Center: (02) 8288-8811"
+            f"PULSO Caloocan Advisory: Good day! Report {ticket_id} (Brgy {barangay}, {category}) "
+            f"is now {status.upper()} to our field crew (Est: {eta_days}). Hotline: 8288-8811"
         )
     elif template_name == "city_announcement":
         msg = (
-            f"PULSO | Caloocan City Public Works Advisory\n\n"
-            f"COMMUNITY NOTICE - Brgy. {barangay}:\n"
-            f"Scheduled {category} maintenance and rehabilitation works are now underway "
-            f"in your area ({asset_name}).\n\n"
-            f"Current Phase: {status.upper()}\n"
-            f"Estimated Completion: {eta_days}\n\n"
-            f"Thank you for your patience as we keep North Caloocan safe and moving. "
-            f"View full city advisories at:\n"
-            f"{domain}/updates\n"
-            f"Hotline: (02) 8288-8811"
+            f"PULSO Caloocan Notice: Good day! Scheduled {category} works are underway in "
+            f"Brgy {barangay} ({asset_name}, Est: {eta_days}). Hotline: 8288-8811"
         )
     elif template_name == "predictive_work_order":
         msg = (
-            f"PULSO | Engineering Operations Dispatch\n\n"
-            f"PREEMPTIVE MAINTENANCE NOTICE ({priority.upper()} PRIORITY):\n"
-            f"Preventive Work Order #{wo_number} has been opened for {asset_name} ({asset_id}) "
-            f"in Brgy. {barangay} following PostGIS + LightGBM risk inspection.\n\n"
-            f"Target Turnaround: {eta_days}\n\n"
-            f"Review the engineering docket and crew assignment at:\n"
-            f"{domain}/gov/predictive"
+            f"PULSO Engineering Dispatch: Preemptive WO {wo_number} opened for {asset_name} "
+            f"(Brgy {barangay}, {priority.upper()} Priority, Est: {eta_days})."
         )
     else:
         msg = (
-            f"PULSO | Caloocan City Engineering Office\n\n"
-            f"Good day! Thank you for helping keep North Caloocan safe. "
-            f"We have received your report for Brgy. {barangay} ({category}) under Ticket #{ticket_id}.\n\n"
-            f"Our engineering triage team is now reviewing your field evidence and location. "
-            f"Estimated resolution window: {eta_days}.\n\n"
-            f"Track live updates on your PULSO portal:\n"
-            f"{domain}/track/{ticket_id}\n"
-            f"Hotline: (02) 8288-8811"
+            f"PULSO Caloocan: Good day! Your report {ticket_id} in Brgy. {barangay} ({category}) "
+            f"has been received and queued for engineering review (Est: {eta_days})."
         )
     return send_plain_sms(phone_number, _sanitize_gsm7(msg))
