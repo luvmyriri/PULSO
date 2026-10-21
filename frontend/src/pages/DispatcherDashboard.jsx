@@ -620,7 +620,7 @@ const DispatcherDashboard = () => {
 
         // Clear location.state so refresh doesn't re-trigger
         window.history.replaceState({}, document.title);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     }, [location.state]);
 
     // Step 2 — once map is ready, pan to the pending tactical coordinates

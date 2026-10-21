@@ -8,14 +8,21 @@ Write-Host ""
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (-not $rootDir) { $rootDir = Get-Location }
 
-# Check Python
-$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonCmd) {
-    $pythonCmd = Get-Command py -ErrorAction SilentlyContinue
-}
-if (-not $pythonCmd) {
-    Write-Host "[ERROR] Python was not found in PATH!" -ForegroundColor Red
-    return
+# Check Python (prefer backend\.venv\Scripts\python.exe if present)
+$venvPython = Join-Path $rootDir "backend\.venv\Scripts\python.exe"
+$pythonExe = $null
+if (Test-Path $venvPython) {
+    $pythonExe = "`"$venvPython`""
+} else {
+    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pythonCmd) {
+        $pythonCmd = Get-Command py -ErrorAction SilentlyContinue
+    }
+    if (-not $pythonCmd) {
+        Write-Host "[ERROR] Python was not found in PATH!" -ForegroundColor Red
+        return
+    }
+    $pythonExe = $pythonCmd.Name
 }
 
 # Check NPM
@@ -26,7 +33,7 @@ if (-not $npmCmd) {
 }
 
 Write-Host "[1/3] Launching FastAPI Backend on http://localhost:33159..." -ForegroundColor Green
-Start-Process -FilePath "cmd.exe" -ArgumentList "/k cd /d `"$rootDir\backend`" && title PULSO Backend [Port 33159] && $($pythonCmd.Name) main.py"
+Start-Process -FilePath "cmd.exe" -ArgumentList "/k cd /d `"$rootDir\backend`" && title PULSO Backend [Port 33159] && $pythonExe main.py"
 
 Write-Host "[2/3] Launching Vite Frontend on http://localhost:5173..." -ForegroundColor Green
 Start-Process -FilePath "cmd.exe" -ArgumentList "/k cd /d `"$rootDir\frontend`" && title PULSO Frontend [Port 5173] && npm run dev"

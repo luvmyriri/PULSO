@@ -99,7 +99,7 @@ export default function GovAnnouncementsPage() {
 
     useEffect(() => {
         fetchAnnouncements();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, []);
 
     const filteredAnnouncements = useMemo(() => {

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status, Query, Request
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status, Query, Request, Header
 from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,22 +49,20 @@ import analytics_service
 import database
 import gov_models, gov_router, gov_schemas, gov_crud           # Government-side modules
 import models, schemas, crud
+import command_integrity
 import analytics_router                 # AI Analytics & Intelligence Engine
 import philsys_router                   # PhilSys Check Authentication (PSA)
 import predictive_router                # Predictive Maintenance Engine
 import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
 import pulseai_router                    # PULSEAI Persistent Chat & History Engine
+from database import get_db
 import spatial_router                    # PostGIS Spatial Queries & GeoEngine
 import admin_router                      # Staff, Residents, Settings & Governance
-from database import engine, get_db
+from services.spatial_service import PUBLIC_REPORT_STATUSES
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter
-
-# Create ALL tables — citizen-side + government-side
-models.Base.metadata.create_all(bind=engine)
-gov_models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="pulso-backend",
@@ -1763,15 +1761,12 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
     using PostGIS spatial containment and returning public incident markers and density points.
     """
     import re
-    from services.spatial_service import locate_point
+    from services.spatial_service import locate_point, mask_coordinates_for_privacy
 
     reports = db.query(models.Report).filter(
         models.Report.location_lat.isnot(None),
         models.Report.location_lng.isnot(None),
-        or_(
-            models.Report.status.is_(None),
-            models.Report.status.notin_(["cancelled", "rejected"])
-        )
+        models.Report.status.in_(PUBLIC_REPORT_STATUSES)
     ).order_by(models.Report.created_at.desc()).all()
 
     barangay_counts = {}
@@ -1855,7 +1850,8 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
         if len(r.description or "") > 90:
             report_title += "..."
 
-        full_addr = r.location_string or (f"{b_name or f'Brgy. {b_num}'}, Caloocan City")
+        full_addr = f"{b_name or (f'Brgy. {b_num}' if b_num else 'Caloocan City')}, Caloocan City" if b_num or b_name else "Caloocan City"
+        public_lat, public_lng = mask_coordinates_for_privacy(r.location_lat, r.location_lng)
 
         report_items.append({
             "id": r.id,
@@ -1871,15 +1867,15 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
             "sector": r.sector or ("North" if r.location_lat and r.location_lat >= 14.70 else "South"),
             "district": r.district or ("North Caloocan" if r.location_lat and r.location_lat >= 14.70 else "South Caloocan"),
             "status": (r.status or "In Progress").replace("_", " ").title(),
-            "lat": float(r.location_lat),
-            "lng": float(r.location_lng),
+            "lat": public_lat,
+            "lng": public_lng,
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "urgency": r.urgency
         })
 
         raw_points.append({
-            "lat": float(r.location_lat),
-            "lng": float(r.location_lng),
+            "lat": public_lat,
+            "lng": public_lng,
             "weight": 2.0 if r.urgency in ["critical", "high"] else 1.0,
             "category": r.category,
             "ticket_id": r.ticket_id
@@ -1906,18 +1902,14 @@ def read_public_reports(
 ):
     """
     Returns public reports that all residents can see as pin locations on the map.
-    Includes active community reports (pending, under_review, validated, in_progress, resolved).
-    Excludes cancelled and rejected reports.
+    Includes only reports approved for public display after validation.
     Strictly strips and anonymizes all resident personal information (name, email, phone, user IDs, tracking tokens)
     so viewers only see the reported pin location, category, status, and evidence.
     """
     query = db.query(models.Report).filter(
         models.Report.location_lat.isnot(None),
         models.Report.location_lng.isnot(None),
-        or_(
-            models.Report.status.is_(None),
-            models.Report.status.notin_(["cancelled", "rejected"])
-        )
+        models.Report.status.in_(PUBLIC_REPORT_STATUSES)
     ).order_by(models.Report.created_at.desc())
     
     db_reports = query.offset(skip).limit(min(limit, 500)).all()
@@ -1943,6 +1935,12 @@ def read_public_reports(
             resp.claimed_by_user_id = None
             resp.tracking_token = None
             resp.tracking_url = None
+            resp.location_lat = round(resp.location_lat, 3) if resp.location_lat is not None else None
+            resp.location_lng = round(resp.location_lng, 3) if resp.location_lng is not None else None
+            resp.location_string = resp.location_barangay or resp.barangay or "Caloocan City"
+            resp.ai_metadata = None
+            resp.ai_reasoning = None
+            resp.budget = None
 
         results.append(resp)
 
@@ -2029,6 +2027,15 @@ async def create_new_report(
     report_submission_limiter.check(request)
 
     # 1. Payload validation
+    text_fields = (
+        category, description, location_string, location_barangay,
+        contact_email, contact_phone, submission_source,
+    )
+    if any("\x00" in value for value in text_fields if value is not None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Text fields cannot contain null bytes.",
+        )
     clean_desc = (description or "").strip()
     if len(clean_desc) < 10:
         raise HTTPException(
@@ -2471,6 +2478,8 @@ def claim_guest_report(
 def confirm_report_resolution(
     report_id: int,
     confirm: schemas.ReportResolutionConfirm,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: models.Resident = Depends(get_current_user)
 ):
@@ -2481,12 +2490,16 @@ def confirm_report_resolution(
     if current_user.role != "resident":
         raise HTTPException(status_code=403, detail="Only residents can confirm resolution.")
         
+    key = command_integrity.validate_key(idempotency_key)
+    expected = command_integrity.parse_version(if_match)
+
     report = crud.confirm_report_resolution(
         db=db, 
         report_id=report_id, 
         resident_id=current_user.id,
         rating=confirm.rating,
-        note=confirm.note
+        note=confirm.note,
+        expected_version=expected,
     )
     
     if not report:
@@ -2535,9 +2548,8 @@ async def upload_resident_avatar(
     stores in persistent uploads/avatars, and saves avatar_url in the database.
     """
     # 1. Authorization check
-    if current_user.id != resident_id and not hasattr(current_user, 'role_id'):
-        if getattr(current_user, 'role', None) not in ["dispatcher", "manager", "admin"]:
-            raise HTTPException(status_code=403, detail="Not authorized to update this avatar")
+    if current_user.id != resident_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this avatar")
 
     # 2. Content-Type and extension validation
     allowed_types = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
@@ -2582,9 +2594,8 @@ async def upload_resident_avatar(
     public_url = f"/api/uploads/avatars/{avatar_filename}"
     
     # Check if target is a Resident or Official
-    target_user = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
-    if not target_user:
-        target_user = db.query(models.Official).filter(models.Official.id == resident_id).first()
+    user_model = models.Resident if isinstance(current_user, models.Resident) else models.Official
+    target_user = db.query(user_model).filter(user_model.id == resident_id).first()
         
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -2706,6 +2717,8 @@ async def get_directions_proxy(
 def update_report_status(
     report_id: int,
     status_update: ReportStatusUpdate,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "system_admin", "admin"))
 ):
@@ -2713,9 +2726,24 @@ def update_report_status(
     status = status_update.status or status_update.targetStatus
     if status != "pending_approval" or status_update.budget is not None or status_update.deployment_date is not None:
         raise HTTPException(status_code=422, detail="Use the governed report decision endpoint")
+    key = command_integrity.validate_key(idempotency_key)
+    expected = command_integrity.parse_version(if_match)
+    digest = command_integrity.request_hash(status_update.model_dump(mode="json")) if key else None
+
     report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    if hasattr(current_user, "id") and getattr(current_user, "role", None) != "resident":
+        receipt = command_integrity.find_receipt(
+            db, actor_id=current_user.id, operation="report_verify",
+            report_id=report_id, key=key, digest=digest,
+        )
+        if receipt:
+            return receipt.result_json
+
+    if expected is not None:
+        command_integrity.check_version(getattr(report, 'version', 1), expected)
+
     if report.status not in ("pending", "unverified", "needs_information", "received", "unvalidated", "under_review"):
         raise HTTPException(status_code=409, detail="Report is not eligible for verification")
     updated_report = crud.update_report_status(
@@ -2728,12 +2756,22 @@ def update_report_status(
     )
     if not updated_report:
         raise HTTPException(status_code=404, detail="Report not found")
+    if hasattr(current_user, "id") and getattr(current_user, "role", None) != "resident" and key:
+        result_data = schemas.ReportResponse.model_validate(updated_report).model_dump(mode="json")
+        command_integrity.record_receipt(
+            db, actor_id=current_user.id, operation="report_verify",
+            report_id=report_id, key=key, digest=digest, resource_id=report_id,
+            result_json=result_data,
+        )
+        db.commit()
     return updated_report
 
 @app.patch("/api/reports/{report_id}/reject", response_model=schemas.ReportResponse)
 def reject_report(
     report_id: int,
     decision: ReportRejectionDecision,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "system_admin", "admin"))
 ):
@@ -2741,12 +2779,35 @@ def reject_report(
     reason = decision.reason.strip()
     if len(reason) < 10:
         raise HTTPException(status_code=422, detail="A rejection reason of at least 10 characters is required")
+    key = command_integrity.validate_key(idempotency_key)
+    expected = command_integrity.parse_version(if_match)
+    digest = command_integrity.request_hash({"reason": reason}) if key else None
+
     report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    receipt = command_integrity.find_receipt(
+        db, actor_id=current_user.id, operation="report_reject",
+        report_id=report_id, key=key, digest=digest,
+    )
+    if receipt:
+        return receipt.result_json
+
+    if expected is not None:
+        command_integrity.check_version(getattr(report, 'version', 1), expected)
+
     if report.status not in ("pending", "unverified", "needs_information", "pending_approval", "received", "unvalidated", "under_review"):
         raise HTTPException(status_code=409, detail="Report cannot be rejected after approval or dispatch")
-    return crud.reject_report(db, report_id=report_id, actor_id=current_user.id, reason=reason)
+    updated_report = crud.reject_report(db, report_id=report_id, actor_id=current_user.id, reason=reason)
+    if key:
+        result_data = schemas.ReportResponse.model_validate(updated_report).model_dump(mode="json")
+        command_integrity.record_receipt(
+            db, actor_id=current_user.id, operation="report_reject",
+            report_id=report_id, key=key, digest=digest, resource_id=report_id,
+            result_json=result_data,
+        )
+        db.commit()
+    return updated_report
 
 @app.patch("/api/reports/{report_id}/dispatch", response_model=schemas.ReportResponse)
 def dispatch_report(

@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import json
 
+PUBLIC_REPORT_STATUSES = ("validated", "dispatched", "approved_internal", "in_progress", "resolved")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Validation & Coordinate Guardrails
@@ -214,6 +216,7 @@ def find_nearby_reports(
         FROM reports r
         LEFT JOIN barangays b ON r.barangay_id = b.id
         WHERE r.location IS NOT NULL
+          AND (:is_staff OR r.status IN ('validated', 'dispatched', 'approved_internal', 'in_progress', 'resolved'))
           AND ST_DWithin(r.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius_m)
           AND (:category IS NULL OR r.category = :category)
           AND (:status IS NULL OR r.status = :status)
@@ -225,6 +228,7 @@ def find_nearby_reports(
         "lat": lat,
         "lng": lng,
         "radius_m": radius_m,
+        "is_staff": is_staff,
         "category": category,
         "status": status,
         "limit": limit
@@ -244,7 +248,7 @@ def find_nearby_reports(
             "description": row.description,
             "location_lat": r_lat,
             "location_lng": r_lng,
-            "location_string": row.location_string,
+            "location_string": row.location_string if is_staff else row.barangay_name,
             "image_url": row.image_url,
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "barangay_id": row.barangay_id,
@@ -372,6 +376,7 @@ def get_reports_in_viewport(
         FROM reports r
         LEFT JOIN barangays b ON r.barangay_id = b.id
         WHERE r.location && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
+          AND (:is_staff OR r.status IN ('validated', 'dispatched', 'approved_internal', 'in_progress', 'resolved'))
           AND (:category IS NULL OR r.category = :category)
           AND (:status IS NULL OR r.status = :status)
         LIMIT :limit;
@@ -382,6 +387,7 @@ def get_reports_in_viewport(
         "south": south,
         "east": east,
         "north": north,
+        "is_staff": is_staff,
         "category": category,
         "status": status,
         "limit": limit
@@ -589,6 +595,9 @@ def get_preventive_risk_inputs(
         "cutoff": cutoff
     }).fetchall()
 
+    from services import lightgbm_service
+    import gov_models
+
     asset_risks = []
     for row in rows:
         count = row.related_report_count
@@ -602,6 +611,12 @@ def get_preventive_risk_inputs(
         else:
             priority = "ROUTINE"
 
+        asset_obj = db.query(gov_models.InfrastructureAsset).filter_by(asset_id=row.asset_id).first()
+        lgbm_data = (
+            lightgbm_service.predict_for_asset(db, asset_obj)
+            if asset_obj else {}
+        )
+
         asset_risks.append({
             "asset_id": row.asset_id,
             "asset_name": row.asset_name,
@@ -610,12 +625,17 @@ def get_preventive_risk_inputs(
             "failure_frequency_90d": count,
             "last_incident": row.last_report_date.isoformat() if row.last_report_date else None,
             "rule_based_recommendation": priority,
-            "model_type": "Deterministic Rule-Based Spatial Heuristic"
+            "model_type": "PostGIS Spatial + LightGBM GBDT Ensemble",
+            "lgbm_failure_probability_30d": lgbm_data.get("lgbm_failure_probability_30d"),
+            "predicted_repair_days_p50": lgbm_data.get("predicted_repair_days_p50"),
+            "predicted_repair_days_p90": lgbm_data.get("predicted_repair_days_p90"),
+            "risk_drivers": lgbm_data.get("risk_drivers", []),
         })
 
     return {
-        "methodology": "Rule-based historical incident recurrence analysis (50m radius / category match)",
+        "methodology": "Rule-based historical incident recurrence analysis (50m radius / category match) + LightGBM TreeSHAP",
         "window_days": days,
+        "ml_engine": lightgbm_service.get_global_model_diagnostics(db),
         "assets_evaluated": len(asset_risks),
         "results": asset_risks
     }

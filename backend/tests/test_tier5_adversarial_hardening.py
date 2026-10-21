@@ -41,23 +41,14 @@ from utils.security import generate_tracking_token, hash_tracking_token, verify_
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter
 from utils.geometry_utils import is_in_caloocan
 
-# Isolated SQLite in-memory database
-TEST_DATABASE_URL = "sqlite:///:memory:"
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-    echo=False
-)
+# Bootstrapped disposable PostGIS database; no ORM DDL in tests.
+from database import engine as test_engine
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
 @pytest.fixture(autouse=True)
-def setup_tier5_db():
-    Base.metadata.drop_all(bind=test_engine)
-    gov_models.Base.metadata.drop_all(bind=test_engine)
-    Base.metadata.create_all(bind=test_engine)
-    gov_models.Base.metadata.create_all(bind=test_engine)
+def setup_tier5_db(clean_postgis):
+    # clean_postgis resets rows while preserving the bootstrapped schema.
 
     report_submission_limiter.reset()
     tracking_query_limiter.reset()
@@ -139,12 +130,11 @@ class TestTier5CryptographicAssurance:
         assert len(tokens) == 1000
 
     def test_token_hash_salt_independence(self):
-        """Same token hashed multiple times with random salt must produce distinct hashes."""
+        """A token has a stable keyed HMAC and remains verifiable."""
         token = generate_tracking_token()
         h1 = hash_tracking_token(token)
         h2 = hash_tracking_token(token)
-        assert h1 != h2
-        # Both must verify cleanly
+        assert h1 == h2
         assert verify_tracking_token(token, h1) is True
         assert verify_tracking_token(token, h2) is True
 
@@ -178,7 +168,7 @@ class TestTier5AntiEnumerationAndTiming:
         Anti-enumeration invariant:
         Querying with non-existent ticket_id, invalid token, or wrong combination
         must return identical HTTP 404 with exact detail string:
-        'Report not found or invalid tracking credentials'
+        'Report not found or invalid tracking credentials.'
         """
         # 1. Create legitimate report
         data = {
@@ -202,7 +192,7 @@ class TestTier5AntiEnumerationAndTiming:
             ("<script>alert(1)</script>", legit_token)
         ]
 
-        expected_detail = "Report not found or invalid tracking credentials"
+        expected_detail = "Report not found or invalid tracking credentials."
         for ticket, tok in test_cases:
             resp = client.post("/api/reports/track", json={"ticket_id": ticket, "tracking_token": tok})
             assert resp.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_422_UNPROCESSABLE_ENTITY, status.HTTP_400_BAD_REQUEST]
@@ -267,7 +257,7 @@ class TestTier5InjectionResilience:
         "Pothole with \x00 null bytes and \r\n CRLF headers"
     ])
     def test_injection_strings_in_report_intake(self, client, malicious_string):
-        """Verify free-form fields safely sanitize and persist without executing or breaking DB."""
+        """Reject null bytes and persist other literal text without executing it."""
         data = {
             "category": "Roads & Bridges",
             "description": f"Detailed description containing: {malicious_string}",
@@ -278,6 +268,9 @@ class TestTier5InjectionResilience:
         }
         headers = {"X-Forwarded-For": f"10.8.{secrets.randbelow(200)}.{secrets.randbelow(250)}"}
         resp = client.post("/api/reports", data=data, headers=headers)
+        if "\x00" in malicious_string:
+            assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+            return
         assert resp.status_code == status.HTTP_201_CREATED
         json_data = resp.json()
         assert "ticket_id" in json_data
@@ -366,13 +359,12 @@ class TestTier5LifecycleProgressionAndTimeline:
         db_rep.ai_urgency = "medium"
 
         # Add process timeline event
-        tl_event = models.ProcessTimeline(
+        tl_event = gov_models.ProcessTimeline(
             report_id=report_id,
-            stage="in_progress",
-            title="Field Team Dispatched",
-            description="Engineering maintenance crew deployed to Deparo Road.",
-            actor_type="official",
-            actor_name="Engr. Dispatcher"
+            status="in_progress",
+            note="Engineering maintenance crew deployed to Deparo Road.",
+            actor_role="dispatcher",
+            is_public=True,
         )
         db.add(tl_event)
         db.commit()

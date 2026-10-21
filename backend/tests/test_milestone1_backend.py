@@ -34,22 +34,14 @@ from database import Base, get_db
 from main import app
 
 # Isolated In-Memory SQLite Setup
-TEST_DATABASE_URL = "sqlite:///:memory:"
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool
-)
+from database import engine as test_engine
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
 @pytest.fixture(autouse=True)
-def setup_test_database():
+def setup_test_database(clean_postgis):
     """Drops and recreates all database tables for test isolation."""
-    Base.metadata.drop_all(bind=test_engine)
-    gov_models.Base.metadata.drop_all(bind=test_engine)
-    Base.metadata.create_all(bind=test_engine)
-    gov_models.Base.metadata.create_all(bind=test_engine)
+    # The disposable PostGIS schema is bootstrapped; clean_postgis resets rows.
 
     def override_get_db():
         db = TestingSessionLocal()

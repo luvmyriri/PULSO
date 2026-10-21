@@ -19,8 +19,15 @@ from typing import Optional, List, Dict, Any
 from database import get_db
 from services import spatial_service
 from auth import get_current_user, get_optional_current_user
+import models
 
 router = APIRouter(prefix="/api", tags=["Spatial & PostGIS Engine"])
+
+
+def require_spatial_staff(current_user=Depends(get_current_user)) -> models.Official:
+    if not isinstance(current_user, models.Official):
+        raise HTTPException(status_code=403, detail="Government role required for this action.")
+    return current_user
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -153,7 +160,8 @@ def check_duplicate_suggestions(
     radius: float = Query(50.0, ge=5.0, le=500.0, description="Deduplication distance threshold in metres"),
     days: int = Query(30, ge=1, le=180, description="Recency search window in days"),
     exclude_id: Optional[int] = Query(None, description="Exclude existing report ID"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.Official = Depends(require_spatial_staff)
 ):
     """
     Suggests possible duplicate tickets within ~50m matching category and time window.
@@ -193,7 +201,8 @@ def get_analytics_hotspots(
     category: Optional[str] = Query(None, description="Category filter"),
     eps: float = Query(0.0015, ge=0.0005, le=0.01, description="DBSCAN clustering epsilon in degrees (~150m)"),
     min_points: int = Query(3, ge=2, le=20, description="Min incidents to form a cluster"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.Official = Depends(require_spatial_staff)
 ):
     """
     Calculates spatial clusters using PostGIS ST_ClusterDBSCAN.
@@ -235,7 +244,8 @@ def get_preventive_risk_inputs(
     asset_id: Optional[str] = Query(None, description="Specific asset ID filter"),
     category: Optional[str] = Query(None, description="Category filter"),
     days: int = Query(90, ge=7, le=365, description="Lookback window in days"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.Official = Depends(require_spatial_staff)
 ):
     """
     Computes empirical spatial recurrence frequency per asset.

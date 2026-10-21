@@ -14,7 +14,7 @@ Endpoints:
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, or_, text
+from sqlalchemy import func, desc
 from typing import Optional, List, Dict, Any, Union
 from pydantic import BaseModel
 from datetime import datetime
@@ -27,34 +27,16 @@ from auth import get_current_user
 
 router = APIRouter(prefix="/api/pulseai", tags=["PulseAI"])
 
-_FK_DROPPED = False
-
-
-def _ensure_chat_fk_dropped(db: Session):
-    """Drop legacy residents-only FK on chat_conversations.user_id so Official accounts can create chat sessions."""
-    global _FK_DROPPED
-    if _FK_DROPPED:
-        return
-    try:
-        db.execute(text("ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_fkey"))
-        db.commit()
-        _FK_DROPPED = True
-    except Exception:
-        db.rollback()
-
-
 def _is_staff_user(user: Any) -> bool:
-    if isinstance(user, models.Official):
-        return True
-    role = (getattr(user, "role", "") or "").lower()
-    return role != "" and role != "resident"
+    return isinstance(user, models.Official)
 
 
-def _get_chat_owner_id(user: Any) -> int:
-    """Namespace Official IDs (100000 + id) so they do not collide with Resident IDs."""
-    if isinstance(user, models.Official):
-        return 100000 + int(user.id)
-    return int(user.id)
+def _chat_owner_type(user: Any) -> str:
+    return "official" if _is_staff_user(user) else "resident"
+
+
+def _owns_conversation(conversation: models.ChatConversation, user: Any) -> bool:
+    return conversation.user_id == user.id and conversation.owner_type == _chat_owner_type(user)
 
 
 # ── Pydantic Request / Response Schemas ────────────────────────────────────────
@@ -128,12 +110,10 @@ def list_conversations(
     List past conversations for the authenticated account, most recent first.
     Returns id, title, timestamps, message count, and last message preview.
     """
-    owner_id = _get_chat_owner_id(current_user)
-    owner_ids = [owner_id, int(current_user.id)] if owner_id != int(current_user.id) else [owner_id]
-
     convs = (
         db.query(models.ChatConversation)
-        .filter(models.ChatConversation.user_id.in_(owner_ids))
+        .filter(models.ChatConversation.user_id == current_user.id,
+                models.ChatConversation.owner_type == _chat_owner_type(current_user))
         .order_by(desc(models.ChatConversation.updated_at))
         .limit(limit)
         .all()
@@ -187,17 +167,16 @@ def list_conversations_by_param(
     except ValueError:
         return list_conversations(limit=limit, db=db, current_user=current_user)
 
-    is_staff = _is_staff_user(current_user)
-    if current_user.id != target_uid and not is_staff:
+    if current_user.id != target_uid:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. You can only view chat conversations belonging to your own account."
         )
 
-    target_ids = [target_uid, 100000 + target_uid] if is_staff and current_user.id == target_uid else [target_uid]
     convs = (
         db.query(models.ChatConversation)
-        .filter(models.ChatConversation.user_id.in_(target_ids))
+        .filter(models.ChatConversation.user_id == target_uid,
+                models.ChatConversation.owner_type == _chat_owner_type(current_user))
         .order_by(desc(models.ChatConversation.updated_at))
         .limit(limit)
         .all()
@@ -245,30 +224,15 @@ def create_conversation(
     """
     Start a fresh PULSEAI conversation session for the resident or official.
     """
-    _ensure_chat_fk_dropped(db)
     title = (req.title or "").strip() or "New Conversation"
-    owner_id = _get_chat_owner_id(current_user)
-
-    try:
-        conv = models.ChatConversation(
-            user_id=owner_id,
-            title=title
-        )
-        db.add(conv)
-        db.commit()
-        db.refresh(conv)
-    except Exception:
-        db.rollback()
-        # Fallback if FK constraint could not be dropped due to DB permissions
-        fallback_res = db.query(models.Resident).first()
-        fallback_uid = fallback_res.id if fallback_res else int(current_user.id)
-        conv = models.ChatConversation(
-            user_id=fallback_uid,
-            title=title
-        )
-        db.add(conv)
-        db.commit()
-        db.refresh(conv)
+    conv = models.ChatConversation(
+        user_id=current_user.id,
+        owner_type=_chat_owner_type(current_user),
+        title=title
+    )
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
 
     return {
         "id": conv.id,
@@ -297,9 +261,7 @@ def get_conversation_messages(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
-    is_staff = _is_staff_user(current_user)
-    owner_id = _get_chat_owner_id(current_user)
-    if conv.user_id not in (owner_id, int(current_user.id)) and not is_staff:
+    if not _owns_conversation(conv, current_user):
         raise HTTPException(status_code=403, detail="You do not have permission to view this conversation.")
 
     query = db.query(models.ChatMessage).filter(models.ChatMessage.conversation_id == conversation_id)
@@ -347,9 +309,7 @@ def append_message_and_respond(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
-    is_staff = _is_staff_user(current_user)
-    owner_id = _get_chat_owner_id(current_user)
-    if conv.user_id not in (owner_id, int(current_user.id)) and not is_staff:
+    if not _owns_conversation(conv, current_user):
         raise HTTPException(status_code=403, detail="You do not have permission to post to this conversation.")
 
     query_text = (req.query or "").strip()
@@ -386,6 +346,7 @@ def append_message_and_respond(
         conv.title = _generate_auto_title(query_text)
 
     # 3. Call AI Assistant with full grounding & tool audit
+    is_staff = _is_staff_user(current_user)
     actor_label = f"Staff ({getattr(current_user, 'role', 'official')})" if is_staff else "Resident"
     user_ctx = f"{actor_label}: {current_user.full_name} (Barangay: {getattr(current_user, 'barangay', 'North Caloocan')}). {req.context or ''}{history_block}"
     ai_result = gemini_service.get_ai_assistant_response(
@@ -455,9 +416,7 @@ def delete_conversation(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
-    is_staff = _is_staff_user(current_user)
-    owner_id = _get_chat_owner_id(current_user)
-    if conv.user_id not in (owner_id, int(current_user.id)) and not is_staff:
+    if not _owns_conversation(conv, current_user):
         raise HTTPException(status_code=403, detail="You do not have permission to delete this conversation.")
 
     db.delete(conv)
@@ -477,9 +436,10 @@ def clear_all_conversations(
     Wipes all chat conversations and messages for the authenticated user.
     Provides complete user control over conversational data history.
     """
-    owner_id = _get_chat_owner_id(current_user)
-    owner_ids = [owner_id, int(current_user.id)] if owner_id != int(current_user.id) else [owner_id]
-    count = db.query(models.ChatConversation).filter(models.ChatConversation.user_id.in_(owner_ids)).delete(synchronize_session=False)
+    count = db.query(models.ChatConversation).filter(
+        models.ChatConversation.user_id == current_user.id,
+        models.ChatConversation.owner_type == _chat_owner_type(current_user),
+    ).delete(synchronize_session=False)
     db.commit()
 
     return {"message": "All conversations deleted successfully.", "deleted_count": count}

@@ -6,8 +6,12 @@ python-dotenv==1.1.0
 httpx==0.28.1
 pillow==11.2.1
 sqlalchemy==2.0.46
+geoalchemy2==0.20.0
 psycopg2-binary==2.9.11
 alembic==1.13.1
+email-validator==2.3.0
+google-auth==2.62.0
+google-genai>=1.0.0
 python-jose[cryptography]
 bcrypt
 passlib[bcrypt]
@@ -15,3 +19,5 @@ scikit-learn
 scipy
 numpy
 haversine
+shapely>=2.0.0
+lightgbm>=4.5.0

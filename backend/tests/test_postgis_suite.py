@@ -19,8 +19,20 @@ from sqlalchemy import text
 from main import app
 from database import get_db, SessionLocal
 from services import spatial_service
+from spatial_router import require_spatial_staff
+import models
 
 client = TestClient(app)
+
+
+@pytest.fixture
+def staff_client():
+    """Authorize staff-only spatial routes without a real user record."""
+    app.dependency_overrides[require_spatial_staff] = lambda: models.Official(id=1, role="system_admin")
+    try:
+        yield client
+    finally:
+        app.dependency_overrides.pop(require_spatial_staff, None)
 
 # Known landmark coordinates
 MONUMENTO_LAT, MONUMENTO_LNG = 14.6575, 120.9839       # South Caloocan (Brgy 78)
@@ -29,8 +41,8 @@ BAGUMBONG_LAT, BAGUMBONG_LNG = 14.7485, 121.0289       # North Caloocan (Brgy 17
 MALABON_LAT, MALABON_LNG = 14.6626, 120.9571           # Outside Caloocan City
 
 
-def test_city_boundaries_landmark_spot_check():
-    """Verify dual non-contiguous boundaries against ground truth landmarks."""
+def test_city_boundaries_landmark_spot_check(synthetic_boundaries):
+    """Verify point lookup against clearly fake North and South test rectangles."""
     db = SessionLocal()
     try:
         # 1. Monumento -> South Caloocan
@@ -56,7 +68,7 @@ def test_city_boundaries_landmark_spot_check():
         db.close()
 
 
-def test_api_locate_endpoint():
+def test_api_locate_endpoint(synthetic_boundaries):
     """Test /api/locate returns correct sector and barangay assignment."""
     # Test South Caloocan
     resp = client.get(f"/api/locate?lat={MONUMENTO_LAT}&lng={MONUMENTO_LNG}")
@@ -85,7 +97,7 @@ def test_api_locate_endpoint():
     assert resp_invalid.status_code == 400
 
 
-def test_api_reports_nearby():
+def test_api_reports_nearby(clean_postgis):
     """Test /api/reports/nearby finds reports within metric radius."""
     resp = client.get(f"/api/reports/nearby?lat={CAMARIN_LAT}&lng={CAMARIN_LNG}&radius=3000")
     assert resp.status_code == 200
@@ -101,7 +113,44 @@ def test_api_reports_nearby():
         assert first["distance_meters"] <= 3000
 
 
-def test_api_reports_map_viewport():
+def test_public_spatial_feed_excludes_pending_reports(clean_postgis):
+    """Unvalidated reports must stay out of public proximity and map views."""
+    db = clean_postgis()
+    try:
+        db.execute(text("""
+            INSERT INTO reports (ticket_id, category, description, status,
+                                 reporter_type, contact_verified, submission_source,
+                                 location_lat, location_lng, location, location_string)
+            VALUES
+              ('FAKE-VALIDATED', 'Roads', 'Public test report', 'validated',
+               'guest', false, 'web', 14.7562, 121.0423,
+               ST_SetSRID(ST_MakePoint(121.0423, 14.7562), 4326), 'Private exact address'),
+              ('FAKE-PENDING', 'Roads', 'Private test report', 'pending',
+               'guest', false, 'web', 14.7562, 121.0423,
+               ST_SetSRID(ST_MakePoint(121.0423, 14.7562), 4326), 'Private exact address')
+        """))
+        db.commit()
+    finally:
+        db.close()
+
+    nearby = client.get(f"/api/reports/nearby?lat={CAMARIN_LAT}&lng={CAMARIN_LNG}")
+    assert nearby.status_code == 200
+    assert [row["ticket_id"] for row in nearby.json()["reports"]] == ["FAKE-VALIDATED"]
+    assert nearby.json()["reports"][0]["location_string"] is None
+
+    viewport = client.get("/api/reports/map?bbox=121.000,14.700,121.070,14.780")
+    assert viewport.status_code == 200
+    assert [item["properties"]["ticket_id"] for item in viewport.json()["features"]] == ["FAKE-VALIDATED"]
+    assert viewport.json()["features"][0]["geometry"]["coordinates"] == [121.042, 14.756]
+
+
+def test_staff_spatial_routes_require_authentication(clean_postgis):
+    assert client.get(f"/api/reports/duplicates?lat={CAMARIN_LAT}&lng={CAMARIN_LNG}&category=Roads").status_code == 401
+    assert client.get("/api/analytics/hotspots").status_code == 401
+    assert client.get("/api/preventive/risk-inputs").status_code == 401
+
+
+def test_api_reports_map_viewport(clean_postgis):
     """Test /api/reports/map returns standard GeoJSON FeatureCollection."""
     # Envelope encompassing North Caloocan
     bbox = "121.000,14.700,121.070,14.780"
@@ -116,7 +165,7 @@ def test_api_reports_map_viewport():
         assert len(feat["geometry"]["coordinates"]) == 2
 
 
-def test_api_reports_duplicates():
+def test_api_reports_duplicates(clean_postgis, staff_client):
     """Test /api/reports/duplicates finds suggestions within ~50m threshold."""
     resp = client.get(
         f"/api/reports/duplicates?lat={CAMARIN_LAT}&lng={CAMARIN_LNG}&category=Roads%20%26%20Bridges&radius=100&days=180"
@@ -129,7 +178,7 @@ def test_api_reports_duplicates():
     assert data["threshold_meters"] == 100
 
 
-def test_api_analytics_hotspots():
+def test_api_analytics_hotspots(clean_postgis, staff_client):
     """Test /api/analytics/hotspots DBSCAN clustering."""
     resp = client.get("/api/analytics/hotspots")
     assert resp.status_code == 200
@@ -140,7 +189,7 @@ def test_api_analytics_hotspots():
     assert isinstance(data["clusters"], list)
 
 
-def test_api_spatial_boundaries():
+def test_api_spatial_boundaries(synthetic_boundaries):
     """Test /api/spatial/boundaries returns simplified polygons for fast mobile maps."""
     resp = client.get("/api/spatial/boundaries?sector=North&simplify=0.001")
     assert resp.status_code == 200
@@ -150,17 +199,93 @@ def test_api_spatial_boundaries():
     assert data["features"][0]["properties"]["sector"] == "North"
 
 
-def test_api_preventive_risk_inputs():
-    """Test /api/preventive/risk-inputs returns rule-based spatial recurrence counts."""
+def test_api_preventive_risk_inputs(clean_postgis, staff_client):
+    """Test /api/preventive/risk-inputs returns rule-based spatial recurrence counts + LightGBM TreeSHAP."""
     resp = client.get("/api/preventive/risk-inputs?days=90")
     assert resp.status_code == 200
     data = resp.json()
     assert "methodology" in data
     assert "window_days" in data
+    assert "ml_engine" in data
     assert "results" in data
 
 
-def test_gist_index_usage():
+def test_lightgbm_postgis_predictive_integration(clean_postgis, staff_client):
+    """Verify LightGBM + PostGIS spatial rings, P50/P90 quantile turnaround, and TreeSHAP attributions."""
+    import gov_models
+    from auth import get_current_user
+    db = SessionLocal()
+    try:
+        asset = db.query(gov_models.InfrastructureAsset).filter_by(asset_id="AST-LGBM-001").first()
+        if not asset:
+            asset = gov_models.InfrastructureAsset(
+                asset_id="AST-LGBM-001",
+                asset_name="Camarin Drainage Culvert A",
+                category="Drainage",
+                barangay="175",
+                design_life=15,
+                condition_score=38.0,
+            )
+            db.add(asset)
+            db.commit()
+    finally:
+        db.close()
+
+    app.dependency_overrides[get_current_user] = lambda: models.Official(id=1, role="system_admin")
+    try:
+        resp_health = client.get("/api/gov/predictive/health")
+        assert resp_health.status_code == 200
+        h_data = resp_health.json()
+        assert "ml_engine" in h_data
+        assert h_data["ml_engine"]["feature_count"] == 14
+        assert len(h_data["health_scores"]) >= 1
+
+        target = next((x for x in h_data["health_scores"] if x["asset_id"] == "AST-LGBM-001"), h_data["health_scores"][0])
+        assert 0.0 <= target["lgbm_failure_probability_30d"] <= target["lgbm_failure_probability_60d"] <= target["lgbm_failure_probability_90d"] <= 1.0
+        assert target["predicted_repair_days_p50"] <= target["predicted_repair_days_p90"]
+        assert "spatial_telemetry" in target
+        assert "reports_50m_90d" in target["spatial_telemetry"]
+        assert isinstance(target["risk_drivers"], list)
+        assert len(target["risk_drivers"]) >= 1
+        assert "shap_impact" in target["risk_drivers"][0]
+
+        resp_diag = client.get("/api/gov/predictive/model-diagnostics")
+        assert resp_diag.status_code == 200
+        diag_data = resp_diag.json()
+        assert "global_feature_importances" in diag_data
+        assert "top_asset_predictions" in diag_data
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_pulseai_grounded_in_postgis_and_lightgbm(clean_postgis):
+    """Verify PULSEAI predictive tool responses include live PostGIS ring telemetry, LightGBM P50/P90 turnaround, and TreeSHAP drivers."""
+    import gemini_service
+    db = SessionLocal()
+    try:
+        res1 = gemini_service.get_ai_assistant_response(
+            query="How long will it take to repair and maintain the drainage issue in Barangay 175?",
+            context="Government Staff Operations",
+            db=db,
+        )
+        text1 = res1["response"]
+        assert "PostGIS" in text1
+        assert "LightGBM" in text1
+        assert "P50" in text1 and "P90" in text1
+
+        res2 = gemini_service.get_ai_assistant_response(
+            query="Which infrastructure assets have the highest risk and what are their LightGBM SHAP risk drivers?",
+            context="Government Staff Operations",
+            db=db,
+        )
+        text2 = res2["response"]
+        assert "LightGBM" in text2
+        assert "PostGIS" in text2
+    finally:
+        db.close()
+
+
+def test_gist_index_usage(clean_postgis):
     """Verify via EXPLAIN that PostgreSQL uses the GiST spatial index on reports.location."""
     db = SessionLocal()
     try:

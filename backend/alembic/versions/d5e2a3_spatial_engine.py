@@ -28,7 +28,7 @@ def upgrade() -> None:
 
     # 2. Add spatial columns to barangays
     op.execute("""
-        ALTER TABLE barangays 
+        ALTER TABLE barangays
         ADD COLUMN IF NOT EXISTS sector VARCHAR(32),
         ADD COLUMN IF NOT EXISTS brgy_num INTEGER,
         ADD COLUMN IF NOT EXISTS display_name VARCHAR(100),
@@ -48,8 +48,8 @@ def upgrade() -> None:
     op.execute("""
         UPDATE reports
         SET location = ST_SetSRID(ST_MakePoint(location_lng, location_lat), 4326)
-        WHERE location IS NULL 
-          AND location_lat BETWEEN -90 AND 90 
+        WHERE location IS NULL
+          AND location_lat BETWEEN -90 AND 90
           AND location_lng BETWEEN -180 AND 180;
     """)
     op.execute("CREATE INDEX IF NOT EXISTS ix_reports_location ON reports USING GIST (location);")

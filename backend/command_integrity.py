@@ -11,7 +11,7 @@ import gov_models
 
 
 def parse_version(value: str | None) -> int | None:
-    if value is None:
+    if value is None or not isinstance(value, str):
         return None  # Legacy clients can migrate without losing access.
     match = re.fullmatch(r'"?([1-9][0-9]*)"?', value.strip())
     if not match:
@@ -28,7 +28,7 @@ def check_version(current: int, expected: int | None) -> None:
 
 
 def validate_key(key: str | None) -> str | None:
-    if key is None:
+    if key is None or not isinstance(key, str):
         return None
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{7,127}", key):
         raise HTTPException(status_code=422, detail="Idempotency-Key must be 8–128 safe characters")

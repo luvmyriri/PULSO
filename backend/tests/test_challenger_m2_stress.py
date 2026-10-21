@@ -40,23 +40,14 @@ from main import app
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter
 
 # In-Memory SQLite Setup for Deterministic Isolated Testing
-TEST_DATABASE_URL = "sqlite:///:memory:"
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-    echo=False
-)
+from database import engine as test_engine
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
 @pytest.fixture(autouse=True)
-def setup_stress_test_db():
+def setup_stress_test_db(clean_postgis):
     """Recreates database tables and resets rate limiters before every test."""
-    Base.metadata.drop_all(bind=test_engine)
-    gov_models.Base.metadata.drop_all(bind=test_engine)
-    Base.metadata.create_all(bind=test_engine)
-    gov_models.Base.metadata.create_all(bind=test_engine)
+    # The disposable PostGIS schema is bootstrapped; clean_postgis resets rows.
 
     # Reset all rate limiters
     report_submission_limiter.reset()
@@ -449,7 +440,7 @@ class TestJurisdictionCoordinatesAndBoundaryStress:
         headers = {"X-Forwarded-For": f"10.2.102.{secrets.randbelow(250)}"}
         resp = client.post("/api/reports", data=data, headers=headers)
         assert resp.status_code == status.HTTP_201_CREATED
-        assert resp.json()["ticket_id"].startswith("RPT-")
+        assert resp.json()["ticket_id"].startswith("PUL-")
 
 
 # ========================================================================================

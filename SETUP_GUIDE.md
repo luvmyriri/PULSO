@@ -1,6 +1,32 @@
 # PULSO Project Setup Guide
 
-Welcome to the **PULSO** development team! This guide will help you set up the entire ecosystem (Backend, Frontend, and Mobile) on your local machine.
+Welcome to the **PULSO** development team! This guide will help you set up the entire ecosystem (Docker PostGIS, LightGBM + PULSEAI Backend, React Frontend, and Flutter Mobile) on your local machine.
+
+---
+
+## ⚡ Quick Start for Developers (1-Command Docker + PostGIS + LightGBM Setup)
+
+If you have **Docker Desktop**, **Python 3.10+**, and **Node.js 18+** installed on Windows, you can pull the latest `ValFinalization` branch and initialize the entire stack with a single command:
+
+```powershell
+git fetch origin
+git checkout ValFinalization
+git pull origin ValFinalization
+
+# 1. Start Docker PostGIS, install Python/Node deps, run migrations, and seed PostGIS + LightGBM:
+.\setup-docker-dev.ps1
+
+# 2. Launch Backend (http://127.0.0.1:8000) and Frontend (http://localhost:5173):
+.\start.ps1
+```
+
+What `.\setup-docker-dev.ps1` does automatically:
+1. Creates `.env` and `backend/.env.local` from templates if missing (configured for Docker PostGIS on `127.0.0.1:5433`).
+2. Starts the `postgis/postgis:16-3.4` container (`pulso-postgis-db`) via `docker compose up -d db` and waits for the healthcheck.
+3. Creates `backend/.venv` and installs all backend dependencies (`lightgbm`, `google-genai`, `geoalchemy2`, `shapely`, etc.).
+4. Bootstraps or upgrades the PostGIS schema (`alembic upgrade head`).
+5. Runs `scripts/seed_dev_postgis_and_lightgbm.py` to populate North Caloocan barangay boundaries, PostGIS `POINT` geometries (`SRID 4326`), and empirical calibration samples (`lightgbm_empirical_calibrated`).
+6. Installs frontend dependencies (`npm install`).
 
 ---
 
@@ -36,17 +62,26 @@ Ensure you have the following installed on your system:
    ```
 
 5. **Configure Environment Variables**:
-   - Copy `.env` from a teammate or use the template provided in the `backend/` folder.
-   - Path: `backend/.env`
+   - Copy `backend/.env.example` to `backend/.env.local` and fill in local values. Keep that file untracked.
+   - Set `DATABASE_URL` in the terminal to the URL of your own blank PostGIS database. The bootstrap command requires an explicit URL and refuses to run without one.
 
-6. **Database Migration**:
-   - Ensure PostgreSQL is running.
-   - Create a database named `pulso_db`.
-   - Run migrations:
+6. **Start PostGIS & Bootstrap the Database**:
+   - **Option A (Recommended - 1-Command Docker)**:
+     If Docker is installed, spin up PostGIS in seconds:
+     `ash
+     docker compose up -d db
+     `
+   - **Option B (Native PostgreSQL/PostGIS)**:
+     Ensure local PostgreSQL with the PostGIS extension is running.
 
-     ```bash
-     alembic upgrade head
-     ```
+   - **Bootstrap the Database**:
+     For a fresh setup, run the bootstrap script from the repository root:
+     - Windows PowerShell: ./scripts/bootstrap_db.ps1
+     - Linux/macOS: ash scripts/bootstrap_db.sh
+     
+     *(This script loads the checked-in schema snapshot, stamps Alembic, and migrates to head e4b7c9d2f610).*
+     
+     *(If upgrading an existing working database, simply run cd backend && python -m alembic upgrade head).*
 
 7. **Run the Backend**:
 

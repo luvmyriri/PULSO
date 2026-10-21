@@ -132,6 +132,6 @@ export default function LandingOverlay({ onNavigate }) {
                     </motion.div>
                 </div>
             </section>
-        </motion.div>
+        </div>
     );
 }

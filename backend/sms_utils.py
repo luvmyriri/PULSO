@@ -8,8 +8,9 @@ from dataclasses import dataclass
 import requests
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env.local"), override=True)
+_ENV_DIR = os.path.dirname(__file__)
+load_dotenv(os.path.join(_ENV_DIR, ".env.local"))
+load_dotenv(os.path.join(_ENV_DIR, ".env"))
 
 _LOG = logging.getLogger(__name__)
 _SEMAPHORE_BASE_URL = "https://api.semaphore.co/api/v4"
@@ -17,6 +18,7 @@ _PHILSMS_SEND_URL = "https://dashboard.philsms.com/api/v3/sms/send"
 _PHILSMS_MESSAGE_URL = "https://dashboard.philsms.com/api/v3/sms"
 _IPROG_SEND_URL = "https://www.iprogsms.com/api/v1/sms_messages"
 _IPROG_NETWORK_URL = "https://www.iprogsms.com/api/v1/phone_numbers/detect"
+_TEXTBEE_BASE_URL = "https://api.textbee.dev/api/v1/gateway"
 _ACCEPTED_STATUSES = {"queued", "pending", "sent"}
 
 
@@ -204,8 +206,78 @@ def _send_iprogsms_sms(phone_number: str, message: str) -> SmsSendResult:
     return SmsSendResult(True, provider_id, "queued")
 
 
+def _normalize_e164_ph_phone(phone_number: str) -> str | None:
+    digits = "".join(character for character in (phone_number or "") if character.isdigit())
+    if digits.startswith("09") and len(digits) == 11:
+        return "+63" + digits[1:]
+    if digits.startswith("639") and len(digits) == 12:
+        return "+" + digits
+    return None
+
+
+def _send_textbee_sms(phone_number: str, message: str) -> SmsSendResult:
+    if os.getenv("TEXTBEE_ENABLE_OUTBOUND", "false").strip().lower() != "true":
+        _LOG.warning("TextBee SMS outbound is disabled")
+        return SmsSendResult(False)
+
+    api_key = os.getenv("TEXTBEE_API_KEY", "").strip()
+    device_id = os.getenv("TEXTBEE_DEVICE_ID", "").strip()
+    recipient = _normalize_e164_ph_phone(phone_number)
+    if not recipient:
+        _LOG.warning("TextBee SMS recipient number is invalid")
+        return SmsSendResult(False)
+    if not api_key or not (message or "").strip():
+        _LOG.warning("TextBee SMS API key or message is not configured; no message was sent")
+        return SmsSendResult(False)
+
+    headers = {
+        "x-api-key": api_key,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if device_id:
+        send_url = f"{_TEXTBEE_BASE_URL}/devices/{device_id}/send-sms"
+    else:
+        send_url = f"{_TEXTBEE_BASE_URL}/send-sms"
+
+    payload: dict = {"recipients": [recipient], "message": message}
+    sim_sub = os.getenv("TEXTBEE_SIM_SUBSCRIPTION_ID", "").strip()
+    if sim_sub.isdigit():
+        payload["simSubscriptionId"] = int(sim_sub)
+
+    try:
+        response = requests.post(send_url, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        body = response.json()
+    except (requests.RequestException, ValueError):
+        _LOG.warning("TextBee SMS request failed")
+        return SmsSendResult(False)
+
+    if not isinstance(body, dict):
+        _LOG.warning("TextBee SMS returned an unexpected response")
+        return SmsSendResult(False)
+
+    data = body.get("data") if isinstance(body.get("data"), dict) else body
+    success = data.get("success") is True or body.get("success") is True
+    provider_id = (
+        data.get("smsBatchId")
+        or data.get("_id")
+        or data.get("id")
+        or data.get("message_id")
+        or body.get("smsBatchId")
+    )
+    if not success or not isinstance(provider_id, (str, int)) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", str(provider_id)):
+        _LOG.warning("TextBee SMS did not accept the message")
+        return SmsSendResult(False)
+
+    provider_status = str(data.get("status") or data.get("message") or "queued").lower()
+    return SmsSendResult(True, provider_id, provider_status)
+
+
 def send_plain_sms(phone_number: str, message: str) -> SmsSendResult:
     """Send one plain SMS using the configured provider."""
+    if _provider() == "textbee":
+        return _send_textbee_sms(phone_number, message)
     if _provider() == "philsms":
         return _send_philsms_sms(phone_number, message)
     if _provider() == "iprogsms":
@@ -219,6 +291,8 @@ def send_plain_sms(phone_number: str, message: str) -> SmsSendResult:
 def send_emergency_sms(phone_number: str, title: str, message: str) -> SmsSendResult:
     """Alert staff without disclosing case details in the SMS body."""
     sms_text = "Urgent PULSO engineering alert. Open your staff workspace for details."
+    if _provider() == "textbee":
+        return _send_textbee_sms(phone_number, sms_text)
     if _provider() == "philsms":
         return _send_philsms_sms(phone_number, sms_text)
     if _provider() == "iprogsms":
@@ -228,9 +302,38 @@ def send_emergency_sms(phone_number: str, title: str, message: str) -> SmsSendRe
     return SmsSendResult(False)
 
 
+def _portal_domain() -> str:
+    raw = os.getenv("PULSO_PUBLIC_URL", "pulso-caloocan.gov.ph").strip()
+    raw = re.sub(r"^https?://", "", raw).rstrip("/")
+    return raw or "pulso-caloocan.gov.ph"
+
+
+def _sanitize_gsm7(text: str) -> str:
+    """Keep SMS strictly within 7-bit GSM-7 ASCII so 160-char single-segment delivery never degrades to 70-char UCS-2."""
+    replacements = {
+        "—": "-",
+        "–": "-",
+        "•": "-",
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+    }
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+    return text
+
+
 def send_login_otp_sms(phone_number: str, otp_code: str, ref_id: str | None = None) -> SmsSendResult:
     """Send a caller-generated code using the configured SMS provider."""
     ref_suffix = f" Ref: {ref_id}." if ref_id else ""
+    if _provider() == "textbee":
+        message = _sanitize_gsm7(
+            f"[PULSO Caloocan Engineering]\n"
+            f"PULSO Caloocan: Your sign-in code is {otp_code}. "
+            f"Valid for 10 minutes. Do not share it.{ref_suffix}"
+        )
+        return _send_textbee_sms(phone_number, message)
     if _provider() == "philsms":
         message = f"PULSO Caloocan: Your sign-in code is {otp_code}. Valid for 10 minutes. Do not share it.{ref_suffix}"
         return _send_philsms_sms(phone_number, message)
@@ -241,3 +344,46 @@ def send_login_otp_sms(phone_number: str, otp_code: str, ref_id: str | None = No
         return SmsSendResult(False)
     message = f"PULSO Caloocan: Your sign-in code is {{otp}}. Valid for 10 minutes. Do not share it.{ref_suffix}"
     return _send_semaphore_sms("otp", phone_number, message, code=otp_code)
+
+
+def send_templated_sms(
+    phone_number: str,
+    template_name: str = "report_received",
+    *,
+    ticket_id: str = "CE-2026-0001",
+    barangay: str = "175",
+    category: str = "Roads & Bridges",
+    status: str = "Validated",
+    eta_days: str = "2 to 5 working days",
+    wo_number: str = "WO-2026-0104",
+    asset_id: str = "CAL-DR-002",
+    asset_name: str = "Camarin Drainage Line",
+    priority: str = "HIGH",
+) -> SmsSendResult:
+    """
+    Send a warm, official PULSO Caloocan civic update or public works announcement SMS.
+    Sanitizes punctuation to GSM-7 ASCII so multi-part messages deliver cleanly across PH carriers.
+    """
+    domain = _portal_domain()
+
+    if template_name == "report_status_update":
+        msg = (
+            f"PULSO Caloocan Advisory: Good day! Report {ticket_id} (Brgy {barangay}, {category}) "
+            f"is now {status.upper()} to our field crew (Est: {eta_days}). Hotline: 8288-8811"
+        )
+    elif template_name == "city_announcement":
+        msg = (
+            f"PULSO Caloocan Notice: Good day! Scheduled {category} works are underway in "
+            f"Brgy {barangay} ({asset_name}, Est: {eta_days}). Hotline: 8288-8811"
+        )
+    elif template_name == "predictive_work_order":
+        msg = (
+            f"PULSO Engineering Dispatch: Preemptive WO {wo_number} opened for {asset_name} "
+            f"(Brgy {barangay}, {priority.upper()} Priority, Est: {eta_days})."
+        )
+    else:
+        msg = (
+            f"PULSO Caloocan: Good day! Your report {ticket_id} in Brgy. {barangay} ({category}) "
+            f"has been received and queued for engineering review (Est: {eta_days})."
+        )
+    return send_plain_sms(phone_number, _sanitize_gsm7(msg))

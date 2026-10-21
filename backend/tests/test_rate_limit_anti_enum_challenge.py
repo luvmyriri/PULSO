@@ -50,23 +50,14 @@ from utils.security import (
 )
 
 # In-Memory SQLite Setup for Deterministic Isolated Testing
-TEST_DATABASE_URL = "sqlite:///:memory:"
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-    echo=False
-)
+from database import engine as test_engine
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
 @pytest.fixture(autouse=True)
-def setup_challenge_db():
+def setup_challenge_db(clean_postgis):
     """Recreates database tables and resets rate limiters before every test."""
-    Base.metadata.drop_all(bind=test_engine)
-    gov_models.Base.metadata.drop_all(bind=test_engine)
-    Base.metadata.create_all(bind=test_engine)
-    gov_models.Base.metadata.create_all(bind=test_engine)
+    # The disposable PostGIS schema is bootstrapped; clean_postgis resets rows.
 
     # Reset all rate limiter singletons
     report_submission_limiter.reset()
@@ -663,6 +654,11 @@ class TestPublicPayloadPIIRedaction:
         """
         # Seed a validated report with a reporter name
         db = TestingSessionLocal()
+        db.add(models.Resident(
+            id=999, full_name="Private Citizen Juan",
+            email="privacy-feed@example.invalid", password_hash="unused",
+        ))
+        db.flush()
         r_validated = models.Report(
             ticket_id="RPT-20260902-VAL0001",
             category="Roads & Bridges",
