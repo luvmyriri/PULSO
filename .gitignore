@@ -7,10 +7,15 @@
 backend/.env.local
 backend/google-credentials.json
 
-# Python Caches
+# Python Caches & Virtual Environments
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
+venv/
+backend/.venv/
+backend/venv/
+backend/.ai_usage.json
 
 # IDE and System Files
 .vscode/
