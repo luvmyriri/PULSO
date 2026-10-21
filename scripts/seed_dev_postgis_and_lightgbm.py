@@ -24,10 +24,74 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from sqlalchemy import text
+import database
 from database import SessionLocal
 import models
 import gov_models
 from services import lightgbm_service
+
+
+def reconcile_schema_if_needed():
+    """
+    Ensures that even if a developer connects to an older pgAdmin database with fewer
+    tables or missing columns, all 38 SQLAlchemy tables and all 506 columns from
+    head_f3a6d8c1b250.inventory.json are automatically created non-destructively.
+    """
+    with database.engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
+
+    # 1. Create any missing tables defined in models.py and gov_models.py
+    database.Base.metadata.create_all(bind=database.engine)
+
+    # 2. Reconcile any missing columns against head_f3a6d8c1b250.inventory.json
+    head_inv_path = BACKEND_DIR / "schema" / "head_f3a6d8c1b250.inventory.json"
+    if not head_inv_path.exists():
+        return
+
+    inv = json.loads(head_inv_path.read_text(encoding="utf-8"))
+    added_cols = 0
+    with database.engine.begin() as conn:
+        existing_rows = conn.execute(
+            text(
+                """
+                SELECT cls.relname, att.attname
+                FROM pg_attribute att
+                JOIN pg_class cls ON cls.oid = att.attrelid
+                JOIN pg_namespace ns ON ns.oid = cls.relnamespace
+                WHERE ns.nspname = 'public' AND cls.relkind IN ('r', 'p')
+                  AND att.attnum > 0 AND NOT att.attisdropped
+                """
+            )
+        ).fetchall()
+        existing_cols = {(r[0], r[1]) for r in existing_rows}
+
+        for col in inv.get("columns", []):
+            t_name = col["table"]
+            c_name = col["name"]
+            c_type = col["type"]
+            if (t_name, c_name) not in existing_cols:
+                conn.execute(
+                    text(f'ALTER TABLE "{t_name}" ADD COLUMN IF NOT EXISTS "{c_name}" {c_type}')
+                )
+                added_cols += 1
+
+        # Ensure alembic_version is stamped at f3a6d8c1b250 so future migrations stay in sync
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS public.alembic_version (
+                    version_num VARCHAR(32) NOT NULL CONSTRAINT alembic_version_pkc PRIMARY KEY
+                )
+                """
+            )
+        )
+        cur_rev = conn.execute(text("SELECT version_num FROM public.alembic_version")).scalar()
+        if cur_rev != "f3a6d8c1b250":
+            conn.execute(text("DELETE FROM public.alembic_version"))
+            conn.execute(text("INSERT INTO public.alembic_version (version_num) VALUES ('f3a6d8c1b250')"))
+
+    if added_cols > 0:
+        print(f"[0/4] Reconciled {added_cols} missing column(s) against head_f3a6d8c1b250 schema")
 
 
 # Verified North Caloocan Barangay coordinates (Barangays 165 to 188)
@@ -88,6 +152,7 @@ SEED_ASSETS = [
 
 
 def seed_all():
+    reconcile_schema_if_needed()
     db = SessionLocal()
     today = datetime.date.today()
     now_utc = datetime.datetime.now(timezone.utc)

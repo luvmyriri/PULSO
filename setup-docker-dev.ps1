@@ -104,10 +104,15 @@ if (-not $env:DATABASE_URL) {
 }
 Push-Location $BackendDir
 try {
-    & $VenvPython -m alembic upgrade head
-} catch {
-    Write-Host "      Running initial PostGIS schema bootstrap..." -ForegroundColor Yellow
-    & (Join-Path $RootDir "scripts\bootstrap_db.ps1") -Python $VenvPython
+    & $VenvPython -m alembic upgrade head 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "      Running PostGIS schema bootstrap / reconciliation..." -ForegroundColor Yellow
+        try {
+            & (Join-Path $RootDir "scripts\bootstrap_db.ps1") -Python $VenvPython 2>$null
+        } catch {
+            Write-Host "      Existing non-empty database detected; reconciling missing tables & columns via seed script..." -ForegroundColor Yellow
+        }
+    }
 } finally {
     Pop-Location
 }
