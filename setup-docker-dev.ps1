@@ -75,11 +75,20 @@ if ($DockerCmd) {
 
 # 4. Python Virtual Environment & Dependencies
 $VenvPython = Join-Path $BackendDir ".venv\Scripts\python.exe"
-if (-not (Test-Path $VenvPython)) {
-    Write-Host "[4/6] Creating Python virtual environment in backend/.venv..." -ForegroundColor Cyan
+$VenvHealthy = $false
+if (Test-Path $VenvPython) {
+    try {
+        & $VenvPython -c "import sys" 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { $VenvHealthy = $true }
+    } catch {
+        $VenvHealthy = $false
+    }
+}
+if (-not $VenvHealthy) {
+    Write-Host "[4/6] Creating/repairing Python virtual environment in backend/.venv..." -ForegroundColor Cyan
     Push-Location $BackendDir
     try {
-        python -m venv .venv
+        python -m venv --clear .venv
     } finally {
         Pop-Location
     }
