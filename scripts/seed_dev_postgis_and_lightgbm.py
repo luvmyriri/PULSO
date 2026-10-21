@@ -151,8 +151,72 @@ SEED_ASSETS = [
 ]
 
 
+def ensure_login_credentials_and_seed():
+    """
+    Ensures that a brand-new Docker PostGIS database is automatically populated with
+    all system_roles, officials, residents, sample reports, and LOGIN_CREDENTIALS.md
+    accounts without wiping existing data if the developer already has records.
+    """
+    db = SessionLocal()
+    try:
+        official_cnt = db.query(models.Official).count()
+    finally:
+        db.close()
+
+    if official_cnt == 0:
+        print("[0/4] Empty officials table detected — running full initial seed (roles, officials, residents, reports)...")
+        import seed_final
+        seed_final.seed_final()
+
+    # Always ensure the standard test accounts in LOGIN_CREDENTIALS.md exist
+    import auth
+    db = SessionLocal()
+    try:
+        res = db.query(models.Resident).filter_by(email="resident@pulso.com").first()
+        if not res:
+            db.add(
+                models.Resident(
+                    email="resident@pulso.com",
+                    full_name="Test Resident",
+                    password_hash=auth.get_password_hash("password123"),
+                    address="123 Test Street",
+                    phone_number="09170000000",
+                    trust_score=100,
+                    is_active=True,
+                    is_verified=True,
+                )
+            )
+        for email, name, role_name, pwd in [
+            ("dispatcher@pulso.com", "Test Dispatcher", "admin_officer", "password123"),
+            ("manager@pulso.com", "Test Manager", "system_admin", "password123"),
+            ("admin@pulso.system", "PULSO System Administrator", "system_admin", "SysAdmin@pulso2025!"),
+            ("city.engineer@caloocan.gov.ph", "Engr. Maria G. Santos", "city_engineer", "CEO@pulso2025!"),
+        ]:
+            off = db.query(models.Official).filter_by(email=email).first()
+            if not off:
+                role_obj = db.query(models.SystemRole).filter_by(name=role_name).first()
+                db.add(
+                    models.Official(
+                        email=email,
+                        full_name=name,
+                        role=role_name,
+                        role_id=role_obj.id if role_obj else None,
+                        password_hash=auth.get_password_hash(pwd),
+                        address="Caloocan City Hall",
+                        barangay="174",
+                        phone_number="09170000000",
+                        account_type="government",
+                        is_active=True,
+                    )
+                )
+        db.commit()
+    finally:
+        db.close()
+
+
 def seed_all():
     reconcile_schema_if_needed()
+    ensure_login_credentials_and_seed()
     db = SessionLocal()
     today = datetime.date.today()
     now_utc = datetime.datetime.now(timezone.utc)

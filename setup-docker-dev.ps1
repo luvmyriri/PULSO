@@ -96,6 +96,12 @@ if (-not $VenvHealthy) {
 Write-Host "[4/6] Installing backend requirements (FastAPI, PostGIS/GeoAlchemy2, LightGBM, Vertex GenAI)..." -ForegroundColor Cyan
 & $VenvPython -m pip install --upgrade pip --quiet
 & $VenvPython -m pip install -r (Join-Path $BackendDir "requirements.txt") --quiet
+$SysPython = Get-Command python -ErrorAction SilentlyContinue
+if ($SysPython) {
+    try {
+        & $SysPython.Source -m pip install -r (Join-Path $BackendDir "requirements.txt") --quiet 2>$null
+    } catch {}
+}
 
 # 5. Bootstrap PostGIS Schema, Run Alembic Migrations & Seed Empirical Assets
 Write-Host "[5/6] Bootstrapping PostGIS schema, running Alembic migrations, and seeding LightGBM data..." -ForegroundColor Cyan
