@@ -32,29 +32,44 @@ _SDK_READY = False
 
 def _init():
     global _client, _SDK_READY
-    # Set credentials path for ADC (Application Default Credentials)
+    # 1. Try Vertex AI via service account credentials
     creds_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), GOOGLE_CREDENTIALS)
     if os.path.exists(creds_path):
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
     elif os.path.exists(GOOGLE_CREDENTIALS):
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_CREDENTIALS
-    else:
-        print(f"[AI] [FAILED] Service account credentials not found at '{GOOGLE_CREDENTIALS}' — AI features disabled.")
-        return
-    try:
-        from google import genai
-        _client = genai.Client(
-            vertexai=True,
-            project=GCP_PROJECT,
-            location=GCP_LOCATION,
-        )
-        _SDK_READY = True
-        print(f"[AI] [SUCCESS] Vertex AI SDK ready  |  Model: {GEMINI_MODEL}")
-        print(f"[AI]    Project  : {GCP_PROJECT}")
-        print(f"[AI]    Location : {GCP_LOCATION}")
-        print("[AI]    Auth     : Configured service account; request access verified on use")
-    except Exception as e:
-        print(f"[AI] [ERROR] Vertex AI SDK init failed: {e}")
+
+    vertex_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if vertex_creds and os.path.exists(vertex_creds):
+        try:
+            from google import genai
+            _client = genai.Client(
+                vertexai=True,
+                project=GCP_PROJECT,
+                location=GCP_LOCATION,
+            )
+            _SDK_READY = True
+            print(f"[AI] [SUCCESS] Vertex AI SDK ready  |  Model: {GEMINI_MODEL}")
+            print(f"[AI]    Project  : {GCP_PROJECT}")
+            print(f"[AI]    Location : {GCP_LOCATION}")
+            print("[AI]    Auth     : Configured service account; request access verified on use")
+            return
+        except Exception as e:
+            print(f"[AI] [WARN] Vertex AI init failed: {e}. Falling back to GOOGLE_GEMINI_API_KEY...")
+
+    # 2. Fallback to direct Gemini API key
+    gemini_key = os.getenv("GOOGLE_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        try:
+            from google import genai
+            _client = genai.Client(api_key=gemini_key)
+            _SDK_READY = True
+            print(f"[AI] [SUCCESS] Google Gemini API Key ready  |  Model: {GEMINI_MODEL}")
+            return
+        except Exception as e:
+            print(f"[AI] [ERROR] Gemini API Key init failed: {e}")
+
+    print(f"[AI] [FAILED] Service account credentials not found at '{GOOGLE_CREDENTIALS}' and no GOOGLE_GEMINI_API_KEY — AI features disabled.")
 
 _init()
 

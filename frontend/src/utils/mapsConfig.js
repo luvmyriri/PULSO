@@ -12,7 +12,7 @@ export const GOOGLE_MAPS_LIBRARIES = Object.freeze(['places', 'geometry']);
 
 export const GOOGLE_MAPS_LOADER_OPTIONS = Object.freeze({
     id: 'pulso-google-map-script',
-    googleMapsApiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_API_KEY) || '',
+    googleMapsApiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_API_KEY) || 'AIzaSyAVtv0dsu9tE-UN6HPsnc1TylQ_ovL6Au8',
     libraries: GOOGLE_MAPS_LIBRARIES,
     language: 'en',
     region: 'PH',

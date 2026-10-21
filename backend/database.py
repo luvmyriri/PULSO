@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, event, text
+﻿from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
 import os
@@ -18,7 +18,7 @@ else:
 
 
 def _resolve_database_url() -> str:
-    primary = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/pulso_db")
+    primary = os.getenv("DATABASE_URL", "postgresql://postgres:0428@localhost/pulso_db")
     try:
         parsed = make_url(primary)
         host = parsed.host or "127.0.0.1"

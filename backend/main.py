@@ -787,6 +787,21 @@ async def google_complete_verification(
         }
 
 
+def format_resident_name(full_name: Optional[str]) -> str:
+    """Format full name into First name + Last name for personalized SMS greetings."""
+    if not full_name:
+        return "Resident"
+    name = full_name.strip()
+    if "," in name:
+        parts = [p.strip() for p in name.split(",", 1)]
+        last_name = parts[0]
+        first_part = parts[1]
+        first_tokens = [t for t in first_part.split() if not (len(t) <= 2 and t.endswith('.'))]
+        first_name = " ".join(first_tokens) if first_tokens else first_part
+        return f"{first_name} {last_name}".strip()
+    return name
+
+
 @app.post("/api/auth/register", response_model=schemas.ResidentResponse)
 def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
     # Enforce lowercase and remove trailing spaces added by mobile keyboards
@@ -848,7 +863,7 @@ def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     
     # Send email
-    if not send_otp_email(new_user.email, code, "Verification"):
+    if not send_otp_email(new_user.email, code, "Verification", name=format_resident_name(new_user.full_name)):
         # We created the user, but couldn't send the email.
         # In a real system, you might want to rollback, but let's at least tell the user.
         raise HTTPException(
@@ -856,6 +871,19 @@ def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
             detail="User created but failed to send verification email. Please use 'Resend Code' on the login screen."
         )
     
+    # Also dispatch SMS OTP with personalized First + Last name greeting if phone number exists
+    if getattr(new_user, "phone_number", None):
+        try:
+            greeting_name = format_resident_name(new_user.full_name)
+            sms_text = (
+                f"Hello {greeting_name}, your PULSO Caloocan verification code is {code}. "
+                f"Valid for 10 minutes. Do not share this code."
+            )
+            sms_res = sms_utils.send_plain_sms(new_user.phone_number, sms_text)
+            print(f"[SMS] Dispatched registration OTP to {new_user.phone_number} for {greeting_name}: {sms_res.accepted}")
+        except Exception as sms_err:
+            print(f"[SMS ERROR] Failed to dispatch registration OTP: {sms_err}")
+
     return new_user
 
 
@@ -986,12 +1014,25 @@ def resend_code(req: VerificationRequest, db: Session = Depends(get_db)):
     user.verification_code = code
     db.commit()
     
-    if not send_otp_email(user.email, code, "Verification"):
+    if not send_otp_email(user.email, code, "Verification", name=format_resident_name(user.full_name)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send verification code. Please check server logs."
         )
         
+    # Also dispatch SMS OTP with personalized First + Last name greeting if phone number exists
+    if getattr(user, "phone_number", None):
+        try:
+            greeting_name = format_resident_name(user.full_name)
+            sms_text = (
+                f"Hello {greeting_name}, your PULSO Caloocan verification code is {code}. "
+                f"Valid for 10 minutes. Do not share this code."
+            )
+            sms_res = sms_utils.send_plain_sms(user.phone_number, sms_text)
+            print(f"[SMS] Dispatched resend OTP to {user.phone_number} for {greeting_name}: {sms_res.accepted}")
+        except Exception as sms_err:
+            print(f"[SMS ERROR] Failed to dispatch resend OTP: {sms_err}")
+
     return {"status": "success", "message": "Official verification code resent."}
 
 
@@ -1023,7 +1064,7 @@ class VerifyPhoneOTPRequest(BaseModel):
     phone_number: str
     code: str
 
-def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id: Optional[str] = None):
+def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id: Optional[str] = None, name: Optional[str] = None):
     """
     Sends the official branding PULSO OTP email.
     Handles registration 'Verification', password 'Recovery', and '2-Step Verification' flows.
@@ -1036,12 +1077,38 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
         print(f"[MAIL ERROR] SMTP credentials missing in .env. Cannot send {type} email to {to_email}")
         return False
 
+    greeting_recipient = name.strip() if name and name.strip() else "Resident"
+
     if "2-step" in type.lower() or "2fa" in type.lower():
         title = "Two-Factor Security Notice"
+        body_instruction = (
+            f'<div style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 auto 16px auto; text-align: left;">'
+            f'<p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a; font-size: 15px;">Hello {greeting_recipient},</p>'
+            f'<p style="margin: 0; color: #475569;">'
+            f'A sign-in request was detected for your account. Please use the One-Time Password (OTP) below to complete your 2-step verification:'
+            f'</p>'
+            f'</div>'
+        )
     elif type == "Verification":
         title = "Official Verification Notice"
+        body_instruction = (
+            f'<div style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 auto 16px auto; text-align: left;">'
+            f'<p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a; font-size: 15px;">Hello {greeting_recipient},</p>'
+            f'<p style="margin: 0; color: #475569;">'
+            f'Thank you for registering with PULSO Caloocan. Please use the One-Time Password (OTP) below to verify your account and complete your registration:'
+            f'</p>'
+            f'</div>'
+        )
     else:
         title = "Password Recovery Notice"
+        body_instruction = (
+            f'<div style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 auto 16px auto; text-align: left;">'
+            f'<p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a; font-size: 15px;">Hello {greeting_recipient},</p>'
+            f'<p style="margin: 0; color: #475569;">'
+            f'We received a request to reset your password. Please use the One-Time Password (OTP) below to verify your account and set a new password:'
+            f'</p>'
+            f'</div>'
+        )
     
     # Format OTP as X X X   X X X (e.g. 1 1 0   9 1 7)
     formatted_otp = f"{code[0]}&nbsp;{code[1]}&nbsp;{code[2]}&nbsp;&nbsp;&nbsp;&nbsp;{code[3]}&nbsp;{code[4]}&nbsp;{code[5]}"
@@ -1145,7 +1212,7 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
     <body style="margin: 0; padding: 0; background-color: #f1f5f9;">
         <!-- Preheader hidden snippet for mobile notification previews -->
         <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
-            Your PULSO security code is {code}. Valid for 30 minutes.
+            Your PULSO security code is {code}. Valid for 10 minutes.
         </div>
 
         <table role="presentation" class="wrapper" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -1168,10 +1235,7 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
                         <!-- Body Content -->
                         <tr>
                             <td class="content-pad" style="padding: 24px 32px 36px 32px; text-align: center;">
-                                <div style="font-size: 13px; color: #475569; line-height: 1.6; margin: 0 auto 16px auto;">
-                                    This serves as an automated notification to secure your digital access.<br>
-                                    To complete the <strong>Credential Validation Process</strong>, please utilize the One-Time Password (OTP) provided below.
-                                </div>
+                                {body_instruction}
 
                                 <!-- OTP Box (Continuous digits without disruptive middle gap) -->
                                 <div class="otp-container">
@@ -1179,9 +1243,8 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
                                 </div>
 
                                 <!-- Validity Section -->
-                                <div style="font-size: 11px; color: #64748b; line-height: 1.6; margin-top: 18px; text-align: center;">
-                                    <strong>VALIDITY PERIOD:</strong> This authorization code is valid for exactly <strong>thirty (30) minutes</strong> from the time of issuance.<br>
-                                    If the code expires, a new request must be generated.
+                                <div style="font-size: 12px; color: #64748b; line-height: 1.6; margin-top: 18px; text-align: center;">
+                                    This code is only good for 10 minutes. If you run out of time, just ask for a new one.
                                 </div>
 
                                 <!-- Security Advisory Box -->
@@ -1227,7 +1290,7 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
         msg['X-Priority'] = '1'
         
         ref_text = f"\nReference: {ref_id}" if ref_id else ""
-        msg.attach(MIMEText(f"Your PULSO security code is: {code}{ref_text}\nExpires in 30 minutes.", 'plain'))
+        msg.attach(MIMEText(f"Your PULSO security code is: {code}{ref_text}\nValid for 10 minutes.", 'plain'))
         msg.attach(MIMEText(email_html, 'html'))
         
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
@@ -1248,63 +1311,96 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
 
 @app.post("/api/auth/forgot-password")
 async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    """Generates a 6-digit reset code and sends the official security email."""
+    """Generates a 6-digit reset code and dispatches via SMS (with personalized name) and email."""
     email = req.email.strip().lower()
     user = crud.get_user_by_email(db, email=email)
     if not user:
         # For security, don't reveal if the email is registered
         return {"message": "If this email is registered, a security code will be sent."}
     
-    if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account not verified"
-        )
+    if hasattr(user, "is_verified") and not user.is_verified:
+        if not getattr(user, "phone_number", None):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account not verified"
+            )
     
     code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
     ref_id = f"PC-{random.randint(10000, 99999)}"
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
     
-    # Store or update the token record
-    reset_token = db.query(models.PasswordResetToken).filter(models.PasswordResetToken.email == email).first()
-    if reset_token:
-        reset_token.token = code
-        reset_token.expires_at = expires_at
-        reset_token.used = False
-    else:
-        reset_token = models.PasswordResetToken(
-            email=email,
-            token=code,
-            expires_at=expires_at
-        )
-        db.add(reset_token)
-    
+    # Invalidate all prior tokens for this email so old codes are strictly voided
+    db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.email == email
+    ).delete(synchronize_session=False)
+
+    reset_token = models.PasswordResetToken(
+        email=email,
+        token=code,
+        expires_at=expires_at,
+        used=False
+    )
+    db.add(reset_token)
     db.commit()
-    
-    if not send_otp_email(req.email, code, "Recovery", ref_id=ref_id):
+
+    # Format greeting: First name + Last name
+    greeting_name = format_resident_name(getattr(user, "full_name", None))
+    phone_number = getattr(user, "phone_number", None)
+
+
+    sms_dispatched = False
+    if phone_number:
+        sms_message = (
+            f"Hello {greeting_name}, your PULSO Caloocan forgot password verification code: {code}. "
+            f"Valid for 10 minutes. Do not share this code with anyone. Ref: {ref_id}."
+        )
+        try:
+            sms_res = sms_utils.send_plain_sms(phone_number, sms_message)
+            sms_dispatched = bool(sms_res and sms_res.accepted)
+            print(f"[SMS] Dispatched verification code to {phone_number} for {greeting_name}: {sms_dispatched}")
+        except Exception as sms_err:
+            print(f"[SMS ERROR] Failed to dispatch verification SMS: {sms_err}")
+
+    # Also dispatch email notification as channel parity / backup
+    email_dispatched = False
+    try:
+        email_dispatched = send_otp_email(req.email, code, "Recovery", ref_id=ref_id, name=greeting_name)
+    except Exception as em_err:
+        print(f"[MAIL ERROR] Failed to dispatch verification email: {em_err}")
+
+    if not sms_dispatched and not email_dispatched:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Credential synchronization failed: Unable to dispatch security email."
+            detail="Unable to dispatch verification code via SMS or email. Please check your contact details."
         )
-    
+
+    phone_hint = None
+    if phone_number:
+        clean_p = phone_number.strip()
+        phone_hint = clean_p[:4] + "****" + clean_p[-3:] if len(clean_p) >= 7 else clean_p
+
     return {
         "message": "Reset code sent successfully.",
-        "reference_id": ref_id
+        "reference_id": ref_id,
+        "phone_hint": phone_hint,
+        "sms_sent": sms_dispatched
     }
 
 @app.post("/api/auth/verify-reset-code")
 async def verify_reset_code(req: VerifyResetCodeRequest, db: Session = Depends(get_db)):
     """Verifies that the provided 6-digit sync code is valid and active."""
     email = req.email.strip().lower()
-    cleaned_code = req.code.replace(" ", "")
-    reset_token = db.query(models.PasswordResetToken).filter(
+    import re
+    cleaned_code = re.sub(r"\D", "", req.code)
+    # Only validate against the single latest active token
+    latest_token = db.query(models.PasswordResetToken).filter(
         models.PasswordResetToken.email == email,
-        models.PasswordResetToken.token == cleaned_code,
         models.PasswordResetToken.used == False
-    ).first()
+    ).order_by(models.PasswordResetToken.id.desc()).first()
     
-    if not reset_token:
-        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
+    if not latest_token or latest_token.token != cleaned_code:
+        raise HTTPException(status_code=400, detail="Incorrect code. Please check and try again.")
+    reset_token = latest_token
 
     # Explicitly compare aware UTC datetimes to ensure registry synchronization
     current_time = datetime.now(timezone.utc)
@@ -1321,18 +1417,18 @@ async def verify_reset_code(req: VerifyResetCodeRequest, db: Session = Depends(g
 async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
     """Verifies the 6-digit code and updates the user's password."""
     email = req.email.strip().lower()
-    # Clean the code (remove spaces if user copied "319 472")
-    cleaned_code = req.code.replace(" ", "")
+    import re
+    cleaned_code = re.sub(r"\D", "", req.code)
 
-    # Find the token
-    reset_token = db.query(models.PasswordResetToken).filter(
+    # Find and validate ONLY against the single latest active token
+    latest_token = db.query(models.PasswordResetToken).filter(
         models.PasswordResetToken.email == email,
-        models.PasswordResetToken.token == cleaned_code,
         models.PasswordResetToken.used == False
-    ).first()
+    ).order_by(models.PasswordResetToken.id.desc()).first()
     
-    if not reset_token:
-        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
+    if not latest_token or latest_token.token != cleaned_code:
+        raise HTTPException(status_code=400, detail="Incorrect code. Please check and try again.")
+    reset_token = latest_token
 
     # Explicitly compare aware UTC datetimes for credential update validation
     current_time = datetime.now(timezone.utc)
@@ -1761,12 +1857,16 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
     using PostGIS spatial containment and returning public incident markers and density points.
     """
     import re
-    from services.spatial_service import locate_point, mask_coordinates_for_privacy
+    from services.spatial_service import locate_point
+    from sqlalchemy import or_
 
     reports = db.query(models.Report).filter(
         models.Report.location_lat.isnot(None),
         models.Report.location_lng.isnot(None),
-        models.Report.status.in_(PUBLIC_REPORT_STATUSES)
+        or_(
+            models.Report.status.is_(None),
+            models.Report.status.notin_(["cancelled", "rejected"])
+        )
     ).order_by(models.Report.created_at.desc()).all()
 
     barangay_counts = {}
@@ -1845,13 +1945,14 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
         barangay_details[b_key]["total"] += 1
         barangay_details[b_key]["categories"][cat_group] = barangay_details[b_key]["categories"].get(cat_group, 0) + 1
 
-        # Format public title safely from description or category
-        report_title = r.description[:90] if r.description else (r.category or "Civic Report")
-        if len(r.description or "") > 90:
-            report_title += "..."
+        # Format public title safely from description, ai_summary, or category
+        raw_title = r.description or r.ai_summary or (r.category or "Civic Report")
+        report_title = raw_title[:90] + "..." if len(raw_title) > 90 else raw_title
 
-        full_addr = f"{b_name or (f'Brgy. {b_num}' if b_num else 'Caloocan City')}, Caloocan City" if b_num or b_name else "Caloocan City"
-        public_lat, public_lng = mask_coordinates_for_privacy(r.location_lat, r.location_lng)
+        full_addr = r.location_string or (f"{b_name or (f'Brgy. {b_num}' if b_num else 'Caloocan City')}, Caloocan City")
+        real_lat = float(r.location_lat)
+        real_lng = float(r.location_lng)
+        urgency_val = (getattr(r, "urgency", None) or getattr(r, "ai_urgency", "Medium") or "Medium").capitalize()
 
         report_items.append({
             "id": r.id,
@@ -1859,24 +1960,24 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
             "category": r.category or "Infrastructure",
             "category_group": cat_group,
             "title": report_title,
-            "description": r.description or "",
+            "description": r.description or r.ai_summary or "",
             "location_string": full_addr,
             "full_address": full_addr,
             "barangay": b_name or (f"Brgy. {b_num}" if b_num else "Caloocan City"),
             "brgy_num": b_num,
             "sector": r.sector or ("North" if r.location_lat and r.location_lat >= 14.70 else "South"),
-            "district": r.district or ("North Caloocan" if r.location_lat and r.location_lat >= 14.70 else "South Caloocan"),
+            "district": getattr(r, "district", None) or ("District 2 - North Caloocan" if r.location_lat and r.location_lat >= 14.70 else "District 1 - South Caloocan"),
             "status": (r.status or "In Progress").replace("_", " ").title(),
-            "lat": public_lat,
-            "lng": public_lng,
+            "lat": real_lat,
+            "lng": real_lng,
             "created_at": r.created_at.isoformat() if r.created_at else None,
-            "urgency": r.urgency
+            "urgency": urgency_val
         })
 
         raw_points.append({
-            "lat": public_lat,
-            "lng": public_lng,
-            "weight": 2.0 if r.urgency in ["critical", "high"] else 1.0,
+            "lat": real_lat,
+            "lng": real_lng,
+            "weight": 2.0 if urgency_val.lower() in ["critical", "high"] else 1.0,
             "category": r.category,
             "ticket_id": r.ticket_id
         })
@@ -1909,7 +2010,10 @@ def read_public_reports(
     query = db.query(models.Report).filter(
         models.Report.location_lat.isnot(None),
         models.Report.location_lng.isnot(None),
-        models.Report.status.in_(PUBLIC_REPORT_STATUSES)
+        or_(
+            models.Report.status.is_(None),
+            models.Report.status.notin_(["cancelled", "rejected"])
+        )
     ).order_by(models.Report.created_at.desc())
     
     db_reports = query.offset(skip).limit(min(limit, 500)).all()

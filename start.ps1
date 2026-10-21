@@ -6,40 +6,18 @@ Write-Host "============================================================" -Foreg
 Write-Host ""
 
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-if (-not $rootDir) { $rootDir = Get-Location }
-
-# Check Python (prefer backend\.venv\Scripts\python.exe if present)
-$venvPython = Join-Path $rootDir "backend\.venv\Scripts\python.exe"
-$pythonExe = $null
-if (Test-Path $venvPython) {
-    $pythonExe = "`"$venvPython`""
-} else {
-    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-    if (-not $pythonCmd) {
-        $pythonCmd = Get-Command py -ErrorAction SilentlyContinue
-    }
-    if (-not $pythonCmd) {
-        Write-Host "[ERROR] Python was not found in PATH!" -ForegroundColor Red
-        return
-    }
-    $pythonExe = $pythonCmd.Name
-}
-
-# Check NPM
-$npmCmd = Get-Command npm -ErrorAction SilentlyContinue
-if (-not $npmCmd) {
-    Write-Host "[ERROR] Node.js / npm was not found in PATH!" -ForegroundColor Red
-    return
-}
+if (-not $rootDir) { $rootDir = (Get-Location).Path }
 
 Write-Host "[1/3] Launching FastAPI Backend on http://localhost:33159..." -ForegroundColor Green
-Start-Process -FilePath "cmd.exe" -ArgumentList "/k cd /d `"$rootDir\backend`" && title PULSO Backend [Port 33159] && $pythonExe main.py"
+$backendBat = Join-Path $rootDir "backend\run_backend.bat"
+Start-Process -FilePath "cmd.exe" -ArgumentList "/k `"$backendBat`"" -WorkingDirectory (Join-Path $rootDir "backend")
 
 Write-Host "[2/3] Launching Vite Frontend on http://localhost:5173..." -ForegroundColor Green
-Start-Process -FilePath "cmd.exe" -ArgumentList "/k cd /d `"$rootDir\frontend`" && title PULSO Frontend [Port 5173] && npm run dev"
+$frontendBat = Join-Path $rootDir "frontend\run_frontend.bat"
+Start-Process -FilePath "cmd.exe" -ArgumentList "/k `"$frontendBat`"" -WorkingDirectory (Join-Path $rootDir "frontend")
 
 Write-Host "[3/3] Waiting for servers to initialize..." -ForegroundColor Gray
-Start-Sleep -Seconds 3
+Start-Sleep -Seconds 5
 
 Write-Host "Launching default web browser..." -ForegroundColor Cyan
 Start-Process "http://localhost:5173"

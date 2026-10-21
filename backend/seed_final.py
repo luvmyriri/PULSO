@@ -1,4 +1,4 @@
-"""
+﻿"""
 seed_final.py — Final Seeding for Decoupled User Architecture
 Caloocan City — PULSO System
 """
@@ -25,15 +25,13 @@ def seed_final():
     try:
         # 2. Clear existing data
         print("  [CLEAN] Clearing existing database records...")
-        db.execute(text("DELETE FROM advisories"))
-        db.execute(text("DELETE FROM notifications"))
-        db.execute(text("DELETE FROM reports"))
-        db.execute(text("DELETE FROM residents"))
-        db.execute(text("DELETE FROM officials"))
-        db.execute(text("DELETE FROM system_roles"))
-        db.execute(text("DELETE FROM barangays"))
-        db.execute(text("DELETE FROM districts"))
-        db.commit()
+        for tbl in ["environmental_context", "maintenance_history", "work_orders", "infrastructure_assets", "advisories", "notifications", "chat_messages", "chat_conversations", "reports", "residents", "officials", "system_roles", "barangays", "districts"]:
+            try:
+                db.execute(text(f"DELETE FROM {tbl}"))
+                db.commit()
+            except Exception:
+                db.rollback()
+
 
         # 3. Seed Districts
         print("  [DISTRICTS] Seeding legislative districts...")
@@ -414,6 +412,7 @@ def seed_final():
     except Exception as e:
         print(f"  [ERROR] Seeding failed: {e}")
         db.rollback()
+
         raise e
     finally:
         db.close()

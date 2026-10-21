@@ -1,4 +1,4 @@
-"""
+﻿"""
 seed_dev_postgis_and_lightgbm.py — Idempotent PostGIS & LightGBM Developer Seeder
 Caloocan City Engineering Office — PULSO System
 
@@ -256,15 +256,17 @@ def seed_all():
 
         for brgy_str, (lat, lng, flood_lvl) in NORTH_CALOOCAN_COORDS.items():
             brgy_id = int(brgy_str)
-            b_obj = db.query(models.Barangay).filter_by(id=brgy_id).first()
+            b_obj = db.query(models.Barangay).filter((models.Barangay.id == brgy_id) | (models.Barangay.name == f"Barangay {brgy_id}")).first()
             if not b_obj:
-                db.add(models.Barangay(id=brgy_id, name=f"Barangay {brgy_id}", district_id=dist.id, zip_code="1420"))
+                b_obj = models.Barangay(id=brgy_id, name=f"Barangay {brgy_id}", district_id=dist.id, zip_code="1420")
+                db.add(b_obj)
                 db.flush()
-            env_obj = db.query(gov_models.EnvironmentalContext).filter_by(barangay_id=brgy_id).first()
+            target_id = b_obj.id
+            env_obj = db.query(gov_models.EnvironmentalContext).filter_by(barangay_id=target_id).first()
             if not env_obj:
                 db.add(
                     gov_models.EnvironmentalContext(
-                        barangay_id=brgy_id,
+                        barangay_id=target_id,
                         flood_risk_level=flood_lvl,
                         soil_subsidence=1.2 if flood_lvl == "High" else (0.6 if flood_lvl == "Medium" else 0.2),
                     )
@@ -276,13 +278,15 @@ def seed_all():
         for idx, (aid, aname, cat, brgy, dlife, score, mat, lat, lng) in enumerate(SEED_ASSETS):
             asset = db.query(gov_models.InfrastructureAsset).filter_by(asset_id=aid).first()
             completed_dt = today - datetime.timedelta(days=int(dlife * 365 * ((100.0 - score) / 100.0)))
+            b_rec = db.query(models.Barangay).filter((models.Barangay.id == int(brgy)) | (models.Barangay.name == f"Barangay {brgy}")).first()
+            actual_brgy_id = b_rec.id if b_rec else int(brgy)
             if not asset:
                 asset = gov_models.InfrastructureAsset(
                     asset_id=aid,
                     asset_name=aname,
                     category=cat,
                     barangay=brgy,
-                    barangay_id=int(brgy),
+                    barangay_id=actual_brgy_id,
                     design_life=dlife,
                     condition_score=score,
                     material_type=mat,
@@ -299,7 +303,7 @@ def seed_all():
                         date_completed = COALESCE(date_completed, :completed_dt)
                     WHERE asset_id = :aid
                 """),
-                {"lng": lng, "lat": lat, "brgy_id": int(brgy), "completed_dt": completed_dt, "aid": aid},
+                {"lng": lng, "lat": lat, "brgy_id": actual_brgy_id, "completed_dt": completed_dt, "aid": aid},
             )
 
         # Backfill any existing assets that still have NULL geom

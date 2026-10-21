@@ -1,5 +1,5 @@
-# ============================================================================
-# PULSO — One-Command Docker PostGIS + LightGBM + Full-Stack Developer Setup
+﻿# ============================================================================
+# PULSO - One-Command Docker PostGIS + LightGBM + Full-Stack Developer Setup
 # Branch: ValFinalization
 # ============================================================================
 param(
@@ -9,23 +9,24 @@ param(
     [string]$PostgresPassword = "pulso_local_dev"
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $RootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (-not $RootDir) { $RootDir = (Get-Location).Path }
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "   PULSO — DOCKER POSTGIS + LIGHTGBM + DEV ENVIRONMENT SETUP" -ForegroundColor White
+Write-Host "   PULSO - DOCKER POSTGIS + LIGHTGBM + DEV ENVIRONMENT SETUP" -ForegroundColor White
 Write-Host "============================================================" -ForegroundColor Cyan
 
 # 1. Root .env for Docker Compose
 $RootEnv = Join-Path $RootDir ".env"
 if (-not (Test-Path $RootEnv)) {
-    @"
-POSTGRES_DB=$PostgresDb
-POSTGRES_USER=$PostgresUser
-POSTGRES_PASSWORD=$PostgresPassword
-POSTGRES_PORT=$PostgresPort
-"@ | Set-Content -Path $RootEnv -Encoding UTF8
+    $rootLines = @(
+        "POSTGRES_DB=$PostgresDb",
+        "POSTGRES_USER=$PostgresUser",
+        "POSTGRES_PASSWORD=$PostgresPassword",
+        "POSTGRES_PORT=$PostgresPort"
+    )
+    $rootLines | Set-Content -Path $RootEnv -Encoding UTF8
     Write-Host "[1/6] Created root .env for Docker Compose (Port $PostgresPort)" -ForegroundColor Green
 } else {
     Write-Host "[1/6] Root .env already exists" -ForegroundColor Gray
@@ -38,15 +39,16 @@ $DbUrl = "postgresql+psycopg2://${PostgresUser}:${PostgresPassword}@127.0.0.1:${
 
 if (-not (Test-Path $BackendEnvLocal)) {
     $JwtSecret = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 48 | ForEach-Object {[char]$_})
-    @"
-DATABASE_URL=$DbUrl
-JWT_SECRET_KEY=$JwtSecret
-ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-SMS_PROVIDER=textbee
-TEXTBEE_ENABLE_OUTBOUND=false
-TEXTBEE_API_KEY=
-TEXTBEE_DEVICE_ID=
-"@ | Set-Content -Path $BackendEnvLocal -Encoding UTF8
+    $envLocalLines = @(
+        "DATABASE_URL=$DbUrl",
+        "JWT_SECRET_KEY=$JwtSecret",
+        "ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173",
+        "SMS_PROVIDER=textbee",
+        "TEXTBEE_ENABLE_OUTBOUND=false",
+        "TEXTBEE_API_KEY=",
+        "TEXTBEE_DEVICE_ID="
+    )
+    $envLocalLines | Set-Content -Path $BackendEnvLocal -Encoding UTF8
     Write-Host "[2/6] Created backend/.env.local with local PostGIS DATABASE_URL" -ForegroundColor Green
 } else {
     Write-Host "[2/6] backend/.env.local already exists" -ForegroundColor Gray
