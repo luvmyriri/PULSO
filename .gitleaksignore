@@ -208,3 +208,6 @@ a3ead430814514a108e5700269718a24ac0568b6:backend/tests/test_m1_database_challeng
 
 # Synthetic authentication token used by a backend test; no external credential.
 a3ead430814514a108e5700269718a24ac0568b6:backend/tests/test_m1_database_challenge.py:generic-api-key:625
+
+# Historic commit with maps client key before cleanup to .env
+cd20bf76f8af0d6b835a281872e6c25303cde132:frontend/src/utils/mapsConfig.js:gcp-api-key:15
