@@ -862,8 +862,11 @@ def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     
+    ref_id = f"PC-{random.randint(10000, 99999)}"
+    greeting_name = format_resident_name(new_user.full_name)
+
     # Send email
-    if not send_otp_email(new_user.email, code, "Verification", name=format_resident_name(new_user.full_name)):
+    if not send_otp_email(new_user.email, code, "Verification", ref_id=ref_id, name=greeting_name):
         # We created the user, but couldn't send the email.
         # In a real system, you might want to rollback, but let's at least tell the user.
         raise HTTPException(
@@ -874,10 +877,9 @@ def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
     # Also dispatch SMS OTP with personalized First + Last name greeting if phone number exists
     if getattr(new_user, "phone_number", None):
         try:
-            greeting_name = format_resident_name(new_user.full_name)
             sms_text = (
-                f"Hello {greeting_name}, your PULSO Caloocan verification code is {code}. "
-                f"Valid for 10 minutes. Do not share this code."
+                f"Hello {greeting_name}, your PULSO Caloocan registration verification code: {code}. "
+                f"Valid for 10 minutes. Do not share this code with anyone. Ref: {ref_id}."
             )
             sms_res = sms_utils.send_plain_sms(new_user.phone_number, sms_text)
             print(f"[SMS] Dispatched registration OTP to {new_user.phone_number} for {greeting_name}: {sms_res.accepted}")
@@ -996,11 +998,26 @@ def verify_registration(req: VerificationRequest, db: Session = Depends(get_db))
     
     # REMOVED 123456 bypass for production-grade security synchronization
     if user.verification_code != cleaned_code:
-        raise HTTPException(status_code=400, detail="Invalid verification code")
+        raise HTTPException(status_code=400, detail="Incorrect code. Please check and try again.")
         
     user.is_verified = True
     user.verification_code = None  # Clear the code after use
     db.commit()
+
+    # Also dispatch SMS notification that account has been verified
+    if getattr(user, "phone_number", None):
+        try:
+            greeting_name = format_resident_name(user.full_name)
+            ref_id = f"PC-{random.randint(10000, 99999)}"
+            sms_text = (
+                f"Hello {greeting_name}, your PULSO Caloocan account has been successfully verified! "
+                f"You may now log in to submit civic reports and access city services. Ref: {ref_id}."
+            )
+            sms_res = sms_utils.send_plain_sms(user.phone_number, sms_text)
+            print(f"[SMS] Dispatched account verified SMS to {user.phone_number} for {greeting_name}: {sms_res.accepted}")
+        except Exception as sms_err:
+            print(f"[SMS ERROR] Failed to dispatch account verified SMS: {sms_err}")
+
     return {"status": "success", "message": "Account verified"}
 
 @app.post("/api/auth/resend-code")
@@ -1014,7 +1031,10 @@ def resend_code(req: VerificationRequest, db: Session = Depends(get_db)):
     user.verification_code = code
     db.commit()
     
-    if not send_otp_email(user.email, code, "Verification", name=format_resident_name(user.full_name)):
+    ref_id = f"PC-{random.randint(10000, 99999)}"
+    greeting_name = format_resident_name(user.full_name)
+
+    if not send_otp_email(user.email, code, "Verification", ref_id=ref_id, name=greeting_name):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send verification code. Please check server logs."
@@ -1023,17 +1043,16 @@ def resend_code(req: VerificationRequest, db: Session = Depends(get_db)):
     # Also dispatch SMS OTP with personalized First + Last name greeting if phone number exists
     if getattr(user, "phone_number", None):
         try:
-            greeting_name = format_resident_name(user.full_name)
             sms_text = (
-                f"Hello {greeting_name}, your PULSO Caloocan verification code is {code}. "
-                f"Valid for 10 minutes. Do not share this code."
+                f"Hello {greeting_name}, your PULSO Caloocan registration verification code: {code}. "
+                f"Valid for 10 minutes. Do not share this code with anyone. Ref: {ref_id}."
             )
             sms_res = sms_utils.send_plain_sms(user.phone_number, sms_text)
             print(f"[SMS] Dispatched resend OTP to {user.phone_number} for {greeting_name}: {sms_res.accepted}")
         except Exception as sms_err:
             print(f"[SMS ERROR] Failed to dispatch resend OTP: {sms_err}")
 
-    return {"status": "success", "message": "Official verification code resent."}
+    return {"status": "success", "message": "Official verification code resent.", "reference_id": ref_id}
 
 
 

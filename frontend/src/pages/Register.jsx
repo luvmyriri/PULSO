@@ -912,7 +912,7 @@ export default function Register() {
             });
             setStep(6); // Step 6 is Celebration!
         } catch (err) {
-            setVerifyError(err.response?.data?.detail || 'Invalid verification code. Please try again.');
+            setVerifyError(err.response?.data?.detail || 'Incorrect code. Please check and try again.');
         } finally {
             setVerifying(false);
         }
@@ -928,7 +928,10 @@ export default function Register() {
                 email: formData.email,
                 code: '000000'
             });
-            setVerifySuccess("A new 6-digit verification code has been dispatched to your email address.");
+            setVerifySuccess(formData.mobile 
+                ? "A new 6-digit verification code has been dispatched to your email and mobile number."
+                : "A new 6-digit verification code has been dispatched to your email address."
+            );
             setResendTimer(60);
             setCanResend(false);
             setTimeout(() => setVerifySuccess(''), 5000);
@@ -2482,7 +2485,10 @@ export default function Register() {
                                             Enter your 6-digit code
                                         </h2>
                                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                            We sent a verification code to <span className="font-bold text-slate-900 dark:text-white">{formData.email}</span>.
+                                            We sent a verification code to <span className="font-bold text-slate-900 dark:text-white">{formData.email}</span>
+                                            {formData.mobile ? (
+                                                <> and mobile <span className="font-bold text-slate-900 dark:text-white">{formData.mobile}</span></>
+                                            ) : null}.
                                         </p>
                                     </div>
 
