@@ -622,14 +622,15 @@ function mapOcrToForm(data) {
     const rawHouseNo = data.house_no !== undefined ? data.house_no : (addr.houseNo || '');
     const rawBlockLot = data.block_lot !== undefined ? data.block_lot : (addr.blockLot || '');
     const rawBuildingVillage = data.building_village || data.subdivision || addr.subdivision || '';
-    const rawStreet = data.street !== undefined ? data.street : (addr.street || (data.address || '').split('\n')[0].trim());
+    const rawStreet = data.street !== undefined ? data.street : (addr.street || '');
 
-    // Automatically sort building parts from house_no/block_lot/street into building_village
+    // Automatically sort building parts and deduplicate block/lot and street
     const sorted = sortAddressParts({
         houseNo: rawHouseNo,
         blockLot: rawBlockLot,
         subdivision: rawBuildingVillage,
-        street: rawStreet
+        street: rawStreet,
+        barangay: data.barangay || addr.barangayId || ''
     });
 
     mapped.houseNo = sorted.houseNo;
@@ -1421,7 +1422,8 @@ export default function Register() {
             houseNo: currentData.houseNo,
             blockLot: currentData.blockLot,
             subdivision: currentData.subdivision,
-            street: currentData.street
+            street: currentData.street,
+            barangay: currentData.barangay || ''
         });
         if (sorted.changed) {
             undoStateRef.current = {
@@ -1559,7 +1561,8 @@ export default function Register() {
             houseNo: formData.houseNo,
             blockLot: formData.blockLot,
             subdivision: formData.subdivision,
-            street: formData.street
+            street: formData.street,
+            barangay: formData.barangay || ''
         });
         setFormData(prev => ({
             ...prev,
@@ -1627,6 +1630,9 @@ export default function Register() {
             }
 
             const mapped = mapOcrToForm(data);
+            if (data.field_confidences || data.address_parse?.confidences) {
+                setFieldConfidences(data.field_confidences || data.address_parse?.confidences || {});
+            }
             setFormData(prev => ({
                 ...prev,
                 firstName: mapped.firstName || prev.firstName,
@@ -1637,10 +1643,10 @@ export default function Register() {
                 dob: mapped.dob || prev.dob,
                 age: mapped.age || prev.age,
                 sex: mapped.sex || prev.sex,
-                houseNo: mapped.houseNo || prev.houseNo,
-                blockLot: mapped.blockLot || prev.blockLot,
-                subdivision: mapped.subdivision || prev.subdivision,
-                street: mapped.street || prev.street,
+                houseNo: mapped.houseNo !== undefined ? mapped.houseNo : prev.houseNo,
+                blockLot: mapped.blockLot !== undefined ? mapped.blockLot : prev.blockLot,
+                subdivision: mapped.subdivision !== undefined ? mapped.subdivision : prev.subdivision,
+                street: mapped.street !== undefined ? mapped.street : prev.street,
                 barangay: mapped.barangay || prev.barangay,
                 postalCode: mapped.postalCode || prev.postalCode,
                 municipality: mapped.municipality || prev.municipality,
@@ -3082,7 +3088,7 @@ export default function Register() {
                                                         {/* Date of Birth & Age (Shared Row) */}
                                                         <div className="grid grid-cols-1 min-[360px]:grid-cols-12 gap-3 sm:gap-4">
                                                             {/* Date of Birth */}
-                                                            <div className="min-[360px]:col-span-8">
+                                                            <div className="min-[360px]:col-span-9">
                                                                 <label className="text-sm font-bold text-black dark:text-white mb-2 block truncate">
                                                                     Date of Birth <span className="text-red-500 font-bold" aria-hidden="true">*</span><span className="sr-only"> (required)</span>
                                                                     {autoFilledFields.dob && <span className="sr-only"> (filled in from your ID)</span>}
@@ -3109,7 +3115,7 @@ export default function Register() {
                                                             </div>
 
                                                             {/* Age (Read-Only) */}
-                                                            <div className="min-[360px]:col-span-4">
+                                                            <div className="min-[360px]:col-span-3">
                                                                 <label className="text-sm font-bold text-black dark:text-white mb-2 block truncate">
                                                                     Age
                                                                 </label>
@@ -3304,7 +3310,7 @@ export default function Register() {
                                                             placeholder="e.g. Camarin Road"
                                                             className="w-full min-h-[50px] h-[52px] bg-white dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-base rounded-[14px] px-4 text-black dark:text-white placeholder:text-black/60 dark:placeholder:text-white/60 placeholder:italic focus:ring-2 focus:ring-orange-500 outline-none"
                                                         />
-                                                        {fieldConfidences?.street === 'low' && (
+                                                        {(fieldConfidences?.street === 'low' || fieldConfidences?.street === 'medium') && Boolean(formData.street) && (
                                                             <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1 font-medium">
                                                                 <Info size={13} className="shrink-0" />
                                                                 Please check this one.

@@ -13,10 +13,11 @@
 
 export const ONBOARDING_CONTENT = {
   header: {
-    title: 'City Engineering Office',
-    subtitle: 'Citizen Services',
-    shortTitle: 'City Engineering',
-    sealAlt: 'City Engineering Department, Caloocan City, PULSO seal',
+    city: 'CALOOCAN CITY',
+    title: 'City Engineering Department',
+    subtitle: 'powered by: PULSO',
+    shortTitle: 'City Engineering Department',
+    sealAlt: 'Caloocan City Engineering Department Logo',
     backAria: 'Go to previous step',
     skipLabel: 'Skip',
     skipAria: 'Skip onboarding'

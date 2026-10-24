@@ -151,11 +151,48 @@ export function sortAddressParts(addressParts = {}) {
     let blockLot = (addressParts.blockLot || '').trim();
     let subdivision = (addressParts.subdivision || '').trim();
     let street = (addressParts.street || '').trim();
+    const barangay = (addressParts.barangay || '').trim();
 
     let movedPart = null;
     let fromField = null;
     let changed = false;
 
+    // 1. De-duplication: If Subdivision/Village contains Block and Lot, remove it from Subdivision (never Block/Lot)
+    if (blockLot && subdivision) {
+        const normBL = normalizeForCompare(blockLot);
+        const normSub = normalizeForCompare(subdivision);
+        if (normSub.includes(normBL) && normBL.length >= 2) {
+            // Escape special regex chars in blockLot and match as whole token
+            const escapedBL = blockLot.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&').replace(/\s+/g, '\\s*');
+            const blRegex = new RegExp('\\b' + escapedBL + '\\b', 'i');
+            if (blRegex.test(subdivision)) {
+                subdivision = subdivision.replace(blRegex, ' ').replace(/^[,/\-\s]+|[,/\-\s]+$/g, '').replace(/\s{2,}/g, ' ').trim();
+                changed = true;
+            } else {
+                // Token-based fallback removal
+                const subTokens = subdivision.split(/[\s,]+/);
+                const blTokens = new Set(blockLot.split(/[\s,\-]+/).map(t => t.toUpperCase()));
+                const filtered = subTokens.filter(t => !blTokens.has(t.toUpperCase()));
+                const newSub = filtered.join(' ').replace(/^[,/\-\s]+|[,/\-\s]+$/g, '').trim();
+                if (newSub && newSub !== subdivision) {
+                    subdivision = newSub;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    // 2. De-duplication: If Street equals Barangay, clear Street (never invent a street from barangay)
+    if (street && barangay) {
+        const cleanSt = normalizeForCompare(street);
+        const cleanBrgy = normalizeForCompare(barangay.replace(/barangay|brgy\.?/gi, ''));
+        if (cleanSt === cleanBrgy || (cleanBrgy && cleanSt === cleanBrgy)) {
+            street = '';
+            changed = true;
+        }
+    }
+
+    // 3. Move Building part into Subdivision
     // Check fields in strict priority order: houseNo -> blockLot -> street
     const candidates = [
         { key: 'houseNo', label: 'House, Floor or Unit', get: () => houseNo, set: (v) => { houseNo = v; } },

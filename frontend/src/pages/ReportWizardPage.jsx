@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getStoredToken } from '../utils/auth';
 import { CALOOCAN_CENTERS } from '../utils/geospatial';
+import { isInstalledApp } from '../utils/appContext';
 
-import WizardHeader from '../components/report-wizard/WizardHeader';
-import WizardSignalCutRail from '../components/report-wizard/WizardSignalCutRail';
+import Branding from '../components/Branding';
+import ThemeToggle from '../components/ThemeToggle';
+import WizardSidebar, { REPORT_STEPS } from '../components/report-wizard/WizardSidebar';
 import Step1CategoryEmergency from '../components/report-wizard/Step1CategoryEmergency';
 import Step2LocationMap from '../components/report-wizard/Step2LocationMap';
 import Step3EvidenceUpload from '../components/report-wizard/Step3EvidenceUpload';
@@ -15,6 +17,7 @@ import Step4DetailsDuplicate from '../components/report-wizard/Step4DetailsDupli
 import Step5ContactPreferences from '../components/report-wizard/Step5ContactPreferences';
 import Step6ReviewConsent from '../components/report-wizard/Step6ReviewConsent';
 import DuplicateWarningModal from '../components/report-wizard/DuplicateWarningModal';
+import { Check, Home } from 'lucide-react';
 
 const DRAFT_STORAGE_KEY = 'pulso_report_wizard_draft_v1';
 
@@ -66,7 +69,6 @@ export default function ReportWizardPage() {
     consentAccepted: false,
   });
 
-
   // Auto-Save Draft to LocalStorage (debounced 400ms)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -117,6 +119,8 @@ export default function ReportWizardPage() {
       setCurrentStep(prev);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setAnnouncement(`Step ${prev} of 6`);
+    } else {
+      navigate('/');
     }
   };
 
@@ -199,7 +203,6 @@ export default function ReportWizardPage() {
           setCurrentStep(2);
           setSubmissionError(errorData.detail || 'Selected location is outside Caloocan City jurisdiction.');
         } else if (response.status === 409) {
-          // Hard duplicate conflict returned from server
           setDuplicateModalData({
             ticketId: errorData.conflict_ticket_id || errorData.detail?.match(/RPT-[\w-]+/)?.[0] || 'RPT-EXISTING',
             category: formData.category,
@@ -222,6 +225,9 @@ export default function ReportWizardPage() {
     }
   };
 
+  const currentStepObj = REPORT_STEPS.find(s => s.id === currentStep) || REPORT_STEPS[0];
+  const currentStepName = t(`reportWizard.steps.${currentStepObj.key}`, currentStepObj.defaultLabel);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
       {/* Screen Reader Live Region */}
@@ -229,100 +235,180 @@ export default function ReportWizardPage() {
         {announcement}
       </div>
 
-      {/* Top Header */}
-      <WizardHeader currentStep={currentStep} totalSteps={6} />
+      {/* ── Top Header: Logo on top-left & Home Section (matching Login page layout) ───────────── */}
+      <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
+        {/* Logo on top-left linking to home */}
+        <Link
+          to="/"
+          className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
+          title="Caloocan City PULSO Home"
+        >
+          <Branding size="h-9 w-9 sm:h-10 sm:w-10" />
+        </Link>
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col">
-        {/* Signal Cut Visual Step Rail */}
-        <WizardSignalCutRail 
-          currentStep={currentStep} 
-          maxStepReached={maxStepReached} 
-          onStepClick={jumpToStep} 
-        />
+        {/* Right side: Theme Toggle & Home Navigation */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <ThemeToggle />
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            title="Return to Home Section"
+          >
+            <Home size={14} className="text-[#ff6b00]" />
+            <span className="hidden sm:inline">Home</span>
+          </Link>
+        </div>
+      </header>
+
+      {/* Main Responsive Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-6 sm:pb-8 flex flex-col">
+        {/* Step-by-Step Segmented Stepper Bar (<1024px / lg:hidden) */}
+        <nav 
+          aria-label="Report progress steps"
+          className="flex lg:hidden flex-col gap-2 mb-6 px-1"
+        >
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-xs uppercase tracking-wider text-orange-600 dark:text-[#ff8a3d]">
+              {t('reportWizard.stepCountUppercase', 'STEP {{current}} OF {{total}}', { current: currentStep, total: 6 })}
+            </span>
+            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
+              {currentStepName}
+            </span>
+          </div>
+
+          {/* 6 Segmented Progress Bars */}
+          <div 
+            className="grid grid-cols-6 gap-2 sm:gap-2.5 w-full"
+            role="progressbar"
+            aria-valuenow={currentStep}
+            aria-valuemin={1}
+            aria-valuemax={6}
+            aria-valuetext={`Step ${currentStep} of 6: ${currentStepName}`}
+          >
+            {REPORT_STEPS.map((step) => {
+              const isPassedOrCurrent = step.id <= currentStep;
+              const isCurrent = step.id === currentStep;
+              const isClickable = step.id <= maxStepReached;
+              const label = t(`reportWizard.steps.${step.key}`, step.defaultLabel);
+
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => isClickable && jumpToStep(step.id)}
+                  disabled={!isClickable}
+                  title={`${step.id}. ${label}`}
+                  aria-label={`Step ${step.id}: ${label}${isCurrent ? ' (current step)' : ''}`}
+                  aria-current={isCurrent ? 'step' : undefined}
+                  className={`h-1 sm:h-1.5 rounded-full transition-all duration-300 ${
+                    isClickable ? 'cursor-pointer hover:opacity-80 active:scale-95' : 'cursor-default'
+                  } ${
+                    isPassedOrCurrent
+                      ? 'bg-[#ff6b00]'
+                      : 'bg-slate-200 dark:bg-slate-800'
+                  }`}
+                />
+              );
+            })}
+          </div>
+        </nav>
 
         {/* Global Submission Error Callout */}
         {submissionError && (
-          <div className="mt-4 p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-sm text-red-800 dark:text-red-300 shadow-sm">
+          <aside aria-label="Error announcement" className="mb-6 p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-sm text-red-800 dark:text-red-300 shadow-xs">
             <p className="font-bold">Notice:</p>
             <p>{submissionError}</p>
-          </div>
+          </aside>
         )}
 
-        {/* Dynamic Step Views */}
-        <div className="mt-6 flex-1">
-          {currentStep === 1 && (
-            <Step1CategoryEmergency 
-              selectedCategory={formData.category}
-              onSelectCategory={(cat) => setFormData(p => ({ ...p, category: cat }))}
-              onContinue={goToNextStep}
-            />
-          )}
+        {/* Two-Column Layout (Desktop) */}
+        <div className="flex-1 flex items-start gap-8">
+          {/* Left Column: Persistent Desktop Sidebar */}
+          <WizardSidebar
+            currentStep={currentStep}
+            maxStepReached={maxStepReached}
+            onStepClick={jumpToStep}
+          />
 
-          {currentStep === 2 && (
-            <Step2LocationMap 
-              isMapLoaded={isMapLoaded}
-              locationData={formData.location}
-              onLocationChange={(loc) => setFormData(p => ({ ...p, location: loc }))}
-              onBack={goToPreviousStep}
-              onContinue={goToNextStep}
-            />
-          )}
+          {/* Right Column: Rounded Main Card */}
+          <section
+            aria-label={`Step ${currentStep} form content`}
+            className="flex-1 w-full rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 md:p-10 shadow-xs min-h-[640px] flex flex-col justify-between"
+          >
+            {currentStep === 1 && (
+              <Step1CategoryEmergency 
+                selectedCategory={formData.category}
+                onSelectCategory={(cat) => setFormData(p => ({ ...p, category: cat }))}
+                onContinue={goToNextStep}
+                onBack={goToPreviousStep}
+              />
+            )}
 
-          {currentStep === 3 && (
-            <Step3EvidenceUpload 
-              evidenceData={formData.evidence}
-              category={formData.category}
-              locationData={formData.location}
-              onEvidenceChange={(ev) => {
-                setFormData(p => {
-                  const updated = { ...p, evidence: ev };
-                  if (ev.autoDescription && !p.details.description) {
-                    updated.details = {
-                      ...p.details,
-                      description: ev.autoDescription,
-                      urgency: ev.urgency || p.details.urgency || 'medium',
-                    };
-                  }
-                  return updated;
-                });
-              }}
-              onBack={goToPreviousStep}
-              onContinue={goToNextStep}
-            />
-          )}
+            {currentStep === 2 && (
+              <Step2LocationMap 
+                isMapLoaded={isMapLoaded}
+                locationData={formData.location}
+                onLocationChange={(loc) => setFormData(p => ({ ...p, location: loc }))}
+                onBack={goToPreviousStep}
+                onContinue={goToNextStep}
+              />
+            )}
 
-          {currentStep === 4 && (
-            <Step4DetailsDuplicate 
-              detailsData={formData.details}
-              locationData={formData.location}
-              category={formData.category}
-              evidenceData={formData.evidence}
-              onDetailsChange={(det) => setFormData(p => ({ ...p, details: det }))}
-              onBack={goToPreviousStep}
-              onContinue={goToNextStep}
-            />
-          )}
+            {currentStep === 3 && (
+              <Step3EvidenceUpload 
+                evidenceData={formData.evidence}
+                category={formData.category}
+                locationData={formData.location}
+                onEvidenceChange={(ev) => {
+                  setFormData(p => {
+                    const updated = { ...p, evidence: ev };
+                    if (ev.autoDescription && !p.details.description) {
+                      updated.details = {
+                        ...p.details,
+                        description: ev.autoDescription,
+                        urgency: ev.urgency || p.details.urgency || 'medium',
+                      };
+                    }
+                    return updated;
+                  });
+                }}
+                onBack={goToPreviousStep}
+                onContinue={goToNextStep}
+              />
+            )}
 
-          {currentStep === 5 && (
-            <Step5ContactPreferences 
-              contactData={formData.contact}
-              onContactChange={(cnt) => setFormData(p => ({ ...p, contact: cnt }))}
-              onBack={goToPreviousStep}
-              onContinue={goToNextStep}
-            />
-          )}
+            {currentStep === 4 && (
+              <Step4DetailsDuplicate 
+                detailsData={formData.details}
+                locationData={formData.location}
+                category={formData.category}
+                evidenceData={formData.evidence}
+                onDetailsChange={(det) => setFormData(p => ({ ...p, details: det }))}
+                onBack={goToPreviousStep}
+                onContinue={goToNextStep}
+              />
+            )}
 
-          {currentStep === 6 && (
-            <Step6ReviewConsent 
-              formData={formData}
-              isSubmitting={isSubmitting}
-              onJumpToStep={jumpToStep}
-              onConsentChange={(val) => setFormData(p => ({ ...p, consentAccepted: val }))}
-              onBack={goToPreviousStep}
-              onSubmit={handleSubmitReport}
-            />
-          )}
+            {currentStep === 5 && (
+              <Step5ContactPreferences 
+                contactData={formData.contact}
+                onContactChange={(cnt) => setFormData(p => ({ ...p, contact: cnt }))}
+                onBack={goToPreviousStep}
+                onContinue={goToNextStep}
+              />
+            )}
+
+            {currentStep === 6 && (
+              <Step6ReviewConsent 
+                formData={formData}
+                isSubmitting={isSubmitting}
+                onJumpToStep={jumpToStep}
+                onConsentChange={(val) => setFormData(p => ({ ...p, consentAccepted: val }))}
+                onBack={goToPreviousStep}
+                onSubmit={handleSubmitReport}
+              />
+            )}
+          </section>
         </div>
       </main>
 

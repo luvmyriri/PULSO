@@ -56,7 +56,7 @@ export default function EmergencyHotlinesSection() {
     <section
       id="hotlines"
       aria-label="Direct Municipal & Utility Hotlines"
-      className="min-h-[calc(100vh-73px)] py-12 sm:py-16 bg-white dark:bg-[#070a12] border-b border-slate-200 dark:border-slate-800 transition-colors flex flex-col justify-center"
+      className="min-h-0 lg:min-h-[calc(100vh-73px)] py-8 sm:py-12 lg:py-16 bg-white dark:bg-[#070a12] border-b border-slate-200 dark:border-slate-800 transition-colors flex flex-col justify-start lg:justify-center scroll-mt-[56px] sm:scroll-mt-[64px] lg:scroll-mt-[73px]"
     >
       <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         
@@ -74,42 +74,42 @@ export default function EmergencyHotlinesSection() {
           </p>
         </div>
 
-        {/* 4 Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 4 Cards Grid - 2 rows on mobile (2x2), 4 columns on desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
           {hotlines.map((item) => {
             const Icon = item.icon;
             return (
               <a
                 key={item.id}
                 href={`tel:${item.tel}`}
-                className="group p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-red-400/60 dark:hover:border-red-500/60 transition-all flex flex-col justify-between shadow-xs hover:shadow-md text-left"
+                className="group p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-red-400/60 dark:hover:border-red-500/60 transition-all flex flex-col justify-between shadow-xs hover:shadow-md text-left"
                 aria-label={`Call ${item.title} at ${item.number}`}
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.color}`}>
-                      <Icon size={20} />
+                  <div className="flex items-center justify-between gap-1.5 mb-2.5 sm:mb-3">
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${item.color}`}>
+                      <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
-                    <span className="text-[10px] font-mono-data font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    <span className="text-[8px] sm:text-[10px] font-mono-data font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 whitespace-nowrap shrink-0">
                       {item.badge}
                     </span>
                   </div>
 
-                  <h3 className="font-heading font-bold text-sm text-slate-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+                  <h3 className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors leading-snug">
                     {item.title}
                   </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                  <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
                     {item.desc}
                   </p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                  <span className="font-mono-data font-bold text-base text-slate-900 dark:text-white group-hover:text-red-600 transition-colors">
+                <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1">
+                  <span className="font-mono-data font-bold text-xs xs:text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-red-600 transition-colors whitespace-nowrap">
                     {item.number}
                   </span>
-                  <div className="inline-flex items-center gap-1 text-xs font-bold text-red-600 dark:text-red-400">
+                  <div className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold text-red-600 dark:text-red-400 shrink-0">
                     <span>Call</span>
-                    <PhoneCall size={13} />
+                    <PhoneCall size={12} className="shrink-0" />
                   </div>
                 </div>
               </a>

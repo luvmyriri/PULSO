@@ -264,12 +264,12 @@ export default function MobileAppTutorial({
       {/* Centered Editorial Column: Strictly fills 100% of frame height */}
       <div className="relative z-10 w-full max-w-[440px] mx-auto h-full max-h-full flex flex-col justify-between px-5 sm:px-6 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-hidden">
 
-        {/* ── 1. TOP BAR (Compact 44px to 48px) ── */}
-        <header className="w-full flex items-center justify-between h-11 sm:h-12 shrink-0">
+        {/* ── 1. TOP BAR (Compact 48px to 54px) ── */}
+        <header className="w-full flex items-center justify-between min-h-[48px] sm:min-h-[52px] shrink-0">
           {currentStep === 1 ? (
-            /* Screen 1: Logo + "City Engineering Office / Citizen Services" */
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800 p-0.5 bg-white dark:bg-slate-800 shadow-2xs">
+            /* Screen 1: Official LGU Hierarchy (CALOOCAN CITY / City Engineering Department / powered by: PULSO) */
+            <div className="flex items-center gap-2.5">
+              <div className={`w-9 h-9 rounded-full overflow-hidden shrink-0 ${isDark ? "border-slate-800 bg-slate-800" : "border-slate-200 bg-white"} border p-0.5 shadow-2xs`}>
                 <img
                   src="/city-engineering-logo.png"
                   alt={ONBOARDING_CONTENT.header.sealAlt}
@@ -280,13 +280,17 @@ export default function MobileAppTutorial({
                   }}
                 />
               </div>
-              <div className="flex flex-col text-left">
-                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                  {ONBOARDING_CONTENT.header.title}
+              <div className="flex flex-col text-left leading-tight">
+                <span className={`font-heading font-black text-[9px] sm:text-[10px] tracking-tight ${isDark ? "text-slate-400" : "text-slate-500"} uppercase leading-none`}>
+                  CALOOCAN CITY
                 </span>
-                <span className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">
-                  {ONBOARDING_CONTENT.header.subtitle}
+                <span className={`font-heading font-black text-xs sm:text-[13px] ${isDark ? "text-white" : "text-slate-900"} tracking-tight leading-tight mt-0.5`}>
+                  City Engineering Department
                 </span>
+                <div className="flex items-center gap-1 text-[8px] sm:text-[9px] font-mono-data leading-none mt-0.5">
+                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>powered by:</span>
+                  <span className="font-heading font-black text-[#ff6b00] uppercase tracking-wider">PULSO</span>
+                </div>
               </div>
             </div>
           ) : (
@@ -296,11 +300,11 @@ export default function MobileAppTutorial({
                 type="button"
                 onClick={handleBack}
                 aria-label={ONBOARDING_CONTENT.header.backAria}
-                className="min-w-[44px] min-h-[44px] -ml-2 rounded-lg flex items-center justify-center text-slate-700 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white active:scale-95 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                className={`min-w-[44px] min-h-[44px] -ml-2 rounded-lg flex items-center justify-center ${isDark ? "text-slate-200 hover:text-white" : "text-slate-700 hover:text-slate-950"} active:scale-95 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]`}
               >
                 <ArrowLeft size={20} aria-hidden="true" />
               </button>
-              <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800 p-0.5 bg-white dark:bg-slate-800">
+              <div className={`w-7 h-7 rounded-full overflow-hidden shrink-0 ${isDark ? "border-slate-800 bg-slate-800" : "border-slate-200 bg-white"} border p-0.5`}>
                 <img
                   src="/city-engineering-logo.png"
                   alt={ONBOARDING_CONTENT.header.sealAlt}
@@ -311,7 +315,7 @@ export default function MobileAppTutorial({
                   }}
                 />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight">
+              <span className={`text-xs sm:text-sm font-bold ${isDark ? "text-white" : "text-slate-900"} leading-tight`}>
                 {ONBOARDING_CONTENT.header.shortTitle}
               </span>
             </div>
@@ -324,7 +328,7 @@ export default function MobileAppTutorial({
                 type="button"
                 onClick={handleSkip}
                 aria-label={ONBOARDING_CONTENT.header.skipAria}
-                className="min-h-[44px] min-w-[44px] -mr-2 px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white active:scale-95 transition-colors cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg"
+                className={`min-h-[44px] min-w-[44px] -mr-2 px-2.5 py-1.5 text-xs sm:text-sm font-semibold ${isDark ? "text-slate-300" : "text-slate-600"} hover:text-slate-900 dark:hover:text-white active:scale-95 transition-colors cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg`}
               >
                 {ONBOARDING_CONTENT.header.skipLabel}
               </button>
@@ -333,7 +337,7 @@ export default function MobileAppTutorial({
                 type="button"
                 onClick={() => finishTutorial(returnToProfile ? '/dashboard?tab=profile' : '/dashboard', 'Close tutorial tapped')}
                 aria-label="Close tutorial"
-                className="min-w-[44px] min-h-[44px] -mr-2 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                className={`min-w-[44px] min-h-[44px] -mr-2 rounded-lg flex items-center justify-center ${isDark ? "text-slate-300" : "text-slate-600"} hover:text-slate-950 dark:hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]`}
               >
                 <X size={18} aria-hidden="true" />
               </button>
@@ -344,7 +348,7 @@ export default function MobileAppTutorial({
         </header>
 
         {/* ── 2. THIN DIVIDER LINE ── */}
-        <div className="w-full h-px bg-slate-200 dark:bg-slate-800 shrink-0" aria-hidden="true" />
+        <div className={`w-full h-px ${isDark ? "bg-slate-800" : "bg-slate-200"} shrink-0" aria-hidden="true`} />
 
         {/* ── 3. FIVE PROGRESS DOTS (Compact rhythm) ── */}
         <div
@@ -362,7 +366,7 @@ export default function MobileAppTutorial({
                 className={`transition-all duration-200 ease-out rounded-full ${
                   isActive
                     ? 'w-6 h-1.5 bg-[#ff6b00]'
-                    : 'w-1.5 h-1.5 bg-slate-300 dark:bg-slate-700'
+                    : isDark ? 'w-1.5 h-1.5 bg-slate-700' : 'w-1.5 h-1.5 bg-slate-300'
                 }`}
               />
             );
@@ -381,7 +385,7 @@ export default function MobileAppTutorial({
               {/* Top Group: Eyebrow + Title + Subtitle */}
               <div className="pt-2 sm:pt-4">
                 {/* Eyebrow Label */}
-                <p className="text-xs uppercase tracking-widest font-semibold text-slate-500 dark:text-slate-400 mb-2 sm:mb-2.5">
+                <p className={`text-xs uppercase tracking-widest font-semibold ${isDark ? "text-slate-400" : "text-slate-500"} mb-2 sm:mb-2.5`}>
                   {copy.screen1.eyebrow}
                 </p>
 
@@ -389,29 +393,29 @@ export default function MobileAppTutorial({
                 <h1
                   ref={headingRef}
                   tabIndex={-1}
-                  className="text-2xl sm:text-[32px] font-extrabold text-slate-900 dark:text-white leading-[1.18] tracking-tight mb-2.5 sm:mb-3 max-w-[16ch] outline-none"
+                  className={`text-2xl sm:text-[32px] font-extrabold ${isDark ? "text-white" : "text-slate-900"} leading-[1.18] tracking-tight mb-2.5 sm:mb-3 max-w-[16ch] outline-none`}
                 >
                   {copy.screen1.title}
                 </h1>
 
                 {/* Short Subtitle (<= 12 words) */}
-                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed max-w-[34ch]">
+                <p className={`text-sm sm:text-base ${isDark ? "text-slate-300" : "text-slate-600"} leading-relaxed max-w-[34ch]`}>
                   {copy.screen1.subtitle}
                 </p>
               </div>
 
               {/* Middle Group: "How it works" + 3 Clean Step Rows with Double Spacing */}
               <div className="flex-1 flex flex-col justify-center py-6 sm:py-8">
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-5 sm:mb-6">
+                <h2 className={`text-base sm:text-lg font-bold ${isDark ? "text-white" : "text-slate-900"} mb-5 sm:mb-6`}>
                   {copy.screen1.howItWorksHeading}
                 </h2>
                 <ol className="w-full list-none pl-0 space-y-6 sm:space-y-8">
                   {copy.screen1.howItWorks.map((item) => (
                     <li key={item.number} className="flex items-center gap-4">
-                      <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white font-bold text-sm sm:text-base flex items-center justify-center shrink-0 shadow-2xs">
+                      <span className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full font-bold text-sm sm:text-base flex items-center justify-center shrink-0 shadow-2xs ${isDark ? "border border-slate-700 bg-slate-800 text-white" : "border border-slate-300 bg-slate-100 text-slate-900"}`}>
                         {item.number}
                       </span>
-                      <span className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-100 leading-snug">
+                      <span className={`text-base sm:text-lg font-semibold ${isDark ? "text-slate-100" : "text-slate-900"} leading-snug`}>
                         {item.title}
                       </span>
                     </li>
@@ -431,11 +435,11 @@ export default function MobileAppTutorial({
                 <h1
                   ref={headingRef}
                   tabIndex={-1}
-                  className="text-2xl sm:text-[30px] font-extrabold text-slate-900 dark:text-white leading-tight tracking-tight mb-2 outline-none"
+                  className={`text-2xl sm:text-[30px] font-extrabold ${isDark ? "text-white" : "text-slate-900"} leading-tight tracking-tight mb-2 outline-none`}
                 >
                   {copy.screen2.title}
                 </h1>
-                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+                <p className={`text-sm sm:text-base ${isDark ? "text-slate-300" : "text-slate-600"} leading-relaxed`}>
                   {copy.screen2.subtitle}
                 </p>
               </div>
@@ -448,21 +452,21 @@ export default function MobileAppTutorial({
                     return (
                       <li key={step.number} className="relative flex items-start gap-4">
                         <div className="relative flex flex-col items-center shrink-0">
-                          <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white font-bold text-sm sm:text-base flex items-center justify-center shrink-0 z-10 shadow-2xs">
+                          <span className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full font-bold text-sm sm:text-base flex items-center justify-center shrink-0 z-10 shadow-2xs ${isDark ? "border border-slate-700 bg-slate-800 text-white" : "border border-slate-300 bg-slate-100 text-slate-900"}`}>
                             {step.number}
                           </span>
                           {!isLast && (
                             <span
-                              className="absolute top-9 sm:top-10 bottom-[-28px] sm:bottom-[-36px] w-0.5 bg-slate-200 dark:bg-slate-800"
+                              className={`absolute top-9 sm:top-10 bottom-[-28px] sm:bottom-[-36px] w-0.5 ${isDark ? "bg-slate-800" : "bg-slate-300"}`}
                               aria-hidden="true"
                             />
                           )}
                         </div>
                         <div className="flex-1 min-w-0 pt-1">
-                          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                          <h2 className={`text-base sm:text-lg font-bold ${isDark ? "text-white" : "text-slate-900"} tracking-tight`}>
                             {step.title}
                           </h2>
-                          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed mt-1">
+                          <p className={`text-sm sm:text-base ${isDark ? "text-slate-300" : "text-slate-600"} leading-relaxed mt-1`}>
                             {step.description}
                           </p>
                         </div>
@@ -484,11 +488,11 @@ export default function MobileAppTutorial({
                 <h1
                   ref={headingRef}
                   tabIndex={-1}
-                  className="text-2xl sm:text-[30px] font-extrabold text-slate-900 dark:text-white leading-tight tracking-tight mb-2 outline-none"
+                  className={`text-2xl sm:text-[30px] font-extrabold ${isDark ? "text-white" : "text-slate-900"} leading-tight tracking-tight mb-2 outline-none`}
                 >
                   {copy.screen3.title}
                 </h1>
-                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+                <p className={`text-sm sm:text-base ${isDark ? "text-slate-300" : "text-slate-600"} leading-relaxed`}>
                   {copy.screen3.subtitle}
                 </p>
               </div>
@@ -501,21 +505,21 @@ export default function MobileAppTutorial({
                     return (
                       <li key={step.number} className="relative flex items-start gap-4">
                         <div className="relative flex flex-col items-center shrink-0">
-                          <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white font-bold text-sm sm:text-base flex items-center justify-center shrink-0 z-10 shadow-2xs">
+                          <span className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full font-bold text-sm sm:text-base flex items-center justify-center shrink-0 z-10 shadow-2xs ${isDark ? "border border-slate-700 bg-slate-800 text-white" : "border border-slate-300 bg-slate-100 text-slate-900"}`}>
                             {step.number}
                           </span>
                           {!isLast && (
                             <span
-                              className="absolute top-9 sm:top-10 bottom-[-28px] sm:bottom-[-36px] w-0.5 bg-slate-200 dark:bg-slate-800"
+                              className={`absolute top-9 sm:top-10 bottom-[-28px] sm:bottom-[-36px] w-0.5 ${isDark ? "bg-slate-800" : "bg-slate-300"}`}
                               aria-hidden="true"
                             />
                           )}
                         </div>
                         <div className="flex-1 min-w-0 pt-1">
-                          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                          <h2 className={`text-base sm:text-lg font-bold ${isDark ? "text-white" : "text-slate-900"} tracking-tight`}>
                             {step.title}
                           </h2>
-                          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed mt-1">
+                          <p className={`text-sm sm:text-base ${isDark ? "text-slate-300" : "text-slate-600"} leading-relaxed mt-1`}>
                             {step.description}
                           </p>
                         </div>
@@ -537,26 +541,26 @@ export default function MobileAppTutorial({
                 <h1
                   ref={headingRef}
                   tabIndex={-1}
-                  className="text-2xl sm:text-[28px] font-extrabold text-slate-900 dark:text-white leading-tight tracking-tight mb-1.5 outline-none"
+                  className={`text-2xl sm:text-[28px] font-extrabold ${isDark ? "text-white" : "text-slate-900"} leading-tight tracking-tight mb-1.5 outline-none`}
                 >
                   {copy.screen4.title}
                 </h1>
-                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+                <p className={`text-sm sm:text-base ${isDark ? "text-slate-300" : "text-slate-600"} leading-relaxed`}>
                   {copy.screen4.subtitle}
                 </p>
               </div>
 
               <div className="w-full flex-1 flex flex-col justify-center py-4 sm:py-6">
                 {/* Example Report Card */}
-                <div className="w-full rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 sm:p-5 mb-5 sm:mb-6 shadow-xs">
-                  <div className="text-xs uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                <div className={`w-full rounded-2xl border p-4 sm:p-5 mb-5 sm:mb-6 shadow-xs ${isDark ? "border-slate-800 bg-slate-900/90" : "border-slate-200 bg-slate-50"}`}>
+                  <div className={`text-xs uppercase tracking-wider font-semibold ${isDark ? "text-slate-400" : "text-slate-500"} mb-1.5`}>
                     {copy.screen4.exampleBadge}
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                    <span className={`font-mono text-base sm:text-lg font-bold ${isDark ? "text-white" : "text-slate-900"} tracking-tight`}>
                       {copy.screen4.sampleTrackingCode}
                     </span>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-50 dark:bg-orange-500/15 text-[#C2410C] dark:text-[#FF8A3D] border border-orange-200 dark:border-orange-500/30">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${isDark ? "bg-orange-500/15 text-[#FF8A3D] border border-orange-500/30" : "bg-orange-50 text-[#d95d00] border border-orange-200"}`}>
                       {copy.screen4.statusBadge}
                     </span>
                   </div>
@@ -571,15 +575,15 @@ export default function MobileAppTutorial({
                         <Check size={15} strokeWidth={3} className="text-white" aria-hidden="true" />
                       </span>
                       <span
-                        className="absolute top-7 sm:top-8 bottom-[-20px] sm:bottom-[-24px] w-0.5 bg-slate-200 dark:bg-slate-800"
+                        className={`absolute top-7 sm:top-8 bottom-[-20px] sm:bottom-[-24px] w-0.5 ${isDark ? "bg-slate-800" : "bg-slate-300"}`}
                         aria-hidden="true"
                       />
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
-                      <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                      <h2 className={`text-sm sm:text-base font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                         {copy.screen4.milestones[0].title}
                       </h2>
-                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                      <p className={`text-xs sm:text-sm ${isDark ? "text-slate-300" : "text-slate-600"} mt-0.5 leading-relaxed`}>
                         {copy.screen4.milestones[0].description}
                       </p>
                     </div>
@@ -588,24 +592,24 @@ export default function MobileAppTutorial({
                   {/* 2. In progress */}
                   <li className="relative flex items-start gap-3.5">
                     <div className="relative flex flex-col items-center shrink-0">
-                      <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-[#ff6b00] bg-white dark:bg-slate-800 text-[#ff6b00] font-bold text-xs sm:text-sm flex items-center justify-center shrink-0 z-10 shadow-2xs">
+                      <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-[#ff6b00] font-bold text-xs sm:text-sm flex items-center justify-center shrink-0 z-10 shadow-2xs ${isDark ? "bg-slate-800 text-[#ff6b00]" : "bg-white text-[#ff6b00]"}`}>
                         2
                       </span>
                       <span
-                        className="absolute top-7 sm:top-8 bottom-[-20px] sm:bottom-[-24px] w-0.5 bg-slate-200 dark:bg-slate-800"
+                        className={`absolute top-7 sm:top-8 bottom-[-20px] sm:bottom-[-24px] w-0.5 ${isDark ? "bg-slate-800" : "bg-slate-300"}`}
                         aria-hidden="true"
                       />
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
                       <div className="flex items-center gap-2">
-                        <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                        <h2 className={`text-sm sm:text-base font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                           {copy.screen4.milestones[1].title}
                         </h2>
                         <span className="text-xs font-bold text-[#ff6b00] tracking-wide">
                           {copy.screen4.milestones[1].badge}
                         </span>
                       </div>
-                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                      <p className={`text-xs sm:text-sm ${isDark ? "text-slate-300" : "text-slate-600"} mt-0.5 leading-relaxed`}>
                         {copy.screen4.milestones[1].description}
                       </p>
                     </div>
@@ -614,15 +618,15 @@ export default function MobileAppTutorial({
                   {/* 3. Resolved */}
                   <li className="relative flex items-start gap-3.5">
                     <div className="relative flex flex-col items-center shrink-0">
-                      <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center shrink-0 z-10 text-xs sm:text-sm font-semibold">
+                      <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full border flex items-center justify-center shrink-0 z-10 text-xs sm:text-sm font-semibold ${isDark ? "border-slate-700 text-slate-400" : "border-slate-300 text-slate-500"}`}>
                         3
                       </span>
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
-                      <h2 className="text-sm sm:text-base font-semibold text-slate-700 dark:text-slate-200">
+                      <h2 className={`text-sm sm:text-base font-semibold ${isDark ? "text-slate-200" : "text-slate-700"}`}>
                         {copy.screen4.milestones[2].title}
                       </h2>
-                      <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                      <p className={`text-xs sm:text-sm ${isDark ? "text-slate-400" : "text-slate-500"} mt-0.5 leading-relaxed`}>
                         {copy.screen4.milestones[2].description}
                       </p>
                     </div>
@@ -642,7 +646,7 @@ export default function MobileAppTutorial({
               <div className="pt-3 sm:pt-6">
                 {/* Green Check Badge in Rounded Circle */}
                 <div
-                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/30 dark:border-emerald-500/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-4 sm:mb-5 shadow-xs"
+                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full ${isDark ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" : "bg-emerald-500/15 border-emerald-500/30 text-emerald-600"} border flex items-center justify-center mb-4 sm:mb-5 shadow-xs`}
                   aria-hidden="true"
                 >
                   <Check size={28} strokeWidth={2.5} />
@@ -651,22 +655,22 @@ export default function MobileAppTutorial({
                 <h1
                   ref={headingRef}
                   tabIndex={-1}
-                  className="text-2xl sm:text-[32px] font-extrabold text-slate-900 dark:text-white leading-tight tracking-tight mb-2.5 sm:mb-3 outline-none"
+                  className={`text-2xl sm:text-[32px] font-extrabold ${isDark ? "text-white" : "text-slate-900"} leading-tight tracking-tight mb-2.5 sm:mb-3 outline-none`}
                 >
                   {copy.screen5.title}
                 </h1>
-                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed max-w-[34ch]">
+                <p className={`text-sm sm:text-base ${isDark ? "text-slate-300" : "text-slate-600"} leading-relaxed max-w-[34ch]`}>
                   {copy.screen5.subtitle}
                 </p>
               </div>
 
               {/* Middle Group: Raised Assurance Card */}
               <div className="w-full flex-1 flex flex-col justify-center py-6 sm:py-8">
-                <div className="w-full rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-5 sm:p-6 shadow-xs">
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2">
+                <div className={`w-full rounded-2xl border p-5 sm:p-6 shadow-xs ${isDark ? "border-slate-800 bg-slate-900/90" : "border-slate-200 bg-slate-50"}`}>
+                  <h2 className={`text-base sm:text-lg font-bold ${isDark ? "text-white" : "text-slate-900"} mb-2`}>
                     {copy.screen5.cardTitle}
                   </h2>
-                  <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+                  <p className={`text-sm sm:text-base ${isDark ? "text-slate-300" : "text-slate-600"} leading-relaxed`}>
                     {copy.screen5.cardDescription}
                   </p>
                 </div>
@@ -691,7 +695,7 @@ export default function MobileAppTutorial({
           {/* Secondary Sign-In Link on Screens 1 & 5 */}
           <div className="mt-1 min-h-[38px] h-9 flex items-center justify-center">
             {currentStep === 1 && !isResidentLoggedIn ? (
-              <div className="text-center text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-200">
+              <div className={`text-center text-xs sm:text-sm font-medium ${isDark ? "text-slate-300" : "text-slate-600"}`}>
                 {copy.screen1.secondaryText}{' '}
                 <button
                   type="button"
@@ -702,7 +706,7 @@ export default function MobileAppTutorial({
                 </button>
               </div>
             ) : currentStep === totalSteps && !isResidentLoggedIn ? (
-              <div className="text-center text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-200">
+              <div className={`text-center text-xs sm:text-sm font-medium ${isDark ? "text-slate-300" : "text-slate-600"}`}>
                 {copy.screen5.secondaryText}{' '}
                 <button
                   type="button"

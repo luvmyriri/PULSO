@@ -179,87 +179,18 @@ def parse_address_components(raw: str, barangay: str = '') -> dict:
     """
     Splits a raw OCR address string into structured sub-fields:
     house_no, block_lot, subdivision, street.
+    Uses the unified deterministic split_address_components logic.
     """
-    import re as _re
-
     if not raw:
         return {'house_no': '', 'block_lot': '', 'subdivision': '', 'street': ''}
 
-    # 1. Normalize
-    s = raw.replace('\n', ' ').replace('|', ' ')
-    s = _re.sub(r'\s{2,}', ' ', s).strip()
-
-    # 2. CRITICAL: Philippine addresses often have trailing metadata after commas
-    #    e.g. "Blk 40 Lot 3 Northville 2b Bagumbong, Barangay 171, City Of Caloocan, NCR..."
-    #    Truncate at the first comma that is followed by city/barangay-level noise
-    TRAILING_MARKERS = r',\s*(?:Barangay|Brgy|City|Municipality|Province|NCR|Metro\s+Manila|Philippines?|Caloocan|Quezon|Third\s+District)'
-    m = _re.search(TRAILING_MARKERS, s, _re.I)
-    if m:
-        s = s[:m.start()].strip()
-
-    # 3. Strip remaining noise keywords
-    NOISE = r'\b(KASARIAN|SEX|MALE|FEMALE|PHILIPPINES?|REPUBLIKA\s+NG|ADDRESS|RESIDENCE|LICENSE|RESTRICTION|ISSUANCE|BLOOD\s+TYPE|EYE\s+COLOR|WEIGHT|HEIGHT|TIN|EXPIRY|NCR|THIRD\s+DISTRICT)\b'
-    s = _re.sub(NOISE, '', s, flags=_re.I)
-    # Strip 4-digit postal codes
-    s = _re.sub(r'\b1[34]\d{2}\b', '', s)
-    # Strip any remaining city/district words
-    s = _re.sub(r'\b(CALOOCAN|KALOOKAN|CITY|METRO\s+MANILA|MANILA|DISTRICT|ZONE)\b', '', s, flags=_re.I)
-    # Strip barangay text by name
-    if barangay:
-        bn = _re.sub(r'^Barangay\s*', '', barangay, flags=_re.I).strip()
-        if bn:
-            s = _re.sub(r'\b' + _re.escape(bn) + r'\b', '', s, flags=_re.I)
-    s = _re.sub(r'\b(BARANGAY|BRGY\.?|BGY\.?)\s*\d+[A-Z]?\b', '', s, flags=_re.I)
-    # Clean up punctuation artifacts
-    s = _re.sub(r'[,\/]+', ' ', s)
-    s = _re.sub(r'\s{2,}', ' ', s).strip()
-
-    house_no = ''
-    block_lot = ''
-    street = ''
-    subdivision = ''
-
-    # 4. Extract Block & Lot (highest priority)
-    blk_lot_re = r'\b((?:BLK|BLOCK|B\.?LK|8LK)\.?\s*\d+[A-Z]?\s*(?:LOT|L0T)\.?\s*\d+[A-Z]?|(?:LOT|L0T)\.?\s*\d+[A-Z]?\s*(?:BLK|BLOCK|B\.?LK)\.?\s*\d+[A-Z]?|(?:BLK|BLOCK|B\.?LK)\.?\s*\d+[A-Z]?|(?:LOT|L0T)\.?\s*\d+[A-Z]?)\b'
-    m = _re.search(blk_lot_re, s, _re.I)
-    if m:
-        block_lot = _re.sub(r'8LK|B\.?LK', 'BLK', m.group(1), flags=_re.I)
-        block_lot = _re.sub(r'L0T', 'LOT', block_lot, flags=_re.I)
-        block_lot = block_lot.upper().strip()
-        s = (s[:m.start()] + ' ' + s[m.end():]).strip()
-
-    # 5. Leading house number (only if no block/lot)
-    if not block_lot:
-        m = _re.match(r'^(#?\d+[-\u2013\/]?[A-Za-z]?)\s', s)
-        if m:
-            house_no = m.group(1).lstrip('#')
-            s = s[m.end():].strip()
-
-    # 6. Extract Street (by suffix keyword)
-    street_re = r'\b((?:[A-Za-z0-9#\.\-]+\s+)*(?:[A-Za-z0-9#\.\-]+)\s+(?:STREET|ST\.?|AVENUE|AVE\.?|ROAD|RD\.?|BOULEVARD|BLVD\.?|DRIVE|DR\.?|LANE|LN\.?|HIGHWAY|HWY\.?|EXTENSION|EXT\.?|LOOP|WALK|WAY|CIRCLE|CIR\.?))\b'
-    m = _re.search(street_re, s, _re.I)
-    if m:
-        street = m.group(1).strip().title()
-        s = (s[:m.start()] + ' ' + s[m.end():]).strip()
-
-    # 7. Extract Subdivision / Village (after street extraction)
-    subdiv_re = r'\b((?:[A-Za-z0-9#\.\-]+\s+)*(?:[A-Za-z0-9#\.\-]+\s+)?(?:HOMES?(?:\s+\d+[A-Z]?)?|VILLAGE|VILL(?:AGE)?\.?|HEIGHTS?|SUBD(?:\.?|IVISION)?|SUBDIVISION|VILLE|ESTATE|PARK(?:\s+\d+)?|PLACE|COURT(?:\s+\d+)?|NORTHVILLE(?:\s+[A-Z0-9]+[A-Z]?)?|FAIRVIEW|TOWNVILLE|RESIDENCES?|COMPOUND|ROYALE|PALMS?|GARDENS?|GROVE|HILLS?))\b'
-    m = _re.search(subdiv_re, s, _re.I)
-    if m:
-        subdivision = m.group(1).strip().title()
-        s = (s[:m.start()] + ' ' + s[m.end():]).strip()
-        s = _re.sub(r'\s{2,}', ' ', s)
-
-    # 8. Remainder -> street fallback if still empty
-    s = _re.sub(r'[,\/\s]+$', '', s).lstrip(', ').strip()
-    if not street and s:
-        street = s.title().strip()
-
+    ai_hint = {'barangay': barangay} if barangay else {}
+    res = split_address_components(raw, ai_hint)
     return {
-        'house_no':    house_no,
-        'block_lot':   block_lot,
-        'subdivision': subdivision,
-        'street':      street,
+        'house_no':    res.get('house_no', ''),
+        'block_lot':   res.get('block_lot', ''),
+        'subdivision': res.get('subdivision', ''),
+        'street':      res.get('street', ''),
     }
 
 # ---------------------------------------------------------------------------
@@ -988,9 +919,9 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
     final_unit = split_res.get('unit', '')
     final_building = split_res.get('building', '')
     final_house_no = split_res.get('house_no', '')
-    final_block_lot = split_res.get('block_lot', '') or (llm_extracted.get('block_lot', '') if llm_extracted else '')
-    final_subdiv = split_res.get('subdivision', '') or (llm_extracted.get('subdivision', '') if llm_extracted else '')
-    final_street = split_res.get('street', '') or (llm_extracted.get('street', '') if llm_extracted else '')
+    final_block_lot = split_res.get('block_lot', '')
+    final_subdiv = split_res.get('subdivision', '')
+    final_street = split_res.get('street', '')
     final_building_village = split_res.get('building_village', '')
     address_parse = split_res.get('address_parse', {})
 

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Megaphone, 
@@ -138,6 +139,25 @@ export default function CityUpdatesSection() {
     return () => clearInterval(timer);
   }, [isPaused, totalPages]);
 
+  // Lock body scroll and notify components (e.g. ScrollToTop) when updates modal is active
+  useEffect(() => {
+    if (selectedUpdate || viewAllModalOpen) {
+      document.body.style.overflow = 'hidden';
+      window.dispatchEvent(new CustomEvent('pulso:updates-modal-active', { detail: { active: true } }));
+      document.body.setAttribute('data-updates-modal-active', 'true');
+    } else {
+      document.body.style.overflow = '';
+      window.dispatchEvent(new CustomEvent('pulso:updates-modal-active', { detail: { active: false } }));
+      document.body.removeAttribute('data-updates-modal-active');
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      window.dispatchEvent(new CustomEvent('pulso:updates-modal-active', { detail: { active: false } }));
+      document.body.removeAttribute('data-updates-modal-active');
+    };
+  }, [selectedUpdate, viewAllModalOpen]);
+
   const startIndex = currentPage * itemsPerPage;
   const visibleCards = UPDATES_DATA.slice(startIndex, startIndex + itemsPerPage);
 
@@ -145,14 +165,14 @@ export default function CityUpdatesSection() {
     <section
       id="city-updates"
       aria-label="City Updates Slideshow"
-      className="py-10 sm:py-14 bg-white dark:bg-[#070a12] border-b border-slate-200/90 dark:border-slate-800 transition-colors scroll-mt-[73px]"
+      className="pt-2 pb-8 sm:pt-6 sm:pb-12 lg:py-14 bg-white dark:bg-[#070a12] border-b border-slate-200/90 dark:border-slate-800 transition-colors scroll-mt-[56px] sm:scroll-mt-[64px] lg:scroll-mt-[73px]"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
       <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         
         {/* Section Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 mb-4 sm:mb-8">
           
           {/* Left: Title + Subtitle */}
           <div className="text-left">
@@ -199,16 +219,16 @@ export default function CityUpdatesSection() {
             <ChevronRight size={20} />
           </button>
 
-          {/* 4 Minimalist Update Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+          {/* 4 Minimalist Update Cards Grid (2 rows on mobile, 4 columns on desktop) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
             {visibleCards.map((card) => (
               <div
                 key={card.id}
                 onClick={() => setSelectedUpdate(card)}
-                className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200 group flex flex-col text-left cursor-pointer"
+                className="rounded-xl sm:rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200 group flex flex-col text-left cursor-pointer"
               >
                 {/* Top Image Container */}
-                <div className="h-40 sm:h-44 w-full relative overflow-hidden bg-slate-100 dark:bg-slate-800">
+                <div className="h-28 sm:h-36 lg:h-44 w-full relative overflow-hidden bg-slate-100 dark:bg-slate-800">
                   <img
                     src={card.image}
                     alt={card.title}
@@ -220,24 +240,24 @@ export default function CityUpdatesSection() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
 
                   {/* Top-Left Date Badge: Light in light mode, dark in dark mode */}
-                  <div className="absolute top-3 left-3 bg-white/95 dark:bg-[#0a192f]/90 text-slate-800 dark:text-white border border-slate-200/90 dark:border-white/10 backdrop-blur-md text-[11px] font-mono-data font-bold px-2.5 py-1 rounded-md tracking-wider uppercase shadow-sm">
+                  <div className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-white/95 dark:bg-[#0a192f]/90 text-slate-800 dark:text-white border border-slate-200/90 dark:border-white/10 backdrop-blur-md text-[9px] sm:text-[11px] font-mono-data font-bold px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded sm:rounded-md tracking-wider uppercase shadow-xs">
                     {card.date}
                   </div>
 
                   {/* Bottom-Left Category Pill */}
-                  <div className={`absolute bottom-3 left-3 text-[10px] font-mono-data font-black uppercase px-2.5 py-1 rounded-md shadow-xs tracking-wider ${card.categoryColor}`}>
+                  <div className={`absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[8px] sm:text-[10px] font-mono-data font-black uppercase px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded sm:rounded-md shadow-xs tracking-wider ${card.categoryColor}`}>
                     {card.category}
                   </div>
                 </div>
 
                 {/* Bottom Body: Title & Arrow */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3 flex-1 bg-white dark:bg-slate-900">
-                  <h3 className="font-heading font-bold text-sm sm:text-[15px] text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors leading-snug line-clamp-2">
+                <div className="p-2.5 sm:p-4 lg:p-5 flex items-center justify-between gap-2 sm:gap-3 flex-1 bg-white dark:bg-slate-900">
+                  <h3 className="font-heading font-bold text-xs sm:text-[15px] text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors leading-snug line-clamp-2">
                     {card.title}
                   </h3>
                   
-                  <div className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 group-hover:bg-orange-50 dark:group-hover:bg-orange-950/40 transition-colors">
-                    <ArrowRight size={15} className="text-slate-400 dark:text-slate-500 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all" />
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-md sm:rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 group-hover:bg-orange-50 dark:group-hover:bg-orange-950/40 transition-colors">
+                    <ArrowRight size={14} className="text-slate-400 dark:text-slate-500 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </div>
               </div>
@@ -268,22 +288,28 @@ export default function CityUpdatesSection() {
 
       </div>
 
-      {/* Single Bulletin Detail Modal */}
+      {/* Single Bulletin Detail Modal (Bottom panel on mobile, centered modal on desktop) */}
       {selectedUpdate && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
+          onClick={() => setSelectedUpdate(null)}
         >
-          <div className="relative w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-8 text-left max-h-[90vh] overflow-y-auto">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-xl rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 shadow-2xl p-5 sm:p-8 text-left max-h-[88vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-300 sm:duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95"
+          >
+            {/* Mobile Drag Indicator Handle */}
+            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mx-auto mb-4 sm:hidden" />
             
             <button
               type="button"
               onClick={() => setSelectedUpdate(null)}
-              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="absolute top-4 right-4 sm:top-5 sm:right-5 z-30 p-2 rounded-full bg-white/95 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 shadow-md backdrop-blur-md transition-all cursor-pointer border border-slate-200/80 dark:border-white/10"
               aria-label="Close modal"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
 
             {/* Modal Image */}
@@ -314,35 +340,41 @@ export default function CityUpdatesSection() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3">
+            <div className="flex items-center justify-end gap-2.5 sm:gap-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0">
               <button
                 type="button"
                 onClick={() => setSelectedUpdate(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-heading font-bold text-xs cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-heading font-bold text-xs cursor-pointer shrink-0 transition-colors"
               >
                 Close
               </button>
-              <a
-                href="/report"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-white font-heading font-bold text-xs shadow-xs cursor-pointer"
+              <Link
+                to="/report"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-white font-heading font-bold text-xs shadow-xs cursor-pointer transition-colors"
               >
                 <span>Report an Issue in this Area</span>
                 <ArrowRight size={14} />
-              </a>
+              </Link>
             </div>
 
           </div>
         </div>
       )}
 
-      {/* View All Updates Modal */}
+      {/* View All Updates Modal (Bottom panel on mobile, centered modal on desktop) */}
       {viewAllModalOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
+          onClick={() => setViewAllModalOpen(false)}
         >
-          <div className="relative w-full max-w-4xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-8 text-left max-h-[90vh] flex flex-col">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-4xl rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 shadow-2xl p-5 sm:p-8 text-left max-h-[88vh] sm:max-h-[90vh] flex flex-col animate-in slide-in-from-bottom duration-300 sm:duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95"
+          >
+            {/* Mobile Drag Indicator Handle */}
+            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mx-auto mb-4 sm:hidden" />
             
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
               <div className="flex items-center gap-2.5">

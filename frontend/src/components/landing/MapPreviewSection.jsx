@@ -13,6 +13,8 @@ import {
   Zap,
   Route as RoadIcon,
   Search,
+  SlidersHorizontal,
+  ListFilter,
   ExternalLink,
   ZoomIn,
   ZoomOut,
@@ -166,14 +168,28 @@ const getMarkerSVG = (category, status, isSelected = false) => {
 };
 
 const ISSUE_CATEGORIES = [
-  { id: 'all', label: 'All Repairs' },
-  { id: 'road', label: 'Roads & Bridges' },
-  { id: 'water', label: 'Water & Drainage' },
-  { id: 'power', label: 'Streetlights & Power' },
-  { id: 'facilities', label: 'Public Facilities' },
-  { id: 'safety', label: 'Public Safety & Hazards' },
-  { id: 'traffic', label: 'Traffic & Road Signs' },
+  { id: 'all', label: 'All categories' },
+  { id: 'road', label: 'Roads & bridges' },
+  { id: 'water', label: 'Water & drainage' },
+  { id: 'power', label: 'Streetlights & power' },
+  { id: 'facilities', label: 'Public facilities' },
+  { id: 'safety', label: 'Public safety & hazards' },
+  { id: 'traffic', label: 'Traffic & road signs' },
 ];
+
+const MAP_VIEW_OPTIONS = [
+  { id: 'pins', label: 'Report pins' },
+  { id: 'heatmap', label: 'Barangay heatmap' },
+  { id: 'density', label: 'Density gradient' },
+  { id: 'both', label: 'Heatmap + pins' },
+];
+
+const MAP_VIEW_LABELS = {
+  pins: 'Report pins',
+  heatmap: 'Barangay heatmap',
+  density: 'Density gradient',
+  both: 'Heatmap + pins',
+};
 
 const getCategoryIcon = (group, category = '') => {
   const g = (group || '').toLowerCase();
@@ -189,8 +205,8 @@ const getCategoryIcon = (group, category = '') => {
 const DISTRICT_OPTIONS = [
   {
     id: 'all',
-    label: 'All 188 Barangays',
-    shortLabel: 'All 188 Barangays',
+    label: 'All barangays',
+    shortLabel: 'All barangays',
     badge: '188 Brgys',
     icon: Layers,
     description: 'Citywide Caloocan (North & South)',
@@ -219,7 +235,7 @@ export default function MapPreviewSection() {
   const [districtFilter, setDistrictFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isDistrictOpen, setIsDistrictOpen] = useState(false);
-  const [mapViewMode, setMapViewMode] = useState('heatmap'); // 'heatmap' | 'density' | 'pins' | 'both'
+  const [mapViewMode, setMapViewMode] = useState('pins'); // 'heatmap' | 'density' | 'pins' | 'both'
   const [hoveredBarangay, setHoveredBarangay] = useState(null);
   const [selectedBarangay, setSelectedBarangay] = useState(null);
 
@@ -238,6 +254,29 @@ export default function MapPreviewSection() {
   const [currentZoom, setCurrentZoom] = useState(11);
 
   const districtDropdownRef = useRef(null);
+  const districtDropdownMobileRef = useRef(null);
+  const mapViewDropdownRef = useRef(null);
+  const [isMapViewOpen, setIsMapViewOpen] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [draftCategory, setDraftCategory] = useState(activeCategory);
+  const [draftViewMode, setDraftViewMode] = useState(mapViewMode);
+
+  const handleOpenFilterSheet = () => {
+    setDraftCategory(activeCategory);
+    setDraftViewMode(mapViewMode);
+    setIsFilterSheetOpen(true);
+  };
+
+  const handleApplyFilters = () => {
+    setActiveCategory(draftCategory);
+    setMapViewMode(draftViewMode);
+    setIsFilterSheetOpen(false);
+  };
+
+  const handleResetFilters = () => {
+    setDraftCategory('all');
+    setDraftViewMode('pins');
+  };
   const mapRef = useRef(null);
 
   const isDarkMode =
@@ -608,13 +647,40 @@ export default function MapPreviewSection() {
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (districtDropdownRef.current && !districtDropdownRef.current.contains(event.target)) {
+      const isInsideDesktop = districtDropdownRef.current && districtDropdownRef.current.contains(event.target);
+      const isInsideMobile = districtDropdownMobileRef.current && districtDropdownMobileRef.current.contains(event.target);
+      if (!isInsideDesktop && !isInsideMobile) {
         setIsDistrictOpen(false);
+      }
+      if (mapViewDropdownRef.current && !mapViewDropdownRef.current.contains(event.target)) {
+        setIsMapViewOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isFilterSheetOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsFilterSheetOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    const origOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    if (typeof document !== 'undefined') {
+      document.body.setAttribute('data-updates-modal-active', 'true');
+      window.dispatchEvent(new CustomEvent('pulso:updates-modal-active', { detail: { active: true } }));
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = origOverflow;
+      if (typeof document !== 'undefined') {
+        document.body.removeAttribute('data-updates-modal-active');
+        window.dispatchEvent(new CustomEvent('pulso:updates-modal-active', { detail: { active: false } }));
+      }
+    };
+  }, [isFilterSheetOpen]);
 
   // Filter the live reports based on category, district, search, and selected barangay
   const filteredReports = useMemo(() => {
@@ -688,25 +754,165 @@ export default function MapPreviewSection() {
     >
       <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         
-        {/* Section Header */}
+        {/* Section Header (Community map) */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-3 sm:mb-4">
           <div className="max-w-2xl text-left">
-            <h2 className="font-heading font-extrabold text-2xl sm:text-3xl md:text-4xl text-slate-900 dark:text-white">
-              Live utility repairs across Caloocan
+            <h2 className="font-heading font-black text-2xl sm:text-3xl md:text-4xl text-slate-900 dark:text-white tracking-tight">
+              Community map
             </h2>
             <p
               id="map-content"
-              className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1.5 scroll-mt-[76px]"
+              className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 scroll-mt-[76px]"
             >
-              Authoritative civic map displaying verified municipal reports, active roadworks, and density concentration across all 188 Caloocan barangays directly from the database.
+              Explore reports across Caloocan City
             </p>
           </div>
         </div>
 
-        {/* Filter & View Mode Controls Bar */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mb-3.5 sm:mb-4">
+        {/* ── MOBILE CONTROLS (Rendered on mobile < lg) ────────────────── */}
+        <div className="flex flex-col gap-2.5 sm:gap-3 mb-3.5 sm:mb-4 max-w-xl lg:hidden">
+          {/* Row 1: Search reports or places */}
+          <div className="relative w-full">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search reports or places"
+              className="w-full pl-10 pr-9 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ff6b00] shadow-2xs transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Row 2: All barangays dropdown */}
+          <div className="relative w-full" ref={districtDropdownMobileRef}>
+            <button
+              type="button"
+              onClick={() => setIsDistrictOpen(!isDistrictOpen)}
+              className="w-full flex items-center justify-between px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 transition-all text-left cursor-pointer"
+            >
+              <span className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                {selectedDistrict.label}
+              </span>
+              <ChevronDown
+                size={16}
+                className={`text-slate-400 transition-transform duration-200 shrink-0 ml-2 ${
+                  isDistrictOpen ? 'rotate-180 text-[#ff6b00]' : ''
+                }`}
+              />
+            </button>
+
+            {isDistrictOpen && (
+              <div
+                role="listbox"
+                className="absolute left-0 top-full mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 p-1.5 animate-fadeIn"
+              >
+                {DISTRICT_OPTIONS.map((opt) => {
+                  const isSelected = districtFilter === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setDistrictFilter(opt.id);
+                        setIsDistrictOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-left transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00]'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex flex-col">
+                        <span>{opt.label}</span>
+                        <span className="text-[10px] text-slate-400 font-normal">{opt.description}</span>
+                      </div>
+                      {isSelected && <Check size={14} className="text-[#ff6b00]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Row 3: Map view & Filters side by side */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Map view dropdown */}
+            <div className="relative flex-1" ref={mapViewDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsMapViewOpen(!isMapViewOpen)}
+                className="w-full flex items-center justify-between px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <span className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white whitespace-nowrap">
+                    Map view
+                  </span>
+                  <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 truncate">
+                    {MAP_VIEW_LABELS[mapViewMode] || 'Report pins'}
+                  </span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`text-slate-400 transition-transform duration-200 shrink-0 ml-2 ${
+                    isMapViewOpen ? 'rotate-180 text-[#ff6b00]' : ''
+                  }`}
+                />
+              </button>
+
+              {isMapViewOpen && (
+                <div className="absolute left-0 top-full mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 p-1.5 animate-fadeIn">
+                  {MAP_VIEW_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setMapViewMode(opt.id);
+                        setIsMapViewOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-left transition-colors cursor-pointer ${
+                        mapViewMode === opt.id
+                          ? 'bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00]'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {mapViewMode === opt.id && <Check size={14} className="text-[#ff6b00]" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Filters Button */}
+            <button
+              type="button"
+              onClick={handleOpenFilterSheet}
+              className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs transition-all cursor-pointer shrink-0"
+            >
+              <ListFilter size={16} className="text-slate-700 dark:text-slate-300 stroke-[2.2]" />
+              <span className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                Filters
+              </span>
+              {activeCategory !== 'all' && (
+                <span className="w-2 h-2 rounded-full bg-[#ff6b00]" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* ── DESKTOP CONTROLS (Restored Previous Horizontal Design for Desktop lg+) ── */}
+        <div className="hidden lg:flex items-center justify-between gap-3 mb-3.5 sm:mb-4">
           
-          {/* Left: Category Filters + View Mode Switcher */}
+          {/* Left: View Mode Switcher + Category Filters */}
           <div className="flex flex-wrap items-center gap-2">
             
             {/* View Mode Switcher */}
@@ -714,7 +920,7 @@ export default function MapPreviewSection() {
               <button
                 type="button"
                 onClick={() => setMapViewMode('heatmap')}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-heading font-bold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition-all cursor-pointer ${
                   mapViewMode === 'heatmap'
                     ? 'bg-[#ff6b00] text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -728,7 +934,7 @@ export default function MapPreviewSection() {
               <button
                 type="button"
                 onClick={() => setMapViewMode('density')}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-heading font-bold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition-all cursor-pointer ${
                   mapViewMode === 'density'
                     ? 'bg-[#ff6b00] text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -742,7 +948,7 @@ export default function MapPreviewSection() {
               <button
                 type="button"
                 onClick={() => setMapViewMode('pins')}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-heading font-bold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition-all cursor-pointer ${
                   mapViewMode === 'pins'
                     ? 'bg-[#ff6b00] text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -756,7 +962,7 @@ export default function MapPreviewSection() {
               <button
                 type="button"
                 onClick={() => setMapViewMode('both')}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-heading font-bold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition-all cursor-pointer ${
                   mapViewMode === 'both'
                     ? 'bg-[#ff6b00] text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -775,7 +981,7 @@ export default function MapPreviewSection() {
                   key={cat.id}
                   type="button"
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                     activeCategory === cat.id
                       ? 'bg-[#ff6b00] text-white shadow-xs'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -787,17 +993,17 @@ export default function MapPreviewSection() {
             </div>
           </div>
 
-          {/* District & Search Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
+          {/* Right: District & Search Controls */}
+          <div className="flex items-center gap-2">
             {/* Custom Designed Civic District Filter Dropdown */}
-            <div className="relative w-full sm:w-auto" ref={districtDropdownRef}>
+            <div className="relative" ref={districtDropdownRef}>
               <button
                 type="button"
                 onClick={() => setIsDistrictOpen(!isDistrictOpen)}
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') setIsDistrictOpen(false);
                 }}
-                className={`w-full sm:w-auto flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-xl border transition-all text-xs font-semibold shadow-2xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
+                className={`flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-xl border transition-all text-xs font-semibold shadow-2xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] ${
                   isDistrictOpen
                     ? 'bg-white dark:bg-slate-800 border-[#ff6b00] ring-2 ring-orange-500/20 text-slate-900 dark:text-white'
                     : 'bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
@@ -824,7 +1030,7 @@ export default function MapPreviewSection() {
                 <div
                   role="listbox"
                   aria-label="Caloocan District Options"
-                  className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-full sm:w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 p-1.5 animate-in fade-in zoom-in-95 duration-150"
+                  className="absolute right-0 top-full mt-1.5 w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 p-1.5 animate-in fade-in zoom-in-95 duration-150"
                 >
                   <div className="px-2.5 py-1 text-[10px] font-mono-data font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800/80 mb-1 flex items-center justify-between">
                     <span>District Sector</span>
@@ -886,8 +1092,8 @@ export default function MapPreviewSection() {
               )}
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:w-auto min-w-0 sm:min-w-[200px]">
+            {/* Desktop Search Input */}
+            <div className="relative min-w-[220px]">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -1306,6 +1512,118 @@ export default function MapPreviewSection() {
         </div>
 
       </div>
+
+      {/* ── FILTER REPORTS BOTTOM SHEET (Matching User Reference Image 3) ── */}
+      {isFilterSheetOpen && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="filter-reports-title"
+          onClick={() => setIsFilterSheetOpen(false)}
+        >
+          <div
+            className="w-full sm:max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[85vh] animate-slideUp sm:animate-scaleIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Mobile Drag Handle */}
+            <div className="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto my-3 shrink-0" />
+
+            {/* Header: Title + Reset */}
+            <div className="px-5 pb-3 flex items-center justify-between shrink-0">
+              <h2 id="filter-reports-title" className="font-heading font-black text-xl text-slate-900 dark:text-white">
+                Filter reports
+              </h2>
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="text-[#ff6b00] hover:text-[#e65c00] font-heading font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+              >
+                Reset
+              </button>
+            </div>
+
+            {/* Content: Scrollable body */}
+            <div className="px-5 py-2 overflow-y-auto space-y-5">
+              {/* Show on map */}
+              <div>
+                <h3 className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white mb-2.5">
+                  Show on map
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {MAP_VIEW_OPTIONS.map((opt) => {
+                    const isSelected = draftViewMode === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setDraftViewMode(opt.id)}
+                        className={`p-3 rounded-xl border text-xs sm:text-sm font-semibold text-center transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-[#ff6b00] bg-orange-50/70 dark:bg-orange-950/30 text-[#ff6b00]'
+                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Report category */}
+              <div>
+                <h3 className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white mb-2.5">
+                  Report category
+                </h3>
+                <div className="space-y-1">
+                  {ISSUE_CATEGORIES.map((cat) => {
+                    const isSelected = draftCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        onClick={() => setDraftCategory(cat.id)}
+                        className="w-full flex items-center gap-3 py-2 px-1 text-left transition-colors cursor-pointer group"
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                            isSelected
+                              ? 'bg-[#ff6b00]'
+                              : 'border border-slate-300 dark:border-slate-600 group-hover:border-slate-400'
+                          }`}
+                        />
+                        <span
+                          className={`text-xs sm:text-sm ${
+                            isSelected
+                              ? 'font-bold text-slate-900 dark:text-white'
+                              : 'font-normal text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'
+                          }`}
+                        >
+                          {cat.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Apply filters button */}
+            <div className="p-4 pt-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+              <button
+                type="button"
+                onClick={handleApplyFilters}
+                className="w-full py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-sm shadow-md transition-all cursor-pointer"
+              >
+                Apply filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

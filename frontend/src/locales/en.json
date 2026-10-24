@@ -37,7 +37,7 @@
         "reportAnIssue": "Report an Issue",
         "track": "Track a Report",
         "trackReport": "Track a Report",
-        "map": "Live Map",
+        "map": "Community Map",
         "hotlines": "Hotlines",
         "login": "Sign In",
         "register": "Register",
@@ -281,8 +281,8 @@
         "review": "Review"
       },
       "step1Category": {
-        "title": "Select Issue Category",
-        "subtitle": "What kind of public infrastructure requires repair or inspection?",
+        "title": "What would you like to report?",
+        "subtitle": "Choose the category that best matches your concern.",
         "selectPlaceholder": "Choose category...",
         "categories": {
           "water_supply_distribution": {
@@ -322,13 +322,19 @@
             "desc": "Any civic infrastructure issue not listed above (please describe in detail in the next steps)"
           }
         },
-        "validationError": "Please select an infrastructure category to continue."
+        "validationError": "Please select an infrastructure category to continue.",
+        "eyebrow": "STEP 1 OF 6 / CATEGORY",
+        "emergencyNoticeTitle": "For non-emergency concerns",
+        "emergencyNoticeDesc": "If someone is in immediate danger, contact emergency services directly.",
+        "call911": "Call 911",
+        "callCDRRMO": "Call Caloocan CDRRMO",
+        "otherConcern": "Other concern"
       },
       "step2Location": {
-        "title": "Pin Incident Location",
-        "subtitle": "Point to the exact spot in Caloocan City where the issue is located.",
-        "searchPlaceholder": "Search street name, landmark, or barangay in Caloocan...",
-        "useMyLocation": "Use My Current GPS Location",
+        "title": "Where is the concern?",
+        "subtitle": "Search for a place, then adjust the pin to the right spot.",
+        "searchPlaceholder": "Street, landmark or barangay",
+        "useMyLocation": "Use my location",
         "locating": "Acquiring accurate GPS...",
         "locationSuccess": "GPS location tagged (accuracy: {{accuracy}}m)",
         "locationError": "Unable to acquire GPS. Please search or drag the pin manually.",
@@ -336,20 +342,26 @@
         "insideBoundary": "Verified within Caloocan City ({{district}})",
         "outsideBoundaryWarning": "Selected location is outside Caloocan City jurisdiction",
         "outsideBoundaryDesc": "PULSO can only dispatch work orders within Caloocan City borders. Please reposition the pin within city boundaries.",
-        "landmarkLabel": "Specific Landmark / Notes (Optional)",
-        "landmarkPlaceholder": "e.g. In front of Caloocan High School, beside Gate 2",
+        "landmarkLabel": "Nearby landmark (optional)",
+        "landmarkPlaceholder": "Add a gate, building or landmark",
         "barangayLabel": "Barangay / District",
         "coordinatesLabel": "GPS Coordinates",
         "listAlternative": "Need text mode? Enter address manually",
-        "validationError": "Please pin a location within Caloocan City boundaries to continue."
+        "validationError": "Please pin a location within Caloocan City boundaries to continue.",
+        "eyebrow": "STEP 2 OF 6 / LOCATION",
+        "searchLabel": "Search for an address or landmark",
+        "selectedLocationTitle": "Selected location",
+        "instruction": "Move the pin to the exact spot. Check the address before continuing.",
+        "emptySelected": "No place chosen yet. Search, or tap Use my location.",
+        "confirmStrip": "Confirm the pin marks the concern, rather than your current position."
       },
       "step3Evidence": {
-        "title": "Upload Photo Evidence",
-        "subtitle": "Clear photos help engineering teams assess materials and dispatch the correct equipment.",
+        "title": "Add photos of the concern",
+        "subtitle": "Clear photos help the team understand your report.",
         "dropzone": "Drag & drop photo here, or click to browse",
         "openCamera": "Take Photo with Camera",
         "chooseFile": "Select Image from Device",
-        "uploadLimits": "PNG, JPG, WebP up to 10MB per image",
+        "uploadLimits": "JPG, PNG or WebP · Up to 10 MB",
         "safetyWarningTitle": "Safety First",
         "safetyWarningDesc": "Never step into moving traffic or approach live electrical cables to take a photo.",
         "removePhoto": "Remove photo",
@@ -362,13 +374,25 @@
         "aiKeepSelected": "Keep Selected Category",
         "fileSizeError": "File size exceeds 10MB limit (Selected: {{size}}MB).",
         "fileTypeError": "Unsupported file format. Please upload JPEG, PNG, or WebP.",
-        "validationError": "Photo evidence is recommended. You may proceed or attach a photo."
+        "validationError": "Photo evidence is recommended. You may proceed or attach a photo.",
+        "eyebrow": "STEP 3 OF 6 / PHOTOS",
+        "safetyStrip": "Take photos only when it is safe. Keep a safe distance from traffic and other hazards.",
+        "uploadTitle": "Add photos to your report",
+        "uploadSubtitle": "Drag and drop, or select files from your device",
+        "choosePhotos": "Choose Photos",
+        "dropHere": "Drop your photos here",
+        "usefulPhotosTitle": "A useful photo shows",
+        "usefulPhoto1": "The concern clearly",
+        "usefulPhoto2": "The surrounding area",
+        "usefulPhoto3": "Enough detail to understand it",
+        "phoneTipTitle": "Using your phone?",
+        "phoneTipDesc": "You can take a photo directly using your device's camera."
       },
       "step4Details": {
-        "title": "Describe the Problem",
-        "subtitle": "Provide clear details on the size, duration, and safety hazard to help crews prepare.",
-        "descriptionLabel": "Detailed Description",
-        "descriptionPlaceholder": "Describe the hazard (e.g. Deep pothole in southbound lane causing vehicles to swerve into oncoming traffic. Has been worsening over the past 3 days)...",
+        "title": "Tell us what happened",
+        "subtitle": "Share the details that will help the team review your report.",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "What did you notice? When did it start?\nInclude any details that could help the team understand the concern.",
         "descriptionHelp": "{{current}} / 5000 characters (minimum 10 required)",
         "urgencyLabel": "Perceived Urgency",
         "urgencyOptions": {
@@ -382,11 +406,22 @@
         "duplicateViewBtn": "View Active Ticket",
         "duplicateAttachBtn": "Attach Evidence to Existing Report",
         "duplicateProceedBtn": "Continue Submitting as New Report",
-        "validationError": "Please provide a description of at least 10 characters."
+        "validationError": "Please provide a description of at least 10 characters.",
+        "eyebrow": "STEP 4 OF 6 / DETAILS",
+        "charLimitMin": "At least 10 characters",
+        "severityTitle": "How much is it affecting the area?",
+        "severitySubtitle": "Choose the closest option. The team will assess the report.",
+        "severityMinor": "Minor",
+        "severityMinorDesc": "Little disruption",
+        "severityModerate": "Moderate",
+        "severityModerateDesc": "Some disruption",
+        "severityHigh": "High",
+        "severityHighDesc": "Significant impact",
+        "immediateDangerStrip": "Immediate danger? Contact emergency services rather than submitting this form."
       },
       "step5Contact": {
-        "title": "Contact & Notification Preferences",
-        "subtitle": "Choose how you would like to receive progress updates for this report.",
+        "title": "How can we reach you?",
+        "subtitle": "Add a mobile number or email to receive updates.",
         "guestOption": {
           "title": "Anonymous Guest (No account required)",
           "desc": "No email or phone stored. You will receive a private tracking token to check status online."
@@ -400,18 +435,27 @@
           "desc": "Link this report directly to your resident dashboard for unified tracking."
         },
         "authenticatedBadge": "Submitting as Registered Resident: {{name}}",
-        "emailLabel": "Email Address",
-        "emailPlaceholder": "juan@example.com",
-        "phoneLabel": "Mobile Number",
-        "phonePlaceholder": "0917 123 4567",
+        "emailLabel": "Email address",
+        "emailPlaceholder": "you@example.com",
+        "phoneLabel": "Mobile number",
+        "phonePlaceholder": "09XX XXX XXXX",
         "privacyNotice": "Your contact information is protected under the Data Privacy Act of 2012 (RA 10173) and will never be shared on public boards.",
         "signInLink": "Already have an account? Sign in here",
         "validationEmailError": "Please enter a valid email address.",
-        "validationPhoneError": "Please enter a valid 11-digit Philippine mobile number (e.g. 0917 123 4567)."
+        "validationPhoneError": "Please enter a valid 11-digit Philippine mobile number (e.g. 0917 123 4567).",
+        "eyebrow": "STEP 5 OF 6 / CONTACT",
+        "oneRequiredTitle": "Only one contact method is required",
+        "oneRequiredDesc": "Use this contact detail with your tracking code to check your report later.",
+        "helperNote": "Provide either a mobile number or an email address. You can add both.",
+        "updatesHeading": "Report updates",
+        "updatesSubtitle": "Send me status updates using:",
+        "updatesCheckbox": "My provided contact details",
+        "privacyCardTitle": "Your contact details are private",
+        "privacyCardDesc": "They will not appear on the public report."
       },
       "step6Review": {
-        "title": "Review & Consent",
-        "subtitle": "Please verify your report details before submitting to the engineering queue.",
+        "title": "Review your report",
+        "subtitle": "Check the details before sending your report.",
         "sectionCategory": "Issue Category",
         "sectionLocation": "Location & Coordinates",
         "sectionEvidence": "Evidence Attached",
@@ -423,7 +467,24 @@
         "notifyReporter": "SMS / Email Alerts ({{contact}})",
         "consentCheckbox": "I declare that the information provided in this report is true and accurate. I understand that submitting false or malicious emergency reports is prohibited under Philippine law.",
         "privacyStatement": "Photos and location data will be used solely for city infrastructure inspection and repair. Personal contact info is never published on public boards.",
-        "validationConsentError": "You must certify the truthfulness of your report before submitting."
+        "validationConsentError": "You must certify the truthfulness of your report before submitting.",
+        "eyebrow": "STEP 6 OF 6 / REVIEW",
+        "summaryTitle": "Report summary",
+        "rowCategory": "CATEGORY",
+        "rowLocation": "LOCATION",
+        "rowLandmark": "LANDMARK",
+        "rowSeverity": "SEVERITY",
+        "rowDescription": "DESCRIPTION",
+        "rowPhotos": "PHOTOS",
+        "rowContact": "CONTACT",
+        "rowUpdates": "UPDATES",
+        "showMore": "Show full description",
+        "showLess": "Show less",
+        "edit": "Edit",
+        "mapPreviewTitle": "Location preview",
+        "photoAttachmentsTitle": "Attached photos",
+        "trackingNotice": "You will receive a tracking code immediately after submitting to check progress anytime.",
+        "confirmAccuracy": "I confirm that this report is accurate to the best of my knowledge and follows the City of Caloocan reporting guidelines."
       },
       "step7Submitting": {
         "title": "Submitting Your Report",
@@ -434,6 +495,17 @@
         "errorTitle": "Submission Failed",
         "errorDesc": "We encountered an issue transmitting your report. Your draft has been saved.",
         "retryBtn": "Retry Submission"
+      },
+      "shell": {
+        "newReport": "NEW REPORT",
+        "reportAConcern": "Report a concern",
+        "privacyTitle": "Your information stays private",
+        "privacyDesc": "Contact details help us follow up and are not shown on public reports.",
+        "notSubmittedYet": "Your report has not been submitted yet.",
+        "reviewBeforeSubmit": "Review your details carefully before submitting.",
+        "submitReport": "Submit Report",
+        "continue": "Continue",
+        "back": "Back"
       }
     },
     "receipt": {

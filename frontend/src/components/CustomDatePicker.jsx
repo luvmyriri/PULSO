@@ -467,7 +467,7 @@ export default function CustomDatePicker({
                 onClick={() => setIsOpen(prev => !prev)}
                 aria-haspopup="dialog"
                 aria-expanded={isOpen}
-                className={`w-full bg-white dark:bg-slate-800/80 border text-left rounded-[14px] px-4 text-base flex items-center justify-between transition-all cursor-pointer min-h-[50px] h-[52px] ${
+                className={`w-full bg-white dark:bg-slate-800/80 border text-left rounded-[14px] px-3.5 sm:px-4 flex items-center justify-between gap-2 overflow-hidden transition-all cursor-pointer min-h-[50px] h-[52px] ${
                     error
                         ? 'border-red-500 ring-1 ring-red-500'
                         : isOpen
@@ -475,10 +475,10 @@ export default function CustomDatePicker({
                             : 'border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 focus:ring-2 focus:ring-orange-500'
                 }`}
             >
-                <span className={selectedDate ? 'text-black dark:text-white font-medium text-base' : 'text-black/60 dark:text-white/60 italic text-base'}>
+                <span className={`whitespace-nowrap truncate text-sm sm:text-base ${selectedDate ? 'text-black dark:text-white font-medium' : 'text-black/60 dark:text-white/60 italic'}`}>
                     {selectedDate ? formatDisplay(selectedDate) : placeholder}
                 </span>
-                <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-slate-400 dark:text-slate-500 shrink-0">
                     {selectedDate && (
                         <span
                             onClick={handleClear}

@@ -1,6 +1,7 @@
+import { Link } from 'react-router-dom';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, PhoneCall, Mail, MapPin, ExternalLink, ArrowUp, QrCode } from 'lucide-react';
+import { ShieldCheck, PhoneCall, Mail, MapPin, ExternalLink, QrCode } from 'lucide-react';
 import Branding from '../Branding';
 import { isInstalledApp } from '../../utils/appContext';
 
@@ -13,10 +14,6 @@ import { isInstalledApp } from '../../utils/appContext';
  */
 export default function CivicFooter({ onOpenLegalModal, onOpenPwaModal }) {
   const { t } = useTranslation();
-
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   return (
     <footer
@@ -66,14 +63,14 @@ export default function CivicFooter({ onOpenLegalModal, onOpenPwaModal }) {
             </h4>
             <ul className="space-y-1.5 text-xs">
               <li>
-                <a href="/login" className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium">
+                <Link to="/login" className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium">
                   Resident Sign In
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/register" className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium">
+                <Link to="/register" className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium">
                   Citizen Registration
-                </a>
+                </Link>
               </li>
               <li>
                 <a href="/gov" className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium flex items-center gap-1">
@@ -162,15 +159,7 @@ export default function CivicFooter({ onOpenLegalModal, onOpenPwaModal }) {
             >
               Citizen&apos;s Charter
             </button>
-            <button
-              type="button"
-              onClick={scrollToTop}
-              className="inline-flex items-center gap-1 text-slate-400 hover:text-white transition-colors cursor-pointer ml-2"
-              title="Back to Top"
-            >
-              <span>Back to top</span>
-              <ArrowUp size={13} />
-            </button>
+
           </div>
         </div>
 

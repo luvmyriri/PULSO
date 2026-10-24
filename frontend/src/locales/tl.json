@@ -37,7 +37,7 @@
         "reportAnIssue": "Mag-ulat ng Isyu",
         "track": "Subaybayan",
         "trackReport": "Sundan ang Ulat",
-        "map": "Live na Mapa",
+        "map": "Mapa ng Komunidad",
         "hotlines": "Mga Hotline",
         "login": "Mag-sign In",
         "register": "Mag-rehistro",
@@ -278,8 +278,8 @@
         "review": "Pagsusuri"
       },
       "step1Category": {
-        "title": "Pumili ng Kategorya ng Problema",
-        "subtitle": "Anong uri ng pampublikong imprastraktura ang nangangailangan ng kumpuni o inspeksyon?",
+        "title": "Ano ang nais mong i-ulat?",
+        "subtitle": "Piliin ang kategoryang pinakaangkop sa iyong inilalapit.",
         "selectPlaceholder": "Pumili ng kategorya...",
         "categories": {
           "water_supply_distribution": {
@@ -319,13 +319,19 @@
             "desc": "Iba pang pampublikong imprastraktura na wala sa listahan (kailangan ng detalye)"
           }
         },
-        "validationError": "Pumili ng kategorya upang magpatuloy."
+        "validationError": "Pumili ng kategorya upang magpatuloy.",
+        "eyebrow": "HAKBANG 1 NG 6 / KATEGORYA",
+        "emergencyNoticeTitle": "Para sa mga hindi emergency na usapin",
+        "emergencyNoticeDesc": "Kung mayroong agarang panganib sa buhay o kaligtasan, direktang tumawag sa emergency services.",
+        "call911": "Tumawag sa 911",
+        "callCDRRMO": "Tumawag sa Caloocan CDRRMO",
+        "otherConcern": "Iba pang usapin"
       },
       "step2Location": {
-        "title": "Ituro ang Lokasyon ng Problema",
-        "subtitle": "Ituro ang eksaktong lugar sa Lungsod ng Caloocan kung saan naroroon ang problema.",
-        "searchPlaceholder": "Maghanap ng kalsada, landmark, o barangay sa Caloocan...",
-        "useMyLocation": "Gamitin ang Aking Kasalukuyang GPS",
+        "title": "Nasaan ang problema?",
+        "subtitle": "Maghanap ng lugar, pagkatapos ay itama ang pin sa eksaktong pwesto.",
+        "searchPlaceholder": "Kalye, palatandaan, o barangay",
+        "useMyLocation": "Gamitin ang aking lokasyon",
         "locating": "Kinukuha ang eksaktong GPS...",
         "locationSuccess": "Nai-tag ang lokasyon ng GPS (katumpakan: {{accuracy}}m)",
         "locationError": "Hindi makuha ang GPS. Mangyaring maghanap o i-drag ang pin.",
@@ -333,20 +339,26 @@
         "insideBoundary": "Kumpirmadong sakop ng Lungsod ng Caloocan ({{district}})",
         "outsideBoundaryWarning": "Ang napiling lokasyon ay nasa labas ng Caloocan",
         "outsideBoundaryDesc": "Ang PULSO ay maaari lamang magpadala ng repair crew sa loob ng Caloocan. Pakilipat ang pin sa loob ng lungsod.",
-        "landmarkLabel": "Palatandaan o Reperensya sa Kalsada (Opsyonal)",
-        "landmarkPlaceholder": "hal. Sa tapat ng Caloocan High School, malapit sa Gate 2",
+        "landmarkLabel": "Malapit na palatandaan (opsyonal)",
+        "landmarkPlaceholder": "Maglagay ng gate, gusali, o palatandaan",
         "barangayLabel": "Barangay / Distrito",
         "coordinatesLabel": "Mga Coordinate ng GPS",
         "listAlternative": "Kailangan ng text mode? Ilagay ang address nang manu-mano",
-        "validationError": "Mangyaring maglagay ng pin sa loob ng Caloocan City upang magpatuloy."
+        "validationError": "Mangyaring maglagay ng pin sa loob ng Caloocan City upang magpatuloy.",
+        "eyebrow": "HAKBANG 2 NG 6 / LOKASYON",
+        "searchLabel": "Maghanap ng address o palatandaan",
+        "selectedLocationTitle": "Napiling lokasyon",
+        "instruction": "Ilipat ang pin sa eksaktong lugar. Suriin ang address bago magpatuloy.",
+        "emptySelected": "Wala pang napipiling lugar. Maghanap, o pindutin ang Gamitin ang aking lokasyon.",
+        "confirmStrip": "Tiyaking tinutukoy ng pin ang lokasyon ng problema, hindi ang iyong kasalukuyang kinatatayuan."
       },
       "step3Evidence": {
-        "title": "Mag-upload ng Litrato Bilang Ebidensya",
-        "subtitle": "Ang malinaw na litrato ay tumutulong sa mga inhinyero na ihanda ang tamang gamit bago pumunta.",
+        "title": "Maglakip ng mga larawan ng problema",
+        "subtitle": "Ang malilinaw na larawan ay tumutulong sa aming team na maunawaan ang ulat.",
         "dropzone": "I-drag at i-drop ang litrato rito, o i-click upang pumili",
         "openCamera": "Kumuha ng Litrato Gamit ang Camera",
         "chooseFile": "Pumili ng Litrato Mula sa Device",
-        "uploadLimits": "PNG, JPG, WebP hanggang 10MB bawat litrato",
+        "uploadLimits": "JPG, PNG o WebP · Hanggang 10 MB",
         "safetyWarningTitle": "Kaligtasan ang Una",
         "safetyWarningDesc": "Huwag tatapak sa gitna ng umaandar na trapiko o lalapit sa sirang kable ng kuryente para lang kumuha ng litrato.",
         "removePhoto": "Alisin ang litrato",
@@ -359,13 +371,25 @@
         "aiKeepSelected": "Panatilihin ang Napiling Kategorya",
         "fileSizeError": "Lumagpas sa 10MB limit ang laki ng file (Sukat: {{size}}MB).",
         "fileTypeError": "Hindi suportadong format. Mag-upload ng JPEG, PNG, o WebP.",
-        "validationError": "Inirerekomenda ang litrato. Maaari kang magpatuloy o mag-attach ng litrato."
+        "validationError": "Inirerekomenda ang litrato. Maaari kang magpatuloy o mag-attach ng litrato.",
+        "eyebrow": "HAKBANG 3 NG 6 / MGA LARAWAN",
+        "safetyStrip": "Kumuha lamang ng litrato kapag ligtas. Manatili sa ligtas na distansya mula sa mga sasakyan at iba pang panganib.",
+        "uploadTitle": "Magdagdag ng mga larawan sa iyong ulat",
+        "uploadSubtitle": "I-drag at i-drop, o pumili ng file mula sa iyong device",
+        "choosePhotos": "Pumili ng Larawan",
+        "dropHere": "I-drop dito ang iyong mga larawan",
+        "usefulPhotosTitle": "Ang isang kapaki-pakinabang na litrato ay nagpapakita ng",
+        "usefulPhoto1": "Malinaw na anyo ng problema",
+        "usefulPhoto2": "Ang nakapaligid na lugar",
+        "usefulPhoto3": "Sapat na detalye upang maunawaan ito",
+        "phoneTipTitle": "Gamit ba ang iyong telepono?",
+        "phoneTipDesc": "Maaari kang direktang kumuha ng litrato gamit ang camera ng iyong telepono."
       },
       "step4Details": {
-        "title": "Ilarawan ang Problema",
-        "subtitle": "Magbigay ng malinaw na impormasyon sa laki, tagal, at panganib upang maihanda ng mga inhinyero ang kagamitan.",
-        "descriptionLabel": "Detalyadong Paglalarawan",
-        "descriptionPlaceholder": "Ilarawan ang sira (hal. Malalim na lubak sa northbound lane na nagdudulot ng panganib sa mga motorista. Lumala sa nakaraang 3 araw)...",
+        "title": "Ikwento sa amin ang nangyari",
+        "subtitle": "Ibahagi ang mga detalyeng makakatulong sa aming team na suriin ang iyong ulat.",
+        "descriptionLabel": "Paglalarawan",
+        "descriptionPlaceholder": "Ano ang iyong napansin? Kailan ito nagsimula?\nMaglagay ng anumang detalyeng makatutulong sa team upang mas maunawaan ang usapin.",
         "descriptionHelp": "{{current}} / 5000 titik (kailangan ng hindi bababa sa 10)",
         "urgencyLabel": "Tinatayang Antas ng Urgency",
         "urgencyOptions": {
@@ -379,11 +403,22 @@
         "duplicateViewBtn": "Tingnan ang Aktibong Ticket",
         "duplicateAttachBtn": "Isama ang Ebidensya sa Naunang Ulat",
         "duplicateProceedBtn": "Magpatuloy sa Pagsumite Bilang Bagong Ulat",
-        "validationError": "Maglagay ng paglalarawan na may hindi bababa sa 10 titik."
+        "validationError": "Maglagay ng paglalarawan na may hindi bababa sa 10 titik.",
+        "eyebrow": "HAKBANG 4 NG 6 / MGA DETALYE",
+        "charLimitMin": "Kahit man lang 10 karakter",
+        "severityTitle": "Gaano kalaki ang epekto nito sa lugar?",
+        "severitySubtitle": "Piliin ang pinakamalapit na opsyon. Susuriin ito ng aming technical team.",
+        "severityMinor": "Maliit",
+        "severityMinorDesc": "Bahagyang abala lamang",
+        "severityModerate": "Katamtaman",
+        "severityModerateDesc": "May kapansin-pansing abala",
+        "severityHigh": "Mataas",
+        "severityHighDesc": "Malaking epekto o panganib",
+        "immediateDangerStrip": "May agarang panganib? Makipag-ugnayan agad sa emergency services sa halip na isumite ang form na ito."
       },
       "step5Contact": {
-        "title": "Paraan ng Pakikipag-ugnayan at Notipikasyon",
-        "subtitle": "Pumili kung paano mo nais makatanggap ng mga update sa progreso ng ulat.",
+        "title": "Paano ka namin makokontak?",
+        "subtitle": "Maglagay ng numero ng telepono o email para makatanggap ng updates.",
         "guestOption": {
           "title": "Hindi Kilalang Bisita / Anonymous (Walang kailangang account)",
           "desc": "Walang kailangang email o telepono. Makakatanggap ka ng pribadong tracking token sa susunod na screen."
@@ -397,18 +432,27 @@
           "desc": "Iugnay ang ulat na ito sa iyong resident dashboard para sa madaling pagsubaybay."
         },
         "authenticatedBadge": "Isinusumite bilang Rehistradong Residente: {{name}}",
-        "emailLabel": "Email Address",
-        "emailPlaceholder": "juan@halimbawa.com",
-        "phoneLabel": "Numero ng Cellphone",
-        "phonePlaceholder": "0917 123 4567",
+        "emailLabel": "Email address",
+        "emailPlaceholder": "ikaw@halimbawa.com",
+        "phoneLabel": "Numero ng mobile",
+        "phonePlaceholder": "09XX XXX XXXX",
         "privacyNotice": "Ang iyong impormasyon sa pakikipag-ugnayan ay protektado sa ilalim ng Data Privacy Act of 2012 (RA 10173) at hindi kailanman ilalabas sa publiko.",
         "signInLink": "May account na? Mag-sign in dito",
         "validationEmailError": "Maglagay ng wastong email address.",
-        "validationPhoneError": "Maglagay ng wastong 11-digit na numero ng mobile sa Pilipinas (hal. 0917 123 4567)."
+        "validationPhoneError": "Maglagay ng wastong 11-digit na numero ng mobile sa Pilipinas (hal. 0917 123 4567).",
+        "eyebrow": "HAKBANG 5 NG 6 / KONTAK",
+        "oneRequiredTitle": "Kailangan lamang ng isang paraan ng pakikipag-ugnayan",
+        "oneRequiredDesc": "Gamitin ang impormasyong ito kasama ng iyong tracking code upang masubaybayan ang iyong ulat sa hinaharap.",
+        "helperNote": "Magbigay ng numero ng mobile o email address. Maaari mo ring ilagay pareho.",
+        "updatesHeading": "Mga update sa ulat",
+        "updatesSubtitle": "Padalhan ako ng status updates gamit ang:",
+        "updatesCheckbox": "Ang aking ibinigay na contact details",
+        "privacyCardTitle": "Pribado ang iyong impormasyon",
+        "privacyCardDesc": "Hindi ito lalabas sa pampublikong ulat."
       },
       "step6Review": {
-        "title": "Pagsusuri at Pahintulot",
-        "subtitle": "Pakisuri ang mga detalye ng iyong ulat bago ito opisyal na isumite sa engineering queue.",
+        "title": "Suriin ang iyong ulat",
+        "subtitle": "Tiyakin ang mga detalye bago ipadala ang iyong ulat.",
         "sectionCategory": "Kategorya ng Problema",
         "sectionLocation": "Lokasyon at Coordinate",
         "sectionEvidence": "Kalakip na Ebidensya",
@@ -420,7 +464,24 @@
         "notifyReporter": "Alerto sa SMS / Email ({{contact}})",
         "consentCheckbox": "Pinatutunayan ko na ang impormasyong ibinigay sa ulat na ito ay totoo at tumpak. Nauunawaan ko na ang pagsumite ng maling ulat ay ipinagbabawal sa ilalim ng batas.",
         "privacyStatement": "Ang litrato at lokasyon ay gagamitin lamang para sa pagsasaayos ng imprastraktura ng Lungsod ng Caloocan.",
-        "validationConsentError": "Kailangan mong patunayan ang katumpakan ng iyong ulat bago magsumite."
+        "validationConsentError": "Kailangan mong patunayan ang katumpakan ng iyong ulat bago magsumite.",
+        "eyebrow": "HAKBANG 6 NG 6 / PAGSUSURI",
+        "summaryTitle": "Buod ng ulat",
+        "rowCategory": "KATEGORYA",
+        "rowLocation": "LOKASYON",
+        "rowLandmark": "PALATANDAAN",
+        "rowSeverity": "BIGAT NG PROBLEMA",
+        "rowDescription": "PAGLALARAWAN",
+        "rowPhotos": "MGA LARAWAN",
+        "rowContact": "KONTAK",
+        "rowUpdates": "MGA UPDATE",
+        "showMore": "Ipakita ang buong paglalarawan",
+        "showLess": "Ipakita nang maikli",
+        "edit": "Baguhin",
+        "mapPreviewTitle": "Silip sa lokasyon",
+        "photoAttachmentsTitle": "Mga nakalakip na larawan",
+        "trackingNotice": "Agad kang makatatanggap ng tracking code matapos magsumite upang masubaybayan ang progreso anumang oras.",
+        "confirmAccuracy": "Pinapatunayan ko na ang ulat na ito ay totoo at tumpak ayon sa abot ng aking kaalaman at sumusunod sa mga panuntunan ng Lungsod ng Caloocan."
       },
       "step7Submitting": {
         "title": "Isinusumite ang Iyong Ulat",
@@ -431,6 +492,17 @@
         "errorTitle": "Nabigo ang Pagsumite",
         "errorDesc": "Nagkaroon ng problema sa pagpapadala ng iyong ulat. Naka-save ang iyong draft.",
         "retryBtn": "Subukang Isumite Muli"
+      },
+      "shell": {
+        "newReport": "BAGONG ULAT",
+        "reportAConcern": "Mag-ulat ng problema",
+        "privacyTitle": "Mananatiling pribado ang iyong impormasyon",
+        "privacyDesc": "Ginagamit lamang ang impormasyon sa pakikipag-ugnayan upang mag-follow up at hindi ito ipinapakita sa publiko.",
+        "notSubmittedYet": "Hindi pa naipapadala ang iyong ulat.",
+        "reviewBeforeSubmit": "Suriing mabuti ang iyong mga detalye bago ipadala.",
+        "submitReport": "Ipadala ang Ulat",
+        "continue": "Magpatuloy",
+        "back": "Bumalik"
       }
     },
     "receipt": {
