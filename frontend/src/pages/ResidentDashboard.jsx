@@ -3539,7 +3539,7 @@ const ProfileView = ({
                                                             onChange={(e) => setTempValues({ ...tempValues, phone: e.target.value })}
                                                             autoFocus
                                                             className="flex-1 bg-white dark:bg-slate-900 border border-orange-500 rounded-xl px-4 py-2.5 font-mono text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none ring-2 ring-orange-500/20"
-                                                            placeholder="e.g. 09171234567"
+                                                            placeholder="e.g. 09XXXXXXXXX"
                                                         />
                                                         <button
                                                             onClick={() => handleSaveField('phone')}

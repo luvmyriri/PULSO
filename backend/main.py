@@ -62,13 +62,25 @@ import admin_router                      # Staff, Residents, Settings & Governan
 from services.spatial_service import PUBLIC_REPORT_STATUSES
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
-from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter
+from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter, availability_check_limiter
+from utils.contact_normalizer import normalize_email, normalize_phone_number, mask_email, mask_phone_number
 
 app = FastAPI(
     title="pulso-backend",
     description="City services platform for North Caloocan citizens.",
     version="2.0.0"
 )
+
+@app.on_event("startup")
+def on_startup():
+    """Ensure database schema has newly added columns without crashing if alembic was not run."""
+    try:
+        from sqlalchemy import text
+        with database.engine.begin() as conn:
+            conn.execute(text("ALTER TABLE residents ADD COLUMN IF NOT EXISTS normalized_email VARCHAR NULL"))
+            conn.execute(text("ALTER TABLE residents ADD COLUMN IF NOT EXISTS normalized_phone_number VARCHAR NULL"))
+    except Exception as e:
+        logging.warning(f"[DB Startup] Schema compatibility check: {e}")
 
 # ---------------------------------------------------------------------------
 # Static File Serving (for report images & assets)
@@ -708,7 +720,29 @@ async def google_complete_verification(
     if req.full_name:
         resident.full_name = req.full_name.strip()
     if req.phone_number:
-        resident.phone_number = req.phone_number.strip()
+        clean_phone = req.phone_number.strip()
+        norm_phone = normalize_phone_number(clean_phone)
+        if norm_phone:
+            # Check for conflict against other verified residents
+            phone_conflict = db.query(models.Resident).filter(
+                models.Resident.id != resident.id,
+                models.Resident.is_verified == True,
+                or_(
+                    models.Resident.normalized_phone_number == norm_phone,
+                    models.Resident.phone_number == clean_phone,
+                    models.Resident.phone_number == norm_phone
+                )
+            ).first()
+            if phone_conflict:
+                raise HTTPException(
+                    status_code=400,
+                    detail="This mobile number is already registered by another account. Please use a different number."
+                )
+            resident.normalized_phone_number = norm_phone
+        resident.phone_number = clean_phone
+
+    if not getattr(resident, "normalized_email", None):
+        resident.normalized_email = normalize_email(resident.email)
     if req.address:
         resident.address = req.address.strip()
 
@@ -802,10 +836,109 @@ def format_resident_name(full_name: Optional[str]) -> str:
     return name
 
 
+class CheckAvailabilityRequest(BaseModel):
+    email: Optional[str] = None
+    mobile: Optional[str] = None
+
+
+@app.post("/api/auth/check-availability")
+async def check_availability(
+    req: CheckAvailabilityRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Real-time pre-check endpoint for Step 4 of Resident Registration.
+    Checks whether the given email or mobile number is already registered by a verified account.
+    Excludes abandoned unverified registrations older than 10 minutes.
+    """
+    availability_check_limiter.check(request)
+    
+    email_available = True
+    email_message = ""
+    mobile_available = True
+    mobile_message = ""
+
+    # 1. Email check
+    if req.email:
+        raw_email = req.email.strip()
+        norm_email = normalize_email(raw_email)
+        if norm_email:
+            try:
+                verified_res = db.query(models.Resident).filter(
+                    models.Resident.is_verified == True,
+                    or_(
+                        models.Resident.normalized_email == norm_email,
+                        func.lower(models.Resident.email) == norm_email
+                    )
+                ).first()
+            except Exception:
+                db.rollback()
+                verified_res = db.query(models.Resident).filter(
+                    models.Resident.is_verified == True,
+                    func.lower(models.Resident.email) == norm_email
+                ).first()
+            
+            official = None
+            if hasattr(models, "Official"):
+                official = db.query(models.Official).filter(
+                    func.lower(models.Official.email) == norm_email
+                ).first()
+
+            if verified_res or official:
+                email_available = False
+                email_message = "This email is already registered. Try logging in, or use a different email."
+
+    # 2. Mobile check
+    if req.mobile:
+        raw_phone = req.mobile.strip()
+        norm_phone = normalize_phone_number(raw_phone)
+        if norm_phone:
+            try:
+                verified_res_phone = db.query(models.Resident).filter(
+                    models.Resident.is_verified == True,
+                    or_(
+                        models.Resident.normalized_phone_number == norm_phone,
+                        models.Resident.phone_number == raw_phone,
+                        models.Resident.phone_number == norm_phone
+                    )
+                ).first()
+            except Exception:
+                db.rollback()
+                verified_res_phone = db.query(models.Resident).filter(
+                    models.Resident.is_verified == True,
+                    or_(
+                        models.Resident.phone_number == norm_phone,
+                        models.Resident.phone_number == raw_phone
+                    )
+                ).first()
+
+            official_phone = None
+            if hasattr(models, "Official") and hasattr(models.Official, "phone_number"):
+                official_phone = db.query(models.Official).filter(
+                    models.Official.phone_number == norm_phone
+                ).first()
+
+            if verified_res_phone or official_phone:
+                mobile_available = False
+                mobile_message = "This mobile number is already registered. Try logging in, or use a different number."
+
+    return {
+        "email_available": email_available,
+        "email_message": email_message,
+        "mobile_available": mobile_available,
+        "mobile_message": mobile_message
+    }
+
+
 @app.post("/api/auth/register", response_model=schemas.ResidentResponse)
-def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
+def register_user(user: schemas.ResidentCreate, request: Request, db: Session = Depends(get_db)):
+    auth_limiter.check(request)
+    
     # Enforce lowercase and remove trailing spaces added by mobile keyboards
-    user.email = user.email.strip().lower()
+    raw_email = user.email.strip().lower()
+    user.email = raw_email
+    norm_email = normalize_email(raw_email)
 
     # STRICT EMAIL VALIDATION: Reject place-holders or obvious fake emails
     import re
@@ -818,15 +951,81 @@ def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
     if any(domain in user.email for domain in blocked_domains):
         raise HTTPException(status_code=400, detail="Please use a valid, official email account.")
 
-    db_user = crud.get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
+    raw_phone = getattr(user, "phone_number", None)
+    clean_phone = raw_phone.strip() if raw_phone else None
+    norm_phone = normalize_phone_number(clean_phone) if clean_phone else None
+
+    # Check for duplicate verified email
+    try:
+        verified_email_res = db.query(models.Resident).filter(
+            models.Resident.is_verified == True,
+            or_(
+                models.Resident.normalized_email == norm_email,
+                func.lower(models.Resident.email) == norm_email,
+                func.lower(models.Resident.email) == raw_email
+            )
+        ).first()
+    except Exception:
+        db.rollback()
+        verified_email_res = db.query(models.Resident).filter(
+            models.Resident.is_verified == True,
+            func.lower(models.Resident.email) == norm_email
+        ).first()
+
+    if verified_email_res:
+        raise HTTPException(
+            status_code=400,
+            detail="This email is already registered. Try logging in, or use a different email."
+        )
+
+    # Check for duplicate verified mobile
+    if norm_phone:
+        try:
+            verified_phone_res = db.query(models.Resident).filter(
+                models.Resident.is_verified == True,
+                or_(
+                    models.Resident.normalized_phone_number == norm_phone,
+                    models.Resident.phone_number == norm_phone,
+                    models.Resident.phone_number == clean_phone
+                )
+            ).first()
+        except Exception:
+            db.rollback()
+            verified_phone_res = db.query(models.Resident).filter(
+                models.Resident.is_verified == True,
+                or_(
+                    models.Resident.phone_number == norm_phone,
+                    models.Resident.phone_number == clean_phone
+                )
+            ).first()
+
+        if verified_phone_res:
+            raise HTTPException(
+                status_code=400,
+                detail="This mobile number is already registered. Try logging in, or use a different number."
+            )
+
+    # Check for existing unverified registration with this email to reuse/update in-place
+    try:
+        existing_unverified = db.query(models.Resident).filter(
+            models.Resident.is_verified == False,
+            or_(
+                models.Resident.normalized_email == norm_email,
+                func.lower(models.Resident.email) == raw_email
+            )
+        ).first()
+    except Exception:
+        db.rollback()
+        existing_unverified = db.query(models.Resident).filter(
+            models.Resident.is_verified == False,
+            func.lower(models.Resident.email) == raw_email
+        ).first()
+
     # Generate 6-digit code
     code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
     
     user_data = user.model_dump()
-    user_data["password"] = auth.get_password_hash(user_data["password"])
+    hashed_password = auth.get_password_hash(user_data["password"])
     
     # Remove 'barangay' which is a property with no setter to prevent AttributeError
     brgy_str = user_data.pop("barangay", None)
@@ -850,43 +1049,82 @@ def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
     else:
         kyc_level = "Bronze (Self-Signed)"
 
-    # Create user as unverified (awaiting OTP verification)
-    new_user = models.Resident(
-        **{k: v for k, v in user_data.items() if k != "password"},
-        password_hash=user_data["password"],
-        verification_code=code,
-        kyc_level=kyc_level,
-        is_verified=False
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    if existing_unverified:
+        # Update existing unverified registration in-place
+        for k, v in user_data.items():
+            if k != "password" and hasattr(existing_unverified, k):
+                setattr(existing_unverified, k, v)
+        existing_unverified.password_hash = hashed_password
+        existing_unverified.verification_code = code
+        existing_unverified.kyc_level = kyc_level
+        try:
+            existing_unverified.normalized_email = norm_email
+            existing_unverified.normalized_phone_number = norm_phone
+        except Exception:
+            pass
+        existing_unverified.created_at = datetime.now(timezone.utc)
+        target_user = existing_unverified
+        try:
+            db.commit()
+            db.refresh(target_user)
+        except Exception:
+            db.rollback()
+            # If normalized column failed on commit, clear them
+            existing_unverified.normalized_email = None
+            existing_unverified.normalized_phone_number = None
+            db.commit()
+            db.refresh(target_user)
+    else:
+        # Create user as unverified (awaiting OTP verification)
+        base_kwargs = {k: v for k, v in user_data.items() if k != "password"}
+        base_kwargs.update({
+            "password_hash": hashed_password,
+            "verification_code": code,
+            "kyc_level": kyc_level,
+            "is_verified": False,
+        })
+        try:
+            new_user = models.Resident(
+                **base_kwargs,
+                normalized_email=norm_email,
+                normalized_phone_number=norm_phone
+            )
+            db.add(new_user)
+            db.commit()
+            target_user = new_user
+            db.refresh(target_user)
+        except Exception:
+            db.rollback()
+            # Fallback without normalized columns
+            new_user = models.Resident(**base_kwargs)
+            db.add(new_user)
+            db.commit()
+            target_user = new_user
+            db.refresh(target_user)
     
     ref_id = f"PC-{random.randint(10000, 99999)}"
-    greeting_name = format_resident_name(new_user.full_name)
+    greeting_name = format_resident_name(target_user.full_name)
 
     # Send email
-    if not send_otp_email(new_user.email, code, "Verification", ref_id=ref_id, name=greeting_name):
-        # We created the user, but couldn't send the email.
-        # In a real system, you might want to rollback, but let's at least tell the user.
+    if not send_otp_email(target_user.email, code, "Verification", ref_id=ref_id, name=greeting_name):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User created but failed to send verification email. Please use 'Resend Code' on the login screen."
+            detail="User created but failed to send verification email. Please use 'Resend Code' on the verification screen."
         )
     
     # Also dispatch SMS OTP with personalized First + Last name greeting if phone number exists
-    if getattr(new_user, "phone_number", None):
+    if getattr(target_user, "phone_number", None):
         try:
             sms_text = (
                 f"Hello {greeting_name}, your PULSO Caloocan registration verification code: {code}. "
                 f"Valid for 10 minutes. Do not share this code with anyone. Ref: {ref_id}."
             )
-            sms_res = sms_utils.send_plain_sms(new_user.phone_number, sms_text)
-            print(f"[SMS] Dispatched registration OTP to {new_user.phone_number} for {greeting_name}: {sms_res.accepted}")
+            sms_res = sms_utils.send_plain_sms(target_user.phone_number, sms_text)
+            print(f"[SMS] Dispatched registration OTP to {mask_phone_number(target_user.phone_number)}: {sms_res.accepted}")
         except Exception as sms_err:
             print(f"[SMS ERROR] Failed to dispatch registration OTP: {sms_err}")
 
-    return new_user
+    return target_user
 
 
 
@@ -987,21 +1225,56 @@ async def login(
     }
 
 @app.post("/api/auth/verify-registration")
+@app.post("/api/auth/verify-code")
 def verify_registration(req: VerificationRequest, db: Session = Depends(get_db)):
-    email = req.email.strip().lower()
-    user = crud.get_user_by_email(db, email=email)
+    raw_email = req.email.strip().lower()
+    norm_email = normalize_email(raw_email)
+    user = db.query(models.Resident).filter(
+        or_(
+            models.Resident.normalized_email == norm_email,
+            func.lower(models.Resident.email) == raw_email
+        )
+    ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
     # Clean the code (remove spaces if user copied "552 108")
     cleaned_code = req.code.replace(" ", "") if req.code else ""
     
-    # REMOVED 123456 bypass for production-grade security synchronization
     if user.verification_code != cleaned_code:
         raise HTTPException(status_code=400, detail="Incorrect code. Please check and try again.")
         
+    # Guard: check if another verified resident exists with same normalized_email or normalized_phone_number
+    conflict_email = db.query(models.Resident).filter(
+        models.Resident.id != user.id,
+        models.Resident.is_verified == True,
+        or_(
+            models.Resident.normalized_email == (user.normalized_email or norm_email),
+            func.lower(models.Resident.email) == raw_email
+        )
+    ).first()
+    if conflict_email:
+        raise HTTPException(status_code=400, detail="This email is already registered and verified by another account.")
+
+    if getattr(user, "normalized_phone_number", None) or getattr(user, "phone_number", None):
+        user_norm_phone = user.normalized_phone_number or normalize_phone_number(user.phone_number)
+        conflict_phone = db.query(models.Resident).filter(
+            models.Resident.id != user.id,
+            models.Resident.is_verified == True,
+            or_(
+                models.Resident.normalized_phone_number == user_norm_phone,
+                models.Resident.phone_number == user.phone_number
+            )
+        ).first()
+        if conflict_phone:
+            raise HTTPException(status_code=400, detail="This mobile number is already registered and verified by another account.")
+
     user.is_verified = True
     user.verification_code = None  # Clear the code after use
+    if not user.normalized_email:
+        user.normalized_email = norm_email
+    if not user.normalized_phone_number and getattr(user, "phone_number", None):
+        user.normalized_phone_number = normalize_phone_number(user.phone_number)
     db.commit()
 
     # Also dispatch SMS notification that account has been verified
@@ -1014,7 +1287,7 @@ def verify_registration(req: VerificationRequest, db: Session = Depends(get_db))
                 f"You may now log in to submit civic reports and access city services. Ref: {ref_id}."
             )
             sms_res = sms_utils.send_plain_sms(user.phone_number, sms_text)
-            print(f"[SMS] Dispatched account verified SMS to {user.phone_number} for {greeting_name}: {sms_res.accepted}")
+            print(f"[SMS] Dispatched account verified SMS to {mask_phone_number(user.phone_number)}: {sms_res.accepted}")
         except Exception as sms_err:
             print(f"[SMS ERROR] Failed to dispatch account verified SMS: {sms_err}")
 
@@ -1022,8 +1295,14 @@ def verify_registration(req: VerificationRequest, db: Session = Depends(get_db))
 
 @app.post("/api/auth/resend-code")
 def resend_code(req: VerificationRequest, db: Session = Depends(get_db)):
-    email = req.email.strip().lower()
-    user = crud.get_user_by_email(db, email=email)
+    raw_email = req.email.strip().lower()
+    norm_email = normalize_email(raw_email)
+    user = db.query(models.Resident).filter(
+        or_(
+            models.Resident.normalized_email == norm_email,
+            func.lower(models.Resident.email) == raw_email
+        )
+    ).first()
     if not user or user.role != "resident":
         raise HTTPException(status_code=404, detail="Resident account not found")
         

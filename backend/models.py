@@ -85,12 +85,14 @@ class Resident(Base):
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, index=True)
     email = Column(String, unique=True, index=True)
+    normalized_email = Column(String, index=True, nullable=True)
     password_hash = Column(String)
     
     address = Column(String, nullable=True)
     barangay_id = Column(Integer, ForeignKey("barangays.id"), nullable=True, index=True)
     district_id = Column(Integer, ForeignKey("districts.id"), nullable=True, index=True)
     phone_number = Column(String, nullable=True)
+    normalized_phone_number = Column(String, index=True, nullable=True)
     
     # Citizen-specific features
     trust_score = Column(Integer, default=100)

@@ -8,6 +8,30 @@ export const APPEARANCE_OPTIONS = [
     { id: 'dark', label: 'Dark' },
 ];
 
+/**
+ * Temporarily disables all CSS transitions during theme switching.
+ * Prevents sluggish intermediate rendering, color fading delays, and visual lag.
+ */
+const disableTransitions = () => {
+    if (typeof document === 'undefined') return () => {};
+    const css = document.createElement('style');
+    css.appendChild(
+        document.createTextNode(
+            `*,*::before,*::after{-webkit-transition:none!important;-moz-transition:none!important;-o-transition:none!important;-ms-transition:none!important;transition:none!important}`
+        )
+    );
+    document.head.appendChild(css);
+    return () => {
+        // Force browser layout reflow so new theme styles apply instantaneously
+        (() => window.getComputedStyle(document.body))();
+        setTimeout(() => {
+            if (css.parentNode) {
+                document.head.removeChild(css);
+            }
+        }, 1);
+    };
+};
+
 export function ThemeProvider({ children }) {
     // Check localStorage, migrate 'system' or initialize from prefers-color-scheme once on first launch
     const [theme, setTheme] = useState(() => {
@@ -52,11 +76,12 @@ export function ThemeProvider({ children }) {
     }, [theme, updateStatusBarColor]);
 
     const changeTheme = (newTheme) => {
+        const enableTransitions = disableTransitions();
         const resolvedTheme = newTheme === 'light' ? 'light' : 'dark';
         const root = window.document.documentElement;
         const activeDark = resolvedTheme === 'dark';
 
-        // Synchronously switch root classes and attributes immediately (no transition delay or lag)
+        // Synchronously switch root classes and attributes immediately (no transition delay, color lag, or muddy rendering)
         root.classList.remove('theme-transitioning');
         root.classList.remove('light', 'dark');
         root.classList.add(activeDark ? 'dark' : 'light');
@@ -66,6 +91,8 @@ export function ThemeProvider({ children }) {
         setTheme(resolvedTheme);
         localStorage.setItem('pulso_theme', resolvedTheme);
         localStorage.setItem('theme', resolvedTheme);
+
+        enableTransitions();
     };
 
     return (

@@ -33,7 +33,7 @@ export default function ThemeToggle({ size = 15, className = "", singleIcon = fa
                     onClick={handleDirectToggle}
                     aria-label={isDarkActive ? 'Switch to light mode' : 'Switch to dark mode'}
                     title={isDarkActive ? 'Switch to light mode' : 'Switch to dark mode'}
-                    className="flex items-center justify-center w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-[#ff6b00] shadow-2xs transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] active:scale-95"
+                    className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-[#ff6b00] shadow-2xs transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] active:scale-95"
                 >
                     {isDarkActive ? (
                         <Moon size={size} className="text-[#ff6b00]" />

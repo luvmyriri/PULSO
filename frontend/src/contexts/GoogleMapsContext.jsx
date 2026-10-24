@@ -13,8 +13,17 @@ const GoogleMapsContext = createContext({ isLoaded: false, loadError: null });
 export function GoogleMapsProvider({ children }) {
     const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
+    // Safeguard: isLoaded must be strictly true only when window.google.maps.Map is a valid constructor
+    const isActuallyLoaded = Boolean(
+        isLoaded &&
+        typeof window !== 'undefined' &&
+        window.google &&
+        window.google.maps &&
+        typeof window.google.maps.Map === 'function'
+    );
+
     return (
-        <GoogleMapsContext.Provider value={{ isLoaded, loadError }}>
+        <GoogleMapsContext.Provider value={{ isLoaded: isActuallyLoaded, rawLoaded: isLoaded, loadError }}>
             {children}
         </GoogleMapsContext.Provider>
     );
@@ -27,11 +36,20 @@ export function useGoogleMaps() {
     const context = useContext(GoogleMapsContext);
     if (!context) {
         return {
-            isLoaded: typeof window !== 'undefined' && Boolean(window.google?.maps),
+            isLoaded: typeof window !== 'undefined' && typeof window.google?.maps?.Map === 'function',
             loadError: null,
         };
     }
-    return context;
+    return {
+        ...context,
+        isLoaded: Boolean(
+            context.isLoaded &&
+            typeof window !== 'undefined' &&
+            window.google &&
+            window.google.maps &&
+            typeof window.google.maps.Map === 'function'
+        ),
+    };
 }
 
 export default GoogleMapsContext;

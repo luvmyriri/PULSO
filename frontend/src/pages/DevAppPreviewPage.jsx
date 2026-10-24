@@ -2435,23 +2435,25 @@ export default function DevAppPreviewPage() {
               )}
 
               {/* CASE G: Nearby Issues Fullscreen Map & Draggable Bottom Sheet */}
-              <div className={`relative w-full h-full overflow-hidden ${previewTarget === 'map' ? 'block' : 'hidden'}`}>
-                <NearbyIssuesMapModal
-                  isOpen={true}
-                  standalone={true}
-                  theme={previewIsDark ? 'dark' : 'light'}
-                  reports={SAMPLE_MAP_REPORTS}
-                  reportLocation={mapSimulateLocation ? { lat: 14.7566, lng: 121.0450 } : null}
-                  locationPermissionDenied={!mapSimulateLocation}
-                  initialSheetPosition={mapSheetPosition}
-                  onClose={() => {
-                    addLog('Back button tapped in Nearby Issues Map.');
-                  }}
-                  onOpenReportDetail={(report) => {
-                    addLog(`Opened details for report: ${report.title}`);
-                  }}
-                />
-              </div>
+              {previewTarget === 'map' && (
+                <div className="relative w-full h-full overflow-hidden block">
+                  <NearbyIssuesMapModal
+                    isOpen={true}
+                    standalone={true}
+                    theme={previewIsDark ? 'dark' : 'light'}
+                    reports={SAMPLE_MAP_REPORTS}
+                    reportLocation={mapSimulateLocation ? { lat: 14.7566, lng: 121.0450 } : null}
+                    locationPermissionDenied={!mapSimulateLocation}
+                    initialSheetPosition={mapSheetPosition}
+                    onClose={() => {
+                      addLog('Back button tapped in Nearby Issues Map.');
+                    }}
+                    onOpenReportDetail={(report) => {
+                      addLog(`Opened details for report: ${report.title}`);
+                    }}
+                  />
+                </div>
+              )}
 
               {/* CASE G2: Map Report Popup Direct Showcase (Pin + Tether + Bottom Card) */}
               {previewTarget === 'popup' && (

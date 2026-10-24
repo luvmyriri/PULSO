@@ -1,3 +1,4 @@
+from address_splitter import split_address_components
 """
 ocr_service.py — Philippine ID OCR & Residency Verification
 Supports all 9 major Philippine government-issued IDs.
@@ -981,22 +982,19 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
     residency_text = f"{upper_text}\n{address}".upper()
     is_nc, msg = verify_caloocan_residency(residency_text, barangay)
 
-    # Priority: AI > Regex Fallback
-    # If the AI produces an output (even an empty string), we explicitly respect it.
-    if llm_extracted:
-        final_house_no  = llm_extracted.get('house_no', '')
-        final_block_lot = llm_extracted.get('block_lot', '')
-        final_subdiv    = llm_extracted.get('subdivision', '')
-        final_street    = llm_extracted.get('street', '')
-    else:
-        # Fallback to Regex modular parser only if AI crashed or fully yielded
-        addr_parts = parse_address_components(address, barangay)
-        final_house_no  = addr_parts['house_no']
-        final_block_lot = addr_parts['block_lot']
-        final_subdiv    = addr_parts['subdivision']
-        final_street    = addr_parts['street']
+    # Priority: AI + Deterministic Address Splitter Check
+    # Run deterministic splitter on full address and AI extraction
+    split_res = split_address_components(address, llm_extracted or {})
+    final_unit = split_res.get('unit', '')
+    final_building = split_res.get('building', '')
+    final_house_no = split_res.get('house_no', '')
+    final_block_lot = split_res.get('block_lot', '') or (llm_extracted.get('block_lot', '') if llm_extracted else '')
+    final_subdiv = split_res.get('subdivision', '') or (llm_extracted.get('subdivision', '') if llm_extracted else '')
+    final_street = split_res.get('street', '') or (llm_extracted.get('street', '') if llm_extracted else '')
+    final_building_village = split_res.get('building_village', '')
+    address_parse = split_res.get('address_parse', {})
 
-    print(f"[OCR] Address Components: house_no='{final_house_no}' | block_lot='{final_block_lot}' | subdivision='{final_subdiv}' | street='{final_street}'")
+    print(f"[OCR] Address Components: unit='{final_unit}' | building='{final_building}' | house_no='{final_house_no}' | block_lot='{final_block_lot}' | subdivision='{final_subdiv}' | street='{final_street}' | building_village='{final_building_village}'")
 
     # 6. ID Number Resolution and Template Validation
     raw_id_num = ""
@@ -1026,6 +1024,10 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
     # Get user-friendly label
     id_label = tmpl.get('label') if tmpl else ID_TYPE_LABELS.get(id_type, 'Unknown Document')
 
+    field_conf = dict(llm_extracted.get('field_confidences', {})) if llm_extracted else {}
+    if address_parse and 'confidences' in address_parse:
+        field_conf.update(address_parse['confidences'])
+
     res = {
         'id_type':              id_type,
         'id_type_label':        id_label,
@@ -1035,7 +1037,7 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
         'id_format_hint':       format_hint,
         'trust_tier':           trust_tier,
         'requires_manual_review': requires_manual_review,
-        'field_confidences':    llm_extracted.get('field_confidences', {}) if llm_extracted else {},
+        'field_confidences':    field_conf,
         'first_name':           first_name,
         'last_name':            last_name,
         'middle_name':          middle_name,
@@ -1043,10 +1045,15 @@ def extract_id_details(front_text: str, back_text: str = "", front_image: bytes 
         'dob':                  dob,
         'sex':                  sex,
         'address':              address,
+        'unit':                 final_unit,
+        'building':             final_building,
         'house_no':             final_house_no,
         'block_lot':            final_block_lot,
         'subdivision':          final_subdiv,
+        'village':              final_subdiv,
         'street':               final_street,
+        'building_village':     final_building_village,
+        'address_parse':        address_parse,
         'barangay':             barangay,
         'postal_code':          postal_code,
         'is_north_caloocan':    is_nc,

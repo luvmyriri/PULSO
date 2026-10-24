@@ -108,3 +108,9 @@ auth_limiter = SlidingWindowRateLimiter(
     window_seconds=60,   # 1 minute
     error_detail="Too many authentication attempts. Please try again in 1 minute."
 )
+
+availability_check_limiter = SlidingWindowRateLimiter(
+    max_requests=120,
+    window_seconds=60,
+    error_detail="Too many check attempts. Please slow down."
+)

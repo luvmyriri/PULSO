@@ -564,6 +564,8 @@ Extract into a JSON object with these exact fields:
   "dob": "",
   "sex": "",
   "address": "",
+  "unit": "",
+  "building": "",
   "house_no": "",
   "block_lot": "",
   "subdivision": "",
@@ -585,7 +587,12 @@ Extract into a JSON object with these exact fields:
     "first_name": "high",
     "last_name": "high",
     "dob": "high",
-    "address": "high"
+    "address": "high",
+    "house_no": "high",
+    "building": "high",
+    "subdivision": "high",
+    "street": "high",
+    "barangay": "high"
   }}
 }}
 
@@ -639,10 +646,14 @@ Intelligence Rules (STRICT ZERO TOLERANCE FOR ERROR):
 6. PHILIPPINE ADDRESS & NAME INTELLIGENCE:
    - Names: Separate into first_name, middle_name, last_name, suffix.
    - Birthdate: Must be YYYY-MM-DD.
-   - house_no: House / Unit / Lot number.
-   - block_lot: Block and Lot if specified (e.g. "BLK 15 LOT 11").
-   - subdivision: Phase / Package / Subdivision name (e.g. "PH8A PKG14").
-   - barangay: Exact number for Caloocan (e.g. "176") or name. Priority: numeric string without "Barangay" prefix.
+   - unit: Unit, room or floor (e.g. "UNIT 224", "RM 5B", "3RD FLOOR").
+   - building: Building name or identifier (e.g. "BLDG. D", "BUILDING 7").
+   - house_no: House or unit number ONLY without building (e.g. "UNIT 224", "12").
+   - block_lot: Block and Lot if specified (e.g. "BLK 15 LOT 11", "PHASE 1").
+   - subdivision: Village, subdivision, condominium or residence name (e.g. "CAMARIN RESIDENCES I", "NORTHVILLE 2B", "PH8A PKG14").
+   - street: Street or road name (e.g. "CAMARIN ROAD", "SAMPAGUITA ST").
+   - barangay: Exact number for Caloocan (e.g. "175", "176") or name. Priority: numeric string without "Barangay" prefix.
+   - Copy words exactly, do not invent. If pattern is "BLDG. D UNIT 224 CAMARIN RESIDENCES I CAMARIN", set building="BLDG. D", unit="UNIT 224", house_no="UNIT 224", subdivision="CAMARIN RESIDENCES I", street="CAMARIN".
    - Assign confidence ("high", "medium", "low") for key fields based on image legibility.
 
 7. RESPONSE FORMAT:

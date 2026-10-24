@@ -6,6 +6,7 @@ import {
     OverlayViewF,
     StreetViewPanorama
 } from '@react-google-maps/api';
+import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import {
     X,
     Layers,
@@ -274,8 +275,8 @@ export default function NearbyIssuesMapModal({
     isOpen = true,
     onClose,
     theme = 'dark',
-    isLoaded = true,
-    loadError = null,
+    isLoaded: propIsLoaded,
+    loadError: propLoadError,
     reports = [],
     reportLocation = null,
     setReportLocation,
@@ -289,6 +290,16 @@ export default function NearbyIssuesMapModal({
     photoPinIcons: externalPhotoPinIcons = null,
     initialSheetPosition = 'half'
 }) {
+    const { isLoaded: contextLoaded, loadError: contextError } = useGoogleMaps();
+    const isLoaded = Boolean(
+        (propIsLoaded !== undefined ? propIsLoaded : contextLoaded) &&
+        typeof window !== 'undefined' &&
+        window.google &&
+        window.google.maps &&
+        typeof window.google.maps.Map === 'function'
+    );
+    const loadError = propLoadError || contextError;
+
     const isDark = theme === 'dark';
     const [map, setMap] = useState(null);
     const [mapLayerType, setMapLayerType] = useState('roadmap'); // 'roadmap' | 'hybrid'

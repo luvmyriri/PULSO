@@ -63,7 +63,7 @@ export default function AuthModal({ view, onNavigate }) {
                                         <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-1.5">Mobile or Email</label>
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400"><User size={16} /></div>
-                                            <input type="text" className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block pl-10 p-3 outline-none transition-all" placeholder="e.g. 0917 123 4567" required />
+                                            <input type="text" className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 block pl-10 p-3 outline-none transition-all" placeholder="e.g. 09XX XXX XXXX" required />
                                         </div>
                                     </div>
 
