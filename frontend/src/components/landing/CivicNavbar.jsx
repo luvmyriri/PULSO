@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, PhoneCall, LogIn, UserPlus, LogOut, ArrowRight, User, Smartphone } from 'lucide-react';
+import { Menu, X, PhoneCall, LogIn, UserPlus, LogOut, ArrowRight, User } from 'lucide-react';
 import Branding from '../Branding';
 import ThemeToggle from '../ThemeToggle';
 import PwaModal from './PwaModal';
@@ -491,15 +491,9 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
                 <button
                   type="button"
                   onClick={() => { setMobileMenuOpen(false); handleOpenPwa(); }}
-                  className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl text-sm font-bold bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] border border-orange-200/80 dark:border-orange-800/60 transition-colors cursor-pointer"
+                  className="w-full text-left py-2.5 px-3 rounded-xl text-sm font-bold text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-2">
-                    <Smartphone size={16} className="text-[#ff6b00]" />
-                    <span>Install Mobile App (PWA)</span>
-                  </div>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-[#ff6b00] text-white">
-                    QR Code
-                  </span>
+                  <span>Install Mobile App</span>
                 </button>
               )}
             </div>

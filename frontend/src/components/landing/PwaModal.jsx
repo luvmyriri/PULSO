@@ -159,7 +159,7 @@ export default function PwaModal({ isOpen, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -167,9 +167,12 @@ export default function PwaModal({ isOpen, onClose }) {
     >
       <div
         ref={dialogRef}
-        className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[88vh] my-auto"
+        className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] sm:my-auto animate-in slide-in-from-bottom duration-300 sm:duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile Drag Indicator Handle */}
+        <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
+
         {/* Header Strip */}
         <div className="relative px-5 py-4 sm:px-6 sm:py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-orange-50/60 via-white to-orange-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-orange-950/20 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -407,7 +410,7 @@ export default function PwaModal({ isOpen, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 sm:px-6 bg-slate-50 dark:bg-slate-800/90 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 relative z-10">
+        <div className="px-5 py-3 sm:px-6 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-3 bg-slate-50 dark:bg-slate-800/90 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 relative z-10">
           <span className="text-[11px] text-slate-500 dark:text-slate-400">
             Powered by Caloocan City Engineering Department
           </span>

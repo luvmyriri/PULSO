@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    User, Phone, Lock, UploadCloud, CheckCircle, CheckCircle2, XCircle, 
-    Loader2, X, ZoomIn, Info, Mail, Shield, ShieldCheck, AlertCircle, Camera, 
-    Eye, EyeOff, Home, RotateCw, RotateCcw, ChevronDown, Calendar, ChevronRight, 
+import {
+    User, Phone, Lock, UploadCloud, CheckCircle, CheckCircle2, XCircle,
+    Loader2, X, ZoomIn, Info, Mail, Shield, ShieldCheck, AlertCircle, Camera,
+    Eye, EyeOff, Home, RotateCw, RotateCcw, ChevronDown, Calendar, ChevronRight,
     Check, CreditCard, ArrowLeft, ArrowRight, RefreshCw,
     Layers, Clock, KeyRound
 } from 'lucide-react';
@@ -97,9 +97,9 @@ function parseOcrAddress(raw, data) {
     s = s.replace(NOISE, '').replace(/\s{2,}/g, ' ').trim();
     s = s.replace(/\b1[34]\d{2}\b/g, '').trim();
 
-    let houseNo     = '';
-    let blockLot    = '';
-    let street      = '';
+    let houseNo = '';
+    let blockLot = '';
+    let street = '';
     let subdivision = '';
 
     const blkLotRe = /\b((?:BLK|BLOCK|B\.?LK|8LK)\.?\s*\d+[A-Z]?\s*(?:LOT|L0T)\.?\s*\d+[A-Z]?|(?:LOT|L0T)\.?\s*\d+[A-Z]?\s*(?:BLK|BLOCK|B\.?LK)\.?\s*\d+[A-Z]?|(?:BLK|BLOCK|B\.?LK)\.?\s*\d+[A-Z]?|(?:LOT|L0T)\.?\s*\d+[A-Z]?)\b/i;
@@ -143,7 +143,7 @@ function parseOcrAddress(raw, data) {
     if (data && data.barangay) {
         try {
             const bn = data.barangay.replace(/^Barangay\s*/i, '').trim();
-            if (bn) s = s.replace(new RegExp(`\\b${bn.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`, 'gi'), '');
+            if (bn) s = s.replace(new RegExp(`\\b${bn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'), '');
         } catch { /* ignore */ }
     }
     s = s.replace(/\b(?:CALOOCAN|KALOOKAN|CITY|NCR|METRO\s+MANILA|MANILA|DISTRICT|ZONE|THIRD\s*DISTRICT)\b/gi, '');
@@ -162,7 +162,7 @@ function getPostalCodeForBarangay(brgy) {
     const numMatch = brgy.match(/\d+/);
     if (!numMatch) return '';
     const num = parseInt(numMatch[0], 10);
-    
+
     if ([165, 166, 168, 169, 170].includes(num)) return '1420';
     if (num === 167) return '1423';
     if ([171, 172, 173].includes(num)) return '1421';
@@ -183,7 +183,7 @@ function FrontIdGraphic({ className = "w-28 h-18 sm:w-32 sm:h-20" }) {
         <svg viewBox="0 0 120 76" fill="none" xmlns="http://www.w3.org/2000/svg" className={`${className} shrink-0`}>
             {/* Card Outer & Border */}
             <rect x="2" y="2" width="116" height="72" rx="7" className="fill-slate-100 dark:fill-slate-800/90 stroke-slate-300/90 dark:stroke-slate-700" strokeWidth="1.5" />
-            
+
             {/* Hologram / LGU Emblem dot */}
             <circle cx="106" cy="14" r="5" className="fill-orange-400/20 stroke-[#ff6b00]/60" strokeWidth="1" />
             <circle cx="106" cy="14" r="2.5" className="fill-[#ff6b00]/70" />
@@ -223,14 +223,14 @@ function BackIdGraphic({ className = "w-28 h-18 sm:w-32 sm:h-20" }) {
         <svg viewBox="0 0 120 76" fill="none" xmlns="http://www.w3.org/2000/svg" className={`${className} shrink-0`}>
             {/* Card Outer & Border */}
             <rect x="2" y="2" width="116" height="72" rx="7" className="fill-slate-100 dark:fill-slate-800/90 stroke-slate-300/90 dark:stroke-slate-700" strokeWidth="1.5" />
-            
+
             {/* Magnetic Stripe */}
             <rect x="2" y="11" width="116" height="15" className="fill-slate-800 dark:fill-slate-950" />
 
             {/* Official Signature Panel */}
             <rect x="10" y="32" width="64" height="13" rx="2" className="fill-white dark:fill-slate-200 stroke-slate-300 dark:stroke-slate-400" strokeWidth="0.8" />
             <path d="M14 40 Q 24 35 34 41 T 52 38 T 68 40" className="stroke-slate-700" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-            
+
             {/* CVC / Auth Code box */}
             <rect x="78" y="34" width="30" height="9" rx="1.5" className="fill-slate-200 dark:fill-slate-700/80" />
             <circle cx="85" cy="38.5" r="1.5" className="fill-slate-600 dark:fill-slate-300" />
@@ -597,7 +597,7 @@ function mapOcrToForm(data) {
     mapped.middleName = formatProperText(parsedName.middleName, false);
     mapped.lastName = formatProperText(parsedName.lastName, false);
     mapped.suffix = parsedName.suffix || '';
-    
+
     mapped.idType = data.id_type_label || 'Unknown Document';
     mapped.selectedIdType = data.selected_id_type || '';
     mapped.idNumber = (data.id_number || data.pcn || data.license_no || data.crn || data.pin || data.passport_no || data.prn || '').trim();
@@ -640,7 +640,7 @@ function mapOcrToForm(data) {
 
     let bn = (data.barangay || addr.barangayId || '').trim();
     if (bn) {
-        const numMatch = bn.match(/\b(1[6-8][0-9])\b/); 
+        const numMatch = bn.match(/\b(1[6-8][0-9])\b/);
         if (numMatch) {
             mapped.barangay = `Barangay ${numMatch[1]}`;
         } else {
@@ -680,7 +680,7 @@ export default function Register() {
     const [step, setStep] = React.useState(1);
     const [isScanning, setIsScanning] = React.useState(false);
     const [scanError, setScanError] = React.useState('');
-    
+
     // Camera & Preview
     const [cameraOpen, setCameraOpen] = React.useState(false);
     const [activeCameraSide, setActiveCameraSide] = React.useState('front');
@@ -689,9 +689,9 @@ export default function Register() {
     const [isTouchDevice, setIsTouchDevice] = React.useState(false);
 
     React.useEffect(() => {
-        const hasTouch = ('ontouchstart' in window) || 
-                         (navigator.maxTouchPoints > 0) || 
-                         (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+        const hasTouch = ('ontouchstart' in window) ||
+            (navigator.maxTouchPoints > 0) ||
+            (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
         setIsTouchDevice(Boolean(hasTouch));
     }, []);
 
@@ -1307,7 +1307,7 @@ export default function Register() {
 
     const handleChange = (e) => {
         let { name, value, type, checked } = e.target;
-        
+
         if (autoFilledFields[name]) {
             setAutoFilledFields(prev => {
                 const next = { ...prev };
@@ -1331,7 +1331,7 @@ export default function Register() {
                 if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
                 next.age = age >= 0 ? String(age) : '';
                 next.dobDate = bd;
-                
+
                 if (age < 18) setAgeError("Residents must be at least 18 years old to register.");
                 else if (age > 100) setAgeError("Maximum allowed registration age is 100 years.");
                 else setAgeError("");
@@ -1347,9 +1347,9 @@ export default function Register() {
     const idButtonRefs = React.useRef({});
 
     const handleSelectId = (t) => {
-        setFormData(prev => ({ 
-            ...prev, 
-            selectedIdType: t.id, 
+        setFormData(prev => ({
+            ...prev,
+            selectedIdType: t.id,
             idType: t.name,
             idTier: t.tier,
             secondaryMode: t.tier === 'primary' ? 'manual_review' : 'automated',
@@ -1582,9 +1582,9 @@ export default function Register() {
             setScanError('Please select your ID type before scanning.');
             return;
         }
-        if (!formData.idFront || !formData.idBack) { 
-            setScanError('Please upload both the FRONT and BACK of your ID to continue.'); 
-            return; 
+        if (!formData.idFront || !formData.idBack) {
+            setScanError('Please upload both the FRONT and BACK of your ID to continue.');
+            return;
         }
         // Ensure photo viewer modal is closed and cannot stay open while checking ID
         setViewerSide(null);
@@ -1676,7 +1676,7 @@ export default function Register() {
             } else {
                 setIsCustomSuffix(false);
             }
-            
+
             setVerifiedBadge(`${data.id_type ? data.id_type.toUpperCase() : 'ID'} — Caloocan City Verified`);
             if (autoNext) {
                 setFormData(prev => ({ ...prev, secondaryMode: 'automated' }));
@@ -1780,7 +1780,7 @@ export default function Register() {
                 email: formData.email,
                 code: '000000'
             });
-            setVerifySuccess(formData.mobile 
+            setVerifySuccess(formData.mobile
                 ? "A new 6-digit verification code has been dispatched to your email and mobile number."
                 : "A new 6-digit verification code has been dispatched to your email address."
             );
@@ -1819,8 +1819,8 @@ export default function Register() {
                             triggerVerifyCode(digits);
                         }
                     }
-                }).catch(() => {});
-            } catch (e) {}
+                }).catch(() => { });
+            } catch (e) { }
         }
 
         return () => {
@@ -1963,20 +1963,20 @@ export default function Register() {
         }
     };
 
-        const selectedIdTypeObj = SUPPORTED_ID_TYPES.find(t => t.id === formData.selectedIdType) || SUPPORTED_ID_TYPES.find(t => t.name === formData.idType);
+    const selectedIdTypeObj = SUPPORTED_ID_TYPES.find(t => t.id === formData.selectedIdType) || SUPPORTED_ID_TYPES.find(t => t.name === formData.idType);
     const secondIdObj = SUPPORTED_ID_TYPES.find(t => t.id === formData.secondIdType);
     const isIdNumberValid = Boolean(
-        formData.idNumber && 
-        selectedIdTypeObj && 
+        formData.idNumber &&
+        selectedIdTypeObj &&
         selectedIdTypeObj.pattern.test(formData.idNumber.trim())
     );
 
     const detailsValid = Boolean(
-        formData.firstName?.trim() && 
-        formData.lastName?.trim() && 
-        formData.dob && 
-        formData.barangay && 
-        formData.idNumber?.trim() && 
+        formData.firstName?.trim() &&
+        formData.lastName?.trim() &&
+        formData.dob &&
+        formData.barangay &&
+        formData.idNumber?.trim() &&
         formData.sex &&
         !ageError
     );
@@ -2014,7 +2014,7 @@ export default function Register() {
                 onChange={(e) => handleFileUpload(e, 'secondIdBack')}
             />
 
-            
+
 
             {/* ── Top Header: Logo, Dynamic Progress, Theme Toggle (Mirrored from Login) ───────────── */}
             <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex flex-col gap-2 shrink-0">
@@ -2029,35 +2029,41 @@ export default function Register() {
                         <Branding size="h-9 w-9 sm:h-10 sm:w-10" monochrome={step === 3} />
                     </Link>
 
-                {/* Center Dynamic Progress Bar (5 Steps) */}
-                {step <= 5 ? (
-                    <div className="hidden sm:flex flex-col items-center gap-0.5 sm:gap-1 px-1 min-w-0">
-                        <div className="flex items-center gap-1 sm:gap-2">
-                            <span className={`text-[11px] sm:text-sm font-black whitespace-nowrap ${step === 3 ? 'text-black dark:text-white' : 'text-slate-800 dark:text-slate-100'}`}>
-                                <span className="hidden xs:inline">Step {step} of 5</span>
-                                <span className="xs:hidden">{step}/5</span>
-                            </span>
-                            <span className={`text-[10px] ${step === 3 ? 'text-black dark:text-white' : 'text-slate-300 dark:text-slate-600'}`}>•</span>
-                            <span className={`text-[11px] sm:text-sm font-semibold truncate max-w-[105px] xs:max-w-[150px] sm:max-w-none ${step === 3 ? 'text-black dark:text-white' : 'text-[#ff6b00]'}`}>
-                                {STEP_LABELS[step]}
-                            </span>
+                    {/* Center Dynamic Progress Bar (5 Steps - Segmented Stepper) */}
+                    {step <= 5 ? (
+                        <div className="hidden sm:flex flex-col gap-1.5 w-60 md:w-72">
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-xs uppercase tracking-wider text-[#ff6b00] dark:text-[#ff8a3d]">
+                                    STEP {step} OF 5
+                                </span>
+                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[140px]">
+                                    {STEP_LABELS[step]}
+                                </span>
+                            </div>
+                            <div
+                                className="grid grid-cols-5 gap-1.5 w-full"
+                                role="progressbar"
+                                aria-valuenow={step}
+                                aria-valuemin={1}
+                                aria-valuemax={5}
+                                aria-label={`Step ${step} of 5: ${STEP_LABELS[step]}`}
+                            >
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                    <div
+                                        key={s}
+                                        className={`h-1.5 rounded-full transition-all duration-300 ${s <= step ? 'bg-[#ff6b00]' : 'bg-slate-200 dark:bg-slate-800'
+                                            }`}
+                                    />
+                                ))}
+                            </div>
                         </div>
-                        <div className="sm:w-56 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <motion.div 
-                                className="h-full bg-[#ff6b00] rounded-full" 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${(step / 5) * 100}%` }}
-                                transition={{ duration: 0.3, ease: 'easeOut' }}
-                            />
+                    ) : (
+                        <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">
+                            <CheckCircle2 size={14} />
+                            <span className="hidden xs:inline">Registration Complete</span>
+                            <span className="xs:hidden">Complete</span>
                         </div>
-                    </div>
-                ) : (
-                    <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">
-                        <CheckCircle2 size={14} />
-                        <span className="hidden xs:inline">Registration Complete</span>
-                        <span className="xs:hidden">Complete</span>
-                    </div>
-                )}
+                    )}
 
                     {/* Right side: Theme Toggle & Home Navigation (Mirrored from Login) */}
                     <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -2074,24 +2080,32 @@ export default function Register() {
                     </div>
                 </div>
 
-                {/* Mobile: Step-by-Step progress placed at the bottom of the header */}
+                {/* Mobile: Step-by-Step progress placed at the bottom of the header (Segmented Stepper) */}
                 {step <= 5 ? (
-                    <div className="sm:hidden w-full flex flex-col gap-1.5 pt-1">
-                        <div className="flex items-center justify-between text-[13px]">
-                            <span className={`font-black ${step === 3 ? 'text-black dark:text-white' : 'text-slate-800 dark:text-slate-100'}`}>
-                                Step {step} of 5
+                    <div className="sm:hidden w-full flex flex-col gap-1.5 pt-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-xs uppercase tracking-wider text-[#ff6b00] dark:text-[#ff8a3d]">
+                                STEP {step} OF 5
                             </span>
-                            <span className={`font-semibold truncate max-w-[220px] ${step === 3 ? 'text-black dark:text-white' : 'text-[#ff6b00]'}`}>
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[180px]">
                                 {STEP_LABELS[step]}
                             </span>
                         </div>
-                        <div className="w-full h-1.5 bg-slate-200/80 dark:bg-slate-800/80 rounded-full overflow-hidden">
-                            <motion.div 
-                                className="h-full bg-[#ff6b00] rounded-full" 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${(step / 5) * 100}%` }}
-                                transition={{ duration: 0.3, ease: 'easeOut' }}
-                            />
+                        <div
+                            className="grid grid-cols-5 gap-1.5 w-full"
+                            role="progressbar"
+                            aria-valuenow={step}
+                            aria-valuemin={1}
+                            aria-valuemax={5}
+                            aria-label={`Step ${step} of 5: ${STEP_LABELS[step]}`}
+                        >
+                            {[1, 2, 3, 4, 5].map((s) => (
+                                <div
+                                    key={s}
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${s <= step ? 'bg-[#ff6b00]' : 'bg-slate-200 dark:bg-slate-800'
+                                        }`}
+                                />
+                            ))}
                         </div>
                     </div>
                 ) : (
@@ -2146,7 +2160,7 @@ export default function Register() {
                                                     Main IDs
                                                 </h2>
                                                 <span className="text-xs sm:text-sm lg:text-[13px] text-slate-500 dark:text-slate-400 font-normal">
-                                                    · One of these is enough.
+
                                                 </span>
                                             </div>
                                             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-2 sm:gap-2.5 lg:gap-2.5">
@@ -2165,19 +2179,17 @@ export default function Register() {
                                                             tabIndex={isTabFocusable ? 0 : -1}
                                                             onKeyDown={(e) => handleIdKeyDown(e, t.id)}
                                                             onClick={() => handleSelectId(t)}
-                                                            className={`p-2.5 sm:p-3 lg:p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between min-h-[88px] sm:min-h-[96px] lg:min-h-[80px] lg:h-[80px] w-full cursor-pointer group select-none ${
-                                                                isSelected
-                                                                    ? 'bg-orange-50/80 dark:bg-orange-950/40 border-[#ff6b00] ring-2 ring-[#ff6b00]/30 shadow-xs'
-                                                                    : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-300 dark:border-slate-700 hover:border-orange-300 dark:hover:border-slate-600 hover:bg-white dark:hover:bg-slate-800/80 active:scale-[0.98]'
-                                                            }`}
+                                                            className={`p-2.5 sm:p-3 lg:p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between min-h-[88px] sm:min-h-[96px] lg:min-h-[80px] lg:h-[80px] w-full cursor-pointer group select-none ${isSelected
+                                                                ? 'bg-orange-50/80 dark:bg-orange-950/40 border-[#ff6b00] ring-2 ring-[#ff6b00]/30 shadow-xs'
+                                                                : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-300 dark:border-slate-700 hover:border-orange-300 dark:hover:border-slate-600 hover:bg-white dark:hover:bg-slate-800/80 active:scale-[0.98]'
+                                                                }`}
                                                         >
                                                             {/* Top Row: Icon tile on left, Radio circle on right */}
                                                             <div className="flex items-center justify-between w-full shrink-0">
-                                                                <div className={`p-1.5 sm:p-2 lg:p-1.5 rounded-lg shrink-0 transition-colors ${
-                                                                    isSelected 
-                                                                        ? 'bg-orange-100 dark:bg-orange-900/50 text-[#ff6b00]' 
-                                                                        : 'bg-slate-200/80 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'
-                                                                }`}>
+                                                                <div className={`p-1.5 sm:p-2 lg:p-1.5 rounded-lg shrink-0 transition-colors ${isSelected
+                                                                    ? 'bg-orange-100 dark:bg-orange-900/50 text-[#ff6b00]'
+                                                                    : 'bg-slate-200/80 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'
+                                                                    }`}>
                                                                     <CreditCard className="w-5 h-5 sm:w-5 sm:h-5 lg:w-[18px] lg:h-[18px]" aria-hidden="true" />
                                                                 </div>
 
@@ -2195,9 +2207,8 @@ export default function Register() {
 
                                                             {/* Bottom: ID Name */}
                                                             <div className="w-full mt-2 sm:mt-1.5 lg:mt-1">
-                                                                <span className={`text-[14px] sm:text-[15px] lg:text-[14px] font-bold leading-snug block break-normal ${
-                                                                    isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-800 dark:text-slate-200'
-                                                                }`}>
+                                                                <span className={`text-[14px] sm:text-[15px] lg:text-[14px] font-bold leading-snug block break-normal ${isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-800 dark:text-slate-200'
+                                                                    }`}>
                                                                     {t.shortName}
                                                                 </span>
                                                             </div>
@@ -2217,7 +2228,7 @@ export default function Register() {
                                                     Other IDs
                                                 </h2>
                                                 <span className="text-xs sm:text-sm lg:text-[13px] text-slate-500 dark:text-slate-400 font-normal">
-                                                    · May need a second ID or city staff review.
+
                                                 </span>
                                             </div>
                                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5 lg:gap-2.5">
@@ -2236,19 +2247,17 @@ export default function Register() {
                                                             tabIndex={isTabFocusable ? 0 : -1}
                                                             onKeyDown={(e) => handleIdKeyDown(e, t.id)}
                                                             onClick={() => handleSelectId(t)}
-                                                            className={`p-2.5 sm:p-3 lg:p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between min-h-[88px] sm:min-h-[96px] lg:min-h-[80px] lg:h-[80px] w-full cursor-pointer group select-none ${
-                                                                isSelected
-                                                                    ? 'bg-orange-50/80 dark:bg-orange-950/40 border-[#ff6b00] ring-2 ring-[#ff6b00]/30 shadow-xs'
-                                                                    : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-300 dark:border-slate-700 hover:border-orange-300 dark:hover:border-slate-600 hover:bg-white dark:hover:bg-slate-800/80 active:scale-[0.98]'
-                                                            }`}
+                                                            className={`p-2.5 sm:p-3 lg:p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between min-h-[88px] sm:min-h-[96px] lg:min-h-[80px] lg:h-[80px] w-full cursor-pointer group select-none ${isSelected
+                                                                ? 'bg-orange-50/80 dark:bg-orange-950/40 border-[#ff6b00] ring-2 ring-[#ff6b00]/30 shadow-xs'
+                                                                : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-300 dark:border-slate-700 hover:border-orange-300 dark:hover:border-slate-600 hover:bg-white dark:hover:bg-slate-800/80 active:scale-[0.98]'
+                                                                }`}
                                                         >
                                                             {/* Top Row: Icon tile on left, Radio circle on right */}
                                                             <div className="flex items-center justify-between w-full shrink-0">
-                                                                <div className={`p-1.5 sm:p-2 lg:p-1.5 rounded-lg shrink-0 transition-colors ${
-                                                                    isSelected 
-                                                                        ? 'bg-orange-100 dark:bg-orange-900/50 text-[#ff6b00]' 
-                                                                        : 'bg-slate-200/80 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'
-                                                                }`}>
+                                                                <div className={`p-1.5 sm:p-2 lg:p-1.5 rounded-lg shrink-0 transition-colors ${isSelected
+                                                                    ? 'bg-orange-100 dark:bg-orange-900/50 text-[#ff6b00]'
+                                                                    : 'bg-slate-200/80 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'
+                                                                    }`}>
                                                                     <CreditCard className="w-5 h-5 sm:w-5 sm:h-5 lg:w-[18px] lg:h-[18px]" aria-hidden="true" />
                                                                 </div>
 
@@ -2266,9 +2275,8 @@ export default function Register() {
 
                                                             {/* Bottom: ID Name */}
                                                             <div className="w-full mt-2 sm:mt-1.5 lg:mt-1">
-                                                                <span className={`text-[14px] sm:text-[15px] lg:text-[14px] font-bold leading-snug block break-normal ${
-                                                                    isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-800 dark:text-slate-200'
-                                                                }`}>
+                                                                <span className={`text-[14px] sm:text-[15px] lg:text-[14px] font-bold leading-snug block break-normal ${isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-800 dark:text-slate-200'
+                                                                    }`}>
                                                                     {t.shortName}
                                                                 </span>
                                                             </div>
@@ -2280,7 +2288,7 @@ export default function Register() {
                                     </div>
 
                                     {/* Tip Box */}
-                                    <div 
+                                    <div
                                         role="region"
                                         aria-live="polite"
                                         aria-label="ID Requirements Tip"
@@ -2308,11 +2316,11 @@ export default function Register() {
                                     </div>
 
                                     {/* Privacy Policy & Terms of Service Agreement Checkbox */}
-                                    <div 
+                                    <div
                                         onClick={() => setAgreedToTerms(prev => !prev)}
                                         className="mt-2.5 sm:mt-3 lg:mt-2 p-2.5 sm:p-3 lg:p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100/70 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 flex items-start gap-2.5 sm:gap-3 lg:gap-2.5 cursor-pointer transition-colors group select-none min-h-[44px] lg:min-h-[40px]"
                                     >
-                                        <div 
+                                        <div
                                             role="checkbox"
                                             aria-checked={agreedToTerms}
                                             tabIndex={0}
@@ -2323,11 +2331,10 @@ export default function Register() {
                                                     setAgreedToTerms(prev => !prev);
                                                 }
                                             }}
-                                            className={`mt-0.5 w-5 h-5 sm:w-6 sm:h-6 lg:w-5 lg:h-5 rounded-md flex items-center justify-center shrink-0 transition-all border ${
-                                                agreedToTerms 
-                                                    ? 'bg-[#ff6b00] border-[#ff6b00] text-white shadow-2xs' 
-                                                    : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-[#ff6b00]'
-                                            }`}
+                                            className={`mt-0.5 w-5 h-5 sm:w-6 sm:h-6 lg:w-5 lg:h-5 rounded-md flex items-center justify-center shrink-0 transition-all border ${agreedToTerms
+                                                ? 'bg-[#ff6b00] border-[#ff6b00] text-white shadow-2xs'
+                                                : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-[#ff6b00]'
+                                                }`}
                                         >
                                             {agreedToTerms && (
                                                 <Check size={14} strokeWidth={3.5} className="text-white stroke-white" />
@@ -2365,8 +2372,8 @@ export default function Register() {
 
                                 {/* Bottom Action Bar */}
                                 <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4 pt-3 lg:pt-2.5 mt-2.5 lg:mt-2 border-t border-slate-200 dark:border-slate-800 sticky sm:static bottom-0 -mx-3.5 sm:mx-0 -mb-3.5 sm:mb-0 px-3.5 sm:px-0 pb-safe sm:pb-0 bg-white/95 dark:bg-slate-900/95 sm:bg-transparent backdrop-blur-md sm:backdrop-blur-none z-10">
-                                    <Link 
-                                        to="/login" 
+                                    <Link
+                                        to="/login"
                                         className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-1.5 text-sm sm:text-base lg:text-[14px] font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors cursor-pointer group text-center"
                                     >
                                         <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform shrink-0" />
@@ -2392,7 +2399,7 @@ export default function Register() {
 
                         {/* ── STEP 2: FRONT & BACK PHOTOS (ZERO DEADSPACE REDESIGN) ── */}
                         {step === 2 && (() => {
-                            const currentActiveIdObj = isCapturingSecondId 
+                            const currentActiveIdObj = isCapturingSecondId
                                 ? (SUPPORTED_ID_TYPES.find(t => t.id === formData.secondIdType) || { shortName: '2nd Supporting ID' })
                                 : selectedIdTypeObj;
                             const hints = getIdHints(currentActiveIdObj);
@@ -2427,7 +2434,7 @@ export default function Register() {
                                                     {isCapturingSecondId ? "Supporting Second ID" : "Front & Back Photos"}
                                                 </h1>
                                                 <p className="text-xs min-[360px]:text-sm text-slate-600 dark:text-slate-300 mt-0.5 sm:mt-1 leading-relaxed">
-                                                    {isCapturingSecondId 
+                                                    {isCapturingSecondId
                                                         ? `Pairing with your ${selectedIdTypeObj ? selectedIdTypeObj.shortName : 'first ID'}. Attach your 2nd card.`
                                                         : `Take or upload a photo of the front and back of your ${selectedIdTypeObj ? selectedIdTypeObj.shortName : 'National ID'}.`
                                                     }
@@ -2652,7 +2659,7 @@ export default function Register() {
 
                                         {/* Scan Error Notice */}
                                         {scanError && (
-                                            <div 
+                                            <div
                                                 role="alert"
                                                 className="p-2 sm:p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 flex items-start gap-2 text-xs sm:text-sm font-medium mt-1.5"
                                             >
@@ -2736,11 +2743,10 @@ export default function Register() {
                                                             setIsCapturingSecondId(false);
                                                             setStep(3);
                                                         }}
-                                                        className={`w-full md:w-auto min-h-[48px] h-[48px] py-2 px-6 rounded-xl font-heading font-extrabold text-sm sm:text-base tracking-normal transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md ${
-                                                            !isSecondIdComplete
-                                                                ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 shadow-none cursor-not-allowed opacity-90'
-                                                                : 'bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white hover:shadow-lg hover:shadow-orange-500/25'
-                                                        }`}
+                                                        className={`w-full md:w-auto min-h-[48px] h-[48px] py-2 px-6 rounded-xl font-heading font-extrabold text-sm sm:text-base tracking-normal transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md ${!isSecondIdComplete
+                                                            ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 shadow-none cursor-not-allowed opacity-90'
+                                                            : 'bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white hover:shadow-lg hover:shadow-orange-500/25'
+                                                            }`}
                                                         aria-disabled={!isSecondIdComplete}
                                                     >
                                                         <span>Continue with Dual IDs</span>
@@ -2770,11 +2776,10 @@ export default function Register() {
                                                         type="button"
                                                         disabled={!isPrimaryPhotosComplete || isScanning}
                                                         onClick={() => handleScanID(true)}
-                                                        className={`w-full md:w-[280px] min-h-[48px] h-[48px] py-2 px-6 rounded-xl font-heading font-extrabold text-sm sm:text-base tracking-normal transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md ${
-                                                            !isPrimaryPhotosComplete || isScanning
-                                                                ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 shadow-none cursor-not-allowed opacity-90'
-                                                                : 'bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white hover:shadow-lg hover:shadow-orange-500/25'
-                                                        }`}
+                                                        className={`w-full md:w-[280px] min-h-[48px] h-[48px] py-2 px-6 rounded-xl font-heading font-extrabold text-sm sm:text-base tracking-normal transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md ${!isPrimaryPhotosComplete || isScanning
+                                                            ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 shadow-none cursor-not-allowed opacity-90'
+                                                            : 'bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white hover:shadow-lg hover:shadow-orange-500/25'
+                                                            }`}
                                                         aria-disabled={!isPrimaryPhotosComplete || isScanning}
                                                     >
                                                         {isScanning ? (
@@ -2908,11 +2913,10 @@ export default function Register() {
                                                                     onCompositionEnd={(e) => { isComposingRef.current = false; handleProperFieldChange(e, false); }}
                                                                     autoCapitalize="words"
                                                                     required
-                                                                    className={`w-full min-h-[50px] h-[52px] bg-white dark:bg-slate-800/80 border text-base rounded-[14px] px-4 text-black dark:text-white placeholder:text-black/60 dark:placeholder:text-white/60 placeholder:italic focus:ring-2 focus:ring-orange-500 outline-none ${
-                                                                        step3Touched.firstName && !formData.firstName?.trim()
-                                                                            ? 'border-red-500 ring-1 ring-red-500'
-                                                                            : 'border-slate-300 dark:border-slate-700'
-                                                                    }`}
+                                                                    className={`w-full min-h-[50px] h-[52px] bg-white dark:bg-slate-800/80 border text-base rounded-[14px] px-4 text-black dark:text-white placeholder:text-black/60 dark:placeholder:text-white/60 placeholder:italic focus:ring-2 focus:ring-orange-500 outline-none ${step3Touched.firstName && !formData.firstName?.trim()
+                                                                        ? 'border-red-500 ring-1 ring-red-500'
+                                                                        : 'border-slate-300 dark:border-slate-700'
+                                                                        }`}
                                                                 />
                                                                 {step3Touched.firstName && !formData.firstName?.trim() && (
                                                                     <p role="alert" className="text-xs text-red-500 font-semibold mt-1">First name is required.</p>
@@ -2966,11 +2970,10 @@ export default function Register() {
                                                                 onCompositionEnd={(e) => { isComposingRef.current = false; handleProperFieldChange(e, false); }}
                                                                 autoCapitalize="words"
                                                                 required
-                                                                className={`w-full min-h-[50px] h-[52px] bg-white dark:bg-slate-800/80 border text-base rounded-[14px] px-4 text-black dark:text-white placeholder:text-black/60 dark:placeholder:text-white/60 placeholder:italic focus:ring-2 focus:ring-orange-500 outline-none ${
-                                                                    step3Touched.lastName && !formData.lastName?.trim()
-                                                                        ? 'border-red-500 ring-1 ring-red-500'
-                                                                        : 'border-slate-300 dark:border-slate-700'
-                                                                }`}
+                                                                className={`w-full min-h-[50px] h-[52px] bg-white dark:bg-slate-800/80 border text-base rounded-[14px] px-4 text-black dark:text-white placeholder:text-black/60 dark:placeholder:text-white/60 placeholder:italic focus:ring-2 focus:ring-orange-500 outline-none ${step3Touched.lastName && !formData.lastName?.trim()
+                                                                    ? 'border-red-500 ring-1 ring-red-500'
+                                                                    : 'border-slate-300 dark:border-slate-700'
+                                                                    }`}
                                                             />
                                                             {step3Touched.lastName && !formData.lastName?.trim() && (
                                                                 <p role="alert" className="text-xs text-red-500 font-semibold mt-1">Last name is required.</p>
@@ -3119,7 +3122,7 @@ export default function Register() {
                                                                 <label className="text-sm font-bold text-black dark:text-white mb-2 block truncate">
                                                                     Age
                                                                 </label>
-                                                                <div 
+                                                                <div
                                                                     role="status"
                                                                     tabIndex={-1}
                                                                     aria-label={formData.age ? `Age: ${formData.age} years old, calculated from the date of birth` : 'Age: not calculated, calculated from the date of birth'}
@@ -3155,13 +3158,12 @@ export default function Register() {
                                                                     onBlur={() => setStep3Touched(prev => ({ ...prev, idNumber: true }))}
                                                                     placeholder={selectedIdTypeObj ? selectedIdTypeObj.formatHint : 'Enter ID Number'}
                                                                     required
-                                                                    className={`w-full min-h-[50px] h-[52px] bg-white dark:bg-slate-800/80 border text-base rounded-[14px] px-4 text-black dark:text-white placeholder:text-black/60 dark:placeholder:text-white/60 placeholder:italic focus:ring-2 focus:ring-orange-500 outline-none font-mono-data pr-10 ${
-                                                                        step3Touched.idNumber && (!formData.idNumber?.trim() || !isIdNumberValid)
-                                                                            ? 'border-red-500 ring-1 ring-red-500'
-                                                                            : isIdNumberValid
+                                                                    className={`w-full min-h-[50px] h-[52px] bg-white dark:bg-slate-800/80 border text-base rounded-[14px] px-4 text-black dark:text-white placeholder:text-black/60 dark:placeholder:text-white/60 placeholder:italic focus:ring-2 focus:ring-orange-500 outline-none font-mono-data pr-10 ${step3Touched.idNumber && (!formData.idNumber?.trim() || !isIdNumberValid)
+                                                                        ? 'border-red-500 ring-1 ring-red-500'
+                                                                        : isIdNumberValid
                                                                             ? 'border-emerald-500/80 dark:border-emerald-500/60'
                                                                             : 'border-slate-300 dark:border-slate-700'
-                                                                    }`}
+                                                                        }`}
                                                                 />
                                                                 {step3Touched.idNumber && !formData.idNumber?.trim() && (
                                                                     <p role="alert" className="text-xs text-red-500 font-semibold mt-1">
@@ -3369,11 +3371,10 @@ export default function Register() {
                                             <button
                                                 type="button"
                                                 onClick={handleStep3Click}
-                                                className={`w-full sm:w-[320px] min-h-[52px] h-[52px] py-2.5 px-6 rounded-[14px] font-heading font-black text-base tracking-normal transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                                                    detailsValid
-                                                        ? 'bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white shadow-md hover:shadow-lg hover:shadow-orange-500/25'
-                                                        : 'bg-[#ff6b00]/40 text-white/90 hover:bg-[#ff6b00]/50'
-                                                }`}
+                                                className={`w-full sm:w-[320px] min-h-[52px] h-[52px] py-2.5 px-6 rounded-[14px] font-heading font-black text-base tracking-normal transition-all flex items-center justify-center gap-2 cursor-pointer ${detailsValid
+                                                    ? 'bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white shadow-md hover:shadow-lg hover:shadow-orange-500/25'
+                                                    : 'bg-[#ff6b00]/40 text-white/90 hover:bg-[#ff6b00]/50'
+                                                    }`}
                                                 aria-disabled={!detailsValid}
                                             >
                                                 <span>Looks good, continue!</span>
@@ -3389,17 +3390,17 @@ export default function Register() {
                             const isStep4Valid = isGoogleAuth
                                 ? (validateMobile(formData.mobile).valid && mobileCheckStatus !== 'checking' && mobileCheckStatus !== 'inUse' && !loginErrors.mobile)
                                 : (validateEmail(formData.email).valid &&
-                                   validateMobile(formData.mobile).valid &&
-                                   validatePassword(formData.password).valid &&
-                                   validateConfirmPassword(formData.confirmPassword, formData.password).valid &&
-                                   emailCheckStatus !== 'checking' &&
-                                   emailCheckStatus !== 'inUse' &&
-                                   mobileCheckStatus !== 'checking' &&
-                                   mobileCheckStatus !== 'inUse' &&
-                                   !loginErrors.email &&
-                                   !loginErrors.mobile &&
-                                   !loginErrors.password &&
-                                   !loginErrors.confirmPassword);
+                                    validateMobile(formData.mobile).valid &&
+                                    validatePassword(formData.password).valid &&
+                                    validateConfirmPassword(formData.confirmPassword, formData.password).valid &&
+                                    emailCheckStatus !== 'checking' &&
+                                    emailCheckStatus !== 'inUse' &&
+                                    mobileCheckStatus !== 'checking' &&
+                                    mobileCheckStatus !== 'inUse' &&
+                                    !loginErrors.email &&
+                                    !loginErrors.mobile &&
+                                    !loginErrors.password &&
+                                    !loginErrors.confirmPassword);
 
 
 
@@ -3523,16 +3524,15 @@ export default function Register() {
                                                                 mobileCheckStatus === 'inUse' || loginErrors.mobile
                                                                     ? "google-mobile-error"
                                                                     : mobileCheckStatus === 'available'
-                                                                    ? "google-mobile-success"
-                                                                    : undefined
+                                                                        ? "google-mobile-success"
+                                                                        : undefined
                                                             }
-                                                            className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-11 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic font-mono-data transition-colors outline-none ${
-                                                                mobileCheckStatus === 'inUse' || Boolean(loginErrors.mobile)
-                                                                    ? 'border-red-500 ring-1 ring-red-500'
-                                                                    : mobileCheckStatus === 'available'
+                                                            className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-11 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic font-mono-data transition-colors outline-none ${mobileCheckStatus === 'inUse' || Boolean(loginErrors.mobile)
+                                                                ? 'border-red-500 ring-1 ring-red-500'
+                                                                : mobileCheckStatus === 'available'
                                                                     ? 'border-emerald-500/80 dark:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500'
                                                                     : 'border-slate-300 dark:border-slate-700 hover:border-slate-400 focus:ring-2 focus:ring-orange-500'
-                                                            }`}
+                                                                }`}
                                                         />
                                                         {mobileCheckStatus === 'available' ? (
                                                             <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center" title="Available mobile number">
@@ -3633,16 +3633,15 @@ export default function Register() {
                                                                     emailCheckStatus === 'inUse' || loginErrors.email
                                                                         ? "login-email-error"
                                                                         : emailCheckStatus === 'available'
-                                                                        ? "login-email-success"
-                                                                        : undefined
+                                                                            ? "login-email-success"
+                                                                            : undefined
                                                                 }
-                                                                className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-11 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic transition-colors outline-none ${
-                                                                    emailCheckStatus === 'inUse' || Boolean(loginErrors.email)
-                                                                        ? 'border-red-500 ring-1 ring-red-500'
-                                                                        : emailCheckStatus === 'available'
+                                                                className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-11 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic transition-colors outline-none ${emailCheckStatus === 'inUse' || Boolean(loginErrors.email)
+                                                                    ? 'border-red-500 ring-1 ring-red-500'
+                                                                    : emailCheckStatus === 'available'
                                                                         ? 'border-emerald-500/80 dark:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500'
                                                                         : 'border-slate-300 dark:border-slate-700 hover:border-slate-400 focus:ring-2 focus:ring-orange-500'
-                                                                }`}
+                                                                    }`}
                                                             />
                                                             {emailCheckStatus === 'available' ? (
                                                                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center" title="Available email address">
@@ -3709,16 +3708,15 @@ export default function Register() {
                                                                     mobileCheckStatus === 'inUse' || loginErrors.mobile
                                                                         ? "login-mobile-error"
                                                                         : mobileCheckStatus === 'available'
-                                                                        ? "login-mobile-success"
-                                                                        : undefined
+                                                                            ? "login-mobile-success"
+                                                                            : undefined
                                                                 }
-                                                                className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-11 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic font-mono-data transition-colors outline-none ${
-                                                                    mobileCheckStatus === 'inUse' || Boolean(loginErrors.mobile)
-                                                                        ? 'border-red-500 ring-1 ring-red-500'
-                                                                        : mobileCheckStatus === 'available'
+                                                                className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-11 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic font-mono-data transition-colors outline-none ${mobileCheckStatus === 'inUse' || Boolean(loginErrors.mobile)
+                                                                    ? 'border-red-500 ring-1 ring-red-500'
+                                                                    : mobileCheckStatus === 'available'
                                                                         ? 'border-emerald-500/80 dark:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500'
                                                                         : 'border-slate-300 dark:border-slate-700 hover:border-slate-400 focus:ring-2 focus:ring-orange-500'
-                                                                }`}
+                                                                    }`}
                                                             />
                                                             {mobileCheckStatus === 'available' ? (
                                                                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center" title="Available mobile number">
@@ -3786,13 +3784,12 @@ export default function Register() {
                                                                 required
                                                                 aria-invalid={Boolean(loginErrors.password)}
                                                                 aria-describedby="password-rules"
-                                                                className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-12 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic transition-colors outline-none ${
-                                                                    loginErrors.password
-                                                                        ? 'border-red-500 ring-1 ring-red-500'
-                                                                        : validatePassword(formData.password).valid
+                                                                className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-12 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic transition-colors outline-none ${loginErrors.password
+                                                                    ? 'border-red-500 ring-1 ring-red-500'
+                                                                    : validatePassword(formData.password).valid
                                                                         ? 'border-emerald-500/80 dark:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500'
                                                                         : 'border-slate-300 dark:border-slate-700 hover:border-slate-400 focus:ring-2 focus:ring-orange-500'
-                                                                }`}
+                                                                    }`}
                                                             />
                                                             <button
                                                                 type="button"
@@ -3814,19 +3811,17 @@ export default function Register() {
 
                                                         {/* Live Password Rule Checklist */}
                                                         <div id="password-rules" className="flex flex-col gap-1 mt-2 text-sm select-none" aria-live="polite">
-                                                            <div className={`flex items-center gap-2 transition-colors ${
-                                                                formData.password.length >= 8 
-                                                                    ? 'text-emerald-600 dark:text-emerald-400 font-semibold' 
-                                                                    : loginErrors.password 
-                                                                    ? 'text-red-500 dark:text-red-400 font-medium' 
+                                                            <div className={`flex items-center gap-2 transition-colors ${formData.password.length >= 8
+                                                                ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                                                                : loginErrors.password
+                                                                    ? 'text-red-500 dark:text-red-400 font-medium'
                                                                     : 'text-slate-400 dark:text-slate-500'
-                                                            }`}>
+                                                                }`}>
                                                                 {formData.password.length >= 8 ? (
                                                                     <Check size={16} className="text-emerald-500 shrink-0" strokeWidth={2.5} />
                                                                 ) : (
-                                                                    <div className={`w-3.5 h-3.5 rounded-full border shrink-0 ${
-                                                                        loginErrors.password ? 'border-red-400' : 'border-slate-300 dark:border-slate-600'
-                                                                    }`} />
+                                                                    <div className={`w-3.5 h-3.5 rounded-full border shrink-0 ${loginErrors.password ? 'border-red-400' : 'border-slate-300 dark:border-slate-600'
+                                                                        }`} />
                                                                 )}
                                                                 <span>{CREATE_LOGIN_CONTENT['password.minLength']}</span>
                                                             </div>
@@ -3841,16 +3836,16 @@ export default function Register() {
                                                                         formData.password.length < 8
                                                                             ? 'text-red-500'
                                                                             : !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password)
-                                                                            ? 'text-orange-500'
-                                                                            : 'text-emerald-500'
+                                                                                ? 'text-orange-500'
+                                                                                : 'text-emerald-500'
                                                                     }>
-                                                                        {formData.password.length < 8 
-                                                                            ? 'Too Short' 
-                                                                            : !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password) 
-                                                                            ? 'Fair' 
-                                                                            : /[!@#$%^&*(),.?":{}|<>]/.test(formData.password)
-                                                                            ? 'Strong'
-                                                                            : 'Good'
+                                                                        {formData.password.length < 8
+                                                                            ? 'Too Short'
+                                                                            : !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password)
+                                                                                ? 'Fair'
+                                                                                : /[!@#$%^&*(),.?":{}|<>]/.test(formData.password)
+                                                                                    ? 'Strong'
+                                                                                    : 'Good'
                                                                         }
                                                                     </span>
                                                                 </div>
@@ -3894,13 +3889,12 @@ export default function Register() {
                                                                 required
                                                                 aria-invalid={Boolean(loginErrors.confirmPassword)}
                                                                 aria-describedby={loginErrors.confirmPassword ? "login-confirm-password-error" : undefined}
-                                                                className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-12 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic transition-colors outline-none ${
-                                                                    loginErrors.confirmPassword
-                                                                        ? 'border-red-500 ring-1 ring-red-500'
-                                                                        : formData.password && formData.confirmPassword === formData.password
+                                                                className={`w-full min-h-[50px] h-[52px] rounded-[14px] pl-11 pr-12 bg-white dark:bg-slate-800/80 border text-base text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 placeholder:italic transition-colors outline-none ${loginErrors.confirmPassword
+                                                                    ? 'border-red-500 ring-1 ring-red-500'
+                                                                    : formData.password && formData.confirmPassword === formData.password
                                                                         ? 'border-emerald-500/80 dark:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500'
                                                                         : 'border-slate-300 dark:border-slate-700 hover:border-slate-400 focus:ring-2 focus:ring-orange-500'
-                                                                }`}
+                                                                    }`}
                                                             />
                                                             <button
                                                                 type="button"
@@ -3954,9 +3948,8 @@ export default function Register() {
                                                     type="button"
                                                     disabled={!isStep4Valid || registering}
                                                     onClick={handleAttemptStep4Submit}
-                                                    className={`w-full sm:w-[220px] min-h-[52px] h-[52px] bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-2.5 px-6 rounded-[14px] font-heading font-black text-base tracking-normal transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer ${
-                                                        !isStep4Valid || registering ? 'opacity-45 cursor-not-allowed shadow-none' : ''
-                                                    }`}
+                                                    className={`w-full sm:w-[220px] min-h-[52px] h-[52px] bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white py-2.5 px-6 rounded-[14px] font-heading font-black text-base tracking-normal transition-all shadow-md hover:shadow-lg hover:shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer ${!isStep4Valid || registering ? 'opacity-45 cursor-not-allowed shadow-none' : ''
+                                                        }`}
                                                 >
                                                     {registering ? (
                                                         <>
@@ -4031,13 +4024,12 @@ export default function Register() {
                                                     onChange={(e) => handleOtpChange(index, e.target.value)}
                                                     onKeyDown={(e) => handleOtpKeyDown(index, e)}
                                                     onPaste={handleOtpPaste}
-                                                    className={`w-9 h-12 min-[340px]:w-10 min-[340px]:h-13 sm:w-13 sm:h-16 text-center text-xl sm:text-2xl font-black rounded-xl sm:rounded-2xl border-2 transition-all outline-none font-mono select-all ${
-                                                        verifyError
-                                                            ? 'border-red-500 bg-red-500/5 text-red-600 dark:text-red-400 ring-2 ring-red-500/20'
-                                                            : digit
+                                                    className={`w-9 h-12 min-[340px]:w-10 min-[340px]:h-13 sm:w-13 sm:h-16 text-center text-xl sm:text-2xl font-black rounded-xl sm:rounded-2xl border-2 transition-all outline-none font-mono select-all ${verifyError
+                                                        ? 'border-red-500 bg-red-500/5 text-red-600 dark:text-red-400 ring-2 ring-red-500/20'
+                                                        : digit
                                                             ? 'border-[#ff6b00] bg-orange-500/5 text-slate-900 dark:text-white ring-2 ring-orange-500/15'
                                                             : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white hover:border-slate-300 dark:hover:border-slate-600'
-                                                    } focus:border-[#ff6b00] focus:ring-4 focus:ring-orange-500/20 focus:scale-[1.03]`}
+                                                        } focus:border-[#ff6b00] focus:ring-4 focus:ring-orange-500/20 focus:scale-[1.03]`}
                                                 />
                                                 {/* Visual separator between digit 3 and 4 */}
                                                 {index === 2 && (
@@ -4193,10 +4185,10 @@ export default function Register() {
                     viewerSide === 'idFront'
                         ? ID_PHOTO_CONTENT.viewer.frontTitle
                         : viewerSide === 'idBack'
-                        ? ID_PHOTO_CONTENT.viewer.backTitle
-                        : viewerSide === 'secondIdFront'
-                        ? ID_PHOTO_CONTENT.viewer.secondFrontTitle
-                        : ID_PHOTO_CONTENT.viewer.secondBackTitle
+                            ? ID_PHOTO_CONTENT.viewer.backTitle
+                            : viewerSide === 'secondIdFront'
+                                ? ID_PHOTO_CONTENT.viewer.secondFrontTitle
+                                : ID_PHOTO_CONTENT.viewer.secondBackTitle
                 }
                 altText={
                     viewerSide?.includes('Front')
@@ -4302,7 +4294,7 @@ export default function Register() {
             </AnimatePresence>
 
             {/* Camera Overlay */}
-            <IDCameraModal 
+            <IDCameraModal
                 isOpen={cameraOpen}
                 onClose={() => setCameraOpen(false)}
                 onCapture={handleCameraCapture}

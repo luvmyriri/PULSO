@@ -231,10 +231,10 @@ export default function GovLanding() {
                                         >
                                             <div className="mb-6 text-left">
                                                 <h2 className="text-xl sm:text-2xl font-heading font-black text-slate-900 dark:text-white tracking-tight">
-                                                    Internal Gateway
+                                                    Staff Sign In
                                                 </h2>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                    Verify credentials for command center access.
+                                                    Sign in to access your work portal.
                                                 </p>
                                             </div>
 
@@ -249,7 +249,7 @@ export default function GovLanding() {
                                                 {/* Personnel ID / Email */}
                                                 <div className="space-y-1.5 text-left">
                                                     <label className="block text-[11px] font-mono-data font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                                                        Personnel ID or Email
+                                                        Work Email or Employee ID
                                                     </label>
                                                     <div className="relative">
                                                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -347,7 +347,7 @@ export default function GovLanding() {
                                                         className="mb-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
                                                     >
                                                         <ShieldCheck size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
-                                                        <span><strong>Security check paused.</strong> Local development only; account credentials are still required.</span>
+                                                        <span><strong>Test Mode:</strong> Extra security verification is turned off for testing. Please sign in with your account details.</span>
                                                     </div>
                                                 )}
 
@@ -361,7 +361,7 @@ export default function GovLanding() {
                                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                                     ) : (
                                                         <>
-                                                            <span>Initialize Session</span>
+                                                            <span>Sign In</span>
                                                             <ChevronRight size={16} />
                                                         </>
                                                     )}
@@ -386,7 +386,7 @@ export default function GovLanding() {
                                                         Recovery Sent
                                                     </h2>
                                                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                                                        An administrative recovery protocol has been initiated for <span className="text-[#ff6b00] font-semibold">{recoveryEmail}</span>. Please check your official inbox.
+                                                        We sent password reset instructions to <span className="text-[#ff6b00] font-semibold">{recoveryEmail}</span>. Please check your inbox.
                                                     </p>
                                                     <button
                                                         onClick={() => { setView('login'); setRecoverySent(false); }}
@@ -402,7 +402,7 @@ export default function GovLanding() {
                                                             Recover Password
                                                         </h2>
                                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                            Enter your registered personnel email to initiate recovery.
+                                                            Enter your registered work email to reset your password.
                                                         </p>
                                                     </div>
 
@@ -416,7 +416,7 @@ export default function GovLanding() {
                                                     <form onSubmit={handleRecovery} className="space-y-4">
                                                         <div className="space-y-1.5 text-left">
                                                             <label className="block text-[11px] font-mono-data font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                                                                Personnel Email
+                                                                Work Email
                                                             </label>
                                                             <div className="relative">
                                                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">

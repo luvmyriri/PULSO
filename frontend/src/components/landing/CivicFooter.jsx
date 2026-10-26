@@ -91,7 +91,7 @@ export default function CivicFooter({ onOpenLegalModal, onOpenPwaModal }) {
                     className="text-slate-400 hover:text-[#ff6b00] transition-colors font-medium flex items-center gap-1.5 cursor-pointer text-left"
                   >
                     <QrCode size={12} className="text-[#ff6b00]" />
-                    <span>Install Mobile App (PWA)</span>
+                    <span>Install Mobile App</span>
                   </button>
                 </li>
               )}
