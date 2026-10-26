@@ -13,6 +13,7 @@ import 'package:pulso_mobile/features/agent/screens/agent_screen.dart';
 import 'package:pulso_mobile/features/agent/agent_provider.dart';
 import 'package:pulso_mobile/features/home/home_provider.dart';
 import 'package:pulso_mobile/features/home/screens/home_screen.dart';
+import 'package:pulso_mobile/features/profile/profile_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +36,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => AgentProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider(ApiClient())),
+        ChangeNotifierProvider(create: (_) => ProfileProvider(ApiClient())),
       ],
       child: PulsoApp(isLoggedIn: isLoggedIn),
     ),

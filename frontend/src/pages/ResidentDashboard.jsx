@@ -15,6 +15,16 @@ import {
     LayoutDashboard,
     Bell,
     User,
+    Users,
+    Database,
+    LifeBuoy,
+    Cookie,
+    Palette,
+    SlidersHorizontal,
+    BarChart2,
+    XCircle,
+    Paperclip,
+    ArrowUpDown,
     Settings,
     LogOut,
     CheckCircle2,
@@ -382,99 +392,156 @@ export const UserAvatar = ({
 
 const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogout, t, unreadCount, unreadBadgeText }) => {
     const navDestinations = [
-        { id: 'overview', icon: <Home size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
-        { id: 'reports', icon: <FileText size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
-        { id: 'updates', icon: <History size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
-        { id: 'profile', icon: <User size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
+        { id: 'overview', icon: <Home size={19} strokeWidth={2.2} aria-hidden="true" />, label: 'Home' },
+        { id: 'reports', icon: <FileText size={19} strokeWidth={2} aria-hidden="true" />, label: 'My Reports' },
+        { id: 'updates', icon: <Bell size={19} strokeWidth={2} aria-hidden="true" />, label: 'Updates' },
+        { id: 'profile', icon: <User size={19} strokeWidth={2} aria-hidden="true" />, label: 'Account' },
     ];
 
+    const residentInitial = (() => {
+        if (user?.avatar) return user.avatar;
+        if (user?.name && user.name.trim()) return user.name.trim()[0].toUpperCase();
+        return 'M';
+    })();
+
     return (
-        <div className="w-full h-full pb-6 hidden lg:flex flex-col justify-between pl-2 pr-4 lg:pr-5 pt-6 border-r border-slate-200/80 dark:border-slate-800">
+        <div className="w-full min-h-full pb-4 hidden lg:flex flex-col justify-between px-3.5 pt-3.5">
             <div>
-                {/* User Identity Snapshot */}
-                <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-5 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 hover:border-orange-500/50 cursor-pointer transition-all group shadow-2xs">
-                    <div className={`w-11 h-11 rounded-full font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative border border-slate-200 dark:border-slate-700 ${
-                        user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-800' : 'bg-gradient-to-br from-orange-400 to-orange-600'
-                    }`}>
-                        <UserAvatar
-                            avatarUrl={user.avatarPhoto}
-                            updatedAt={user.updatedAt}
-                            fallbackInitial={user.avatar || 'R'}
-                            alt={user.name || 'Resident'}
-                        />
+                {/* 1. User Identity Snapshot Card */}
+                <div
+                    onClick={() => handleSetTab('profile')}
+                    className="flex items-center gap-3 p-3 mb-4 rounded-xl bg-slate-50/90 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 hover:border-orange-500/40 cursor-pointer transition-all group shadow-2xs"
+                    title="View Account & Settings"
+                >
+                    <div className="w-10 h-10 rounded-full font-bold flex items-center justify-center text-white bg-[#EA580C] shrink-0 text-base shadow-xs select-none">
+                        {residentInitial}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-[15px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">{user.name}</h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.barangay}</p>
+                        <h3 className="font-bold text-[14px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">
+                            {user?.name || 'Marc Alexis'}
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                            {user?.barangay || 'Barangay 171'}
+                        </p>
                     </div>
+                    <ChevronRight size={18} className="text-slate-400 group-hover:text-orange-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                 </div>
 
-                {/* Primary Action Button — Structurally separated from navigation list */}
-                <div className="mb-4">
+                {/* 2. Primary Action Button */}
+                <div className="mb-5">
                     <button
                         type="button"
                         onClick={() => handleSetModal('file-report')}
-                        className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-extrabold text-sm tracking-wide shadow-md hover:shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 group"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-[0.98] text-white font-bold text-sm tracking-wide shadow-sm hover:shadow transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400"
                         title="Submit a new civic infrastructure report"
                     >
-                        <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0 group-hover:rotate-90 transition-transform duration-200">
-                            <Plus size={14} strokeWidth={3} className="text-white" />
-                        </div>
-                        <span>{t('dashboard.sidebar.report', { defaultValue: 'Report an issue' })}</span>
+                        <Plus size={18} strokeWidth={2.8} className="text-white shrink-0" />
+                        <span>Report an issue</span>
                     </button>
                 </div>
 
-                {/* Structural Divider Separating Standing Action from Destination Rails */}
-                <div className="h-px bg-slate-200/80 dark:bg-slate-800 my-4" role="separator" />
+                {/* 3. Section: WORKSPACE */}
+                <div className="mb-2">
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 mb-2">
+                        WORKSPACE
+                    </span>
+                    <nav className="space-y-1" aria-label="Workspace Navigation">
+                        {navDestinations.map(item => {
+                            const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
 
-                {/* Persistent Side Navigation Rail (Destinations) */}
-                <nav className="space-y-1.5" aria-label="Main Navigation">
-                    {navDestinations.map(item => {
-                        const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
-
-                        return (
-                            <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => handleSetTab(item.id)}
-                                aria-current={isActive ? 'page' : undefined}
-                                className={`w-full relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 group ${
-                                    isActive
-                                        ? 'bg-orange-500/10 dark:bg-orange-500/15 text-[#ff6b00] font-extrabold shadow-2xs border border-orange-500/30 dark:border-orange-500/20'
-                                        : 'text-slate-600 dark:text-slate-400 font-semibold hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white border border-transparent'
-                                }`}
-                            >
-                                {/* Signal Cut Accent Indicator for Active State */}
-                                {isActive && (
-                                    <span className="absolute left-0 top-2 bottom-2 w-1 bg-[#ff6b00] rounded-r-full" aria-hidden="true" />
-                                )}
-                                <span className={`shrink-0 transition-colors ${isActive ? 'text-[#ff6b00]' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-200'}`}>
-                                    {item.icon}
-                                </span>
-                                <span className="truncate">{item.label}</span>
-                                {item.id === 'updates' && unreadCount > 0 && (
-                                    <span
-                                        className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#f05a00] text-white tabular-nums shadow-xs"
-                                        aria-label={`${unreadCount} unread`}
-                                    >
-                                        {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
+                            return (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => handleSetTab(item.id)}
+                                    aria-current={isActive ? 'page' : undefined}
+                                    className={`w-full relative flex items-center gap-3 px-3.5 py-2.5 text-sm transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C] group ${
+                                        isActive
+                                            ? 'bg-[#FFF7ED] dark:bg-orange-950/30 text-[#EA580C] font-bold border-l-[3.5px] border-[#EA580C] rounded-r-xl rounded-l-xs shadow-2xs'
+                                            : 'text-slate-800 dark:text-slate-200 font-semibold hover:bg-slate-100/70 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white rounded-xl border-l-[3.5px] border-transparent'
+                                    }`}
+                                >
+                                    <span className={`shrink-0 transition-colors ${isActive ? 'text-[#EA580C]' : 'text-slate-800 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'}`}>
+                                        {item.icon}
                                     </span>
-                                )}
+                                    <span className="truncate">{item.label}</span>
+                                    {item.id === 'updates' && unreadCount > 0 && (
+                                        <span
+                                            className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#f05a00] text-white tabular-nums shadow-xs"
+                                            aria-label={`${unreadCount} unread`}
+                                        >
+                                            {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </nav>
+                </div>
+
+                {/* Divider between Workspace and Resources */}
+                <div className="my-4 border-t border-slate-200/80 dark:border-slate-800" />
+
+                {/* 4. Section: RESOURCES */}
+                <div className="mb-4">
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 mb-2">
+                        RESOURCES
+                    </span>
+                    <nav className="space-y-1" aria-label="Resources Navigation">
+                        <button
+                            type="button"
+                            onClick={() => handleSetModal('help-center')}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors text-left cursor-pointer group"
+                        >
+                            <HelpCircle size={19} strokeWidth={2} className="text-slate-800 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white shrink-0" />
+                            <span className="truncate">Help center</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSetModal('reporting-guide')}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors text-left cursor-pointer group"
+                        >
+                            <BookOpen size={19} strokeWidth={2} className="text-slate-800 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white shrink-0" />
+                            <span className="truncate">Reporting guide</span>
+                        </button>
+                    </nav>
+                </div>
+
+                {/* 5. "Need a hand?" Support Card */}
+                <div className="my-4 p-4 rounded-2xl bg-[#FFF8F0] dark:bg-orange-950/20 border border-orange-100/80 dark:border-orange-900/30">
+                    <div className="flex items-start gap-3">
+                        <LifeBuoy size={28} strokeWidth={2.2} className="text-[#EA580C] shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                                Need a hand?
+                            </h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                                Learn how to submit a clear report.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => handleSetModal('reporting-guide')}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-[#EA580C] hover:text-orange-700 dark:hover:text-orange-400 mt-2.5 cursor-pointer transition-colors group"
+                            >
+                                <span>View reporting guide</span>
+                                <ArrowRight size={13} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
                             </button>
-                        );
-                    })}
-                </nav>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Supporting Footer Links */}
-            <div className="pt-4 border-t border-slate-200/80 dark:border-slate-800">
-                <div className="px-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    <div className="flex flex-wrap gap-2 mb-2">
-                        <button onClick={() => handleSetModal('privacy')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.privacy', { defaultValue: 'Privacy' })}</button> ·
-                        <button onClick={() => handleSetModal('terms')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.terms', { defaultValue: 'Terms' })}</button> ·
-                        <button onClick={() => handleSetModal('cookies')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.cookie', { defaultValue: 'Cookies' })}</button>
-                    </div>
-                    <div className="text-[11px] text-slate-400 dark:text-slate-600">PULSO Caloocan North © 2026</div>
+            {/* 6. Supporting Footer Links */}
+            <div className="pt-3 pb-2 border-t border-slate-200/80 dark:border-slate-800 text-center">
+                <div className="text-xs text-slate-400 dark:text-slate-500 flex items-center justify-center gap-2 mb-1.5 font-medium">
+                    <button onClick={() => handleSetModal('privacy')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.privacy', { defaultValue: 'Privacy' })}</button>
+                    <span>·</span>
+                    <button onClick={() => handleSetModal('terms')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.terms', { defaultValue: 'Terms' })}</button>
+                    <span>·</span>
+                    <button onClick={() => handleSetModal('cookies')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.cookie', { defaultValue: 'Cookies' })}</button>
+                </div>
+                <div className="text-[11px] text-slate-400 dark:text-slate-600">
+                    PULSO Caloocan North © 2026
                 </div>
             </div>
         </div>
@@ -1848,6 +1915,80 @@ const getCategoryIconComponent = (category) => {
     return Wrench;
 };
 
+const SAMPLE_REPORTS_LIST = [
+    {
+        id: 'sample-1',
+        ticket_id: 'PUL-2026-2635',
+        title: 'Reported public safety hazard',
+        category: 'Public Safety',
+        status: 'rejected',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        created_at: '2026-10-29T10:30:00Z',
+        attachments_count: 2,
+        image_url: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80',
+        department_title: 'Not accepted after review.',
+        department_message: "Open the report to read the department's reason."
+    },
+    {
+        id: 'sample-2',
+        ticket_id: 'PUL-2026-1697',
+        title: 'Streetlight not working',
+        category: 'Streetlights',
+        status: 'pending',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        created_at: '2026-10-24T14:15:00Z',
+        attachments_count: 1,
+        image_url: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=400&q=80',
+        department_title: 'Received by the department.',
+        department_message: 'No action needed while under review.'
+    },
+    {
+        id: 'sample-3',
+        ticket_id: 'PUL-2026-1681',
+        title: 'Damaged road surface',
+        category: 'Roads and Infrastructure',
+        status: 'in_progress',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        created_at: '2026-10-20T08:45:00Z',
+        attachments_count: 3,
+        stage: 'Stage 4 of 5',
+        image_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=400&q=80',
+        department_title: 'Department work is in progress.',
+        department_message: 'Follow this report for updates.'
+    },
+    {
+        id: 'sample-4',
+        ticket_id: 'PUL-2026-4745',
+        title: 'Water leak on sidewalk',
+        category: 'Water and Drainage',
+        status: 'resolved',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        created_at: '2026-10-15T16:20:00Z',
+        attachments_count: 2,
+        image_url: 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&w=400&q=80',
+        department_title: 'Marked resolved.',
+        department_message: 'Review the completion update.'
+    },
+    {
+        id: 'sample-5',
+        ticket_id: 'PUL-2026-4802',
+        title: 'Clogged roadside drain',
+        category: 'Drainage and Flood Control',
+        status: 'pending',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        created_at: '2026-10-12T11:10:00Z',
+        attachments_count: 1,
+        image_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80',
+        department_title: 'Received by the department.',
+        department_message: 'Waiting for review.'
+    }
+];
+
 const MyReports = ({
     userReports = [],
     loadingReports,
@@ -1862,417 +2003,338 @@ const MyReports = ({
     t
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const [expandedReportIds, setExpandedReportIds] = useState(() => new Set());
-    const [hasInitializedDesktopFirstCard, setHasInitializedDesktopFirstCard] = useState(false);
-    const [reportHistoryPage, setReportHistoryPage] = useState(1);
+    const [selectedCategory, setSelectedCategory] = useState('All categories');
+    const [selectedDateFilter, setSelectedDateFilter] = useState('All dates');
+    const [sortOrder, setSortOrder] = useState('newest'); // 'newest' | 'oldest'
 
-    const tabsScrollRef = useRef(null);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
+    // Determine data source (live reports take precedence; fallback to sample demo reports when 0)
+    const isUsingSampleData = !userReports || userReports.length === 0;
+    const baseReports = isUsingSampleData ? SAMPLE_REPORTS_LIST : userReports;
 
-    const checkTabsScroll = useCallback(() => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        const { scrollLeft, scrollWidth, clientWidth } = el;
-        setCanScrollLeft(scrollLeft > 6);
-        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 6);
-    }, []);
-
-    useEffect(() => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        checkTabsScroll();
-        el.addEventListener('scroll', checkTabsScroll, { passive: true });
-        window.addEventListener('resize', checkTabsScroll);
-        const timer = setTimeout(checkTabsScroll, 120);
-        return () => {
-            el.removeEventListener('scroll', checkTabsScroll);
-            window.removeEventListener('resize', checkTabsScroll);
-            clearTimeout(timer);
-        };
-    }, [checkTabsScroll]);
-
-    const scrollTabs = (direction) => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        const scrollAmount = 180;
-        el.scrollBy({
-            left: direction === 'left' ? -scrollAmount : scrollAmount,
-            behavior: 'smooth'
+    // Available categories for dropdown
+    const categoriesList = useMemo(() => {
+        const set = new Set();
+        baseReports.forEach(r => {
+            const cat = r.category || r.ai_category;
+            if (cat) set.add(cat);
         });
-    };
+        return ['All categories', ...Array.from(set)];
+    }, [baseReports]);
 
-    useEffect(() => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        const activeBtn = el.querySelector(`[data-filter-id="${reportStatusFilter}"]`);
-        if (activeBtn) {
-            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
-    }, [reportStatusFilter]);
+    // Available dates for dropdown
+    const datesList = useMemo(() => {
+        const set = new Set();
+        baseReports.forEach(r => {
+            const d = r.created_at ? new Date(r.created_at) : new Date();
+            const str = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            set.add(str);
+        });
+        return ['All dates', ...Array.from(set)];
+    }, [baseReports]);
 
-    const filterOptions = [
-        { id: 'all', label: 'All reports' },
-        { id: 'pending', label: 'Pending' },
-        { id: 'in_progress', label: 'In Progress' },
-        { id: 'resolved', label: 'Resolved' },
-        { id: 'rejected', label: 'Rejected' },
-        { id: 'cancelled', label: 'Cancelled' }
+    // Stat metric counts across the base list
+    const totalCount = baseReports.length;
+    const awaitingReviewCount = useMemo(() => {
+        return baseReports.filter(r => ['pending', 'unverified', 'received', 'under_review'].includes((r.status || '').toLowerCase())).length;
+    }, [baseReports]);
+    const inProgressCount = useMemo(() => {
+        return baseReports.filter(r => ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes((r.status || '').toLowerCase())).length;
+    }, [baseReports]);
+    const resolvedCount = useMemo(() => {
+        return baseReports.filter(r => ['resolved', 'completed', 'fixed'].includes((r.status || '').toLowerCase())).length;
+    }, [baseReports]);
+    const rejectedCount = useMemo(() => {
+        return baseReports.filter(r => ['rejected', 'declined', 'invalid', 'spam'].includes((r.status || '').toLowerCase())).length;
+    }, [baseReports]);
+
+    // Filtered reports
+    const filteredReports = useMemo(() => {
+        return baseReports.filter(r => {
+            // Status Tab Filter
+            const s = (r.status || '').toLowerCase();
+            if (reportStatusFilter === 'pending' || reportStatusFilter === 'awaiting_review') {
+                if (!['pending', 'unverified', 'received', 'under_review'].includes(s)) return false;
+            } else if (reportStatusFilter === 'in_progress') {
+                if (!['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(s)) return false;
+            } else if (reportStatusFilter === 'resolved') {
+                if (!['resolved', 'completed', 'fixed'].includes(s)) return false;
+            } else if (reportStatusFilter === 'rejected') {
+                if (!['rejected', 'declined', 'invalid', 'spam'].includes(s)) return false;
+            }
+
+            // Category Filter
+            if (selectedCategory !== 'All categories') {
+                const cat = r.category || r.ai_category;
+                if (cat !== selectedCategory) return false;
+            }
+
+            // Date Filter
+            if (selectedDateFilter !== 'All dates') {
+                const d = r.created_at ? new Date(r.created_at) : new Date();
+                const m = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                if (m !== selectedDateFilter) return false;
+            }
+
+            // Text search
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase().trim();
+                const matchId = (r.ticket_id || '').toLowerCase().includes(q);
+                const matchCat = (r.category || r.ai_category || '').toLowerCase().includes(q);
+                const matchLoc = (r.location_string || r.barangay || '').toLowerCase().includes(q);
+                const matchTitle = (r.title || '').toLowerCase().includes(q);
+                if (!matchId && !matchCat && !matchLoc && !matchTitle) return false;
+            }
+
+            return true;
+        }).sort((a, b) => {
+            const dateA = new Date(a.created_at || 0).getTime();
+            const dateB = new Date(b.created_at || 0).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }, [baseReports, reportStatusFilter, selectedCategory, selectedDateFilter, searchQuery, sortOrder]);
+
+    const statusPillOptions = [
+        { id: 'all', label: 'All', count: totalCount },
+        { id: 'pending', label: 'Awaiting review', count: awaitingReviewCount },
+        { id: 'in_progress', label: 'In progress', count: inProgressCount },
+        { id: 'resolved', label: 'Resolved', count: resolvedCount },
+        { id: 'rejected', label: 'Rejected', count: rejectedCount }
     ];
 
-    // Combined filtering: tab filter + in-page text search
-    const filteredReports = userReports.filter(r => {
-        // Tab Status Filter
-        if (reportStatusFilter === 'in_progress') {
-            if (!['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(r.status)) return false;
-        } else if (reportStatusFilter === 'pending') {
-            if (!['pending', 'unverified', 'received', 'under_review'].includes(r.status)) return false;
-        } else if (reportStatusFilter !== 'all') {
-            if (r.status !== reportStatusFilter) return false;
-        }
-
-        // In-page Text Search Filter
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase().trim();
-            const matchId = (r.ticket_id || '').toLowerCase().includes(q);
-            const matchCat = (r.category || r.ai_category || '').toLowerCase().includes(q);
-            const matchLoc = (r.location_string || '').toLowerCase().includes(q);
-            const matchDesc = (r.description || r.notes || '').toLowerCase().includes(q);
-            return matchId || matchCat || matchLoc || matchDesc;
-        }
-
-        return true;
-    });
-
-    // Pagination: 5 reports per page
-    const REPORTS_PER_PAGE = 5;
-    const totalReportPages = Math.max(1, Math.ceil(filteredReports.length / REPORTS_PER_PAGE));
-    const activeReportPage = Math.min(reportHistoryPage, totalReportPages);
-
-    useEffect(() => {
-        setReportHistoryPage(1);
-    }, [reportStatusFilter, searchQuery]);
-
-    const paginatedReports = useMemo(() => {
-        const start = (activeReportPage - 1) * REPORTS_PER_PAGE;
-        return filteredReports.slice(start, start + REPORTS_PER_PAGE);
-    }, [filteredReports, activeReportPage]);
-
-    // Expand the first card by default on desktop once data arrives
-    useEffect(() => {
-        if (!hasInitializedDesktopFirstCard && paginatedReports.length > 0) {
-            if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
-                setExpandedReportIds(new Set([paginatedReports[0].id]));
-            }
-            setHasInitializedDesktopFirstCard(true);
-        }
-    }, [paginatedReports, hasInitializedDesktopFirstCard]);
-
-    const handleCardToggle = (reportId) => {
-        setExpandedReportIds(prev => {
-            const next = new Set(prev);
-            if (next.has(reportId)) {
-                next.delete(reportId);
-            } else {
-                next.add(reportId);
-            }
-            return next;
-        });
+    const getCategoryIcon = (categoryStr) => {
+        const cat = (categoryStr || '').toLowerCase();
+        if (cat.includes('safety') || cat.includes('hazard')) return <AlertTriangle size={13} className="text-rose-500 shrink-0" />;
+        if (cat.includes('light')) return <Lightbulb size={13} className="text-amber-500 shrink-0" />;
+        if (cat.includes('water') || cat.includes('leak')) return <Droplets size={13} className="text-blue-500 shrink-0" />;
+        if (cat.includes('drain')) return <Droplets size={13} className="text-cyan-500 shrink-0" />;
+        return <Wrench size={13} className="text-slate-500 shrink-0" />;
     };
-
-    // Group filtered reports by Month Heading ("August 2026", "April 2026")
-    const groupedReports = useMemo(() => {
-        const groups = {};
-        paginatedReports.forEach((report) => {
-            const dateObj = report.created_at ? new Date(report.created_at) : new Date();
-            const monthYear = dateObj.toLocaleDateString('en-US', {
-                month: 'long',
-                year: 'numeric'
-            });
-            if (!groups[monthYear]) {
-                groups[monthYear] = [];
-            }
-            groups[monthYear].push(report);
-        });
-
-        return Object.entries(groups).map(([monthYear, reports]) => ({
-            monthYear,
-            reports
-        }));
-    }, [paginatedReports]);
-
-    // Stat counts for desktop 4-card overview
-    const totalCount = userReports.length;
-    const awaitingReviewCount = useMemo(() => {
-        return userReports.filter(r => ['pending', 'unverified', 'received', 'under_review'].includes((r.status || '').toLowerCase())).length;
-    }, [userReports]);
-    const inProgressCount = useMemo(() => {
-        return userReports.filter(r => ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes((r.status || '').toLowerCase())).length;
-    }, [userReports]);
-    const resolvedCount = useMemo(() => {
-        return userReports.filter(r => ['resolved', 'completed', 'fixed'].includes((r.status || '').toLowerCase())).length;
-    }, [userReports]);
 
     return (
         <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full space-y-4 max-w-2xl lg:max-w-[1160px] mx-auto lg:px-8"
+            className="w-full space-y-5"
         >
-            {/* ============================================================ */}
-            {/* MOBILE & TABLET (< 1024px) HEADER & TOOLS - UNTOUCHED        */}
-            {/* ============================================================ */}
-            <div className="lg:hidden">
-                <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Report History
-                </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                    Track your submitted reports.
-                </p>
-            </div>
+            {/* Top Header Row */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1528] dark:text-white tracking-tight">
+                        My Reports
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        See what changed and what happens next.
+                    </p>
+                </div>
 
-            <div className="lg:hidden relative w-full">
-                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
-                <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by ID or location"
-                    className="w-full h-12 min-h-[3rem] pl-11 pr-10 text-sm bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 rounded-[0.875rem] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#ff6b00] focus:ring-[3px] focus:ring-[#ff6b00]/20 transition-all shadow-2xs"
-                />
-                {searchQuery && (
+                <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0">
                     <button
                         type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                        aria-label="Clear search query"
+                        onClick={() => handleSetModal('file-report')}
+                        className="px-5 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all cursor-pointer"
                     >
-                        <X size={16} />
+                        <Plus size={17} strokeWidth={2.8} />
+                        <span>New report</span>
                     </button>
-                )}
+                    {isUsingSampleData && (
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 select-none">
+                            Sample data
+                        </span>
+                    )}
+                </div>
             </div>
 
-            <div className="lg:hidden relative flex items-center min-w-0 max-w-full w-full">
+            {/* 5 Stats Metrics Cards Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+                {/* Total Reports */}
                 <button
                     type="button"
-                    onClick={() => scrollTabs('left')}
-                    disabled={!canScrollLeft}
-                    aria-label="Scroll filter options left"
-                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 mr-1 sm:mr-1.5 ${
-                        canScrollLeft
-                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
-                            : 'hidden'
-                    }`}
+                    onClick={() => setReportStatusFilter('all')}
+                    className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all text-left flex items-center gap-3.5 cursor-pointer group"
                 >
-                    <ChevronLeft size={16} strokeWidth={2.5} />
-                </button>
-
-                <div className="relative min-w-0 flex-1 overflow-hidden">
-                    <div
-                        className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
-                            canScrollLeft ? 'opacity-100' : 'opacity-0'
-                        }`}
-                        aria-hidden="true"
-                    />
-
-                    <div
-                        ref={tabsScrollRef}
-                        className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5 w-full"
-                    >
-                        {filterOptions.map((opt) => {
-                            const count = opt.id === 'all'
-                                ? userReports.length
-                                : userReports.filter(r => {
-                                    if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(r.status);
-                                    if (opt.id === 'pending') return ['pending', 'unverified', 'received', 'under_review'].includes(r.status);
-                                    return r.status === opt.id;
-                                }).length;
-
-                            const isSelected = reportStatusFilter === opt.id;
-
-                            return (
-                                <button
-                                    key={opt.id}
-                                    data-filter-id={opt.id}
-                                    type="button"
-                                    onClick={() => setReportStatusFilter(opt.id)}
-                                    aria-pressed={isSelected}
-                                    className={`h-12 min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
-                                        isSelected
-                                            ? 'bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold shadow-sm'
-                                            : 'bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-                                    }`}
-                                >
-                                    <span className={isSelected ? 'text-white' : ''}>{opt.label}</span>
-                                    <span
-                                        className={`px-1.5 py-0.5 rounded-full text-[11px] font-mono font-bold leading-none transition-colors ${
-                                            isSelected
-                                                ? 'bg-black/20 text-white'
-                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                                        }`}
-                                    >
-                                        {count}
-                                    </span>
-                                </button>
-                            );
-                        })}
+                    <FileText size={26} strokeWidth={1.8} className="text-slate-400 dark:text-slate-500 shrink-0 group-hover:text-slate-600 transition-colors" />
+                    <div>
+                        <div className="text-2xl sm:text-3xl font-bold text-[#0B1528] dark:text-white leading-none font-mono">
+                            {totalCount}
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">
+                            Total reports
+                        </p>
                     </div>
-
-                    <div
-                        className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
-                            canScrollRight ? 'opacity-100' : 'opacity-0'
-                        }`}
-                        aria-hidden="true"
-                    />
-                </div>
-
-                <button
-                    type="button"
-                    onClick={() => scrollTabs('right')}
-                    disabled={!canScrollRight}
-                    aria-label="Scroll filter options right"
-                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 ml-1 sm:ml-1.5 ${
-                        canScrollRight
-                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
-                            : 'hidden'
-                    }`}
-                >
-                    <ChevronRight size={16} strokeWidth={2.5} />
                 </button>
-            </div>
 
-            {/* ============================================================ */}
-            {/* DESKTOP (>= 1024px) TARGET DESIGN HEADER, STATS & TOOLS       */}
-            {/* ============================================================ */}
-            {/* 1. Desktop Top Row */}
-            <div className="hidden lg:flex items-center justify-between gap-4 pb-1 pt-1">
-                <div>
-                    <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-0.5">
-                        Every report. A step forward.
-                    </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Track your concerns and see what happens next.
-                    </p>
-                </div>
-
+                {/* Awaiting Review */}
                 <button
                     type="button"
-                    onClick={() => handleSetModal('file-report')}
-                    className="h-11 min-h-[44px] px-5 rounded-xl bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold text-sm flex items-center gap-2 shadow-sm transition-all focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] cursor-pointer active:scale-[0.98]"
+                    onClick={() => setReportStatusFilter('pending')}
+                    className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-300 dark:hover:border-amber-800/60 transition-all text-left flex items-center gap-3.5 cursor-pointer group"
                 >
-                    <Plus size={18} strokeWidth={2.5} className="text-white" />
-                    <span className="text-white">New Report</span>
+                    <Clock size={26} strokeWidth={1.8} className="text-amber-500 shrink-0 group-hover:scale-105 transition-transform" />
+                    <div>
+                        <div className="text-2xl sm:text-3xl font-bold text-amber-600 dark:text-amber-500 leading-none font-mono">
+                            {awaitingReviewCount}
+                        </div>
+                        <p className="text-xs text-amber-600 dark:text-amber-500 mt-1 font-medium">
+                            Awaiting review
+                        </p>
+                    </div>
+                </button>
+
+                {/* In Progress */}
+                <button
+                    type="button"
+                    onClick={() => setReportStatusFilter('in_progress')}
+                    className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-blue-300 dark:hover:border-blue-800/60 transition-all text-left flex items-center gap-3.5 cursor-pointer group"
+                >
+                    <Settings size={26} strokeWidth={1.8} className="text-blue-500 shrink-0 group-hover:rotate-45 transition-transform duration-300" />
+                    <div>
+                        <div className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 leading-none font-mono">
+                            {inProgressCount}
+                        </div>
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
+                            In progress
+                        </p>
+                    </div>
+                </button>
+
+                {/* Resolved */}
+                <button
+                    type="button"
+                    onClick={() => setReportStatusFilter('resolved')}
+                    className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800/60 transition-all text-left flex items-center gap-3.5 cursor-pointer group"
+                >
+                    <CheckCircle2 size={26} strokeWidth={1.8} className="text-emerald-500 shrink-0 group-hover:scale-105 transition-transform" />
+                    <div>
+                        <div className="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 leading-none font-mono">
+                            {resolvedCount}
+                        </div>
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
+                            Resolved
+                        </p>
+                    </div>
+                </button>
+
+                {/* Rejected */}
+                <button
+                    type="button"
+                    onClick={() => setReportStatusFilter('rejected')}
+                    className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-rose-300 dark:hover:border-rose-800/60 transition-all text-left flex items-center gap-3.5 cursor-pointer group"
+                >
+                    <XCircle size={26} strokeWidth={1.8} className="text-rose-500 shrink-0 group-hover:scale-105 transition-transform" />
+                    <div>
+                        <div className="text-2xl sm:text-3xl font-bold text-rose-600 dark:text-rose-400 leading-none font-mono">
+                            {rejectedCount}
+                        </div>
+                        <p className="text-xs text-rose-600 dark:text-rose-400 mt-1 font-medium">
+                            Rejected
+                        </p>
+                    </div>
                 </button>
             </div>
 
-            {/* 2. Desktop 4 Stat Cards */}
-            <div className="hidden lg:grid grid-cols-4 gap-4 py-1">
-                <div className="p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c1427] shadow-2xs">
-                    <div className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono [font-variant-numeric:tabular-nums]">
-                        {totalCount}
-                    </div>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
-                        Total reports
-                    </p>
-                </div>
-
-                <div className="p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c1427] shadow-2xs">
-                    <div className="text-3xl font-extrabold text-[#ff6b00] font-mono [font-variant-numeric:tabular-nums]">
-                        {awaitingReviewCount}
-                    </div>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
-                        Awaiting review
-                    </p>
-                </div>
-
-                <div className="p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c1427] shadow-2xs">
-                    <div className="text-3xl font-extrabold text-[#0284c7] dark:text-[#38bdf8] font-mono [font-variant-numeric:tabular-nums]">
-                        {inProgressCount}
-                    </div>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
-                        In progress
-                    </p>
-                </div>
-
-                <div className="p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c1427] shadow-2xs">
-                    <div className="text-3xl font-extrabold text-[#10b981] dark:text-[#34d399] font-mono [font-variant-numeric:tabular-nums]">
-                        {resolvedCount}
-                    </div>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
-                        Resolved
-                    </p>
-                </div>
-            </div>
-
-            {/* 3. Desktop Tools Row: Search Field (~50% width) */}
-            <div className="hidden lg:flex items-center justify-between gap-4 py-1">
-                <div className="relative w-1/2 min-w-[360px]">
-                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+            {/* Filter Toolbar: Search + Category + Date Dropdowns */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                {/* Search Field */}
+                <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search by report ID, category, or location"
-                        className="w-full h-12 pl-11 pr-10 text-sm bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#ff6b00] focus:ring-[3px] focus:ring-[#ff6b00]/20 transition-all shadow-2xs"
+                        placeholder="Search by report ID, category, or location..."
+                        className="w-full h-10 pl-9 pr-8 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/20 transition-all shadow-2xs"
                     />
                     {searchQuery && (
                         <button
                             type="button"
                             onClick={() => setSearchQuery('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                            aria-label="Clear search query"
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
                         >
-                            <X size={16} />
+                            <X size={14} />
                         </button>
                     )}
                 </div>
+
+                {/* Categories Dropdown */}
+                <div className="relative shrink-0">
+                    <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="h-10 pl-3.5 pr-8 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:border-[#EA580C] transition-all cursor-pointer shadow-2xs appearance-none"
+                    >
+                        {categoriesList.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+
+                {/* Date Dropdown */}
+                <div className="relative shrink-0">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                        <Calendar size={14} />
+                    </div>
+                    <select
+                        value={selectedDateFilter}
+                        onChange={(e) => setSelectedDateFilter(e.target.value)}
+                        className="h-10 pl-8 pr-8 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:border-[#EA580C] transition-all cursor-pointer shadow-2xs appearance-none"
+                    >
+                        {datesList.map(d => (
+                            <option key={d} value={d}>{d}</option>
+                        ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
             </div>
 
-            {/* 4. Desktop Status Tabs (Light Active Pill) */}
-            <div className="hidden lg:flex items-center gap-2 py-1 border-b border-slate-200/80 dark:border-slate-800/80">
-                {filterOptions.map((opt) => {
-                    const count = opt.id === 'all'
-                        ? userReports.length
-                        : userReports.filter(r => {
-                            if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(r.status);
-                            if (opt.id === 'pending') return ['pending', 'unverified', 'received', 'under_review'].includes(r.status);
-                            return r.status === opt.id;
-                        }).length;
-
-                    const isSelected = reportStatusFilter === opt.id;
-
+            {/* Status Pills Row */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                {statusPillOptions.map((opt) => {
+                    const isSelected = (reportStatusFilter === opt.id) || (opt.id === 'all' && (!reportStatusFilter || reportStatusFilter === 'all'));
                     return (
                         <button
                             key={opt.id}
                             type="button"
                             onClick={() => setReportStatusFilter(opt.id)}
-                            aria-pressed={isSelected}
-                            className={`group h-10 min-h-[40px] px-4 rounded-full text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
+                            className={`h-8 px-3.5 rounded-full text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                                 isSelected
-                                    ? 'bg-white hover:bg-slate-50 text-slate-900 font-extrabold border border-slate-300/90 shadow-xs dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 dark:border-transparent dark:shadow-sm'
-                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800/80 hover:shadow-2xs border border-transparent hover:border-slate-200/90 dark:hover:border-slate-700/80'
+                                    ? 'bg-[#0B1528] text-white shadow-xs'
+                                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
                             }`}
                         >
                             <span>{opt.label}</span>
                             <span
-                                className={`px-1.5 py-0.5 rounded-full text-[11px] font-mono font-bold leading-none transition-colors ${
+                                className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-mono font-bold ${
                                     isSelected
-                                        ? 'bg-slate-100 dark:bg-black/10 text-slate-800 dark:text-slate-900 border border-slate-200/80 dark:border-transparent'
-                                        : 'bg-slate-200/60 dark:bg-slate-800 group-hover:bg-slate-100 dark:group-hover:bg-slate-700 text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-200'
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                                 }`}
                             >
-                                {count}
+                                {opt.count}
                             </span>
                         </button>
                     );
                 })}
             </div>
 
-            {/* ============================================================ */}
-            {/* REPORT LIST / LOADING / EMPTY STATES                         */}
-            {/* ============================================================ */}
-            <div className="pt-2 space-y-5">
+            {/* Month Heading & Sort Order Row */}
+            <div className="flex items-center justify-between pt-2 pb-1 border-b border-slate-100 dark:border-slate-800/80">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                    {selectedDateFilter !== 'All dates' ? selectedDateFilter : 'October 2026'}
+                </h3>
+                <button
+                    type="button"
+                    onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
+                    className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium flex items-center gap-1.5 transition-colors cursor-pointer select-none"
+                >
+                    <span>Showing {filteredReports.length} {filteredReports.length === 1 ? 'report' : 'reports'}, {sortOrder === 'newest' ? 'Newest first' : 'Oldest first'}</span>
+                    <ArrowUpDown size={13} className="text-slate-400" />
+                </button>
+            </div>
+
+            {/* Reports Cards List */}
+            <div className="space-y-3">
                 {loadingReports ? (
                     <div className="space-y-3">
                         <ReportCardSkeleton />
@@ -2280,137 +2342,217 @@ const MyReports = ({
                         <ReportCardSkeleton />
                     </div>
                 ) : filteredReports.length === 0 ? (
-                    userReports.length === 0 ? (
-                        <div className="flex flex-col items-center gap-3 py-16 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-[#0c1427]/40">
-                            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-[#ff6b00] flex items-center justify-center">
-                                <FileText size={28} strokeWidth={1.75} />
-                            </div>
-                            <div>
-                                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
-                                    No reports yet.
-                                </h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
-                                    You haven't submitted any civic infrastructure reports yet.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => handleSetModal('file-report')}
-                                className="h-12 min-h-[48px] mt-2 px-5 rounded-xl bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold text-sm flex items-center gap-2 cursor-pointer shadow-sm transition-all focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
-                            >
-                                <Plus size={18} strokeWidth={2.5} className="text-white" />
-                                <span className="text-white">Report a problem</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center gap-3 py-16 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-[#0c1427]/40">
-                            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
-                                <Search size={26} strokeWidth={1.75} />
-                            </div>
-                            <div>
-                                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
-                                    No reports found.
-                                </h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
-                                    No reports match your active search keyword or filter criteria.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setReportStatusFilter('all');
-                                }}
-                                className="h-12 min-h-[48px] mt-2 px-5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm flex items-center justify-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
-                            >
-                                Clear filters
-                            </button>
-                        </div>
-                    )
-                ) : (
-                    groupedReports.map(({ monthYear, reports }) => (
-                        <section key={monthYear} className="space-y-3">
-                            {/* Desktop Month Heading with count & sort */}
-                            <div className="hidden lg:flex items-center justify-between pb-0.5 pt-2">
-                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                                    {monthYear}
-                                </h3>
-                                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                                    {reports.length} {reports.length === 1 ? 'report' : 'reports'} · Newest first
-                                </span>
-                            </div>
-
-                            {/* Mobile Month Heading */}
-                            <h3 className="lg:hidden text-[13px] font-semibold text-slate-500 dark:text-slate-400 px-1 select-none">
-                                {monthYear}
-                            </h3>
-
-                            {/* Reports under this month */}
-                            <div className="space-y-3 lg:space-y-3.5">
-                                {reports.map((report) => (
-                                    <ReportHistoryCard
-                                        key={report.id}
-                                        report={report}
-                                        categoryIcon={getCategoryIconComponent(report.category || report.ai_category)}
-                                        isExpanded={expandedReportIds.has(report.id)}
-                                        onToggle={() => handleCardToggle(report.id)}
-                                        onOpenDetails={(rep) => onSelectReportForDetails?.(rep)}
-                                        onOpenMap={(rep) => onOpenMap?.(rep)}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    ))
-                )}
-
-                {/* Pagination Controls (5 per page) */}
-                {filteredReports.length > REPORTS_PER_PAGE && (
-                    <div className="flex items-center justify-between pt-4 pb-2 px-1 border-t border-slate-200/80 dark:border-slate-800/80 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                        <span className="text-[12px] text-slate-500 dark:text-slate-400 font-medium">
-                            Showing {Math.min((activeReportPage - 1) * REPORTS_PER_PAGE + 1, filteredReports.length)}–{Math.min(activeReportPage * REPORTS_PER_PAGE, filteredReports.length)} of {filteredReports.length}
-                        </span>
-
-                        <div className="flex items-center gap-1.5">
-                            <button
-                                type="button"
-                                disabled={activeReportPage <= 1}
-                                onClick={() => {
-                                    setReportHistoryPage(prev => Math.max(1, prev - 1));
-                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                                aria-label="Previous page"
-                                className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                            >
-                                Prev
-                            </button>
-                            <span className="px-2.5 py-0.5 text-xs font-bold text-slate-800 dark:text-white">
-                                {activeReportPage} / {totalReportPages}
-                            </span>
-                            <button
-                                type="button"
-                                disabled={activeReportPage >= totalReportPages}
-                                onClick={() => {
-                                    setReportHistoryPage(prev => Math.min(totalReportPages, prev + 1));
-                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                                aria-label="Next page"
-                                className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                            >
-                                Next
-                            </button>
-                        </div>
+                    <div className="p-12 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-slate-900/40">
+                        <FileText size={32} className="mx-auto text-slate-400 mb-2" />
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">No reports found</h4>
+                        <p className="text-xs text-slate-500 mt-1">Try clearing your search query or status filter.</p>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearchQuery('');
+                                setReportStatusFilter('all');
+                                setSelectedCategory('All categories');
+                                setSelectedDateFilter('All dates');
+                            }}
+                            className="mt-3 px-4 py-2 rounded-xl text-xs font-bold bg-[#EA580C] text-white hover:bg-[#d94e07] cursor-pointer"
+                        >
+                            Reset filters
+                        </button>
                     </div>
+                ) : (
+                    filteredReports.map((report) => {
+                        const rawStatus = (report.status || '').toLowerCase();
+                        const isRejected = ['rejected', 'declined', 'invalid', 'spam'].includes(rawStatus);
+                        const isResolved = ['resolved', 'completed', 'fixed'].includes(rawStatus);
+                        const isInProgress = ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(rawStatus);
+                        const isAwaiting = !isRejected && !isResolved && !isInProgress;
+
+                        const ticketId = report.ticket_id || `PUL-2026-${String(report.id || '').padStart(4, '0')}`;
+                        const title = report.title || report.summary || `Reported ${report.category || 'civic concern'}`;
+                        const categoryName = report.category || report.ai_category || 'Civic Infrastructure';
+                        const locationStr = report.location_string || report.address || report.barangay || 'Caloocan City';
+
+                        const dateObj = report.created_at ? new Date(report.created_at) : new Date();
+                        const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        const attachmentsCount = report.attachments_count || (report.image_url ? 1 : 0);
+
+                        // Image source resolution
+                        const rawImg = report.image_url || report.photo_url;
+                        const imgSrc = rawImg
+                            ? (rawImg.startsWith('http://') || rawImg.startsWith('https://') || rawImg.startsWith('data:')
+                                ? rawImg
+                                : `${API_BASE_URL}${rawImg.startsWith('/') ? '' : '/'}${rawImg}`)
+                            : 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80';
+
+                        return (
+                            <div
+                                key={report.id}
+                                className="p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-4 group"
+                            >
+                                {/* Left Section: Thumbnail + Details */}
+                                <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                                    {/* Thumbnail */}
+                                    <div
+                                        onClick={() => onSelectReportForDetails?.(report)}
+                                        className="w-20 h-16 sm:w-24 sm:h-18 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 shrink-0 cursor-pointer shadow-2xs group/img"
+                                    >
+                                        <img
+                                            src={imgSrc}
+                                            alt={title}
+                                            className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
+                                            onError={(e) => {
+                                                e.currentTarget.src = 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80';
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Titles & Meta */}
+                                    <div className="min-w-0 flex-1">
+                                        <h4
+                                            onClick={() => onSelectReportForDetails?.(report)}
+                                            className="text-sm sm:text-[15.5px] font-bold text-slate-900 dark:text-white leading-tight cursor-pointer hover:text-[#EA580C] dark:hover:text-[#EA580C] transition-colors truncate"
+                                        >
+                                            {title}
+                                        </h4>
+
+                                        {/* Category & Ticket ID */}
+                                        <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                            {getCategoryIcon(categoryName)}
+                                            <span className="font-medium text-slate-600 dark:text-slate-300 truncate">{categoryName}</span>
+                                            <span className="text-slate-300 dark:text-slate-600">|</span>
+                                            <span className="font-mono text-[11.5px] text-slate-500 dark:text-slate-400">{ticketId}</span>
+                                        </div>
+
+                                        {/* Location */}
+                                        <div className="flex items-center gap-1 mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                            <MapPin size={12.5} className="text-slate-400 shrink-0" />
+                                            <span className="truncate">{locationStr}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Middle Column 1: Status Pill */}
+                                <div className="shrink-0 xl:w-36">
+                                    {isRejected && (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#FEF2F2] dark:bg-rose-950/40 text-[#EF4444] border border-[#FEE2E2] dark:border-rose-900/40">
+                                            <X size={12} strokeWidth={2.8} />
+                                            <span>Rejected</span>
+                                        </span>
+                                    )}
+                                    {isAwaiting && (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#FEF3C7] dark:bg-amber-950/40 text-[#B45309] dark:text-amber-400 border border-[#FDE68A] dark:border-amber-900/40">
+                                            <Clock size={12} strokeWidth={2.5} />
+                                            <span>Awaiting review</span>
+                                        </span>
+                                    )}
+                                    {isInProgress && (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#EFF6FF] dark:bg-blue-950/40 text-[#2563EB] dark:text-blue-400 border border-[#DBEAFE] dark:border-blue-900/40">
+                                            <Settings size={12} strokeWidth={2.5} />
+                                            <span>In progress</span>
+                                        </span>
+                                    )}
+                                    {isResolved && (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#ECFDF5] dark:bg-emerald-950/40 text-[#059669] dark:text-emerald-400 border border-[#D1FAE5] dark:border-emerald-900/40">
+                                            <Check size={12} strokeWidth={2.8} />
+                                            <span>Resolved</span>
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Middle Column 2: Department Feedback Box & Date */}
+                                <div className="flex flex-col gap-1.5 shrink-0 xl:w-72">
+                                    {isRejected && (
+                                        <div className="p-2.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/25 border border-rose-100 dark:border-rose-900/30 text-left">
+                                            <h5 className="text-xs font-bold text-rose-700 dark:text-rose-400 leading-tight">
+                                                {report.department_title || 'Not accepted after review.'}
+                                            </h5>
+                                            <p className="text-[11px] text-rose-600/90 dark:text-rose-400/80 mt-0.5 leading-snug">
+                                                {report.department_message || "Open the report to read the department's reason."}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {isAwaiting && (
+                                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-left">
+                                            <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
+                                                {report.department_title || 'Received by the department.'}
+                                            </h5>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                {report.department_message || 'No action needed while under review.'}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {isInProgress && (
+                                        <div className="p-2.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/25 border border-blue-100/80 dark:border-blue-900/30 text-left">
+                                            <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
+                                                {report.department_title || 'Department work is in progress.'}
+                                            </h5>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                {report.department_message || 'Follow this report for updates.'}
+                                            </p>
+                                            <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 mt-0.5">
+                                                {report.stage || 'Stage 4 of 5'}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {isResolved && (
+                                        <div className="p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/25 border border-emerald-100/80 dark:border-emerald-900/30 text-left">
+                                            <h5 className="text-xs font-bold text-emerald-800 dark:text-emerald-300 leading-tight">
+                                                {report.department_title || 'Marked resolved.'}
+                                            </h5>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                {report.department_message || 'Review the completion update.'}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Date & Attachments */}
+                                    <div className="flex items-center gap-3 text-[11.5px] text-slate-500 dark:text-slate-400 font-medium">
+                                        <div className="flex items-center gap-1">
+                                            <Calendar size={13} className="text-slate-400" />
+                                            <span>{dateFormatted}</span>
+                                        </div>
+                                        {attachmentsCount > 0 && (
+                                            <div className="flex items-center gap-1">
+                                                <Paperclip size={13} className="text-slate-400" />
+                                                <span>{attachmentsCount} {attachmentsCount === 1 ? 'attachment' : 'attachments'}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Right Column: Action Buttons */}
+                                <div className="flex items-center gap-2 shrink-0 self-end xl:self-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => onOpenMap?.(report)}
+                                        className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                    >
+                                        <MapPin size={14} className="text-slate-500 dark:text-slate-400" />
+                                        <span>View map</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => onSelectReportForDetails?.(report)}
+                                        className="px-4 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+                                    >
+                                        <span>View details</span>
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })
                 )}
             </div>
 
-            {/* Footer Text under the list */}
-            {userReports.length > 0 && (
-                <div className="pt-2 pb-8 text-center">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                        Total {userReports.length} reports recorded
-                    </p>
-                </div>
-            )}
+            {/* Bottom Footer Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-3 pb-6 text-xs text-slate-400 dark:text-slate-500">
+                <span>
+                    Showing {filteredReports.length} of {totalCount} {isUsingSampleData ? 'sample reports.' : 'reports.'}
+                </span>
+                {isUsingSampleData && (
+                    <span>Sample data shown for demonstration purposes only.</span>
+                )}
+            </div>
         </motion.div>
     );
 };
@@ -2845,163 +2987,387 @@ const ProfileView = ({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
                         transition={{ duration: 0.15 }}
-                        className="w-full max-w-[640px] mx-auto space-y-5 pb-36 sm:pb-28"
+                        className="w-full space-y-6 pb-36 sm:pb-28"
                     >
-                        {/* Page Header (Title "Settings", no long subtitle) */}
+                        {/* Page Header */}
                         <div className="px-1 pt-1">
-                            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                Settings
+                            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                                Account &amp; Settings
                             </h2>
+                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                Manage your profile, security, and how you use PULSO.
+                            </p>
                         </div>
 
-                        {/* User Card (top) */}
-                        <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-3.5 shadow-xs min-h-[72px]">
-                            <div className="flex items-center gap-3.5 min-w-0">
-                                <div className={`w-13 h-13 rounded-full font-black flex items-center justify-center text-white text-base shadow-sm border border-slate-200 dark:border-slate-700/80 shrink-0 overflow-hidden ${
-                                    user.avatarPhoto
-                                        ? 'bg-slate-100 dark:bg-slate-800'
-                                        : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
-                                }`}>
-                                    <UserAvatar
-                                        avatarUrl={user.avatarPhoto}
-                                        updatedAt={user.updatedAt}
-                                        fallbackInitial={user.avatar || 'R'}
-                                        alt={user.fullName || 'Resident'}
-                                    />
+                        {/* Top User Banner Card */}
+                        <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 min-w-0">
+                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full font-black flex items-center justify-center text-white text-xl sm:text-2xl shadow-sm bg-[#EA580C] shrink-0 select-none overflow-hidden">
+                                    {user.avatarPhoto ? (
+                                        <UserAvatar
+                                            avatarUrl={user.avatarPhoto}
+                                            updatedAt={user.updatedAt}
+                                            fallbackInitial={user.avatar || 'M'}
+                                            alt={user.fullName || 'Resident'}
+                                        />
+                                    ) : (
+                                        (user.name ? user.name[0].toUpperCase() : 'M')
+                                    )}
                                 </div>
 
                                 <div className="min-w-0 text-left">
-                                    <div className="flex items-center gap-1.5">
-                                        <h3 className="font-bold text-slate-900 dark:text-white text-base tracking-tight truncate">
-                                            {user.fullName || 'Resident'}
-                                        </h3>
-                                        <ShieldCheck size={16} className="text-emerald-500 shrink-0" aria-label="Verified resident" />
+                                    <h3 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl tracking-tight truncate">
+                                        {user.fullName || user.name || 'Marc Alexis'}
+                                    </h3>
+                                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
+                                        {user.email ? user.email.replace(/(.{2})(.*)(?=@)/, '$1••••') : 'marc••••@gmail.com'}
+                                    </p>
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        <MapPin size={14} className="text-slate-400 shrink-0" />
+                                        <span className="truncate">{user.barangay ? `${user.barangay}, Caloocan` : 'Barangay 171, Caloocan'}</span>
                                     </div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
-                                        {user.email || user.phone || 'alexismarcaida@gmail.com'}
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => changeSubView('profile-details')}
+                                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#EA580C] text-[#EA580C] hover:bg-orange-50 dark:hover:bg-orange-950/20 text-xs sm:text-sm font-bold transition-colors cursor-pointer shrink-0 self-start sm:self-center"
+                            >
+                                <Edit3 size={15} />
+                                <span>Edit profile</span>
+                            </button>
+                        </div>
+
+                        {/* 2-Column Desktop Grid Layout */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                            {/* ── LEFT COLUMN: Account & Preferences (~7 cols) ── */}
+                            <div className="lg:col-span-7 flex flex-col gap-6">
+
+                                {/* Card 1: Account */}
+                                <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs text-left">
+                                    <h3 className="font-heading font-extrabold text-base text-slate-900 dark:text-white mb-2">
+                                        Account
+                                    </h3>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                        <button
+                                            type="button"
+                                            onClick={() => changeSubView('profile-details')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <User size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Personal information
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Name, email, phone number, and address
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => changeSubView('security')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Lock size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Password &amp; security
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Update password and manage session security
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Card 2: Preferences */}
+                                <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs text-left">
+                                    <h3 className="font-heading font-extrabold text-base text-slate-900 dark:text-white mb-2">
+                                        Preferences
+                                    </h3>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                        {/* Notifications */}
+                                        <button
+                                            type="button"
+                                            onClick={() => changeSubView('notifications')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Bell size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Notifications
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Push and SMS updates about your reports
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-xs font-bold text-[#EA580C]">On</span>
+                                                <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all" />
+                                            </div>
+                                        </button>
+
+                                        {/* Language Selector */}
+                                        <div className="py-3.5 flex items-center justify-between gap-3 text-left -mx-2 px-2">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Globe size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white">
+                                                        Language
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Current: {isFilipino ? 'Filipino (Tagalog)' : 'English'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <select
+                                                value={isFilipino ? 'tl' : 'en'}
+                                                onChange={(e) => handleSwitchLanguage(e.target.value)}
+                                                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl px-3 py-2 cursor-pointer outline-none focus:ring-2 focus:ring-[#ff6b00]"
+                                                aria-label="Select language"
+                                            >
+                                                <option value="en">English</option>
+                                                <option value="tl">Filipino</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Appearance 3-way Segmented Control */}
+                                        <div className="py-3.5 -mx-2 px-2">
+                                            <div className="flex items-center gap-3.5 min-w-0 mb-3">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Palette size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white">
+                                                        Appearance
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Choose your display style
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-2 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => changeTheme('light')}
+                                                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                        theme === 'light'
+                                                            ? 'bg-[#FFF7ED] text-[#EA580C] border border-[#FDBA74] shadow-xs'
+                                                            : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                                                    }`}
+                                                >
+                                                    <Sun size={15} />
+                                                    <span>Light</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => changeTheme('dark')}
+                                                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                        theme === 'dark'
+                                                            ? 'bg-slate-900 text-white border border-slate-700 shadow-xs'
+                                                            : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                                                    }`}
+                                                >
+                                                    <Moon size={15} />
+                                                    <span>Dark</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                                                        changeTheme(prefersDark ? 'dark' : 'light');
+                                                    }}
+                                                    className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
+                                                >
+                                                    <Monitor size={15} />
+                                                    <span>System</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 text-left">
+                                        Preferences apply to your account.
                                     </p>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Grouped Sections */}
-                        <div className="w-full space-y-5">
-                            {/* ACCOUNT SECTION */}
-                            <div>
-                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
-                                    Account
-                                </h5>
-                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs">
-                                    <SettingsRow
-                                        icon={User}
-                                        label="Manage Profile"
-                                        onClick={() => changeSubView('profile-details')}
-                                    />
-                                    <SettingsRow
-                                        icon={Lock}
-                                        label="Password & Security"
-                                        onClick={() => changeSubView('security')}
-                                    />
-                                </div>
-                            </div>
+                            {/* ── RIGHT COLUMN: Help & Support, Privacy & Legal, Sign Out (~5 cols) ── */}
+                            <div className="lg:col-span-5 flex flex-col gap-6">
 
-                            {/* PREFERENCES SECTION */}
-                            <div>
-                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
-                                    Preferences
-                                </h5>
-                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs">
-                                    <SettingsRow
-                                        icon={Bell}
-                                        label="Notifications"
-                                        value={notificationsEnabled ? 'On' : 'Off'}
-                                        onClick={() => changeSubView('notifications')}
-                                    />
-                                    <SettingsRow
-                                        icon={Globe}
-                                        label={isFilipino ? "Tagalog" : "English"}
-                                        isLanguageSwitch={true}
-                                        isChecked={isFilipino}
-                                        onClick={handleToggleLanguage}
-                                        ariaLabel={isFilipino ? "Language: Tagalog" : "Language: English"}
-                                    />
-                                    {/* Accessible screen reader announcement for language changes */}
-                                    <div className="sr-only" aria-live="polite" aria-atomic="true">
-                                        {languageAnnouncement}
+                                {/* Card: Help & support */}
+                                <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs text-left">
+                                    <h3 className="font-heading font-extrabold text-base text-slate-900 dark:text-white mb-2">
+                                        Help &amp; support
+                                    </h3>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                        {/* Row 1: How PULSO works */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('reporting-guide')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <BookOpen size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        How PULSO works
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Reporting guide.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        {/* Row 2: Help center */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('help-center')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <HelpCircle size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Help center
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Common questions.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        {/* Row 3: Contact support */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsContactModalOpen(true)}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <MessageSquare size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Contact support
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Get help with your account.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
                                     </div>
-                                    <SettingsRow
-                                        icon={theme === 'dark' ? Moon : Sun}
-                                        label={theme === 'dark'
-                                            ? t('dashboard.profile.darkMode', { defaultValue: 'Dark mode' })
-                                            : t('dashboard.profile.lightMode', { defaultValue: 'Light mode' })
-                                        }
-                                        isSwitch={true}
-                                        isChecked={theme === 'dark'}
-                                        onClick={handleToggleDarkMode}
-                                    />
-                                    {/* Accessible screen reader announcement for theme changes */}
-                                    <div className="sr-only" aria-live="polite" aria-atomic="true">
-                                        {themeAnnouncement}
+                                </div>
+
+                                {/* Card: Privacy & legal */}
+                                <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs text-left">
+                                    <h3 className="font-heading font-extrabold text-base text-slate-900 dark:text-white mb-2">
+                                        Privacy &amp; legal
+                                    </h3>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                        {/* Row 1: Privacy policy */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('privacy')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <ShieldCheck size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                    Privacy policy
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        {/* Row 2: Terms of use */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('terms')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <FileText size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                    Terms of use
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        {/* Row 3: Cookie preferences */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('cookies')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Cookie size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                    Cookie preferences
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
                                     </div>
                                 </div>
+
+                                {/* Card: Sign out (Card button) */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsLogoutConfirmOpen(true)}
+                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-center gap-1 hover:border-red-300 dark:hover:border-red-900/50 hover:bg-red-50/30 dark:hover:bg-red-950/20 transition-all cursor-pointer text-left group"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <LogOut size={18} className="text-slate-700 dark:text-slate-300 group-hover:text-red-600 transition-colors shrink-0" />
+                                        <span className="font-heading font-extrabold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-red-600 transition-colors">
+                                            Sign out
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 pl-7">
+                                        End your session on this device.
+                                    </p>
+                                </button>
+
                             </div>
 
-                            {/* SUPPORT SECTION */}
-                            <div>
-                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
-                                    Support
-                                </h5>
-                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs">
-                                    <SettingsRow
-                                        icon={HelpCircle}
-                                        label="How PULSO Works"
-                                        onClick={() => navigate('/tutorial?from=profile')}
-                                    />
-                                    <SettingsRow
-                                        icon={PhoneCall}
-                                        label="Contact"
-                                        onClick={() => setIsContactModalOpen(true)}
-                                    />
-                                    <SettingsRow
-                                        icon={Shield}
-                                        label="Privacy Policy"
-                                        onClick={handleOpenPrivacy}
-                                    />
-                                    <SettingsRow
-                                        icon={FileText}
-                                        label="Terms & Conditions"
-                                        onClick={handleOpenTerms}
-                                    />
-                                    <SettingsRow
-                                        icon={Star}
-                                        label="Rate App"
-                                        onClick={() => setIsRateModalOpen(true)}
-                                    />
-                                    <SettingsRow
-                                        icon={Share2}
-                                        label="Share App"
-                                        onClick={handleShareApp}
-                                    />
-                                    <SettingsRow
-                                        icon={Info}
-                                        label="About PULSO"
-                                        value="v2.4.0"
-                                        onClick={() => setIsAboutModalOpen(true)}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* LOGOUT (STANDALONE RED ROW) */}
-                            <div className="pt-1">
-                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
-                                    <SettingsRow
-                                        icon={LogOut}
-                                        label="Sign Out"
-                                        isDestructive={true}
-                                        onClick={() => setIsLogoutConfirmOpen(true)}
-                                    />
-                                </div>
-                            </div>
                         </div>
                     </motion.div>
                 )}
@@ -5091,13 +5457,34 @@ const ResidentModals = ({
     t,
     handleQuickReportSubmit,
     currentUser,
-    setActiveTab
+    setActiveTab,
+    setIsAIChatOpen
 }) => {
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
     const [isSvFullscreen, setIsSvFullscreen] = useState(false);
     const [currentMapZoom, setCurrentMapZoom] = useState(11);
     const [activeSector, setActiveSector] = useState('all');
+    const [helpSearchQuery, setHelpSearchQuery] = useState('');
+    const [expandedFaqId, setExpandedFaqId] = useState(1);
+    const [dontShowGuideAgain, setDontShowGuideAgain] = useState(() => {
+        try {
+            return localStorage.getItem('pulso_hide_reporting_guide') === 'true';
+        } catch (_) {
+            return false;
+        }
+    });
+
+    const handleToggleGuidePreference = (checked) => {
+        setDontShowGuideAgain(checked);
+        try {
+            if (checked) {
+                localStorage.setItem('pulso_hide_reporting_guide', 'true');
+            } else {
+                localStorage.removeItem('pulso_hide_reporting_guide');
+            }
+        } catch (_) {}
+    };
 
     // Auto-reset fullscreen when Street View closes
     useEffect(() => {
@@ -5376,34 +5763,256 @@ const ResidentModals = ({
                             </div>
                         </div>
                     )}
-                    {activeModal === 'knowledge' && (
-                        <div className="p-4 sm:p-6 md:p-8 max-h-[85vh] overflow-y-auto custom-scrollbar">
-                            <div className="flex justify-between items-center mb-6">
-                                <div>
-                                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">Knowledge Base</h3>
-                                    <p className="text-xs sm:text-sm text-slate-500 font-medium">Guides, Tips & Information Hub</p>
-                                </div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
-                            </div>
-                            <div className="space-y-3 sm:space-y-4">
-                                {KNOWLEDGE_BASE_ARTICLES(t).map(article => (
-                                    <button key={article.id} className="w-full p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-orange-500/30 hover:bg-white dark:hover:bg-slate-800 transition-all text-left flex flex-col items-start gap-1">
-                                        <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">{article.category}</span>
-                                        <h4 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">{article.title}</h4>
-                                        <p className="text-xs sm:text-sm text-slate-500 font-medium">{article.excerpt}</p>
-                                        <div className="mt-2 h-0 w-0 group-hover:w-full border-b border-orange-500 transition-all"></div>
+                    {(activeModal === 'knowledge' || activeModal === 'help-center') && (() => {
+                        const FAQ_ITEMS = [
+                            {
+                                id: 1,
+                                question: 'How do I submit a report?',
+                                answer: 'Choose a category, pin the location, add evidence and details, then review and submit.'
+                            },
+                            {
+                                id: 2,
+                                question: 'Where can I find my report ID?',
+                                answer: "Your report ID is displayed immediately after submission and listed under 'My Reports' in your resident dashboard."
+                            },
+                            {
+                                id: 3,
+                                question: 'What do report statuses mean?',
+                                answer: 'Submitted means received; Under Review means dispatchers are assessing; Dispatched means a field team is assigned; Resolved means work is completed.'
+                            },
+                            {
+                                id: 4,
+                                question: 'Can I update my contact details?',
+                                answer: 'Yes, go to Account Settings from the sidebar or profile menu to update your phone number, email address, and notification preferences.'
+                            }
+                        ];
+
+                        const CATEGORY_CARDS = [
+                            {
+                                id: 'reporting',
+                                icon: <FileText size={22} strokeWidth={2} />,
+                                title: 'Reporting a concern',
+                                desc: 'Learn how to submit a report, add photos and provide details.',
+                                action: () => setActiveModal('reporting-guide')
+                            },
+                            {
+                                id: 'tracking',
+                                icon: <BarChart2 size={22} strokeWidth={2} />,
+                                title: 'Tracking reports',
+                                desc: 'Check the status of your reports and understand what happens next.',
+                                action: () => {
+                                    setActiveModal(null);
+                                    setActiveTab('reports');
+                                }
+                            },
+                            {
+                                id: 'account',
+                                icon: <User size={22} strokeWidth={2} />,
+                                title: 'Account & security',
+                                desc: 'Manage your account, update your details and keep it secure.',
+                                action: () => {
+                                    setActiveModal(null);
+                                    setActiveTab('profile');
+                                }
+                            },
+                            {
+                                id: 'maps',
+                                icon: <MapPin size={22} strokeWidth={2} />,
+                                title: 'Maps & locations',
+                                desc: 'Find, pin and understand locations on the map.',
+                                action: () => setActiveModal('map')
+                            }
+                        ];
+
+                        const query = helpSearchQuery.trim().toLowerCase();
+                        const filteredFaqs = query
+                            ? FAQ_ITEMS.filter(f => f.question.toLowerCase().includes(query) || f.answer.toLowerCase().includes(query))
+                            : FAQ_ITEMS;
+                        const filteredCards = query
+                            ? CATEGORY_CARDS.filter(c => c.title.toLowerCase().includes(query) || c.desc.toLowerCase().includes(query))
+                            : CATEGORY_CARDS;
+
+                        return (
+                            <div className="p-5 sm:p-7 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                                {/* Top Close Button */}
+                                <div className="flex justify-end -mt-1 -mr-1 mb-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveModal(null)}
+                                        className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                        aria-label="Close"
+                                    >
+                                        <X size={18} strokeWidth={2.5} />
                                     </button>
-                                ))}
-                            </div>
-                            <div className="mt-6 p-4 bg-orange-500 text-white rounded-2xl sm:rounded-3xl flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><Info size={18} /></div>
-                                    <div><p className="text-xs sm:text-sm font-bold">Need more help?</p><p className="text-[10px] opacity-80">Message our AI Assistant available 24/7.</p></div>
                                 </div>
-                                <button onClick={() => { setActiveModal(null); setIsAIChatOpen(true); }} className="px-4 py-2 bg-white text-orange-500 rounded-xl sm:rounded-2xl font-black text-xs uppercase shadow-lg shrink-0 cursor-pointer">Chat Support</button>
+
+                                {/* Center Icon Badge */}
+                                <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#EA580C] text-white flex items-center justify-center mx-auto mb-3 shadow-md shadow-orange-500/25">
+                                    <span className="text-2xl sm:text-3xl font-black leading-none select-none">?</span>
+                                </div>
+
+                                {/* Title & Subtitle */}
+                                <h3 className="text-2xl sm:text-[28px] font-bold text-slate-900 dark:text-white text-center leading-tight">
+                                    How can we help?
+                                </h3>
+                                <p className="text-xs sm:text-[13.5px] text-slate-500 dark:text-slate-400 text-center mt-1 mb-4">
+                                    Find answers about reporting and your account.
+                                </p>
+
+                                {/* Search Bar */}
+                                <div className="relative mb-4">
+                                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                    <input
+                                        type="text"
+                                        value={helpSearchQuery}
+                                        onChange={(e) => setHelpSearchQuery(e.target.value)}
+                                        placeholder="Search help topics..."
+                                        className="w-full pl-9 pr-8 py-2.5 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C] transition-all"
+                                    />
+                                    {helpSearchQuery && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setHelpSearchQuery('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* 4 Category Cards (2x2 Grid) */}
+                                {filteredCards.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-5">
+                                        {filteredCards.map((card) => (
+                                            <button
+                                                key={card.id}
+                                                type="button"
+                                                onClick={card.action}
+                                                className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-orange-300 dark:hover:border-orange-900/50 hover:shadow-sm transition-all text-left flex items-start justify-between gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="flex items-start gap-3 min-w-0">
+                                                    <div className="text-[#EA580C] shrink-0 mt-0.5">
+                                                        {card.icon}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-[#EA580C] transition-colors leading-snug">
+                                                            {card.title}
+                                                        </h4>
+                                                        <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-snug mt-0.5 line-clamp-2">
+                                                            {card.desc}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 shrink-0 mt-1" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Frequently Asked Questions Section */}
+                                <div className="mb-4">
+                                    <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mb-2.5">
+                                        Frequently asked questions
+                                    </h4>
+
+                                    {filteredFaqs.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {filteredFaqs.map((faq) => {
+                                                const isExpanded = expandedFaqId === faq.id;
+                                                return (
+                                                    <div
+                                                        key={faq.id}
+                                                        className={`rounded-xl border transition-all ${
+                                                            isExpanded
+                                                                ? 'border-orange-300 dark:border-orange-900/60 bg-[#FFF7ED]/40 dark:bg-orange-950/20'
+                                                                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700'
+                                                        }`}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setExpandedFaqId(isExpanded ? null : faq.id)}
+                                                            className="w-full p-3 sm:p-3.5 flex items-center justify-between gap-3 text-left cursor-pointer"
+                                                        >
+                                                            <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                                                {faq.question}
+                                                            </span>
+                                                            {isExpanded ? (
+                                                                <ChevronUp size={16} className="text-[#EA580C] shrink-0" strokeWidth={2.2} />
+                                                            ) : (
+                                                                <ChevronDown size={16} className="text-slate-400 shrink-0" strokeWidth={2.2} />
+                                                            )}
+                                                        </button>
+
+                                                        {isExpanded && (
+                                                            <div className="px-3 sm:px-3.5 pb-3 sm:pb-3.5 pt-0">
+                                                                <p className="text-xs sm:text-[12.5px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                                                                    {faq.answer}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center">
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                No help topics found matching "{helpSearchQuery}".
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Still Need Help Callout Banner */}
+                                <div className="mt-4 p-3.5 rounded-2xl bg-[#FFF7ED] dark:bg-orange-950/25 border border-[#FFEDD5] dark:border-orange-900/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/40 text-[#EA580C] flex items-center justify-center shrink-0">
+                                            <LifeBuoy size={22} strokeWidth={2.2} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h5 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                                Still need help?
+                                            </h5>
+                                            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                Open the support form to describe your question.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveModal(null);
+                                            if (typeof setIsAIChatOpen === 'function') {
+                                                setIsAIChatOpen(true);
+                                            }
+                                        }}
+                                        className="px-4 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm shadow-sm transition-all shrink-0 cursor-pointer self-start sm:self-auto"
+                                    >
+                                        Contact support
+                                    </button>
+                                </div>
+
+                                {/* Bottom Footer Row */}
+                                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveModal(null)}
+                                        className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveModal('reporting-guide')}
+                                        className="text-xs sm:text-sm font-bold text-[#EA580C] hover:text-[#d94e07] flex items-center gap-1 cursor-pointer transition-colors"
+                                    >
+                                        <span>View reporting guide</span>
+                                        <span className="text-sm font-bold">→</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {activeModal.startsWith('calling-') && (() => {
                         const hotlineName = activeModal.split('calling-')[1];
@@ -5465,50 +6074,205 @@ const ResidentModals = ({
                     })()}
 
                     {activeModal === 'privacy' && (
-                        <div className="p-5 sm:p-8">
-                            <div className="flex justify-between items-center mb-5">
-                                <div><h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.privacy', { defaultValue: 'Privacy Policy' })}</h3><p className="text-slate-500 font-medium text-xs">PULSO Data Protection standards</p></div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
+                        <div className="p-5 sm:p-7">
+                            {/* Top row: Draft content badge & Close button */}
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FFF7ED] dark:bg-orange-950/40 text-[#EA580C] border border-[#FFEDD5] dark:border-orange-900/40">
+                                    Draft content
+                                </span>
+                                <button
+                                    onClick={() => setActiveModal(null)}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    aria-label="Close"
+                                >
+                                    <X size={18} strokeWidth={2.5} />
+                                </button>
                             </div>
-                            <div className="space-y-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-2 sm:pr-4">
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-orange-500/30 underline-offset-4">{t('dashboard.privacy.s1_title', { defaultValue: '1. Information Collection' })}</h4>
-                                    <p>{t('dashboard.privacy.s1_desc', { defaultValue: 'PULSO collects data relevant to infrastructure reporting, including precise GPS coordinates, photographic evidence, and resident account details for verification purposes.' })}</p>
-                                </section>
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-orange-500/30 underline-offset-4">2. Digital Stewardship</h4>
-                                    <p>Your data is stored in encrypted government-grade servers. We do not sell or share citizen data with 3rd party advertising entities.</p>
-                                </section>
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-orange-500/30 underline-offset-4">3. AI Analysis Disclosure</h4>
-                                    <p>Triage automation uses Gemini AI to analyze report photos. No resident facial biometric data is stored or used for surveillance.</p>
-                                </section>
+
+                            {/* Header: Outline Shield + Title & Subtitle */}
+                            <div className="flex items-center gap-3.5 mb-3.5">
+                                <div className="text-[#EA580C] shrink-0">
+                                    <Shield size={34} strokeWidth={1.9} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+                                        Privacy Policy
+                                    </h3>
+                                    <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                        Understand how your information is used.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info Banner Callout */}
+                            <div className="p-3 sm:p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/25 border border-blue-100/90 dark:border-blue-900/30 flex items-center gap-2.5 mb-4">
+                                <Info size={17} className="text-blue-600 dark:text-blue-400 shrink-0" strokeWidth={2.2} />
+                                <p className="text-xs sm:text-[12.5px] text-slate-700 dark:text-slate-200 leading-snug">
+                                    Report information may include your location, photos, and account details.
+                                </p>
+                            </div>
+
+                            {/* 3 Structured Items */}
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                <div className="flex items-start gap-3.5 py-3 first:pt-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <User size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Information you provide
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Location, report descriptions, attachments, and contact details.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <FileText size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            How information is used
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            To review concerns, coordinate follow-up, and provide report updates.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3 last:pb-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Settings size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Automated review
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            If AI assists with review, explain its role and the data involved in the final policy.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footnote & Bottom Action */}
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-normal max-w-sm">
+                                    Full data handling details should match the service's actual practices.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveModal(null)}
+                                    className="px-6 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm tracking-wide shadow-sm transition-all shrink-0 self-end sm:self-auto cursor-pointer"
+                                >
+                                    Close
+                                </button>
                             </div>
                         </div>
                     )}
 
                     {activeModal === 'terms' && (
-                        <div className="p-5 sm:p-8">
-                            <div className="flex justify-between items-center mb-5">
-                                <div><h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.terms', { defaultValue: 'Terms of Service' })}</h3><p className="text-slate-500 font-medium text-xs">Resident User agreement for reporting</p></div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
+                        <div className="p-5 sm:p-7">
+                            {/* Top row: Draft content badge & Close button */}
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FFF7ED] dark:bg-orange-950/40 text-[#EA580C] border border-[#FFEDD5] dark:border-orange-900/40">
+                                    Draft content
+                                </span>
+                                <button
+                                    onClick={() => setActiveModal(null)}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    aria-label="Close"
+                                >
+                                    <X size={18} strokeWidth={2.5} />
+                                </button>
                             </div>
-                            <div className="space-y-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-2 sm:pr-4">
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-blue-500/30 underline-offset-4">{t('dashboard.terms.s1_title', { defaultValue: '1. Truthful Reporting' })}</h4>
-                                    <p>{t('dashboard.terms.s1_desc', { defaultValue: 'Residents are accountable for the accuracy of their reports. Submitting false or fake reports may result in account restrictions or suspension.' })}</p>
-                                </section>
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-blue-500/30 underline-offset-4">2. Citizen Conduct</h4>
-                                    <p>Harassment, abusive language, or uploading unrelated media to the engineering portal is strictly prohibited.</p>
-                                </section>
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-blue-500/30 underline-offset-4">3. Jurisdiction</h4>
-                                    <p>PULSO North Caloocan applies only to incidents within the city boundary as defined by the LGU mapping department.</p>
-                                </section>
+
+                            {/* Header: Outline FileText + Title & Subtitle */}
+                            <div className="flex items-center gap-3.5 mb-3.5">
+                                <div className="text-[#EA580C] shrink-0">
+                                    <FileText size={34} strokeWidth={1.9} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+                                        Terms of Service
+                                    </h3>
+                                    <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                        Guidelines for using PULSO.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info Banner Callout */}
+                            <div className="p-3 sm:p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/25 border border-blue-100/90 dark:border-blue-900/30 flex items-center gap-2.5 mb-4">
+                                <Info size={17} className="text-blue-600 dark:text-blue-400 shrink-0" strokeWidth={2.2} />
+                                <p className="text-xs sm:text-[12.5px] text-slate-700 dark:text-slate-200 leading-snug">
+                                    Submit relevant reports and use the service respectfully.
+                                </p>
+                            </div>
+
+                            {/* 3 Structured Items */}
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                <div className="flex items-start gap-3.5 py-3 first:pt-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Edit3 size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Report accurately
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Describe concerns honestly and include relevant evidence.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Users size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Be respectful
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Avoid abusive language and unrelated uploads.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3 last:pb-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <MapPin size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Check service coverage
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Use the published service-area guidance before submitting.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footnote & Bottom Action */}
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-normal max-w-sm">
+                                    These guidelines are a summary and should be read together with the full terms of service.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveModal(null)}
+                                    className="px-6 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm tracking-wide shadow-sm transition-all shrink-0 self-end sm:self-auto cursor-pointer"
+                                >
+                                    Close
+                                </button>
                             </div>
                         </div>
                     )}
+
                     {activeModal === 'post-details' && selectedPost && (
                         <div className="flex flex-col h-full max-h-[85vh]">
                             <div className="p-5 sm:p-8 pb-4 shrink-0 border-b border-slate-100 dark:border-slate-800">
@@ -5522,7 +6286,7 @@ const ResidentModals = ({
                                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">{new Date(selectedPost.created_at).toLocaleDateString()} • Ref: {selectedPost.advisory_id}</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors shrink-0"><X size={20} /></button>
+                                    <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors shrink-0 cursor-pointer"><X size={20} /></button>
                                 </div>
                             </div>
                             <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-6">
@@ -5544,20 +6308,322 @@ const ResidentModals = ({
                     )}
 
                     {activeModal === 'cookies' && (
-                        <div className="p-5 sm:p-8">
-                            <div className="flex justify-between items-center mb-5">
-                                <div><h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.cookie', { defaultValue: 'Cookie Policy' })}</h3><p className="text-slate-500 font-medium text-xs">How we manage your portal session</p></div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
+                        <div className="p-5 sm:p-7">
+                            {/* Top row: Draft content badge & Close button */}
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FFF7ED] dark:bg-orange-950/40 text-[#EA580C] border border-[#FFEDD5] dark:border-orange-900/40">
+                                    Draft content
+                                </span>
+                                <button
+                                    onClick={() => setActiveModal(null)}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    aria-label="Close"
+                                >
+                                    <X size={18} strokeWidth={2.5} />
+                                </button>
                             </div>
-                            <div className="space-y-4 text-xs sm:text-[13px] text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-2 sm:pr-4">
-                                <div className="p-3.5 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl mb-4">
-                                    <p className="font-bold text-blue-700 dark:text-blue-400">PULSO uses essential local storage to keep you securely signed in and maintain your theme preferences across sessions.</p>
+
+                            {/* Header: Outline SlidersHorizontal + Title & Subtitle */}
+                            <div className="flex items-center gap-3.5 mb-3.5">
+                                <div className="text-[#EA580C] shrink-0">
+                                    <SlidersHorizontal size={34} strokeWidth={1.9} />
                                 </div>
-                                <ul className="list-disc pl-5 space-y-2">
-                                    <li><strong>Auth Token:</strong> Securely stored to prevent re-login on every page refresh.</li>
-                                    <li><strong>Theme Preference:</strong> Remembers your Light/Dark mode choice.</li>
-                                    <li><strong>Map Cache:</strong> Improves performance when loading local hazard markers.</li>
-                                </ul>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+                                        Cookies &amp; Local Storage
+                                    </h3>
+                                    <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                        Understand what is stored on your device.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info Banner Callout (Peach tint) */}
+                            <div className="p-3 sm:p-3.5 rounded-xl bg-orange-50/80 dark:bg-orange-950/25 border border-orange-100/90 dark:border-orange-900/30 flex items-center gap-2.5 mb-4">
+                                <Info size={17} className="text-[#EA580C] shrink-0" strokeWidth={2.2} />
+                                <p className="text-xs sm:text-[12.5px] text-slate-700 dark:text-slate-200 leading-snug">
+                                    Storage can support sign-in, preferences, and map performance.
+                                </p>
+                            </div>
+
+                            {/* 3 Structured Items */}
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                <div className="flex items-start gap-3.5 py-3 first:pt-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Database size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Session storage
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Supports your signed-in session.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Monitor size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Appearance preference
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Remembers your display choice.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3 last:pb-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <MapIcon size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Map cache
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Helps previously loaded map content load faster.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footnote & Bottom Action */}
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-normal max-w-sm">
+                                    These descriptions must be checked against the implemented storage behavior.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveModal(null)}
+                                    className="px-6 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm tracking-wide shadow-sm transition-all shrink-0 self-end sm:self-auto cursor-pointer"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeModal === 'reporting-guide' && (
+                        <div className="p-5 sm:p-7 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                            {/* Header: Rounded peach icon box + Title & Subtitle + Close */}
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="w-12 h-12 rounded-2xl bg-[#FFF7ED] dark:bg-orange-950/40 border border-[#FFEDD5] dark:border-orange-900/40 flex items-center justify-center text-[#EA580C] shrink-0">
+                                        <BookOpen size={26} strokeWidth={2.2} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+                                            How to report a concern
+                                        </h3>
+                                        <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                            A clear report helps the city understand the issue.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setActiveModal(null)}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                                    aria-label="Close"
+                                >
+                                    <X size={18} strokeWidth={2.5} />
+                                </button>
+                            </div>
+
+                            {/* Section Kicker */}
+                            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-3 mb-2 px-0.5">
+                                REPORTING GUIDE
+                            </div>
+
+                            {/* Info Banner: Before you start */}
+                            <div className="p-3 sm:p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/25 border border-blue-100/90 dark:border-blue-900/30 flex items-center gap-2.5 mb-3.5">
+                                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                                    i
+                                </div>
+                                <p className="text-xs sm:text-[12.5px] text-slate-700 dark:text-slate-200 leading-snug">
+                                    <span className="font-bold text-slate-900 dark:text-white">Before you start:</span> have the location, a clear photo, and a short description ready.
+                                </p>
+                            </div>
+
+                            {/* 6 Numbered Steps Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3.5">
+                                {/* Step 1 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        1
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Choose a category
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Select the type of issue that best fits your concern.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 2 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        2
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Pin the location
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Mark the exact spot and add a nearby landmark.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 3 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        3
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Add evidence
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Upload clear photos taken from a safe place.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 4 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        4
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Describe the issue
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Explain what happened and when you noticed it.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 5 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        5
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Confirm your contact details
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Check how the department can reach you.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 6 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        6
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Review and submit
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Check your information before sending the report.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section Box: After you submit */}
+                            <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/90 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 mt-4">
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-2.5">
+                                    After you submit
+                                </h4>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
+                                        <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                            <FileText size={15} strokeWidth={2.2} />
+                                        </div>
+                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">
+                                            Find your report ID
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
+                                        <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                            <TrendingUp size={15} strokeWidth={2.2} />
+                                        </div>
+                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">
+                                            Track status in My Reports
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
+                                        <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                            <MessageSquare size={15} strokeWidth={2.2} />
+                                        </div>
+                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">
+                                            Read department feedback
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Confirmation Note */}
+                                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-2.5">
+                                    <div className="w-4 h-4 rounded-full bg-slate-400/20 text-slate-500 dark:text-slate-400 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                        i
+                                    </div>
+                                    <span>Your report is only submitted after you confirm it on the Review step.</span>
+                                </div>
+
+                                {/* Immediate Danger Warning Banner */}
+                                <div className="p-2.5 sm:p-3 rounded-xl bg-[#FFF8F0] dark:bg-orange-950/30 border border-orange-200/80 dark:border-orange-900/40 flex items-center gap-2.5">
+                                    <AlertTriangle size={18} className="text-[#EA580C] shrink-0" strokeWidth={2.2} />
+                                    <p className="text-xs text-orange-950 dark:text-orange-200 leading-snug">
+                                        <span className="font-bold">Immediate danger?</span> Use emergency services rather than waiting for a report update.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Bottom Footer Row */}
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-600 dark:text-slate-400">
+                                    <input
+                                        type="checkbox"
+                                        checked={dontShowGuideAgain}
+                                        onChange={(e) => handleToggleGuidePreference(e.target.checked)}
+                                        className="w-4 h-4 rounded border-slate-300 text-[#EA580C] focus:ring-orange-400 cursor-pointer"
+                                    />
+                                    <span>Don't show this guide automatically</span>
+                                </label>
+
+                                <div className="flex items-center gap-2 justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveModal(null)}
+                                        className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveModal('file-report');
+                                        }}
+                                        className="px-4 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                    >
+                                        <Plus size={16} strokeWidth={2.5} />
+                                        <span>Start a report</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -6475,6 +7541,7 @@ export default function ResidentDashboard() {
     const navigate = useNavigate();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+
     const [claimModalInitialTicket, setClaimModalInitialTicket] = useState('');
     const [claimModalInitialToken, setClaimModalInitialToken] = useState('');
 
@@ -8920,6 +9987,7 @@ export default function ResidentDashboard() {
                 handleQuickReportSubmit={handleQuickReportSubmit}
                 currentUser={currentUser}
                 setActiveTab={setActiveTab}
+                setIsAIChatOpen={setIsAIChatOpen}
             />
 
             {activeModal === 'all-notifications' && (
@@ -9049,7 +10117,7 @@ export default function ResidentDashboard() {
                 <div className="max-w-[1700px] mx-auto w-full px-0 sm:px-4 flex flex-col lg:flex-row flex-1 items-start">
 
                     {/* Persistent Desktop Left Side Navigation Rail (≥1024px) - Follows when scrolling */}
-                    <aside className="w-60 xl:w-64 shrink-0 hidden lg:block sticky top-14 sm:top-16 h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar border-r border-slate-200/80 dark:border-slate-800 self-start z-30">
+                    <aside className="w-64 xl:w-72 shrink-0 hidden lg:block sticky top-14 sm:top-16 h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar border-r border-slate-200/80 dark:border-slate-800 self-start z-30">
                         <LeftSidebar
                             user={user}
                             activeTab={activeTab}
@@ -9147,7 +10215,7 @@ export default function ResidentDashboard() {
                         )}
 
                         {activeTab === 'profile' && (
-                            <div className="w-full max-w-4xl mx-auto pb-32 lg:pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
+                            <div className="w-full max-w-5xl xl:max-w-6xl mx-auto pb-32 lg:pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
                                 <h1 className="sr-only">{t('dashboard.sidebar.account', { defaultValue: 'Account' })}</h1>
                                 <ProfileView
                                     user={user}

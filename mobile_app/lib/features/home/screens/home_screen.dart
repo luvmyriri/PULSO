@@ -8,6 +8,9 @@ import 'package:provider/provider.dart';
 import 'package:pulso_mobile/features/home/home_provider.dart';
 import 'package:pulso_mobile/features/registration/screens/camera_screen.dart';
 import 'package:pulso_mobile/features/home/screens/map_screen.dart';
+import 'package:pulso_mobile/features/profile/screens/profile_screen.dart';
+import 'package:pulso_mobile/features/advisories/screens/advisories_screen.dart';
+import 'package:pulso_mobile/features/reports/screens/my_reports_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,7 +22,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  // Quick Links remain static UI components
   final List<Map<String, dynamic>> _quickLinks = [
     {
       'title': 'Report\nIssue',
@@ -43,351 +45,328 @@ class _HomeScreenState extends State<HomeScreen> {
     },
   ];
 
+  Future<void> _openCameraReport() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const CameraScreen(side: 'incident_report'),
+      ),
+    );
+
+    if (result != null &&
+        result is Map &&
+        result['file'] != null &&
+        mounted) {
+      final File imageFile = result['file'];
+      final double? capturedLat = result['lat'];
+      final double? capturedLng = result['lng'];
+      final String? capturedAddress = result['address'];
+
+      String selectedCategory = 'Road Issue';
+      final TextEditingController notesController = TextEditingController();
+      final TextEditingController locationDescController = TextEditingController();
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setModalState) => Container(
+            height: MediaQuery.of(context).size.height * 0.75,
+            decoration: const BoxDecoration(
+              color: AppTheme.primaryDark,
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(30),
+              ),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'New AI Report',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.file(
+                    imageFile,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (capturedLat != null && capturedLng != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.green.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          color: Colors.green,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'GPS: ${capturedLat.toStringAsFixed(5)}, ${capturedLng.toStringAsFixed(5)}',
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Exact Location Description',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: locationDescController,
+                    maxLines: 2,
+                    style: const TextStyle(
+                      color: Colors.white,
+                    ),
+                    decoration: InputDecoration(
+                      hintText:
+                          'e.g., "Near the yellow street sign at the corner of..."',
+                      hintStyle: const TextStyle(
+                        color: Colors.white24,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(
+                        0.05,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                          12,
+                        ),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '⚠️ Please describe exactly where in the photo the issue is located.',
+                    style: TextStyle(
+                      color: Colors.orange.shade300,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                const Text(
+                  'Incident Category',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedCategory,
+                  dropdownColor: AppTheme.primaryDark,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: [
+                    'Road Issue',
+                    'Streetlight',
+                    'Drainage',
+                    'Garbage',
+                    'Other'
+                  ].map((cat) {
+                    return DropdownMenuItem(
+                      value: cat,
+                      child: Text(cat),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setModalState(() => selectedCategory = val);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Additional Notes',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: notesController,
+                  maxLines: 2,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Describe what needs to be fixed...',
+                    hintStyle: const TextStyle(color: Colors.white24),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      final result = await context
+                          .read<HomeProvider>()
+                          .submitQuickReport(
+                            image: imageFile,
+                            category: selectedCategory,
+                            notes: notesController.text,
+                            latitude: capturedLat,
+                            longitude: capturedLng,
+                            address: capturedAddress,
+                            locationDescription:
+                                locationDescController.text,
+                          );
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              result['message'] ??
+                                  (result['success']
+                                      ? 'Report submitted successfully!'
+                                      : 'Submission failed'),
+                            ),
+                            backgroundColor: result['success']
+                                ? Colors.green
+                                : Colors.redAccent,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryOrange,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          16,
+                        ),
+                      ),
+                    ),
+                    child: const Text(
+                      'Verify & Submit',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<HomeProvider>();
 
-    /// Pages indexed by bottom nav
     final List<Widget> pages = [
-      _HomeFeed(provider: provider, quickLinks: _quickLinks),
-      const MapScreen(), // Live Google Maps view
-      _PlaceholderPage(icon: Icons.foundation_rounded, label: 'OBO Services'),
-      _PlaceholderPage(icon: Icons.person_rounded, label: 'Profile'),
+      _HomeFeed(
+        provider: provider,
+        quickLinks: _quickLinks,
+        onNavigateToReports: () => setState(() => _currentIndex = 1),
+      ),
+      MyReportsScreen(
+        onNewReport: _openCameraReport,
+        onOpenProfile: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ProfileScreen()),
+        ),
+        onOpenMap: (rep) => setState(() => _currentIndex = 2),
+      ),
+      const MapScreen(),
+      const AdvisoriesScreen(),
     ];
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryDark,
+      backgroundColor: const Color(0xFFF8FAFC),
       body: IndexedStack(index: _currentIndex, children: pages),
 
       // Floating Action Button — only show on Home tab
       floatingActionButton: _currentIndex == 0
           ? Container(
-              height: 65,
-              width: 160,
+              height: 54,
+              width: 154,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(35),
+                borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryOrange.withOpacity(0.4),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
+                    color: AppTheme.primaryOrange.withOpacity(0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(35),
+                borderRadius: BorderRadius.circular(30),
                 child: Material(
                   color: AppTheme.primaryOrange,
                   child: InkWell(
-                    onTap: () async {
-                      final result = await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const CameraScreen(side: 'incident_report'),
-                        ),
-                      );
-
-                      if (result != null &&
-                          result is Map &&
-                          result['file'] != null &&
-                          mounted) {
-                        final File imageFile = result['file'];
-                        final double? capturedLat = result['lat'];
-                        final double? capturedLng = result['lng'];
-                        final String? capturedAddress = result['address'];
-                        // Show Quick Review / Submission Dialog
-                        String selectedCategory = 'Road Issue';
-                        final TextEditingController notesController =
-                            TextEditingController();
-                        final TextEditingController locationDescController =
-                            TextEditingController();
-
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => StatefulBuilder(
-                            builder: (context, setModalState) => Container(
-                              height: MediaQuery.of(context).size.height * 0.75,
-                              decoration: const BoxDecoration(
-                                color: AppTheme.primaryDark,
-                                borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(30),
-                                ),
-                              ),
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'New AI Report',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        icon: const Icon(
-                                          Icons.close,
-                                          color: Colors.white54,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Image.file(
-                                      imageFile,
-                                      height: 180,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  const Text(
-                                    'Category',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.05),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.white10),
-                                    ),
-                                    child: DropdownButton<String>(
-                                      value: selectedCategory,
-                                      dropdownColor: AppTheme.primaryDark,
-                                      isExpanded: true,
-                                      underline: const SizedBox(),
-                                      items:
-                                          [
-                                                'Road Issue',
-                                                'Water / Drainage',
-                                                'Waste Management',
-                                                'Street Lighting',
-                                                'Public Safety',
-                                              ]
-                                              .map(
-                                                (c) => DropdownMenuItem(
-                                                  value: c,
-                                                  child: Text(
-                                                    c,
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                                ),
-                                              )
-                                              .toList(),
-                                      onChanged: (val) => setModalState(
-                                        () => selectedCategory = val!,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  // Location Info Display
-                                  if (capturedLat != null &&
-                                      capturedLng != null) ...[
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.green.withOpacity(0.3),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.location_on,
-                                            color: Colors.green,
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              'GPS: ${capturedLat!.toStringAsFixed(5)}, ${capturedLng!.toStringAsFixed(5)}',
-                                              style: const TextStyle(
-                                                color: Colors.green,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    const Text(
-                                      'Exact Location Description',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    TextField(
-                                      controller: locationDescController,
-                                      maxLines: 2,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                      ),
-                                      decoration: InputDecoration(
-                                        hintText:
-                                            'e.g., "Near the yellow street sign at the corner of..."',
-                                        hintStyle: const TextStyle(
-                                          color: Colors.white24,
-                                        ),
-                                        filled: true,
-                                        fillColor: Colors.white.withOpacity(
-                                          0.05,
-                                        ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '⚠️ Please describe exactly where in the photo the issue is located.',
-                                      style: TextStyle(
-                                        color: Colors.orange.shade300,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                  ],
-                                  const Text(
-                                    'Description',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  TextField(
-                                    controller: notesController,
-                                    maxLines: 3,
-                                    style: const TextStyle(color: Colors.white),
-                                    decoration: InputDecoration(
-                                      hintText: 'Describe the hazard...',
-                                      hintStyle: const TextStyle(
-                                        color: Colors.white24,
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.white.withOpacity(0.05),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 55,
-                                    child: ElevatedButton(
-                                      onPressed: () async {
-                                        Navigator.pop(context);
-
-                                        // Append location description to the report
-                                        String fullDescription =
-                                            notesController.text;
-                                        if (locationDescController
-                                            .text
-                                            .isNotEmpty) {
-                                          fullDescription +=
-                                              '\n\n📍 EXACT LOCATION: ${locationDescController.text}';
-                                        }
-                                        if (capturedLat != null &&
-                                            capturedLng != null) {
-                                          fullDescription +=
-                                              '\n(GPS: ${capturedLat!.toStringAsFixed(5)}, ${capturedLng!.toStringAsFixed(5)})';
-                                        }
-
-                                        // Trigger submission via Provider
-                                        final result = await provider
-                                            .submitReport(
-                                              category: selectedCategory,
-                                              description: fullDescription,
-                                              lat: capturedLat ?? 14.7566,
-                                              lng: capturedLng ?? 121.0450,
-                                              locationString: capturedAddress,
-                                              image: imageFile,
-                                            );
-
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                result['message'] ??
-                                                    (result['success']
-                                                        ? 'Report submitted successfully!'
-                                                        : 'Submission failed'),
-                                              ),
-                                              backgroundColor: result['success']
-                                                  ? Colors.green
-                                                  : Colors.redAccent,
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                            ),
-                                          );
-                                        }
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.primaryOrange,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'Verify & Submit',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    child: const Row(
+                    onTap: _openCameraReport,
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                      children: const [
                         Icon(
                           Icons.camera_alt_rounded,
                           color: Colors.white,
-                          size: 22,
+                          size: 20,
                         ),
                         SizedBox(width: 8),
                         Text(
@@ -395,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 15,
+                            fontSize: 14,
                           ),
                         ),
                       ],
@@ -411,53 +390,31 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
 
-      // Bottom Nav
-      bottomNavigationBar: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            color: Colors.white.withOpacity(0.02),
-            child: BottomNavigationBar(
-              currentIndex: _currentIndex,
-              onTap: (index) => setState(() => _currentIndex = index),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              type: BottomNavigationBarType.fixed,
-              selectedItemColor: AppTheme.primaryOrange,
-              unselectedItemColor: Colors.white38,
-              showSelectedLabels: true,
-              showUnselectedLabels: true,
-              selectedFontSize: 11,
-              unselectedFontSize: 11,
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.home_rounded),
-                  ),
-                  label: 'Home',
-                ),
-                BottomNavigationBarItem(
-                  icon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.map_rounded),
-                  ),
-                  label: 'Map',
-                ),
-                BottomNavigationBarItem(
-                  icon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.shield_rounded),
-                  ),
-                  label: 'OBO Services',
-                ),
-                BottomNavigationBarItem(
-                  icon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.person_rounded),
-                  ),
-                  label: 'Profile',
-                ),
+      // Bottom Navigation Bar matching the 4 destinations
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: const Color(0xFFE2E8F0), width: 1),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 56,
+            child: Row(
+              children: [
+                _buildNavItem(0, Icons.home_outlined, Icons.home_rounded, 'Home'),
+                _buildNavItem(1, Icons.assignment_outlined, Icons.assignment_rounded, 'My Reports'),
+                _buildNavItem(2, Icons.map_outlined, Icons.map_rounded, 'Map'),
+                _buildNavItem(3, Icons.notifications_none_outlined, Icons.notifications_rounded, 'Updates'),
               ],
             ),
           ),
@@ -465,15 +422,59 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
 
-// ─── Home Feed (extracted so IndexedStack child is stateless) ─────────────────
+  Widget _buildNavItem(
+    int index,
+    IconData unselectedIcon,
+    IconData selectedIcon,
+    String label,
+  ) {
+    final isSelected = _currentIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _currentIndex = index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Top orange indicator bar if selected
+            Container(
+              height: 2.5,
+              width: 32,
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFFEA580C) : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              isSelected ? selectedIcon : unselectedIcon,
+              color: isSelected ? const Color(0xFFEA580C) : const Color(0xFF64748B),
+              size: 22,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? const Color(0xFFEA580C) : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 5),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _HomeFeed extends StatelessWidget {
   final HomeProvider provider;
   final List<Map<String, dynamic>> quickLinks;
 
-  const _HomeFeed({required this.provider, required this.quickLinks});
+  final VoidCallback? onNavigateToReports;
+
+  const _HomeFeed({required this.provider, required this.quickLinks, this.onNavigateToReports});
 
   @override
   Widget build(BuildContext context) {
@@ -556,10 +557,13 @@ class _HomeFeed extends StatelessWidget {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                    child: _buildSectionHeader(
-                      'My Incident Reports',
-                      Icons.history_rounded,
-                      action: 'View All',
+                    child: GestureDetector(
+                      onTap: onNavigateToReports,
+                      child: _buildSectionHeader(
+                        'My Incident Reports',
+                        Icons.history_rounded,
+                        action: 'View All',
+                      ),
                     ),
                   ),
                 ),

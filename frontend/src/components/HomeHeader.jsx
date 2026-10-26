@@ -334,7 +334,7 @@ export default function HomeHeader({
                                     inputRef.current?.blur();
                                 }
                             }}
-                            placeholder="Search reports, maps, guides"
+                            placeholder="Search reports, maps, guides (e.g. drainage, street light, Barangay 171)"
                             aria-label="Search PULSO"
                             className="flex-1 min-w-0 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none text-base font-normal text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 truncate caret-[#ff6b00]"
                             style={{ outline: 'none', boxShadow: 'none' }}
@@ -421,7 +421,7 @@ export default function HomeHeader({
                                     desktopSearchInputRef.current?.blur();
                                 }
                             }}
-                            placeholder="Search reports, maps, guides"
+                            placeholder="Search reports, maps, guides (e.g. drainage, street light, Barangay 171)"
                             aria-label="Search PULSO"
                             className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm flex-1 min-w-0 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                         />
