@@ -1862,7 +1862,8 @@ const MyReports = ({
     t
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const [expandedReportId, setExpandedReportId] = useState(null);
+    const [expandedReportIds, setExpandedReportIds] = useState(() => new Set());
+    const [hasInitializedDesktopFirstCard, setHasInitializedDesktopFirstCard] = useState(false);
     const [reportHistoryPage, setReportHistoryPage] = useState(1);
 
     const tabsScrollRef = useRef(null);
@@ -1910,11 +1911,6 @@ const MyReports = ({
         }
     }, [reportStatusFilter]);
 
-    // Auto-collapse expanded report card when switching status tabs or searching
-    useEffect(() => {
-        setExpandedReportId(null);
-    }, [reportStatusFilter, searchQuery]);
-
     const filterOptions = [
         { id: 'all', label: 'All reports' },
         { id: 'pending', label: 'Pending' },
@@ -1928,9 +1924,9 @@ const MyReports = ({
     const filteredReports = userReports.filter(r => {
         // Tab Status Filter
         if (reportStatusFilter === 'in_progress') {
-            if (!['dispatched', 'approved_internal', 'in_progress'].includes(r.status)) return false;
+            if (!['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(r.status)) return false;
         } else if (reportStatusFilter === 'pending') {
-            if (!['pending', 'unverified', 'received'].includes(r.status)) return false;
+            if (!['pending', 'unverified', 'received', 'under_review'].includes(r.status)) return false;
         } else if (reportStatusFilter !== 'all') {
             if (r.status !== reportStatusFilter) return false;
         }
@@ -1962,6 +1958,28 @@ const MyReports = ({
         return filteredReports.slice(start, start + REPORTS_PER_PAGE);
     }, [filteredReports, activeReportPage]);
 
+    // Expand the first card by default on desktop once data arrives
+    useEffect(() => {
+        if (!hasInitializedDesktopFirstCard && paginatedReports.length > 0) {
+            if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                setExpandedReportIds(new Set([paginatedReports[0].id]));
+            }
+            setHasInitializedDesktopFirstCard(true);
+        }
+    }, [paginatedReports, hasInitializedDesktopFirstCard]);
+
+    const handleCardToggle = (reportId) => {
+        setExpandedReportIds(prev => {
+            const next = new Set(prev);
+            if (next.has(reportId)) {
+                next.delete(reportId);
+            } else {
+                next.add(reportId);
+            }
+            return next;
+        });
+    };
+
     // Group filtered reports by Month Heading ("August 2026", "April 2026")
     const groupedReports = useMemo(() => {
         const groups = {};
@@ -1977,22 +1995,35 @@ const MyReports = ({
             groups[monthYear].push(report);
         });
 
-        // Return ordered array of { monthYear, reports }
         return Object.entries(groups).map(([monthYear, reports]) => ({
             monthYear,
             reports
         }));
     }, [paginatedReports]);
 
+    // Stat counts for desktop 4-card overview
+    const totalCount = userReports.length;
+    const awaitingReviewCount = useMemo(() => {
+        return userReports.filter(r => ['pending', 'unverified', 'received', 'under_review'].includes((r.status || '').toLowerCase())).length;
+    }, [userReports]);
+    const inProgressCount = useMemo(() => {
+        return userReports.filter(r => ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes((r.status || '').toLowerCase())).length;
+    }, [userReports]);
+    const resolvedCount = useMemo(() => {
+        return userReports.filter(r => ['resolved', 'completed', 'fixed'].includes((r.status || '').toLowerCase())).length;
+    }, [userReports]);
+
     return (
         <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full space-y-4 max-w-2xl mx-auto"
+            className="w-full space-y-4 max-w-2xl lg:max-w-[1160px] mx-auto lg:px-8"
         >
-            {/* Header: Title 24px bold + one soft gray line "Track your submitted reports." */}
-            <div>
+            {/* ============================================================ */}
+            {/* MOBILE & TABLET (< 1024px) HEADER & TOOLS - UNTOUCHED        */}
+            {/* ============================================================ */}
+            <div className="lg:hidden">
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                     Report History
                 </h2>
@@ -2001,8 +2032,7 @@ const MyReports = ({
                 </p>
             </div>
 
-            {/* Search: Full-width rounded field (0.875rem radius, 3rem tall, existing card fill & 1px border) */}
-            <div className="relative w-full">
+            <div className="lg:hidden relative w-full">
                 <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
                 <input
                     type="text"
@@ -2023,9 +2053,7 @@ const MyReports = ({
                 )}
             </div>
 
-            {/* Filter chips: 48px tall tap targets, horizontal scroll with smooth chevrons and fade affordances */}
-            <div className="relative flex items-center min-w-0 max-w-full w-full">
-                {/* Left Scroll Chevron (<) */}
+            <div className="lg:hidden relative flex items-center min-w-0 max-w-full w-full">
                 <button
                     type="button"
                     onClick={() => scrollTabs('left')}
@@ -2040,9 +2068,7 @@ const MyReports = ({
                     <ChevronLeft size={16} strokeWidth={2.5} />
                 </button>
 
-                {/* Scrollable Track with Edge Fades */}
                 <div className="relative min-w-0 flex-1 overflow-hidden">
-                    {/* Left Trailing Edge Fade */}
                     <div
                         className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
                             canScrollLeft ? 'opacity-100' : 'opacity-0'
@@ -2058,8 +2084,8 @@ const MyReports = ({
                             const count = opt.id === 'all'
                                 ? userReports.length
                                 : userReports.filter(r => {
-                                    if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress'].includes(r.status);
-                                    if (opt.id === 'pending') return ['pending', 'unverified', 'received'].includes(r.status);
+                                    if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(r.status);
+                                    if (opt.id === 'pending') return ['pending', 'unverified', 'received', 'under_review'].includes(r.status);
                                     return r.status === opt.id;
                                 }).length;
 
@@ -2093,7 +2119,6 @@ const MyReports = ({
                         })}
                     </div>
 
-                    {/* Right Trailing Edge Fade */}
                     <div
                         className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
                             canScrollRight ? 'opacity-100' : 'opacity-0'
@@ -2102,7 +2127,6 @@ const MyReports = ({
                     />
                 </div>
 
-                {/* Right Scroll Chevron (>) */}
                 <button
                     type="button"
                     onClick={() => scrollTabs('right')}
@@ -2118,7 +2142,136 @@ const MyReports = ({
                 </button>
             </div>
 
-            {/* List / Loading / Empty States */}
+            {/* ============================================================ */}
+            {/* DESKTOP (>= 1024px) TARGET DESIGN HEADER, STATS & TOOLS       */}
+            {/* ============================================================ */}
+            {/* 1. Desktop Top Row */}
+            <div className="hidden lg:flex items-center justify-between gap-4 pb-1 pt-1">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-0.5">
+                        Every report. A step forward.
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Track your concerns and see what happens next.
+                    </p>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => handleSetModal('file-report')}
+                    className="h-11 min-h-[44px] px-5 rounded-xl bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold text-sm flex items-center gap-2 shadow-sm transition-all focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] cursor-pointer active:scale-[0.98]"
+                >
+                    <Plus size={18} strokeWidth={2.5} className="text-white" />
+                    <span className="text-white">New Report</span>
+                </button>
+            </div>
+
+            {/* 2. Desktop 4 Stat Cards */}
+            <div className="hidden lg:grid grid-cols-4 gap-4 py-1">
+                <div className="p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c1427] shadow-2xs">
+                    <div className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono [font-variant-numeric:tabular-nums]">
+                        {totalCount}
+                    </div>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                        Total reports
+                    </p>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c1427] shadow-2xs">
+                    <div className="text-3xl font-extrabold text-[#ff6b00] font-mono [font-variant-numeric:tabular-nums]">
+                        {awaitingReviewCount}
+                    </div>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                        Awaiting review
+                    </p>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c1427] shadow-2xs">
+                    <div className="text-3xl font-extrabold text-[#0284c7] dark:text-[#38bdf8] font-mono [font-variant-numeric:tabular-nums]">
+                        {inProgressCount}
+                    </div>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                        In progress
+                    </p>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c1427] shadow-2xs">
+                    <div className="text-3xl font-extrabold text-[#10b981] dark:text-[#34d399] font-mono [font-variant-numeric:tabular-nums]">
+                        {resolvedCount}
+                    </div>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                        Resolved
+                    </p>
+                </div>
+            </div>
+
+            {/* 3. Desktop Tools Row: Search Field (~50% width) */}
+            <div className="hidden lg:flex items-center justify-between gap-4 py-1">
+                <div className="relative w-1/2 min-w-[360px]">
+                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search by report ID, category, or location"
+                        className="w-full h-12 pl-11 pr-10 text-sm bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#ff6b00] focus:ring-[3px] focus:ring-[#ff6b00]/20 transition-all shadow-2xs"
+                    />
+                    {searchQuery && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            aria-label="Clear search query"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* 4. Desktop Status Tabs (Dark Navy Active Pill) */}
+            <div className="hidden lg:flex items-center gap-2 py-1 border-b border-slate-200/80 dark:border-slate-800/80">
+                {filterOptions.map((opt) => {
+                    const count = opt.id === 'all'
+                        ? userReports.length
+                        : userReports.filter(r => {
+                            if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(r.status);
+                            if (opt.id === 'pending') return ['pending', 'unverified', 'received', 'under_review'].includes(r.status);
+                            return r.status === opt.id;
+                        }).length;
+
+                    const isSelected = reportStatusFilter === opt.id;
+
+                    return (
+                        <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setReportStatusFilter(opt.id)}
+                            aria-pressed={isSelected}
+                            className={`group h-10 min-h-[40px] px-4 rounded-full text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
+                                isSelected
+                                    ? 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 shadow-sm'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800/80 hover:shadow-2xs border border-transparent hover:border-slate-200/90 dark:hover:border-slate-700/80'
+                            }`}
+                        >
+                            <span>{opt.label}</span>
+                            <span
+                                className={`px-1.5 py-0.5 rounded-full text-[11px] font-mono font-bold leading-none transition-colors ${
+                                    isSelected
+                                        ? 'bg-white/20 dark:bg-black/20 text-white dark:text-slate-900'
+                                        : 'bg-slate-200/60 dark:bg-slate-800 group-hover:bg-slate-100 dark:group-hover:bg-slate-700 text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-200'
+                                }`}
+                            >
+                                {count}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* ============================================================ */}
+            {/* REPORT LIST / LOADING / EMPTY STATES                         */}
+            {/* ============================================================ */}
             <div className="pt-2 space-y-5">
                 {loadingReports ? (
                     <div className="space-y-3">
@@ -2128,7 +2281,6 @@ const MyReports = ({
                     </div>
                 ) : filteredReports.length === 0 ? (
                     userReports.length === 0 ? (
-                        /* Empty State: "No reports yet." with "Report a problem" button */
                         <div className="flex flex-col items-center gap-3 py-16 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-[#0c1427]/40">
                             <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-[#ff6b00] flex items-center justify-center">
                                 <FileText size={28} strokeWidth={1.75} />
@@ -2151,7 +2303,6 @@ const MyReports = ({
                             </button>
                         </div>
                     ) : (
-                        /* No-Match State: "No reports found." with "Clear filters" button */
                         <div className="flex flex-col items-center gap-3 py-16 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-[#0c1427]/40">
                             <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
                                 <Search size={26} strokeWidth={1.75} />
@@ -2177,23 +2328,32 @@ const MyReports = ({
                         </div>
                     )
                 ) : (
-                    /* Month-Grouped Report Cards List */
                     groupedReports.map(({ monthYear, reports }) => (
-                        <section key={monthYear} className="space-y-2.5">
-                            {/* Month Heading ("August 2026", "April 2026"), 13px semibold, soft gray */}
-                            <h3 className="text-[13px] font-semibold text-slate-500 dark:text-slate-400 px-1 select-none">
+                        <section key={monthYear} className="space-y-3">
+                            {/* Desktop Month Heading with count & sort */}
+                            <div className="hidden lg:flex items-center justify-between pb-0.5 pt-2">
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                    {monthYear}
+                                </h3>
+                                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                    {reports.length} {reports.length === 1 ? 'report' : 'reports'} · Newest first
+                                </span>
+                            </div>
+
+                            {/* Mobile Month Heading */}
+                            <h3 className="lg:hidden text-[13px] font-semibold text-slate-500 dark:text-slate-400 px-1 select-none">
                                 {monthYear}
                             </h3>
 
                             {/* Reports under this month */}
-                            <div className="space-y-3">
+                            <div className="space-y-3 lg:space-y-3.5">
                                 {reports.map((report) => (
                                     <ReportHistoryCard
                                         key={report.id}
                                         report={report}
                                         categoryIcon={getCategoryIconComponent(report.category || report.ai_category)}
-                                        isExpanded={expandedReportId === report.id}
-                                        onToggle={() => setExpandedReportId(prev => prev === report.id ? null : report.id)}
+                                        isExpanded={expandedReportIds.has(report.id)}
+                                        onToggle={() => handleCardToggle(report.id)}
                                         onOpenDetails={(rep) => onSelectReportForDetails?.(rep)}
                                         onOpenMap={(rep) => onOpenMap?.(rep)}
                                     />
@@ -2205,7 +2365,7 @@ const MyReports = ({
 
                 {/* Pagination Controls (5 per page) */}
                 {filteredReports.length > REPORTS_PER_PAGE && (
-                    <div className="flex items-center justify-between pt-3 pb-1 px-1 border-t border-slate-200/80 dark:border-slate-800/80 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    <div className="flex items-center justify-between pt-4 pb-2 px-1 border-t border-slate-200/80 dark:border-slate-800/80 text-xs font-semibold text-slate-600 dark:text-slate-400">
                         <span className="text-[12px] text-slate-500 dark:text-slate-400 font-medium">
                             Showing {Math.min((activeReportPage - 1) * REPORTS_PER_PAGE + 1, filteredReports.length)}–{Math.min(activeReportPage * REPORTS_PER_PAGE, filteredReports.length)} of {filteredReports.length}
                         </span>
@@ -2219,11 +2379,11 @@ const MyReports = ({
                                     window.scrollTo({ top: 0, behavior: 'smooth' });
                                 }}
                                 aria-label="Previous page"
-                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
                                 Prev
                             </button>
-                            <span className="px-2 py-0.5 text-xs font-bold text-slate-800 dark:text-white">
+                            <span className="px-2.5 py-0.5 text-xs font-bold text-slate-800 dark:text-white">
                                 {activeReportPage} / {totalReportPages}
                             </span>
                             <button
@@ -2234,7 +2394,7 @@ const MyReports = ({
                                     window.scrollTo({ top: 0, behavior: 'smooth' });
                                 }}
                                 aria-label="Next page"
-                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
                                 Next
                             </button>
@@ -2243,7 +2403,7 @@ const MyReports = ({
                 )}
             </div>
 
-            {/* Footer Text under the list: "Total X reports recorded" (14px soft gray) */}
+            {/* Footer Text under the list */}
             {userReports.length > 0 && (
                 <div className="pt-2 pb-8 text-center">
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
@@ -5563,6 +5723,7 @@ const TopNavigation = ({
     processedHazards = [],
     setSelectedPost,
     setSelectedHazard,
+    setSelectedReportForDetails,
     token,
     isSearchOpen: controlledIsSearchOpen,
     setIsSearchOpen: controlledSetIsSearchOpen,
@@ -5778,11 +5939,40 @@ const TopNavigation = ({
     const totalResults = matchedActions.length + matchedReports.length + matchedAdvisories.length + matchedKB.length + matchedHotlines.length;
 
     const handleSelectReport = (r) => {
+        if (!r) return;
         saveRecentSearch(r.category || r.ticket_id);
         if (setReportStatusFilter) setReportStatusFilter('all');
+        if (setSelectedReportForDetails) {
+            setSelectedReportForDetails(r);
+        }
         handleSetTab('reports');
         setIsSearchOpen(false);
-        if (showToast) showToast(`Navigating to report: ${r.ticket_id}`);
+        setSearchQuery('');
+        if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+        if (showToast) showToast(`Opened report: ${r.ticket_id}`);
+    };
+
+    const handleSearchKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            if (matchedReports.length > 0) {
+                e.preventDefault();
+                handleSelectReport(matchedReports[0]);
+            } else if (matchedActions.length > 0) {
+                e.preventDefault();
+                matchedActions[0].onClick();
+            } else if (matchedAdvisories.length > 0) {
+                e.preventDefault();
+                handleSelectAdvisory(matchedAdvisories[0]);
+            } else if (matchedKB.length > 0) {
+                e.preventDefault();
+                handleSelectKB(matchedKB[0]);
+            } else if (matchedHotlines.length > 0) {
+                e.preventDefault();
+                handleSelectHotline(matchedHotlines[0]);
+            }
+        }
     };
 
     const handleSelectAdvisory = (adv) => {
@@ -5947,6 +6137,7 @@ const TopNavigation = ({
                                     <button
                                         key={r.id}
                                         type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => handleSelectReport(r)}
                                         className="w-full flex items-center justify-between px-3 min-h-[48px] py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors group cursor-pointer"
                                     >
@@ -6243,6 +6434,7 @@ const TopNavigation = ({
                     userMenuItems={userMenuItems}
                     handleLogout={handleLogout}
                     handleSetTab={handleSetTab}
+                    onSearchKeyDown={handleSearchKeyDown}
                     t={t}
                 />
             ) : (
@@ -6268,6 +6460,7 @@ const TopNavigation = ({
                     userMenuItems={userMenuItems}
                     avatarInitials={avatarInitials}
                     handleSetTab={handleSetTab}
+                    onSearchKeyDown={handleSearchKeyDown}
                     t={t}
                     hideMobileHeader={isHeaderlessTab}
                 />
@@ -6727,6 +6920,18 @@ export default function ResidentDashboard() {
     }, []);
 
     const [publicReports, setPublicReports] = useState([]);
+
+    const allAvailableReports = useMemo(() => {
+        const map = new Map();
+        (userReports || []).forEach(r => {
+            if (r && (r.id || r.ticket_id)) map.set(r.ticket_id || r.id, r);
+        });
+        (publicReports || []).forEach(r => {
+            const key = r.ticket_id || r.id;
+            if (key && !map.has(key)) map.set(key, r);
+        });
+        return Array.from(map.values());
+    }, [userReports, publicReports]);
     const [loadingPublicReports, setLoadingPublicReports] = useState(true);
 
     const fetchPublicReports = useCallback(async () => {
@@ -8826,11 +9031,12 @@ export default function ResidentDashboard() {
                 showToast={showToast}
                 i18n={i18n}
                 t={t}
-                userReports={userReports}
+                userReports={allAvailableReports}
                 lguUpdates={lguUpdates}
                 processedHazards={processedHazards}
                 setSelectedPost={setSelectedPost}
                 setSelectedHazard={setSelectedHazard}
+                setSelectedReportForDetails={setSelectedReportForDetails}
                 setReportStatusFilter={setReportStatusFilter}
                 token={token}
                 isSearchOpen={isHeaderSearchOpen}
