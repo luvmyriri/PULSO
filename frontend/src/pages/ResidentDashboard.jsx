@@ -2229,7 +2229,7 @@ const MyReports = ({
                 </div>
             </div>
 
-            {/* 4. Desktop Status Tabs (Dark Navy Active Pill) */}
+            {/* 4. Desktop Status Tabs (Light Active Pill) */}
             <div className="hidden lg:flex items-center gap-2 py-1 border-b border-slate-200/80 dark:border-slate-800/80">
                 {filterOptions.map((opt) => {
                     const count = opt.id === 'all'
@@ -2250,7 +2250,7 @@ const MyReports = ({
                             aria-pressed={isSelected}
                             className={`group h-10 min-h-[40px] px-4 rounded-full text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
                                 isSelected
-                                    ? 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 shadow-sm'
+                                    ? 'bg-white hover:bg-slate-50 text-slate-900 font-extrabold border border-slate-300/90 shadow-xs dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 dark:border-transparent dark:shadow-sm'
                                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800/80 hover:shadow-2xs border border-transparent hover:border-slate-200/90 dark:hover:border-slate-700/80'
                             }`}
                         >
@@ -2258,7 +2258,7 @@ const MyReports = ({
                             <span
                                 className={`px-1.5 py-0.5 rounded-full text-[11px] font-mono font-bold leading-none transition-colors ${
                                     isSelected
-                                        ? 'bg-white/20 dark:bg-black/20 text-white dark:text-slate-900'
+                                        ? 'bg-slate-100 dark:bg-black/10 text-slate-800 dark:text-slate-900 border border-slate-200/80 dark:border-transparent'
                                         : 'bg-slate-200/60 dark:bg-slate-800 group-hover:bg-slate-100 dark:group-hover:bg-slate-700 text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-200'
                                 }`}
                             >

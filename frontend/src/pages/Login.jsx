@@ -897,29 +897,6 @@ export default function Login() {
                 </div>
             </header>
 
-            {/* ── Background Seal Watermark (Desktop website only, hidden in installed app and mobile) ───── */}
-            {!isApp && (
-                <div
-                    className="hidden lg:flex absolute inset-0 overflow-hidden pointer-events-none select-none z-0 items-center justify-end"
-                    aria-hidden="true"
-                >
-                    <div className="relative w-[340px] h-[340px] xs:w-[420px] xs:h-[420px] sm:w-[540px] sm:h-[540px] lg:w-[680px] lg:h-[680px] mr-[-8%] sm:mr-[2%] lg:mr-[5%] opacity-[0.14] sm:opacity-[0.16] dark:opacity-[0.10] transition-all duration-500">
-                        <div className="absolute inset-0 rounded-full border-2 border-orange-500/30 dark:border-white/20 animate-pulse" style={{ animationDuration: '6s' }} />
-                        <div className="absolute inset-[-18px] sm:inset-[-24px] rounded-full border border-dashed border-[#ff6b00]/40 dark:border-[#ff6b00]/30" />
-                        <div className="absolute inset-[-36px] sm:inset-[-50px] rounded-full border border-slate-400/25 dark:border-white/10" />
-
-                        <img
-                            src="/engineering-logo.jpg"
-                            alt="Official Caloocan City Seal Watermark"
-                            className="w-full h-full object-contain rounded-full drop-shadow-sm dark:brightness-105"
-                            loading="eager"
-                        />
-
-                        <div className="absolute inset-0 rounded-full bg-radial from-transparent via-transparent to-white/40 dark:to-[#070a12]/50 pointer-events-none" />
-                    </div>
-                </div>
-            )}
-
             {/* ── Main Content Grid (60/40 Ratio in max-w-7xl on Desktop, Hero hidden on Mobile) ───────────── */}
             <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-6 lg:py-12 flex-1 flex items-center justify-center">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center w-full">
