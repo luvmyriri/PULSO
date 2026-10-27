@@ -87,12 +87,12 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
     return () => window.removeEventListener('scroll', handleScroll);
   }, [onSelectTab]);
 
-  // State awareness: Detect active user session from session storage
+  // Public resident navigation must not present a staff session as a resident account.
   useEffect(() => {
     try {
       const token = getAuthToken();
       const user = getAuthUser();
-      if (token && user && (user.full_name || user.name || user.email)) {
+      if (token && user?.role === 'resident' && (user.full_name || user.name || user.email)) {
         setCurrentUser(user);
       } else {
         setCurrentUser(null);
@@ -104,21 +104,9 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
 
   const handleSignOut = (e) => {
     e?.preventDefault();
-    const wasGov = currentUser?.role && currentUser.role !== 'resident';
     clearAuthSession();
     setCurrentUser(null);
-    if (wasGov) { window.location.href = '/gov'; } else { navigate('/login'); }
-  };
-
-  const getUserDestination = (user) => {
-    if (!user) return '/dashboard';
-    const role = user.role;
-    if (role === 'lgu_official' || role === 'admin' || (role && role !== 'resident' && role !== 'dispatcher' && role !== 'field_responder')) {
-      return '/gov';
-    }
-    if (role === 'dispatcher') return '/dispatcher';
-    if (role === 'field_responder') return '/responder';
-    return '/dashboard';
+    navigate('/login');
   };
 
   const getInitials = (user) => {
@@ -332,7 +320,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
               /* Already Signed In: Recognizable Account Indicator */
               <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-1 pr-2 shadow-2xs">
                 <Link
-                  to={getUserDestination(currentUser)}
+                  to="/dashboard"
                   className="flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg"
                   aria-label={`Go to ${getDisplayName(currentUser)}'s account dashboard`}
                 >
@@ -405,7 +393,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
             {currentUser ? (
               /* Mobile Signed-In Avatar Pill */
               <Link
-                to={getUserDestination(currentUser)}
+                to="/dashboard"
                 className="inline-flex min-w-11 min-h-11 justify-center items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-50 dark:bg-slate-800 border border-orange-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white shrink-0"
                 aria-label={`Go to ${getDisplayName(currentUser)}'s account`}
               >
@@ -536,7 +524,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
             {currentUser ? (
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
                 <Link
-                  to={getUserDestination(currentUser)}
+                  to="/dashboard"
                   className="flex items-center justify-between w-full py-3 px-4 rounded-xl bg-orange-50 dark:bg-slate-800 border border-orange-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold text-sm"
                 >
                   <div className="flex items-center gap-2">
