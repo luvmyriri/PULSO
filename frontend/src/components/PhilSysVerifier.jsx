@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { API_BASE_URL } from '../utils/apiBase';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PhilSysVerifier.jsx
@@ -13,7 +14,7 @@ import React, { useState, useRef, useCallback } from 'react';
 //   • Sandbox mode banner
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = API_BASE_URL;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

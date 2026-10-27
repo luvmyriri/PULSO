@@ -1,0 +1,59 @@
+name: pulso
+services:
+  db:
+    image: postgis/postgis:18-3.6
+    restart: unless-stopped
+    env_file: /opt/pulso/shared/database.env
+    volumes:
+      - database:/var/lib/postgresql
+      - ./init-app-role.sh:/docker-entrypoint-initdb.d/20-pulso-role.sh:ro
+    networks: [data]
+    shm_size: 256mb
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: &logs
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+  api:
+    image: pulso-api:${PULSO_RELEASE:?Select the release image}
+    build:
+      context: ../..
+      dockerfile: deploy/production/backend.Dockerfile
+    restart: unless-stopped
+    env_file: /opt/pulso/shared/backend.env
+    depends_on:
+      db: {condition: service_healthy}
+    volumes:
+      - /opt/pulso/shared/uploads:/app/backend/uploads
+      - /opt/pulso/shared/private_publications:/app/backend/private_publications
+      - /opt/pulso/shared/secrets:/run/secrets:ro
+      - /opt/pulso/shared/ai_usage.json:/app/backend/.ai_usage.json
+    networks: [data, egress]
+    security_opt: [no-new-privileges:true]
+    logging: *logs
+  web:
+    image: pulso-web:${PULSO_RELEASE:?Select the release image}
+    build:
+      context: ../..
+      dockerfile: deploy/production/frontend.Dockerfile
+      args:
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+        VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_healthy}
+    ports: [127.0.0.1:18080:80]
+    networks:
+      data:
+      edge: {aliases: [pulso-web]}
+    logging: *logs
+volumes:
+  database:
+networks:
+  data: {internal: true}
+  egress:
+  edge: {external: true, name: pulso_edge}
