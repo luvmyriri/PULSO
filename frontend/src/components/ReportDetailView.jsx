@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import ResidentInformationReply from './ResidentInformationReply';
 import { API_BASE_URL } from '../utils/apiBase';
 import { useGovernmentData } from '../utils/governmentApi';
 import React, { useState, useRef, useEffect } from 'react';
@@ -73,9 +75,13 @@ function ReportDetailViewContent({
     report,
     onBack,
     onOpenMap,
-    setZoomedImage
+    setZoomedImage,
+    onReportUpdated,
+    onRefreshReport
 }) {
 
+    const { t } = useTranslation();
+    const [informationReceipt, setInformationReceipt] = useState(null);
     const [isCopied, setIsCopied] = useState(false);
     const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
@@ -88,6 +94,7 @@ function ReportDetailViewContent({
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
+            containerRef.current?.querySelector('h1')?.focus({ preventScroll: true });
             window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         }
     }, [report?.id, report?.ticket_id]);
@@ -160,7 +167,10 @@ function ReportDetailViewContent({
     // Primary evidence photo
     const imageSource = report.image_url || report.media_urls?.[0] || report.photos?.[0] || null;
     const evidencePhotoUrl = imageSource?.startsWith('/') ? `${API_BASE_URL}${imageSource}` : imageSource;
-    const rawStatus = (report.status || 'Not recorded').toLowerCase().trim();
+    // Retain the server-confirmed reply status while the detail refresh is pending
+    // or unavailable. A newer report revision takes precedence over this receipt.
+    const confirmedStatus = informationReceipt?.previousUpdatedAt === report.updated_at ? informationReceipt?.status : null;
+    const rawStatus = (confirmedStatus || report.status || 'Not recorded').toLowerCase().trim();
     const isRejected = ['rejected', 'declined', 'invalid', 'spam'].includes(rawStatus);
     const isResolved = ['resolved', 'closed'].includes(rawStatus);
     const isInProgress = ['in_progress', 'dispatched'].includes(rawStatus);
@@ -198,7 +208,8 @@ function ReportDetailViewContent({
 
     if (!isRejected && !isResolved && !isInProgress && !['pending', 'received', 'unverified'].includes(rawStatus)) {
         bannerTitle = `Report status: ${rawStatus.replaceAll('_', ' ')}`;
-        bannerSubtitle = rawStatus === 'needs_information' ? 'The department needs more information. Review the activity below.' : 'See the recorded department activity below.';
+        bannerSubtitle = rawStatus === 'needs_information' ? t('informationReply.banner') : 'See the recorded department activity below.';
+        if (rawStatus === 'needs_information') bannerTitle = t('informationReply.title');
     }
 
     // Copy Ticket ID
@@ -244,7 +255,7 @@ function ReportDetailViewContent({
             {/* ── 2. Title & Action Row ── */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1528] dark:text-white tracking-tight leading-tight">
+                    <h1 tabIndex={-1} className="focus-visible:outline-3 focus-visible:outline-blue-600 text-2xl sm:text-3xl font-extrabold text-[#0B1528] dark:text-white tracking-tight leading-tight">
                         {categoryName}
                     </h1>
                     <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
@@ -289,10 +300,24 @@ function ReportDetailViewContent({
                 </div>
             </div>
 
+            {informationReceipt && rawStatus !== 'needs_information' && <p role="status" className="px-4 py-3 text-sm text-slate-800 dark:text-slate-100">{t('informationReply.success')}</p>}
+
             {/* ── 4. Main 2-Column Responsive Grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-start">
                 {/* ── Left Column: Feedback, Evidence, Information (Span 2) ── */}
                 <div className="lg:col-span-2 space-y-5">
+                    {rawStatus === 'needs_information' && <ResidentInformationReply
+                        key={report.id}
+                        report={report}
+                        activity={activity}
+                        onRefreshReport={onRefreshReport}
+                        onSubmitted={result => {
+                            setInformationReceipt({ status: result.status, previousUpdatedAt: report.updated_at });
+                            activity.reload();
+                            onReportUpdated?.(result);
+                        }}
+                    />}
+
 
                     <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-3">
                         <h2 className="flex items-center gap-2 font-bold text-base text-slate-900 dark:text-white"><ImageIcon size={18}/>Submitted evidence</h2>

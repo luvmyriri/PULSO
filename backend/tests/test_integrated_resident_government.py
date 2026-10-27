@@ -142,3 +142,57 @@ def test_password_recovery_uses_confirmed_email_not_unverified_profile_phone(con
     assert response.status_code == 200, response.text
     assert response.json()['sms_sent'] is False
     sms.assert_not_called()
+
+
+def test_information_request_notification_opens_owned_report_and_reply_resumes_review(context):
+    import gov_models as gm
+    from outbox_worker import deliver_pending
+    from utils.rate_limiter import claim_limiter
+    claim_limiter.reset()
+    client, sessions, tokens = context
+    message = 'FAKE Please identify the nearest intersection and describe access to the damaged road.'
+    requested = client.post('/api/gov/reports/1/request-info', headers=tokens['chief'],
+        json={'reason': 'Landmark verification', 'message': message})
+    assert requested.status_code == 200, requested.text
+    with sessions() as db:
+        assert deliver_pending(db) == 1
+    notices = client.get('/api/notifications/user/100', headers=tokens['owner']).json()
+    notice = next(item for item in notices if item['target_url'] == '/dashboard?tab=reports&reportId=1')
+    assert client.patch(f'/api/notifications/{notice["id"]}/read', headers=tokens['owner']).status_code == 200
+    detail = client.get('/api/reports/1', headers=tokens['owner'])
+    assert detail.status_code == 200 and detail.json()['status'] == 'needs_information'
+    timeline = client.get('/api/reports/1/timeline', headers=tokens['owner'])
+    assert timeline.status_code == 200, timeline.text
+    assert any(message in event['note'] for event in timeline.json())
+    reply = 'FAKE The damaged road is beside the intersection; access is available from the east.'
+    payload = {'ticket_id': detail.json()['ticket_id'], 'message': reply}
+    assert client.post('/api/reports/information-reply', json=payload, headers=tokens['resident2']).status_code == 404
+    received = client.post('/api/reports/information-reply', json=payload, headers=tokens['owner'])
+    assert received.status_code == 200 and received.json()['status'] == 'pending', received.text
+    assert client.post('/api/reports/information-reply', json=payload, headers=tokens['owner']).status_code == 409
+    docket = client.get('/api/gov/reports/1/docket', headers=tokens['chief'])
+    assert docket.status_code == 200 and docket.json()['report']['status'] == 'pending'
+    assert any(reply in (event.get('note') or '') for event in docket.json()['timeline'])
+    public_timeline = client.get('/api/reports/1/timeline', headers=tokens['owner']).json()
+    assert not any(reply in (event.get('note') or '') for event in public_timeline)
+    with sessions() as db:
+        assert db.query(gm.ProcessTimeline).filter_by(report_id=1, is_public=False, note=f'Reporter clarification: {reply}').count() == 1
+        assert db.query(gm.AuditLog).filter_by(report_id=1, trigger_type='information_reply', details=reply).count() == 1
+        assert db.query(models.Notification).filter_by(official_id=1, title='Reporter clarification received').count() == 1
+    assert client.get('/api/reports/1', headers=tokens['resident2']).status_code in (403, 404)
+    assert client.get('/api/reports/1/timeline', headers=tokens['resident2']).status_code in (403, 404)
+
+
+def test_notification_report_detail_does_not_depend_on_first_page_of_reports(context):
+    client, sessions, tokens = context
+    with sessions() as db:
+        from datetime import datetime, timezone, timedelta
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        db.get(models.Report, 1).created_at = base
+        db.add_all(models.Report(id=1000+i, ticket_id=f'FAKE-OLDER-LINK-{i}', resident_id=100,
+            category='Roads', description='FAKE pagination record', status='pending', created_at=base+timedelta(days=i+1)) for i in range(55))
+        db.commit()
+    first_page = client.get('/api/reports/user/100', headers=tokens['owner'])
+    assert first_page.status_code == 200 and len(first_page.json()) == 50
+    assert not any(report['id'] == 1 for report in first_page.json())
+    assert client.get('/api/reports/1', headers=tokens['owner']).json()['id'] == 1

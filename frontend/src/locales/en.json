@@ -1,5 +1,30 @@
 {
   "translation": {
+    "reportLink": {
+        "loading": "Opening your report…",
+        "error": "This report could not be opened. Check your connection and try again. It may be unavailable, or your account may not have access.",
+        "retry": "Try again",
+        "back": "Back to My reports"
+    },
+    "informationReply": {
+        "title": "Information requested",
+        "banner": "Read the department’s request below and send your response.",
+        "loading": "Loading the department’s request…",
+        "loadError": "The request details could not be loaded. Try again before replying.",
+        "label": "Your response",
+        "hint": "Provide 10–2,000 characters. Your response goes to the department for review and is not shown publicly.",
+        "send": "Send information",
+        "sending": "Sending…",
+        "success": "Your response was recorded. The report is back in the department’s review queue.",
+        "tooShort": "Please provide at least 10 characters of additional information.",
+        "expired": "Your session has expired. Sign in again before sending.",
+        "denied": "Your account does not have permission to reply to this report.",
+        "unavailable": "This report is unavailable or does not belong to your account.",
+        "changed": "This report is no longer awaiting information. Refresh the report to see its current status.",
+        "rateLimit": "Too many attempts. Wait a moment before trying again.",
+        "sendFailed": "We could not confirm your response. Your text is kept here. Refresh the report status before trying again.",
+        "refresh": "Refresh report status"
+    },
     "auth": {
       "strength": {
         "weak": "WEAK",

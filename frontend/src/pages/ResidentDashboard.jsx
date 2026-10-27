@@ -2,7 +2,9 @@ import { residentPublication } from '../utils/publicationAdapter';
 import ResidentNotificationSettings from '../components/ResidentNotificationSettings';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useGovernmentData } from '../utils/governmentApi';
+import { residentDashboardRoute, residentDashboardUrl, residentNotificationTarget } from '../utils/residentDashboardRoute';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     GoogleMap,
@@ -7343,8 +7345,8 @@ const ResidentModals = ({
                     }}
                     onViewExistingReport={(report) => {
                         setActiveModal(null);
-                        setSelectedReportForDetails(report);
                         setActiveTab('reports');
+                        setSelectedReportForDetails(report);
                     }}
                     currentUser={currentUser}
                 />
@@ -8815,10 +8817,10 @@ const TopNavigation = ({
         if (!r) return;
         saveRecentSearch(r.category || r.ticket_id);
         if (setReportStatusFilter) setReportStatusFilter('all');
+        handleSetTab('reports');
         if (setSelectedReportForDetails) {
             setSelectedReportForDetails(r);
         }
-        handleSetTab('reports');
         setIsSearchOpen(false);
         setSearchQuery('');
         if (typeof window !== 'undefined') {
@@ -9148,24 +9150,6 @@ const TopNavigation = ({
 
     const isHomeTab = activeTab === 'overview' || activeTab === 'home';
 
-    // Synchronize browser URL (?tab=...) with activeTab so page reload preserves the exact current view
-    useEffect(() => {
-        try {
-            const url = new URL(window.location.href);
-            if (activeTab === 'overview' || activeTab === 'home') {
-                if (url.searchParams.has('tab')) {
-                    url.searchParams.delete('tab');
-                    window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
-                }
-            } else {
-                if (url.searchParams.get('tab') !== activeTab) {
-                    url.searchParams.set('tab', activeTab);
-                    window.history.replaceState(null, '', url.pathname + url.search);
-                }
-            }
-        } catch (_) {}
-    }, [activeTab]);
-
     const getScreenTitle = () => {
         if (activeModal === 'map') {
             return t('dashboard.sidebar.communityMap', { defaultValue: 'Community map' });
@@ -9380,6 +9364,12 @@ export default function ResidentDashboard() {
     const { t, i18n } = useTranslation();
     const { theme, changeTheme } = useTheme();
     const navigate = useNavigate();
+    const location = useLocation();
+    const dashboardRoute = residentDashboardRoute(location.search);
+    const activeTab = dashboardRoute.tab;
+    const setActiveTab = useCallback(tab => {
+        navigate(residentDashboardUrl(tab, location.search));
+    }, [navigate, location.search]);
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
 
@@ -9390,13 +9380,6 @@ export default function ResidentDashboard() {
     // Contextual Claim Modal States & URL Parameter Deep-linking
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search);
-        const tabParam = searchParams.get('tab');
-        if (tabParam) {
-            setActiveTab(tabParam);
-            if (tabParam === 'profile') {
-                setAccountSubView('settings');
-            }
-        }
         const claimTicketParam = searchParams.get('claim_ticket') || searchParams.get('claim_id');
         const claimTokenParam = searchParams.get('claim_token') || searchParams.get('token');
         if (claimTicketParam || claimTokenParam) {
@@ -9447,17 +9430,6 @@ export default function ResidentDashboard() {
         }
     }, [token, currentUser, navigate]);
 
-    // Prototype States
-    const [activeTab, setActiveTab] = useState(() => {
-        try {
-            const params = new URLSearchParams(window.location.search);
-            const tabParam = params.get('tab');
-            if (tabParam) {
-                return tabParam;
-            }
-        } catch (_) {}
-        return 'overview';
-    });
     const isHomeTab = activeTab === 'overview' || activeTab === 'home';
     const [isHeaderSearchOpen, setIsHeaderSearchOpen] = useState(false);
 
@@ -9556,12 +9528,8 @@ export default function ResidentDashboard() {
         if (setSelectedHazard) setSelectedHazard(null);
         setIsAIChatOpen(false);
         setAccountSubView('settings');
+        setSelectedReportForDetails(null);
         setActiveTab('overview');
-        try {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('tab');
-            window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
-        } catch (_) {}
         window.scrollTo({ top: 0, behavior: 'smooth' });
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
@@ -9582,6 +9550,10 @@ export default function ResidentDashboard() {
             return;
         }
         if (tab === activeTab) {
+            if (tab === 'reports') {
+                setSelectedReportForDetails(null);
+                setActiveTab('reports');
+            }
             // If already on profile/settings, reset to top-level settings overview and scroll to top
             if (tab === 'profile' || tab === 'settings' || tab === 'account') {
                 setAccountSubView('settings');
@@ -9614,17 +9586,6 @@ export default function ResidentDashboard() {
             setActiveModal(null);
         }
         setActiveTab(tab);
-
-        // Synchronize browser URL query param immediately
-        try {
-            const url = new URL(window.location.href);
-            if (tab === 'overview' || tab === 'home') {
-                url.searchParams.delete('tab');
-            } else {
-                url.searchParams.set('tab', tab);
-            }
-            window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
-        } catch (_) {}
 
         // Always default to top (0) for profile settings
         const targetScrollY = (tab === 'profile' || tab === 'settings') ? 0 : (tabScrollPositionsRef.current[tab] || 0);
@@ -9840,12 +9801,24 @@ export default function ResidentDashboard() {
     const [loadingReports, setLoadingReports] = useState(true);
     const [reportStatusFilter, setReportStatusFilter] = useState('all');
     const [selectedReportForDetails, setSelectedReportForDetails] = useState(null);
-    useEffect(() => {
-        const id = new URLSearchParams(window.location.search).get('reportId');
-        if (!id || !userReports.length) return;
-        const report = userReports.find(r => String(r.id) === id);
-        if (report) { setSelectedReportForDetails(report); setActiveTab('reports'); }
-    }, [userReports]);
+    // Fetch the notification's exact report, even when it is outside the first page.
+    // A changed router search cancels the previous fetch and cannot show another report.
+    const linkedReport = useGovernmentData(dashboardRoute.reportId ? `/api/reports/${dashboardRoute.reportId}` : null);
+    const displayedReport = dashboardRoute.reportId ? linkedReport.data : selectedReportForDetails;
+    const returnToReports = () => {
+        setSelectedReportForDetails(null);
+        setActiveTab('reports');
+    };
+    const openReportDetails = (report) => {
+        setActiveModal(null);
+        setReportStatusFilter('all');
+        if (Number.isSafeInteger(Number(report.id)) && Number(report.id) > 0 && !report.is_sample && !report.is_offline_pending && !report.is_offline_draft) {
+            setSelectedReportForDetails(null);
+            navigate(residentDashboardUrl('reports', location.search, report.id));
+        } else {
+            setSelectedReportForDetails(report);
+        }
+    };
 
     const handleLogout = () => {
         clearAuthSession();
@@ -10022,11 +9995,17 @@ export default function ResidentDashboard() {
     };
 
     const handleNotificationClick = async (notif) => {
-        if (/^\/updates\/\d+$/.test(notif.target_url || '') || /^\/dashboard\?tab=reports&reportId=\d+$/.test(notif.target_url || '')) {
+        const target = residentNotificationTarget(notif.target_url);
+        if (target) {
+            setShowNotifications(false);
+            setActiveModal(null);
+            setSelectedReportForDetails(null);
+            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+            linkedReport.reload();
+            navigate(target);
             if (!notif.is_read) {
                 try { await apiFetch(`/api/notifications/${notif.id}/read`, { method: 'PATCH' }); } catch { /* Reading the update remains available. */ }
             }
-            navigate(notif.target_url);
             return;
         }
         if (!notif.is_read) {
@@ -12031,7 +12010,7 @@ export default function ResidentDashboard() {
 
             {/* Render Overlay Modals */}
             <ResidentModals
-                setSelectedReportForDetails={setSelectedReportForDetails}
+                setSelectedReportForDetails={openReportDetails}
                 activeModal={activeModal}
                 setActiveModal={setActiveModal}
                 t={t}
@@ -12234,7 +12213,7 @@ export default function ResidentDashboard() {
                 processedHazards={processedHazards}
                 setSelectedPost={setSelectedPost}
                 setSelectedHazard={setSelectedHazard}
-                setSelectedReportForDetails={setSelectedReportForDetails}
+                setSelectedReportForDetails={openReportDetails}
                 setReportStatusFilter={setReportStatusFilter}
                 token={token}
                 isSearchOpen={isHeaderSearchOpen}
@@ -12284,17 +12263,29 @@ export default function ResidentDashboard() {
 
                         {activeTab === 'reports' && (
                             <div className={`w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1550px] mx-auto ${
-                                selectedReportForDetails
+                                displayedReport
                                     ? 'pt-0 pb-6 px-0'
                                     : 'pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 pb-32 lg:pb-8 px-[clamp(1rem,5vw,1.25rem)] lg:px-6'
                             }`}>
                                 <h1 className="sr-only">{t('dashboard.sidebar.reports', { defaultValue: 'My reports' })}</h1>
-                                {selectedReportForDetails ? (
+                                {dashboardRoute.reportId && !displayedReport ? (
+                                    <section className="p-6 space-y-4 text-slate-900 dark:text-slate-100" aria-live="polite">
+                                        {linkedReport.loading ? <p role="status">{t('reportLink.loading', { defaultValue: 'Opening your report…' })}</p> : <>
+                                            <p role="alert">{t('reportLink.error', { defaultValue: 'This report could not be opened. It may be unavailable, or your account may not have access.' })}</p>
+                                            <button type="button" onClick={linkedReport.reload} className="min-h-11 px-4 border rounded-xl focus-visible:outline-3 focus-visible:outline-blue-600">{t('reportLink.retry', { defaultValue: 'Try again' })}</button>
+                                        </>}
+                                        <button type="button" onClick={returnToReports} className="min-h-11 px-4 underline focus-visible:outline-3 focus-visible:outline-blue-600">{t('reportLink.back', { defaultValue: 'Back to My reports' })}</button>
+                                    </section>
+                                ) : displayedReport ? (
                                     <ReportDetailView
-                                        report={selectedReportForDetails}
-                                        onBack={() => {
-                                            setSelectedReportForDetails(null);
-                                            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                                        key={displayedReport.id}
+                                        report={displayedReport}
+                                        onBack={returnToReports}
+                                        onRefreshReport={linkedReport.reload}
+                                        onReportUpdated={(result) => {
+                                            setUserReports(prev => prev.map(row => row.id === displayedReport.id ? { ...row, status: result.status } : row));
+                                            setSelectedReportForDetails(prev => prev?.id === displayedReport.id ? { ...prev, status: result.status } : prev);
+                                            linkedReport.reload();
                                         }}
                                         onOpenMap={(rep) => {
                                             handleSetModal('map');
@@ -12314,10 +12305,7 @@ export default function ResidentDashboard() {
                                         reportStatusFilter={reportStatusFilter}
                                         setReportStatusFilter={setReportStatusFilter}
                                         handleCancelReport={handleCancelReport}
-                                        onSelectReportForDetails={(rep) => {
-                                            setSelectedReportForDetails(rep);
-                                            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-                                        }}
+                                        onSelectReportForDetails={openReportDetails}
                                         onOpenMap={(rep) => {
                                             handleSetModal('map');
                                             setSelectedPost(rep);
@@ -12390,7 +12378,7 @@ export default function ResidentDashboard() {
             </main>
 
             {/* ── Mobile Bottom Navigation Bar & More Pop-up Menu ── */}
-            {(activeModal !== 'file-report' && !selectedReportForDetails) && (
+            {(activeModal !== 'file-report' && !displayedReport && !dashboardRoute.reportId) && (
                 <>
                     {/* ── Mobile "More" Pop-up Menu Modal / Bottom Sheet ── */}
                     <AnimatePresence>

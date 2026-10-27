@@ -1,5 +1,30 @@
 {
   "translation": {
+    "reportLink": {
+        "loading": "Binubuksan ang iyong ulat…",
+        "error": "Hindi mabuksan ang ulat. Suriin ang koneksiyon at subukang muli. Maaaring hindi ito magagamit o wala kang pahintulot na makita ito.",
+        "retry": "Subukang muli",
+        "back": "Bumalik sa Aking mga ulat"
+    },
+    "informationReply": {
+        "title": "Hinihinging impormasyon",
+        "banner": "Basahin ang hiling ng departamento sa ibaba at ipadala ang iyong sagot.",
+        "loading": "Kinukuha ang hiling ng departamento…",
+        "loadError": "Hindi makuha ang detalye ng hiling. Subukang muli bago sumagot.",
+        "label": "Ang iyong sagot",
+        "hint": "Magbigay ng 10–2,000 karakter. Ipapadala ang sagot sa departamento para sa pagsusuri at hindi ito ipapakita sa publiko.",
+        "send": "Ipadala ang impormasyon",
+        "sending": "Ipinapadala…",
+        "success": "Naitala ang iyong sagot. Ibinalik ang ulat sa pila ng departamento para sa pagsusuri.",
+        "tooShort": "Magbigay ng hindi bababa sa 10 karakter ng karagdagang impormasyon.",
+        "expired": "Nag-expire ang iyong sesyon. Mag-sign in muli bago magpadala.",
+        "denied": "Walang pahintulot ang iyong account na sumagot sa ulat na ito.",
+        "unavailable": "Hindi magagamit ang ulat o hindi ito kabilang sa iyong account.",
+        "changed": "Hindi na naghihintay ng impormasyon ang ulat. I-refresh upang makita ang kasalukuyang katayuan.",
+        "rateLimit": "Napakaraming pagsubok. Maghintay muna bago subukang muli.",
+        "sendFailed": "Hindi namin makumpirma ang iyong sagot. Nananatili rito ang iyong isinulat. I-refresh muna ang katayuan ng ulat bago muling subukan.",
+        "refresh": "I-refresh ang katayuan ng ulat"
+    },
     "auth": {
       "strength": {
         "weak": "MAHINA",
